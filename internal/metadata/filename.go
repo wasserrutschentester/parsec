@@ -2,12 +2,25 @@ package metadata
 
 import (
 	"regexp"
+	"strconv"
 )
 
 func ParseFilename(filename string) *Metadata {
 	meta := &Metadata{}
 
 	// match Title, Year, SeasonID, EpisodeID, and EpisodeTitle if available
+	title, year := matchTitleYear(filename)
+	meta.Title = title
+	meta.Year = year
+
+	// Season/Episode ID
+	meta.Season, meta.Episode = matchSeasonEpisode(filename)
+
+	// Date (YYYY-MM-DD)
+	dataRegex := regexp.MustCompile(`\.(?:\d{4}-\d{2}-\d{2})\.`)
+	if match := dataRegex.FindStringSubmatch(filename); len(match) > 0 {
+		meta.Date = match[0][1 : len(match[0])-1]
+	}
 
 	// match REPACK
 	repackRegex := regexp.MustCompile(`\.REPACK\.(?:\w+)\.`)
@@ -55,4 +68,32 @@ func ParseFilename(filename string) *Metadata {
 func matchStreamingService(filename string) string {
 
 	return ""
+}
+
+func matchTitleYear(filename string) (string, int) {
+	re := regexp.MustCompile(`^(.*?)(?:[ .](\d{4})|[ .]S\d{2,4}(?:E\d{2})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
+	match := re.FindStringSubmatchIndex(filename)
+	if match != nil {
+		title := filename[match[2]:match[3]]
+		year := 0
+		if match[4] != -1 && match[5] != -1 {
+			yearStr := filename[match[4]:match[5]]
+			year, _ = strconv.Atoi(yearStr)
+		}
+		return title, year
 	}
+	return "", 0
+}
+
+func matchSeasonEpisode(filename string) (int, int) {
+	re := regexp.MustCompile(`S(\d{2,4})(?:E(\d{2,3}))?`)
+	match := re.FindStringSubmatch(filename)
+	if match != nil {
+		season, season_err := strconv.Atoi(match[1])
+		episode, episode_err := strconv.Atoi(match[2])
+		if episode_err == nil && season_err == nil {
+			return season, episode
+		}
+	}
+	return 0, 0
+}
