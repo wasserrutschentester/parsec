@@ -28,7 +28,7 @@ func ParseFilename(filename string) *Metadata {
 	meta.Language = matchLanguage(filename)
 
 	// match REPACK
-	repackRegex := regexp.MustCompile(`\.REPACK\.(?:\w+)\.`)
+	repackRegex := regexp.MustCompile(`\.REPACK\.`)
 	if repackRegex.MatchString(filename) {
 		meta.Repack = true
 	}
@@ -39,24 +39,24 @@ func ParseFilename(filename string) *Metadata {
 		meta.Resolution = match[1]
 	}
 
-	// Basic regex for Audio (AAC2.0, DDP5.1, DD2.0, etc.)
+	// Basic regex for Audio (AAC|DDP|DD) and channels
 	audioRegex := regexp.MustCompile(`\.(AAC|DDP|DD)([0-9]\.[0-9])\.`)
 	if match := audioRegex.FindStringSubmatch(filename); len(match) > 2 {
 		meta.AudioCodec = match[1]
 		meta.AudioChannels = match[2]
 	}
 
-	// Basic regex for Video Codec H.264/H264/h264/x264 and H.265/H265/h265/x265
+	// Basic regex for Video Codec
 	videoRegex := regexp.MustCompile(`\.((H\.|H|h|x)26[456]|AVC|HEVC|AV1)(-|\.|$)`)
 	if match := videoRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.VideoCodec = match[1]
 	}
 
-	// Service (only with WEB-DL and WEBRip, normally between the resolution and source. e.g. 1080p.ARD.WEB-DL)
+	// Service
 	meta.Service = matchStreamingService(filename)
 
 	// Source
-	sourceRegex := regexp.MustCompile(`\.(WEB?-(\w+)|BluRay|DVD)\.`)
+	sourceRegex := regexp.MustCompile(`\.(WEB-?(\w+)|BluRay|DVD)\.`)
 	if match := sourceRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Source = match[1]
 	}
@@ -76,12 +76,12 @@ func ParseFilename(filename string) *Metadata {
 func matchStreamingService(filename string) string {
 	// only match the filename after the resolution
 	resolutionRegex := regexp.MustCompile(`\.\d{3,4}p\.`)
-	if match := resolutionRegex.FindStringSubmatch(filename); len(match) > 0 {
-		filename = filename[len(match[0]):]
+	if loc := resolutionRegex.FindStringIndex(filename); loc != nil {
+		filename = filename[loc[1]-1:]
 	}
 
 	// only use everything before the WEB-DL or WEBRip source tag
-	webRegex := regexp.MustCompile(`\.(\w+)\.(WEB?-(\w+))\.`)
+	webRegex := regexp.MustCompile(`\.(\w+)\.(WEB-?(\w+))\.`)
 	if match := webRegex.FindStringSubmatch(filename); len(match) > 1 {
 		return match[1]
 	}
@@ -90,23 +90,52 @@ func matchStreamingService(filename string) string {
 }
 
 func (meta *Metadata) matchEpisodeTitle(filename string) string {
-	// Episode title should be between the season/episode and language tags
-	if meta.Season != 0 || meta.Episode != 0 || meta.Date != "" {
-		seasonEpisodeID := fmt.Sprintf("S%02dE%02d.", meta.Season, meta.Episode)
-		filename = strings.Split(filename, seasonEpisodeID)[1]
-		if meta.Date != "" {
-			filename = strings.Split(filename, meta.Date+".")[1]
-		}
-		if meta.Language != "" {
-			filename = strings.Split(filename, "."+meta.Language)[0]
-		} else if meta.Resolution != "" {
-			filename = strings.Split(filename, "."+meta.Resolution)[0]
-		} else {
-			return ""
-		}
-		return filename
+	if meta.Season == 0 && meta.Episode == 0 && meta.Date == "" {
+		return ""
 	}
-	return ""
+
+	// Find the end of the season/episode or date tag
+	start := 0
+	if meta.Season != 0 || meta.Episode != 0 {
+		tag := fmt.Sprintf("S%02dE%02d", meta.Season, meta.Episode)
+		if loc := strings.Index(filename, tag); loc != -1 {
+			start = loc + len(tag)
+		}
+	} else if meta.Date != "" {
+		if loc := strings.Index(filename, meta.Date); loc != -1 {
+			start = loc + len(meta.Date)
+		}
+	}
+
+	if start == 0 || start >= len(filename) {
+		return ""
+	}
+
+	sub := filename[start:]
+
+	// Now find the beginning of Language or Resolution
+	end := len(sub)
+	if meta.Language != "" {
+		re := regexp.MustCompile("(?i)\\." + regexp.QuoteMeta(meta.Language))
+		if loc := re.FindStringIndex(sub); loc != nil {
+			end = loc[0]
+		}
+	} else if meta.Resolution != "" {
+		re := regexp.MustCompile("(?i)\\." + regexp.QuoteMeta(meta.Resolution))
+		if loc := re.FindStringIndex(sub); loc != nil {
+			end = loc[0]
+		}
+	}
+
+	if end <= 0 {
+		return ""
+	}
+
+	result := sub[:end]
+	if strings.HasPrefix(result, ".") {
+		result = result[1:]
+	}
+	return result
 }
 
 func matchTitleYear(filename string) (string, int) {
@@ -138,7 +167,7 @@ func matchSeasonEpisode(filename string) (int, int) {
 }
 
 func matchLanguage(filename string) string {
-	re := regexp.MustCompile(`\.(GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:\.(DL|ML|SUBBED))?\.`)
+	re := regexp.MustCompile(`(?i)\.(GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:\.(DL|ML|SUBBED))?\.`)
 	languageTag := ""
 	if match := re.FindStringSubmatch(filename); len(match) > 0 {
 		languageTag = match[1]
@@ -147,7 +176,7 @@ func matchLanguage(filename string) string {
 		}
 	}
 
-	audioDescriptionRegex := regexp.MustCompile(`\.(WiTH\.AD|with\.Audio\.Description)\.`)
+	audioDescriptionRegex := regexp.MustCompile(`(?i)\.(WiTH\.AD|with\.Audio\.Description)\.`)
 	if match := audioDescriptionRegex.FindStringSubmatch(filename); len(match) > 0 {
 		languageTag += "." + match[1]
 	}
