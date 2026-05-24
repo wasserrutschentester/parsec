@@ -18,8 +18,8 @@ func TestLanguageName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.lang, func(t *testing.T) {
-			if got := languageName(tt.lang); got != tt.want {
-				t.Errorf("languageName() = %v, want %v", got, tt.want)
+			if got := LanguageName(tt.lang); got != tt.want {
+				t.Errorf("LanguageName() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -40,8 +40,8 @@ func TestChanToNotation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(string(rune(tt.channels)), func(t *testing.T) {
-			if got := chanToNotation(tt.channels); got != tt.want {
-				t.Errorf("chanToNotation(%d) = %v, want %v", tt.channels, got, tt.want)
+			if got := ChanToNotation(tt.channels); got != tt.want {
+				t.Errorf("ChanToNotation(%d) = %v, want %v", tt.channels, got, tt.want)
 			}
 		})
 	}
@@ -59,8 +59,8 @@ func TestAudioCodecName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.codec, func(t *testing.T) {
-			if got := audioCodecName(tt.codec); got != tt.want {
-				t.Errorf("audioCodecName() = %v, want %v", got, tt.want)
+			if got := AudioCodecName(tt.codec); got != tt.want {
+				t.Errorf("AudioCodecName() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -77,8 +77,8 @@ func TestVideoCodecName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.codec, func(t *testing.T) {
-			if got := videoCodecName(tt.codec); got != tt.want {
-				t.Errorf("videoCodecName() = %v, want %v", got, tt.want)
+			if got := VideoCodecName(tt.codec); got != tt.want {
+				t.Errorf("VideoCodecName() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -96,8 +96,8 @@ func TestHeightToResolution(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(string(rune(tt.height)), func(t *testing.T) {
-			if got := heightToResolution(tt.height); got != tt.want {
-				t.Errorf("heightToResolution(%d) = %v, want %v", tt.height, got, tt.want)
+			if got := HeightToResolution(tt.height); got != tt.want {
+				t.Errorf("HeightToResolution(%d) = %v, want %v", tt.height, got, tt.want)
 			}
 		})
 	}

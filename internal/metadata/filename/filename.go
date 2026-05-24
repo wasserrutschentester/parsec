@@ -1,14 +1,16 @@
-package metadata
+package filename
 
 import (
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"codeberg.org/n0ne/parsec/internal/metadata"
 )
 
-func ParseFilename(filename string) *Metadata {
-	meta := &Metadata{}
+func Parse(filename string) *metadata.Metadata {
+	meta := &metadata.Metadata{}
 
 	// match Title, Year, SeasonID, EpisodeID, and EpisodeTitle if available
 	title, year := matchTitleYear(filename)
@@ -77,12 +79,12 @@ func ParseFilename(filename string) *Metadata {
 	}
 
 	// Episode title
-	meta.EpisodeTitle = meta.matchEpisodeTitle(filename)
+	meta.EpisodeTitle = matchEpisodeTitle(filename, meta)
 
 	return meta
 }
 
-func extractTitleFallback(filename string, meta *Metadata) string {
+func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 	end := len(filename)
 
 	tags := []string{
@@ -127,7 +129,7 @@ func matchStreamingService(filename string) string {
 	return ""
 }
 
-func (meta *Metadata) matchEpisodeTitle(filename string) string {
+func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 	if !meta.IsTV {
 		return ""
 	}

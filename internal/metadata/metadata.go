@@ -26,7 +26,7 @@ type Metadata struct {
 	IsTV          bool
 }
 
-func languageName(lang string) string {
+func LanguageName(lang string) string {
 	switch lang {
 	case "de":
 		return "GERMAN"
@@ -39,7 +39,7 @@ func languageName(lang string) string {
 	}
 }
 
-func chanToNotation(channels int) string {
+func ChanToNotation(channels int) string {
 	switch channels {
 	case 1:
 		return "1.0"
@@ -58,7 +58,7 @@ func chanToNotation(channels int) string {
 	}
 }
 
-func audioCodecName(codec string) string {
+func AudioCodecName(codec string) string {
 	switch codec {
 	case "AAC":
 		return "AAC"
@@ -71,7 +71,7 @@ func audioCodecName(codec string) string {
 	}
 }
 
-func videoCodecName(codec string) string {
+func VideoCodecName(codec string) string {
 	switch codec {
 	case "AVC":
 		return "H.264"
@@ -82,7 +82,7 @@ func videoCodecName(codec string) string {
 	}
 }
 
-func heightToResolution(height int) string {
+func HeightToResolution(height int) string {
 	if height <= 0 {
 		return ""
 	}
@@ -116,7 +116,7 @@ func (meta *Metadata) String() string {
 		name += fmt.Sprintf(".%s", meta.EpisodeTitle)
 	}
 	if meta.Language != "" {
-		name += fmt.Sprintf(".%s", languageName(meta.Language))
+		name += fmt.Sprintf(".%s", LanguageName(meta.Language))
 	}
 	if meta.Repack {
 		name += fmt.Sprintf(".REPACK")

@@ -1,10 +1,11 @@
-package metadata
+package mediainfo
 
 import (
 	"reflect"
 	"testing"
 
 	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/n0ne/parsec/internal/metadata"
 )
 
 func TestMediaInfo_GetAudioLanguages(t *testing.T) {
@@ -109,7 +110,7 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 	}
 }
 
-func TestMediaInfo_GetMediaMetadata(t *testing.T) {
+func TestMediaInfo_GetMetadata(t *testing.T) {
 	mi := &MediaInfo{
 		Media: Media{
 			Tracks: []Track{
@@ -128,8 +129,8 @@ func TestMediaInfo_GetMediaMetadata(t *testing.T) {
 		},
 	}
 
-	got := mi.GetMediaMetadata()
-	want := &Metadata{
+	got := mi.GetMetadata()
+	want := &metadata.Metadata{
 		Resolution:    "1080p",
 		VideoCodec:    "H.264",
 		AudioCodec:    "DDP",
@@ -138,7 +139,6 @@ func TestMediaInfo_GetMediaMetadata(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("GetMediaMetadata() mismatch")
-		// Use a better diff if available, but for now this is fine
+		t.Errorf("GetMetadata() mismatch")
 	}
 }

@@ -1,4 +1,4 @@
-package metadata
+package mediainfo
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/n0ne/parsec/internal/metadata"
 )
 
 type MediaInfo struct {
@@ -56,7 +57,7 @@ type Track struct {
 	// For fields you don't want to explicitly type, use map[string]interface{}
 }
 
-func GetMediaInfo(filePath string) (*MediaInfo, error) {
+func Get(filePath string) (*MediaInfo, error) {
 	cmd := exec.Command("mediainfo", "--Output=JSON", filePath)
 	out, err := cmd.Output()
 	if err != nil {
@@ -71,17 +72,17 @@ func GetMediaInfo(filePath string) (*MediaInfo, error) {
 	return &mi, nil
 }
 
-func (mi *MediaInfo) GetMediaMetadata() *Metadata {
-	meta := &Metadata{}
+func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
+	meta := &metadata.Metadata{}
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" {
 			height, _ := strconv.Atoi(track.Height)
-			meta.Resolution = heightToResolution(height)
-			meta.VideoCodec = videoCodecName(track.Format)
+			meta.Resolution = metadata.HeightToResolution(height)
+			meta.VideoCodec = metadata.VideoCodecName(track.Format)
 		} else if track.Type == "Audio" {
-			meta.AudioCodec = audioCodecName(track.Format)
+			meta.AudioCodec = metadata.AudioCodecName(track.Format)
 			channels, _ := strconv.Atoi(track.Channels)
-			meta.AudioChannels = chanToNotation(channels)
+			meta.AudioChannels = metadata.ChanToNotation(channels)
 		}
 	}
 	meta.Language = mi.GetLanguageTag()
@@ -128,13 +129,13 @@ func (mi *MediaInfo) GetLanguageTag() string {
 		if len(subtitleLanguages) > 0 {
 			for _, lang := range subtitleLanguages {
 				if lang == preferredLanguage {
-					return fmt.Sprintf("%s.SUBBED", languageName(preferredLanguage))
+					return fmt.Sprintf("%s.SUBBED", metadata.LanguageName(preferredLanguage))
 				}
 			}
 		}
 	}
 
-	languageTag := languageName(firstAudioLanguage)
+	languageTag := metadata.LanguageName(firstAudioLanguage)
 	if len(languages) > 2 {
 		languageTag += ".ML"
 	} else if len(languages) == 2 {

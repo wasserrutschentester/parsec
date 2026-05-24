@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 	"github.com/spf13/cobra"
 )
 
@@ -15,17 +16,17 @@ var checkCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
 
-		filename := filepath.Base(filePath)
-		filenameNoExt := filename
-		if ext := filepath.Ext(filename); ext != "" {
-			filenameNoExt = filename[:len(filename)-len(ext)]
+		name := filepath.Base(filePath)
+		filenameNoExt := name
+		if ext := filepath.Ext(name); ext != "" {
+			filenameNoExt = name[:len(name)-len(ext)]
 		}
 		fmt.Printf("Current Name:\t%s\n", filenameNoExt)
-		metadata.CheckAllowedCharacters(filenameNoExt)
-		metadata.CheckCharacterSequences(filenameNoExt)
+		filename.CheckAllowedCharacters(filenameNoExt)
+		filename.CheckCharacterSequences(filenameNoExt)
 
 		// match filename against spec
-		match := metadata.ParseFilename(filenameNoExt)
+		match := filename.Parse(filenameNoExt)
 		matchName := match.String()
 		if matchName != filenameNoExt {
 			fmt.Println("Some Tags weren't parsed correctly from the filename")
@@ -33,12 +34,12 @@ var checkCmd = &cobra.Command{
 		}
 
 		// Generate Name from mediainfo
-		mediainfo, err := metadata.GetMediaInfo(filePath)
+		mi, err := mediainfo.Get(filePath)
 		if err != nil {
 			fmt.Printf("Error getting mediainfo: %v\n", err)
 			return
 		}
-		mediaMeta := mediainfo.GetMediaMetadata()
+		mediaMeta := mi.GetMetadata()
 		updated := match.Override(mediaMeta) // keep only the fields that can't be parsed from MediaInfo
 		if updated {
 			fmt.Println("After Applying those updates the name looks like this:")
