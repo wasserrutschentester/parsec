@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"fmt"
+	"reflect"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 )
@@ -145,80 +146,28 @@ func (meta *Metadata) String() string {
 
 func (meta *Metadata) Override(newMeta *Metadata) bool {
 	updated := false
-	if newMeta.Title != "" && meta.Title != newMeta.Title {
-		fmt.Printf("Update Title: %s -> %s\n", meta.Title, newMeta.Title)
-		meta.Title = newMeta.Title
-		updated = true
-	}
-	if newMeta.Year > 0 && meta.Year != newMeta.Year {
-		fmt.Printf("Update Year: %d -> %d\n", meta.Year, newMeta.Year)
-		meta.Year = newMeta.Year
-		updated = true
-	}
-	if newMeta.Season > 0 && meta.Season != newMeta.Season {
-		fmt.Printf("Update Season: %d -> %d\n", meta.Season, newMeta.Season)
-		meta.Season = newMeta.Season
-		updated = true
-	}
-	if newMeta.Episode > 0 && meta.Episode != newMeta.Episode {
-		fmt.Printf("Update Episode: %d -> %d\n", meta.Episode, newMeta.Episode)
-		meta.Episode = newMeta.Episode
-		updated = true
-	}
-	if newMeta.Date != "" && meta.Date != newMeta.Date {
-		fmt.Printf("Update Date: %s -> %s\n", meta.Date, newMeta.Date)
-		meta.Date = newMeta.Date
-		updated = true
-	}
-	if newMeta.EpisodeTitle != "" && meta.EpisodeTitle != newMeta.EpisodeTitle {
-		fmt.Printf("Update EpisodeTitle: %s -> %s\n", meta.EpisodeTitle, newMeta.EpisodeTitle)
-		meta.EpisodeTitle = newMeta.EpisodeTitle
-		updated = true
-	}
-	if newMeta.Language != "" && meta.Language != newMeta.Language {
-		fmt.Printf("Update Language: %s -> %s\n", meta.Language, newMeta.Language)
-		meta.Language = newMeta.Language
-		updated = true
-	}
-	if newMeta.Repack != meta.Repack {
-		fmt.Printf("Update Repack: %t -> %t\n", meta.Repack, newMeta.Repack)
-		meta.Repack = newMeta.Repack
-		updated = true
-	}
-	if newMeta.Resolution != "" && meta.Resolution != newMeta.Resolution {
-		fmt.Printf("Update Resolution: %s -> %s\n", meta.Resolution, newMeta.Resolution)
-		meta.Resolution = newMeta.Resolution
-		updated = true
-	}
-	if newMeta.Service != "" && meta.Service != newMeta.Service {
-		fmt.Printf("Update Service: %s -> %s\n", meta.Service, newMeta.Service)
-		meta.Service = newMeta.Service
-		updated = true
-	}
-	if newMeta.Source != "" && meta.Source != newMeta.Source {
-		fmt.Printf("Update Source: %s -> %s\n", meta.Source, newMeta.Source)
-		meta.Source = newMeta.Source
-		updated = true
-	}
-	if newMeta.AudioCodec != "" && meta.AudioCodec != newMeta.AudioCodec {
-		fmt.Printf("Update AudioCodec: %s -> %s\n", meta.AudioCodec, newMeta.AudioCodec)
-		meta.AudioCodec = newMeta.AudioCodec
-		updated = true
-	}
-	if newMeta.AudioChannels != "" && meta.AudioChannels != newMeta.AudioChannels {
-		fmt.Printf("Update AudioChannels: %s -> %s\n", meta.AudioChannels, newMeta.AudioChannels)
-		meta.AudioChannels = newMeta.AudioChannels
-		updated = true
-	}
-	if newMeta.VideoCodec != "" && meta.VideoCodec != newMeta.VideoCodec {
-		fmt.Printf("Update VideoCodec: %s -> %s\n", meta.VideoCodec, newMeta.VideoCodec)
-		meta.VideoCodec = newMeta.VideoCodec
-		updated = true
-	}
-	if newMeta.Group != "" && meta.Group != newMeta.Group {
-		fmt.Printf("Update Group: %s -> %s\n", meta.Group, newMeta.Group)
-		meta.Group = newMeta.Group
-		updated = true
+	mVal := reflect.ValueOf(meta).Elem()
+	nVal := reflect.ValueOf(newMeta).Elem()
+	typ := mVal.Type()
+
+	for i := 0; i < mVal.NumField(); i++ {
+		mField := mVal.Field(i)
+		nField := nVal.Field(i)
+		f := typ.Field(i)
+
+		if f.Type.Kind() == reflect.Bool {
+			if mField.Bool() != nField.Bool() {
+				fmt.Printf("Update %s: %t -> %t\n", f.Name, mField.Bool(), nField.Bool())
+				mField.SetBool(nField.Bool())
+				updated = true
+			}
+		} else {
+			if !nField.IsZero() && mField.Interface() != nField.Interface() {
+				fmt.Printf("Update %s: %v -> %v\n", f.Name, mField.Interface(), nField.Interface())
+				mField.Set(nField)
+				updated = true
+			}
+		}
 	}
 	return updated
 }
