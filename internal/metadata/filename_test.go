@@ -42,6 +42,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "2.0",
 				VideoCodec:    "H.264",
 				Group:         "GRP.mkv",
+				IsTV:          false,
 			},
 		},
 		{
@@ -59,6 +60,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "2.0",
 				VideoCodec:    "H.264",
 				Group:         "GRP",
+				IsTV:          true,
 			},
 		},
 		{
@@ -73,6 +75,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "5.1",
 				VideoCodec:    "H.264",
 				Group:         "GRP.mkv",
+				IsTV:          false,
 			},
 		},
 		{
@@ -86,6 +89,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "2.0",
 				VideoCodec:    "H.265",
 				Group:         "GRP.mkv",
+				IsTV:          false,
 			},
 		},
 		{
@@ -99,6 +103,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "2.0",
 				VideoCodec:    "H.264",
 				Group:         "GRP",
+				IsTV:          true,
 			},
 		},
 		{
@@ -112,6 +117,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "5.1",
 				VideoCodec:    "x264",
 				Group:         "GRP",
+				IsTV:          false,
 			},
 		},
 		{
@@ -128,6 +134,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "5.1",
 				VideoCodec:    "x265",
 				Group:         "GRP",
+				IsTV:          true,
 			},
 		},
 		{
@@ -142,6 +149,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "5.1",
 				VideoCodec:    "x264",
 				Group:         "GRP",
+				IsTV:          false,
 			},
 		},
 		{
@@ -157,6 +165,7 @@ func TestParseFilename(t *testing.T) {
 				AudioChannels: "2.0",
 				VideoCodec:    "H.265",
 				Group:         "NoGroup",
+				IsTV:          false,
 			},
 		},
 	}

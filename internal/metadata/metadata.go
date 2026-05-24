@@ -23,6 +23,7 @@ type Metadata struct {
 	AudioChannels string
 	VideoCodec    string
 	Group         string
+	IsTV          bool
 }
 
 func languageName(lang string) string {

@@ -24,6 +24,11 @@ func ParseFilename(filename string) *Metadata {
 		meta.Date = match[0][1 : len(match[0])-1]
 	}
 
+	// TV Show
+	if meta.Season > 0 || meta.Episode > 0 || meta.Date != "" {
+		meta.IsTV = true
+	}
+
 	// Language
 	meta.Language = matchLanguage(filename)
 
@@ -123,7 +128,7 @@ func matchStreamingService(filename string) string {
 }
 
 func (meta *Metadata) matchEpisodeTitle(filename string) string {
-	if meta.Season == 0 && meta.Episode == 0 && meta.Date == "" {
+	if !meta.IsTV {
 		return ""
 	}
 
