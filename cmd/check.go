@@ -26,7 +26,11 @@ var checkCmd = &cobra.Command{
 
 		// match filename against spec
 		match := metadata.ParseFilename(filenameNoExt)
-		fmt.Printf("Parsed Name:\t%s\n", match)
+		matchName := match.String()
+		if matchName != filenameNoExt {
+			fmt.Println("Some Tags weren't parsed correctly from the filename")
+			fmt.Printf("Parsed Name:\t%s\n", match)
+		}
 
 		// Generate Name from mediainfo
 		mediainfo, err := metadata.GetMediaInfo(filePath)
@@ -35,8 +39,13 @@ var checkCmd = &cobra.Command{
 			return
 		}
 		mediaMeta := mediainfo.GetMediaMetadata()
-		mediaMeta.SetDefaults()
-		fmt.Printf("Generated Name:\t%s\n", mediaMeta)
+		updated := match.Override(mediaMeta) // keep only the fields that can't be parsed from MediaInfo
+		if updated {
+			fmt.Println("After Applying those updates the name looks like this:")
+			fmt.Printf("Generated Name:\t%s\n", match)
+		} else {
+			fmt.Println("The Parsed name fits the specification")
+		}
 
 	},
 }
