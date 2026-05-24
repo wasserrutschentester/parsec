@@ -143,6 +143,10 @@ func (mi *MediaInfo) GetSubtitleLanguages() []string {
 func (mi *MediaInfo) GetLanguageTag() string {
 	languages := mi.GetAudioLanguages()
 	preferredLanguage := config.GetPreferredLanguage()
+	if len(languages) == 0 {
+		fmt.Println("no audio languages found")
+		return ""
+	}
 	firstAudioLanguage := languages[0]
 
 	// check for preferred language subs if it's not the first audio language
