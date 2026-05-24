@@ -22,6 +22,9 @@ func ParseFilename(filename string) *Metadata {
 		meta.Date = match[0][1 : len(match[0])-1]
 	}
 
+	// Language
+	meta.Language = matchLanguage(filename)
+
 	// match REPACK
 	repackRegex := regexp.MustCompile(`\.REPACK\.(?:\w+)\.`)
 	if repackRegex.MatchString(filename) {
@@ -96,4 +99,22 @@ func matchSeasonEpisode(filename string) (int, int) {
 		}
 	}
 	return 0, 0
+}
+
+func matchLanguage(filename string) string {
+	re := regexp.MustCompile(`\.(GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:\.(DL|ML|SUBBED))?\.`)
+	languageTag := ""
+	if match := re.FindStringSubmatch(filename); len(match) > 0 {
+		languageTag = match[1]
+		if len(match) > 2 && match[2] != "" {
+			languageTag += "." + match[2]
+		}
+	}
+
+	audioDescriptionRegex := regexp.MustCompile(`\.(WiTH\.AD|with\.Audio\.Description)\.`)
+	if match := audioDescriptionRegex.FindStringSubmatch(filename); len(match) > 0 {
+		languageTag += "." + match[1]
+	}
+
+	return languageTag
 }
