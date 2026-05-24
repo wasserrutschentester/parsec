@@ -69,6 +69,17 @@ func ParseFilename(filename string) *Metadata {
 }
 
 func matchStreamingService(filename string) string {
+	// only match the filename after the resolution
+	resolutionRegex := regexp.MustCompile(`\.\d{3,4}p\.`)
+	if match := resolutionRegex.FindStringSubmatch(filename); len(match) > 0 {
+		filename = filename[len(match[0]):]
+	}
+
+	// only use everything before the WEB-DL or WEBRip source tag
+	webRegex := regexp.MustCompile(`\.(\w+)\.(WEB?-(\w+))\.`)
+	if match := webRegex.FindStringSubmatch(filename); len(match) > 1 {
+		return match[1]
+	}
 
 	return ""
 }
