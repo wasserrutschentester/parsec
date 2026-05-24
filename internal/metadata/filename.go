@@ -28,7 +28,7 @@ func ParseFilename(filename string) *Metadata {
 	meta.Language = matchLanguage(filename)
 
 	// match REPACK
-	repackRegex := regexp.MustCompile(`\.REPACK\.`)
+	repackRegex := regexp.MustCompile(`\.REPACK(\.|-|$|\d)`)
 	if repackRegex.MatchString(filename) {
 		meta.Repack = true
 	}
@@ -67,10 +67,43 @@ func ParseFilename(filename string) *Metadata {
 		meta.Group = match[1]
 	}
 
+	if meta.Title == "" {
+		meta.Title = extractTitleFallback(filename, meta)
+	}
+
 	// Episode title
 	meta.EpisodeTitle = meta.matchEpisodeTitle(filename)
 
 	return meta
+}
+
+func extractTitleFallback(filename string, meta *Metadata) string {
+	end := len(filename)
+
+	tags := []string{
+		meta.Language,
+		meta.Resolution,
+		meta.Service,
+		meta.Source,
+	}
+	if meta.Repack {
+		tags = append(tags, "REPACK")
+	}
+
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		re := regexp.MustCompile("(?i)\\." + regexp.QuoteMeta(tag))
+		if loc := re.FindStringIndex(filename); loc != nil {
+			if loc[0] < end {
+				end = loc[0]
+			}
+		}
+	}
+
+	title := filename[:end]
+	return strings.Trim(title, ".")
 }
 
 func matchStreamingService(filename string) string {
