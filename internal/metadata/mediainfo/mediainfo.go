@@ -2,7 +2,9 @@ package mediainfo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 
@@ -58,9 +60,16 @@ type Track struct {
 }
 
 func Get(filePath string) (*MediaInfo, error) {
+	if _, err := os.Stat(filePath); err != nil {
+		return nil, fmt.Errorf("file not found: %w", err)
+	}
+
 	cmd := exec.Command("mediainfo", "--Output=JSON", filePath)
 	out, err := cmd.Output()
 	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("mediainfo is not installed or not available in PATH: %w", err)
+		}
 		return nil, fmt.Errorf("failed to run mediainfo: %w", err)
 	}
 
@@ -69,7 +78,20 @@ func Get(filePath string) (*MediaInfo, error) {
 		return nil, fmt.Errorf("failed to parse mediainfo output: %w", err)
 	}
 
+	if !mi.isVideo() {
+		return nil, fmt.Errorf("no video track found")
+	}
+
 	return &mi, nil
+}
+
+func (mi *MediaInfo) isVideo() bool {
+	for _, track := range mi.Media.Tracks {
+		if track.Type == "Video" {
+			return true
+		}
+	}
+	return false
 }
 
 func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
