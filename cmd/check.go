@@ -21,6 +21,8 @@ var checkCmd = &cobra.Command{
 			filenameNoExt = filename[:len(filename)-len(ext)]
 		}
 		fmt.Printf("Current Name:\t%s\n", filenameNoExt)
+		metadata.CheckAllowedCharacters(filenameNoExt)
+		metadata.CheckCharacterSequences(filenameNoExt)
 
 		// match filename against spec
 		match := metadata.ParseFilename(filenameNoExt)
