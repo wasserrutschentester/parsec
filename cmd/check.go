@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 	"github.com/spf13/cobra"
@@ -46,6 +47,18 @@ var checkCmd = &cobra.Command{
 			fmt.Printf("Generated Name:\t%s\n", match)
 		} else {
 			fmt.Println("The Parsed name fits the specification")
+		}
+
+		// Verify Track Order
+		ebml, err := metadata.GetEbmlMetadata(filePath)
+		if err == nil {
+			if err := metadata.VerifyTrackOrder(ebml.Tracks); err != nil {
+				fmt.Printf("Track Order Error: %v\n", err)
+			} else {
+				fmt.Println("Track order and languages are correct")
+			}
+		} else {
+			fmt.Printf("Error getting EBML metadata: %v\n", err)
 		}
 
 	},
