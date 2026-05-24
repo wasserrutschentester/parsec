@@ -106,6 +106,48 @@ func TestVerifyTrackOrder(t *testing.T) {
 			},
 			wantErr: true,
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := VerifyTrackOrder(tt.tracks); (err != nil) != tt.wantErr {
+				t.Errorf("VerifyTrackOrder() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCheckDefaultFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		tracks  []EbmlTrack
+		wantErr bool
+	}{
+		{
+			name: "Correct default flags",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "eng", Default: true}},
+				{ID: 3, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", Forced: true, Name: "Forced"}},
+				{ID: 4, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing default flag for first audio",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: false}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Relaxation: single track without default flag",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: false}},
+			},
+			wantErr: false,
+		},
 		{
 			name: "Specialized track with Default flag (invalid)",
 			tracks: []EbmlTrack{
@@ -114,12 +156,61 @@ func TestVerifyTrackOrder(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "Multiple default flags for same language",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := VerifyTrackOrder(tt.tracks); (err != nil) != tt.wantErr {
-				t.Errorf("VerifyTrackOrder() error = %v, wantErr %v", err, tt.wantErr)
+			if err := CheckDefaultFlags(tt.tracks); (err != nil) != tt.wantErr {
+				t.Errorf("CheckDefaultFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCheckSubtitleFormat(t *testing.T) {
+	tests := []struct {
+		name    string
+		tracks  []EbmlTrack
+		wantErr bool
+	}{
+		{
+			name: "All SRT subtitles",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT"},
+				{ID: 2, Type: "subtitles", Codec: "SRT"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Contains non-SRT subtitle",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT"},
+				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Audio tracks are ignored",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_AC3"},
+				{ID: 2, Type: "subtitles", Codec: "SRT"},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := CheckSubtitleFormat(tt.tracks); (err != nil) != tt.wantErr {
+				t.Errorf("CheckSubtitleFormat() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

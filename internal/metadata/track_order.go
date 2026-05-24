@@ -58,14 +58,10 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 		}
 	}
 
-	if err := checkDefaultFlags(tracks); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func checkDefaultFlags(tracks []EbmlTrack) error {
+func CheckDefaultFlags(tracks []EbmlTrack) error {
 	seenAudioLangs := make(map[string]bool)
 	seenSubLangs := make(map[string]bool)
 	audioLangCount := make(map[string]int)
@@ -124,6 +120,16 @@ func checkDefaultFlags(tracks []EbmlTrack) error {
 				return fmt.Errorf("track %d (%s, %s) should NOT have the Default flag set because it is a specialized track (Forced/AD/SDH/Commentary/Simple)", track.ID, track.Type, props.Language)
 			}
 			return fmt.Errorf("track %d (%s, %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.ID, track.Type, props.Language)
+		}
+	}
+	return nil
+}
+
+func CheckSubtitleFormat(tracks []EbmlTrack) error {
+	for _, track := range tracks {
+		codec := track.Codec
+		if track.Type == "subtitles" && !strings.Contains(codec, "SRT") {
+			return fmt.Errorf("track %d (%s, %s) is not a SRT subtitle track", track.ID, track.Type, track.Codec)
 		}
 	}
 	return nil

@@ -57,6 +57,19 @@ var checkCmd = &cobra.Command{
 			} else {
 				fmt.Println("Track order and languages are correct")
 			}
+
+			if err := metadata.CheckDefaultFlags(ebml.Tracks); err != nil {
+				fmt.Printf("Default Flag Error: %v\n", err)
+			} else {
+				fmt.Println("Default flags are correct")
+			}
+
+			if err := metadata.CheckSubtitleFormat(ebml.Tracks); err != nil {
+				fmt.Printf("Subtitle Format Error: %v\n", err)
+			} else {
+				fmt.Println("Subtitle format is correct")
+			}
+
 		} else {
 			fmt.Printf("Error getting EBML metadata: %v\n", err)
 		}
