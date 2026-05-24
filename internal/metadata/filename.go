@@ -1,8 +1,10 @@
 package metadata
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 func ParseFilename(filename string) *Metadata {
@@ -65,6 +67,9 @@ func ParseFilename(filename string) *Metadata {
 		meta.Group = match[1]
 	}
 
+	// Episode title
+	meta.EpisodeTitle = meta.matchEpisodeTitle(filename)
+
 	return meta
 }
 
@@ -81,6 +86,26 @@ func matchStreamingService(filename string) string {
 		return match[1]
 	}
 
+	return ""
+}
+
+func (meta *Metadata) matchEpisodeTitle(filename string) string {
+	// Episode title should be between the season/episode and language tags
+	if meta.Season != 0 || meta.Episode != 0 || meta.Date != "" {
+		seasonEpisodeID := fmt.Sprintf("S%02dE%02d.", meta.Season, meta.Episode)
+		filename = strings.Split(filename, seasonEpisodeID)[1]
+		if meta.Date != "" {
+			filename = strings.Split(filename, meta.Date+".")[1]
+		}
+		if meta.Language != "" {
+			filename = strings.Split(filename, "."+meta.Language)[0]
+		} else if meta.Resolution != "" {
+			filename = strings.Split(filename, "."+meta.Resolution)[0]
+		} else {
+			return ""
+		}
+		return filename
+	}
 	return ""
 }
 
