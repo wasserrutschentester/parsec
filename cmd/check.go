@@ -74,6 +74,8 @@ var checkCmd = &cobra.Command{
 			fmt.Printf("Error getting EBML metadata: %v\n", err)
 		}
 
+		metadata.RunGenericChecks(match)
+
 	},
 }
 
