@@ -109,9 +109,21 @@ func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResul
 			if r.ImdbID == "" {
 				r.ImdbID = tvdbRes.ImdbID
 			}
+			if r.OriginalLanguage == "" {
+				r.OriginalLanguage = tvdbRes.OriginalLanguage
+			}
 			if r.Overview == "" {
 				r.Overview = tvdbRes.Overview
 			}
+
+			// Merge Titles
+			if tvdbRes.Title != "" && tvdbRes.Title != r.Title {
+				r.AltTitle = addUniqueAltTitle(r.AltTitle, tvdbRes.Title, r.Title, r.OriginalTitle)
+			}
+			for _, alt := range tvdbRes.AltTitle {
+				r.AltTitle = addUniqueAltTitle(r.AltTitle, alt, r.Title, r.OriginalTitle)
+			}
+
 			matchedTVDB[tvdbRes.TvdbID] = true
 		}
 		merged = append(merged, r)
@@ -125,6 +137,23 @@ func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResul
 	}
 
 	return merged
+}
+
+func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...string) []string {
+	if newTitle == "" {
+		return titles
+	}
+	for _, et := range existingTitles {
+		if newTitle == et {
+			return titles
+		}
+	}
+	for _, t := range titles {
+		if t == newTitle {
+			return titles
+		}
+	}
+	return append(titles, newTitle)
 }
 
 // FuzzySearch combines search and filtering/sorting to find the best match
@@ -219,23 +248,45 @@ func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchRe
 	}
 
 	// If we have a TMDB result but it's missing TVDB info, try to fetch it if we have a TVDB ID
-	if result.TvdbID > 0 && result.TvdbSlug == "" {
+	if result.TvdbID > 0 && (result.TvdbSlug == "" || len(result.AltTitle) == 0) {
 		tvdbResult, err := tvdb.GetByID(result.TvdbID, mediaType)
 		if err == nil && tvdbResult != nil {
-			result.TvdbSlug = tvdbResult.TvdbSlug
+			if result.TvdbSlug == "" {
+				result.TvdbSlug = tvdbResult.TvdbSlug
+			}
 			if result.TvdbType == "" {
 				result.TvdbType = tvdbResult.TvdbType
+			}
+			if result.OriginalLanguage == "" {
+				result.OriginalLanguage = tvdbResult.OriginalLanguage
+			}
+			if tvdbResult.Title != "" && tvdbResult.Title != result.Title {
+				result.AltTitle = addUniqueAltTitle(result.AltTitle, tvdbResult.Title, result.Title, result.OriginalTitle)
+			}
+			for _, alt := range tvdbResult.AltTitle {
+				result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
 			}
 		}
 	}
 
 	// Vice versa, if we have a TVDB result but it's missing TMDB info
-	if result.TmdbID > 0 && result.TmdbType == "" {
+	if result.TmdbID > 0 && (result.TmdbType == "" || len(result.AltTitle) == 0) {
 		tmdbResult, err := tmdb.GetByID(result.TmdbID, mediaType)
 		if err == nil && tmdbResult != nil {
-			result.TmdbType = tmdbResult.TmdbType
+			if result.TmdbType == "" {
+				result.TmdbType = tmdbResult.TmdbType
+			}
 			if result.ImdbID == "" {
 				result.ImdbID = tmdbResult.ImdbID
+			}
+			if result.OriginalLanguage == "" {
+				result.OriginalLanguage = tmdbResult.OriginalLanguage
+			}
+			if tmdbResult.Title != "" && tmdbResult.Title != result.Title {
+				result.AltTitle = addUniqueAltTitle(result.AltTitle, tmdbResult.Title, result.Title, result.OriginalTitle)
+			}
+			for _, alt := range tmdbResult.AltTitle {
+				result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
 			}
 		}
 	}

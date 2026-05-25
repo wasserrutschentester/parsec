@@ -3,19 +3,20 @@ package mdb
 import "fmt"
 
 type SearchResult struct {
-	TmdbID        int
-	TmdbType      string
-	ImdbID        string
-	TvdbID        int
-	TvdbType      string
-	TvdbSlug      string
-	Title         string
-	OriginalTitle string
-	AltTitle      []string
-	Year          int
-	IsTV          bool
-	Popularity    float64
-	Overview      string
+	TmdbID           int
+	TmdbType         string
+	ImdbID           string
+	TvdbID           int
+	TvdbType         string
+	TvdbSlug         string
+	Title            string
+	OriginalTitle    string
+	OriginalLanguage string
+	AltTitle         []string
+	Year             int
+	IsTV             bool
+	Popularity       float64
+	Overview         string
 }
 
 type EpisodeResult struct {
@@ -38,6 +39,15 @@ type MatroskaTags struct {
 func PrintResult(result SearchResult) {
 	fmt.Println()
 	fmt.Printf("Found: %s (%d)\n", result.Title, result.Year)
+	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
+		fmt.Printf("Original Title: %s\n", result.OriginalTitle)
+	}
+	if result.OriginalLanguage != "" {
+		fmt.Printf("Original Language: %s\n", result.OriginalLanguage)
+	}
+	if len(result.AltTitle) > 0 {
+		fmt.Printf("Alternative Titles: %v\n", result.AltTitle)
+	}
 	if result.Overview != "" {
 		fmt.Printf("Overview: %s\n", result.Overview)
 	}

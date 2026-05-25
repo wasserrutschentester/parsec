@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -81,6 +82,11 @@ type remoteID struct {
 type tvdbExternalIDsResponse struct {
 	Status string `json:"status"`
 	Data   struct {
+		OriginalLanguage string `json:"originalLanguage"`
+		Aliases          []struct {
+			Name     string `json:"name"`
+			Language string `json:"language"`
+		} `json:"alias"`
 		RemoteIds []remoteID `json:"remoteIds"`
 	} `json:"data"`
 }
@@ -198,6 +204,17 @@ func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 	externalIDs, err := GetExternalIDs(tvdbID, mediaType)
 	if err == nil {
+		result.OriginalLanguage = externalIDs.Data.OriginalLanguage
+
+		prefLang := config.GetPreferredLanguage()
+		origLang := externalIDs.Data.OriginalLanguage
+
+		for _, alias := range externalIDs.Data.Aliases {
+			if isLanguageMatch(alias.Language, prefLang, "en", origLang) {
+				result.AltTitle = append(result.AltTitle, alias.Name)
+			}
+		}
+
 		for _, ext := range externalIDs.Data.RemoteIds {
 			if ext.SourceName == "IMDB" {
 				result.ImdbID = ext.ID
@@ -243,4 +260,17 @@ func GetEpisodeMetadata(seriesID int, season, episode int) (mdb.EpisodeResult, e
 	}
 
 	return mdb.EpisodeResult{}, fmt.Errorf("episode not found")
+}
+
+func isLanguageMatch(lang string, targets ...string) bool {
+	tag := language.Make(lang)
+	for _, target := range targets {
+		if target == "" {
+			continue
+		}
+		if tag == language.Make(target) {
+			return true
+		}
+	}
+	return false
 }

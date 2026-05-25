@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -16,15 +18,16 @@ const (
 )
 
 type tmdbMedia struct {
-	ID            int     `json:"id"`
-	Title         string  `json:"title"`          // For movies
-	Name          string  `json:"name"`           // For TV shows
-	OriginalTitle string  `json:"original_title"` // For movies
-	OriginalName  string  `json:"original_name"`  // For TV shows
-	ReleaseDate   string  `json:"release_date"`   // For movies
-	FirstAirDate  string  `json:"first_air_date"` // For TV shows
-	Popularity    float64 `json:"popularity"`
-	Overview      string  `json:"overview"`
+	ID               int     `json:"id"`
+	Title            string  `json:"title"`          // For movies
+	Name             string  `json:"name"`           // For TV shows
+	OriginalTitle    string  `json:"original_title"` // For movies
+	OriginalName     string  `json:"original_name"`  // For TV shows
+	OriginalLanguage string  `json:"original_language"`
+	ReleaseDate      string  `json:"release_date"`   // For movies
+	FirstAirDate     string  `json:"first_air_date"` // For TV shows
+	Popularity       float64 `json:"popularity"`
+	Overview         string  `json:"overview"`
 }
 
 func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
@@ -44,14 +47,15 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 	}
 
 	return mdb.SearchResult{
-		TmdbID:        m.ID,
-		TmdbType:      mediaType,
-		Title:         title,
-		OriginalTitle: originalTitle,
-		Year:          resYear,
-		IsTV:          mediaType == "tv",
-		Popularity:    m.Popularity,
-		Overview:      m.Overview,
+		TmdbID:           m.ID,
+		TmdbType:         mediaType,
+		Title:            title,
+		OriginalTitle:    originalTitle,
+		OriginalLanguage: m.OriginalLanguage,
+		Year:             resYear,
+		IsTV:             mediaType == "tv",
+		Popularity:       m.Popularity,
+		Overview:         m.Overview,
 	}
 }
 
@@ -121,6 +125,7 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	for _, r := range data.Results {
 		result := r.toSearchResult(mediaType)
 		applyExternalIDs(&result, mediaType)
+		applyAltTitles(&result, mediaType)
 		results = append(results, result)
 	}
 
@@ -140,6 +145,13 @@ func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
 	}
 }
 
+func applyAltTitles(result *mdb.SearchResult, mediaType string) {
+	altTitles, err := GetAlternativeTitles(result.TmdbID, mediaType, result.OriginalLanguage)
+	if err == nil {
+		result.AltTitle = altTitles
+	}
+}
+
 func GetByID(tmdbID int, mediaType string) (*mdb.SearchResult, error) {
 	var r tmdbMedia
 	if err := get(fmt.Sprintf("%s/%d", mediaType, tmdbID), nil, &r); err != nil {
@@ -148,6 +160,7 @@ func GetByID(tmdbID int, mediaType string) (*mdb.SearchResult, error) {
 
 	result := r.toSearchResult(mediaType)
 	applyExternalIDs(&result, mediaType)
+	applyAltTitles(&result, mediaType)
 
 	return &result, nil
 }
@@ -185,6 +198,7 @@ func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult
 	result := m.toSearchResult(mediaType)
 	result.ImdbID = imdbID
 	applyExternalIDs(&result, mediaType)
+	applyAltTitles(&result, mediaType)
 	if result.IsTV {
 		result.TvdbType = "series"
 	} else {
@@ -199,6 +213,51 @@ func GetExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, erro
 		return tmdbExternalIDsResponse{}, err
 	}
 	return data, nil
+}
+
+func GetAlternativeTitles(tmdbID int, mediaType string, originalLanguage string) ([]string, error) {
+	var data struct {
+		Titles []struct {
+			Title string `json:"title"`
+			ISO   string `json:"iso_3166_1"`
+		} `json:"titles"` // Movies
+		Results []struct {
+			Title string `json:"title"`
+			ISO   string `json:"iso_3166_1"`
+		} `json:"results"` // TV
+	}
+
+	if err := get(fmt.Sprintf("%s/%d/alternative_titles", mediaType, tmdbID), nil, &data); err != nil {
+		return nil, err
+	}
+
+	prefTag := language.Make(config.GetPreferredLanguage())
+	origTag := language.Make(originalLanguage)
+
+	// Determine country code for original language
+	origCountry, _ := origTag.Region()
+	origCountryStr := origCountry.String()
+
+	titles := []string{}
+	process := func(title, iso string) {
+		iso = strings.ToUpper(iso)
+		isPreferred := iso == strings.ToUpper(prefTag.String())
+		isEnglish := iso == "US" || iso == "GB" || iso == "CA" || iso == "AU"
+		isOriginal := iso == origCountryStr
+
+		if isPreferred || isEnglish || isOriginal {
+			titles = append(titles, title)
+		}
+	}
+
+	for _, t := range data.Titles {
+		process(t.Title, t.ISO)
+	}
+	for _, t := range data.Results {
+		process(t.Title, t.ISO)
+	}
+
+	return titles, nil
 }
 
 func GetEpisodeMetadata(seriesID int, season, episode int) (mdb.EpisodeResult, error) {
