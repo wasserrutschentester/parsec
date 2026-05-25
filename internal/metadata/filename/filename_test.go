@@ -311,3 +311,60 @@ func TestDeobfuscateTitle(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeTitle(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"München", "Muenchen"},
+		{"Blöde Bühnendüsen", "Bloede.Buehnenduesen"},
+		{"Film & Dokumentation", "Film.und.Dokumentation"},
+		{"Das.Traumschiff.(S01_E01)", "Das.Traumschiff"},
+		{"Bam.Fernsehfilm.Deutschland.2023", "Bam.2023"},
+		{"FooMärchenfilm.Österreich.1990", "Foo.1990"},
+		{"Test...Sequence.-..Fix", "Test.Sequence.Fix"},
+		{"Café.Smørebrød", "Cafe.Smoerebroed"},
+		{"Title with (parentheses) and \"quotes\"", "Title.with.parentheses.and.quotes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := NormalizeTitle(tt.input)
+			if got != tt.expected {
+				t.Errorf("NormalizeTitle(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNormalizeService(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"SWR", "ARD"},
+		{"RBB", "ARD"},
+		{"WDR", "ARD"},
+		{"MDR", "ARD"},
+		{"NDR", "ARD"},
+		{"BR", "ARD"},
+		{"HR", "ARD"},
+		{"rbtv", "ARD"},
+		{"ZDFneo", "ZDF"},
+		{"ZDFkultur", "ZDF"},
+		{"ZDFtivi", "ZDF"},
+		{"ZDF", "ZDF"},
+		{"Netflix", "Netflix"},
+		{"ARD", "ARD"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := NormalizeService(tt.input)
+			if got != tt.expected {
+				t.Errorf("NormalizeService(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}

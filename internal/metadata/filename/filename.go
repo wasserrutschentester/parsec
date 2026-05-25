@@ -284,3 +284,86 @@ func DeobfuscateTitle(title string) string {
 
 	return result
 }
+
+func NormalizeTitle(title string) string {
+	// replace umlauts and similar characters
+	title = removeDiacritics(title)
+
+	// replace ampersand
+	title = strings.ReplaceAll(title, "&", "und")
+
+	// replace spaces with dots
+	title = strings.ReplaceAll(title, " ", ".")
+
+	// remove extra (S0x_E0x) info from title
+	reExtra := regexp.MustCompile(`\(S[0-9]+[_]E[0-9]+\)`)
+	title = reExtra.ReplaceAllString(title, "")
+
+	// remove extra description
+	originExp := `(Fernseh|Dokumentar|Spiel|Kurz|Animations|Maerchen|Märchen)film.*(Deutschland|Oesterreich|Österreich|Schweiz|DDR)`
+	reOrigin := regexp.MustCompile(originExp)
+	title = reOrigin.ReplaceAllString(title, "")
+
+	// remove unnecessary characters: [(),?!"_|\:] and '
+	reUnwanted := regexp.MustCompile(`[(),?!"_|'\:]`)
+	title = reUnwanted.ReplaceAllString(title, "")
+
+	// remove .-. or .. like stuff
+	reSequences := regexp.MustCompile(`\.(-|–|·)?\.+`)
+	title = reSequences.ReplaceAllString(title, ".")
+
+	// remove all remaining unwanted characters
+	reRemaining := regexp.MustCompile(`[^a-zA-Z0-9\-\.]`)
+	title = reRemaining.ReplaceAllString(title, "")
+
+	return strings.Trim(title, ".")
+}
+
+func removeDiacritics(title string) string {
+	replacements := map[string]string{
+		"ä": "ae", "ö": "oe", "ü": "ue",
+		"Ä": "Ae", "Ö": "Oe", "Ü": "Ue",
+		"ß": "ss",
+		"æ": "ae", "Æ": "Ae",
+		"ø": "oe", "Ø": "Oe",
+		"å": "aa", "Å": "Aa",
+	}
+	for old, new := range replacements {
+		title = strings.ReplaceAll(title, old, new)
+	}
+
+	diacritics := map[rune]rune{
+		'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a',
+		'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+		'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+		'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o',
+		'ù': 'u', 'ú': 'u', 'û': 'u',
+		'ý': 'y', 'ÿ': 'y',
+	}
+	title = strings.Map(func(r rune) rune {
+		if val, ok := diacritics[r]; ok {
+			return val
+		}
+		// Also remove combining diacritical marks if any
+		if r >= 0x0300 && r <= 0x036F {
+			return -1
+		}
+		return r
+	}, title)
+	return title
+}
+
+func NormalizeService(service string) string {
+	// ARD channels == ARDMediathek
+	reARD := regexp.MustCompile(`(?i)^(SWR|RBB|WDR|MDR|NDR|BR|HR|rbtv)$`)
+	if reARD.MatchString(service) {
+		return "ARD"
+	}
+
+	// ZDFtivi, -kultur and -neo are ZDF
+	if strings.HasPrefix(service, "ZDF") {
+		return "ZDF"
+	}
+
+	return service
+}
