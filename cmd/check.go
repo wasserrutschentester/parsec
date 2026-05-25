@@ -3,10 +3,17 @@ package cmd
 import (
 	"fmt"
 
+	"codeberg.org/n0ne/parsec/internal/checks"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 	"github.com/spf13/cobra"
+)
+
+var (
+	checkTmdbIDFlag int
+	checkTvdbIDFlag int
+	checkImdbIDFlag string
 )
 
 var checkCmd = &cobra.Command{
@@ -68,11 +75,14 @@ var checkCmd = &cobra.Command{
 			fmt.Printf("Error getting EBML metadata: %v\n", err)
 		}
 
-		metadata.RunGenericChecks(match)
-
+		checks.RunGenericChecks(match)
+		checks.RunMdbChecks(match, checkImdbIDFlag, checkTmdbIDFlag, checkTvdbIDFlag)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(checkCmd)
+	checkCmd.Flags().IntVar(&checkTmdbIDFlag, "tmdb", 0, "TMDB ID")
+	checkCmd.Flags().IntVar(&checkTvdbIDFlag, "tvdb", 0, "TVDB ID")
+	checkCmd.Flags().StringVar(&checkImdbIDFlag, "imdb", "", "IMDb ID")
 }
