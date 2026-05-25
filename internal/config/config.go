@@ -26,3 +26,7 @@ func GetSource() string {
 func GetGroup() string {
 	return viper.GetString("group")
 }
+
+func GetTmdbApiKey() string {
+	return viper.GetString("tmdb_api_key")
+}
