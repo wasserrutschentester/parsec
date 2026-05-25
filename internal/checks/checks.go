@@ -89,6 +89,68 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
 
 	// 4. Inconsistent Track Durations
 	checkDurations(mi)
+
+	// 5. Redundant Audio Tracks
+	CheckRedundantAudio(mi)
+
+	// 6. Non-standard Resolution
+	CheckResolution(videoTrack)
+}
+
+func CheckRedundantAudio(mi *mediainfo.MediaInfo) {
+	langCounts := make(map[string]int)
+	for _, track := range mi.Media.Tracks {
+		if track.Type == "Audio" {
+			title := strings.ToLower(track.Title)
+			if strings.Contains(title, "commentary") || strings.Contains(title, "description") {
+				continue
+			}
+			lang := track.Language
+			if lang == "" {
+				lang = "Unknown"
+			}
+			langCounts[lang]++
+		}
+	}
+
+	for lang, count := range langCounts {
+		if count > 1 {
+			fmt.Printf("QA Warning: Redundant audio tracks detected for language '%s' (%d tracks)\n", lang, count)
+		}
+	}
+}
+
+func CheckResolution(videoTrack *mediainfo.Track) {
+	width, _ := strconv.Atoi(videoTrack.Width)
+	height, _ := strconv.Atoi(videoTrack.Height)
+
+	if width == 0 || height == 0 {
+		return
+	}
+
+	// 1. Modulo check (should be at least mod-2)
+	if width%2 != 0 || height%2 != 0 {
+		fmt.Printf("QA Warning: Non-standard resolution: %dx%d (not divisible by 2)\n", width, height)
+	}
+
+	// 2. Standard Widths (common for scene/P2P)
+	standardWidths := []int{3840, 1920, 1280, 1024, 960, 854, 768, 720, 640}
+	isStandardWidth := false
+	for _, w := range standardWidths {
+		if width == w {
+			isStandardWidth = true
+			break
+		}
+	}
+
+	if !isStandardWidth {
+		fmt.Printf("QA Warning: Non-standard width detected: %d\n", width)
+	}
+
+	// 3. Aspect Ratio check (sanity)
+	if height > width {
+		fmt.Printf("QA Warning: Unusual aspect ratio: height (%d) is greater than width (%d)\n", height, width)
+	}
 }
 
 func CheckFrameRate(videoTrack *mediainfo.Track) {
