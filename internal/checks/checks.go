@@ -153,10 +153,13 @@ func checkDurations(mi *mediainfo.MediaInfo) {
 		if (track.Type == "Audio" || track.Type == "Text") && track.Duration != "" {
 			dur, _ := strconv.ParseFloat(track.Duration, 64)
 			diff := dur - videoDur
+			percentDiff := diff / videoDur * -100
 			if diff > 5.0 {
 				fmt.Printf("QA Warning: %s track (ID %s) is significantly longer than video (diff: %.1fs)\n", track.Type, track.ID, diff)
-			} else if diff < -20.0 {
-				fmt.Printf("QA Warning: %s track (ID %s) is significantly shorter than video (diff: %.1fs)\n", track.Type, track.ID, diff)
+			} else if diff < -20.0 && track.Type == "Audio" {
+				fmt.Printf("QA Warning: Audio track (ID %s) is significantly shorter than video (diff: %.1fs)\n", track.ID, diff)
+			} else if percentDiff > 10.0 {
+				fmt.Printf("QA Warning: Subtitle track (ID %s) is %.1f%% shorter than video (diff: %.1fs)\n", track.ID, percentDiff, diff)
 			}
 		}
 	}
@@ -197,6 +200,7 @@ func RunMdbChecks(meta *metadata.Metadata, imdbID string, tmdbID, tvdbID int) {
 
 	fmt.Printf("MDB Matched: %s (%d)\n", searchResult.Title, searchResult.Year)
 
+	CheckTitle(meta, searchResult)
 	CheckMovieYear(meta, searchResult)
 	if meta.IsTV {
 		CheckSeriesYear(meta, searchResult)
@@ -239,7 +243,7 @@ func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) {
 	}
 }
 
-func CheckTitle(meta *metadata.Metadata, result mdb.SearchResult) {
+func CheckTitle(meta *metadata.Metadata, result *mdb.SearchResult) {
 	if meta.Title != "" {
 		normParsed := NormalizeForComparison(filename.DeobfuscateTitle(meta.Title))
 		normOfficial := NormalizeForComparison(result.Title)

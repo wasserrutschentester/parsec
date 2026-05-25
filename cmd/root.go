@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -139,7 +138,4 @@ func initConfig() {
 
 	viper.AutomaticEnv()
 
-	if viper.ConfigFileUsed() != "" {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
 }

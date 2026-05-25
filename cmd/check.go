@@ -45,7 +45,7 @@ var checkCmd = &cobra.Command{
 		updated := match.Override(mediaMeta, false) // keep only the fields that can't be parsed from MediaInfo
 		if updated {
 			fmt.Println("After Applying those updates the name looks like this:")
-			fmt.Printf("Generated Name:\t%s\n", match)
+			fmt.Printf("Generated Name:\t%s\n\n", match)
 		} else {
 			fmt.Println("The Parsed name fits the specification")
 		}
@@ -57,20 +57,14 @@ var checkCmd = &cobra.Command{
 		if err == nil {
 			if err := metadata.VerifyTrackOrder(ebml.Tracks); err != nil {
 				fmt.Printf("Track Order Error: %v\n", err)
-			} else {
-				fmt.Println("Track order and languages are correct")
 			}
 
 			if err := metadata.CheckDefaultFlags(ebml.Tracks); err != nil {
 				fmt.Printf("Default Flag Error: %v\n", err)
-			} else {
-				fmt.Println("Default flags are correct")
 			}
 
 			if err := metadata.CheckSubtitleFormat(ebml.Tracks); err != nil {
 				fmt.Printf("Subtitle Format Error: %v\n", err)
-			} else {
-				fmt.Println("Subtitle format is correct")
 			}
 
 		} else {
