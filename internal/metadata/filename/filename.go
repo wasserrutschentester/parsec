@@ -2,12 +2,21 @@ package filename
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/metadata"
 )
+
+func GetBaseName(filePath string) string {
+	name := filepath.Base(filePath)
+	if ext := filepath.Ext(name); ext != "" {
+		name = name[:len(name)-len(ext)]
+	}
+	return name
+}
 
 func Parse(filename string) *metadata.Metadata {
 	meta := &metadata.Metadata{}

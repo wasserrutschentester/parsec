@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
@@ -16,12 +15,7 @@ var checkCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
-
-		name := filepath.Base(filePath)
-		filenameNoExt := name
-		if ext := filepath.Ext(name); ext != "" {
-			filenameNoExt = name[:len(name)-len(ext)]
-		}
+		filenameNoExt := filename.GetBaseName(filePath)
 		fmt.Printf("Current Name:\t%s\n", filenameNoExt)
 		filename.CheckAllowedCharacters(filenameNoExt)
 		filename.CheckCharacterSequences(filenameNoExt)
