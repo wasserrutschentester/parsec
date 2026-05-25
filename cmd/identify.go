@@ -20,6 +20,9 @@ var (
 	episodeFlag   int
 	isTVFlag      bool
 	isMovieFlag   bool
+	imdbIDFlag    string
+	tmdbIDFlag    int
+	tvdbIDFlag    int
 	writeTagsFlag bool
 )
 
@@ -62,21 +65,29 @@ var identifyCmd = &cobra.Command{
 			meta.IsTV = !isMovieFlag
 		}
 
-		if meta.Title == "" {
-			fmt.Println("Error: Title is required (either from filename or --title flag)")
+		if meta.Title == "" && imdbIDFlag == "" && tmdbIDFlag == 0 && tvdbIDFlag == 0 {
+			fmt.Println("Error: Title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
 			return
 		}
-
-		// Replace dots with spaces for the search query
-		searchQuery := filename.DeobfuscateTitle(meta.Title)
 
 		mediaType := "movie"
 		if meta.IsTV {
 			mediaType = "tv"
 		}
-		fmt.Printf("Searching for %s (%d) [%s]...\n", searchQuery, meta.Year, mediaType)
 
-		result, err := mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
+		var result *mdb.SearchResult
+		var err error
+
+		if imdbIDFlag != "" || tmdbIDFlag > 0 || tvdbIDFlag > 0 {
+			fmt.Printf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...\n", imdbIDFlag, tmdbIDFlag, tvdbIDFlag, mediaType)
+			result, err = mdbSearch.SearchByID(imdbIDFlag, tmdbIDFlag, tvdbIDFlag, meta.IsTV)
+		} else {
+			// Replace dots with spaces for the search query
+			searchQuery := filename.DeobfuscateTitle(meta.Title)
+			fmt.Printf("Searching for %s (%d) [%s]...\n", searchQuery, meta.Year, mediaType)
+			result, err = mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
+		}
+
 		if err != nil {
 			fmt.Printf("Error searching: %v\n", err)
 			return
@@ -93,7 +104,7 @@ var identifyCmd = &cobra.Command{
 		if meta.IsTV && (meta.Season > 0 || meta.Episode > 0) {
 			episodeResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
 			mdb.PrintEpisodeResult(episodeResult)
-			tags.SetEpisodeTags(episodeResult);
+			tags.SetEpisodeTags(episodeResult)
 		}
 
 		if writeTagsFlag {
@@ -116,5 +127,23 @@ func init() {
 	identifyCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
 	identifyCmd.Flags().BoolVar(&isTVFlag, "tv", false, "identify as TV show")
 	identifyCmd.Flags().BoolVar(&isMovieFlag, "movie", false, "identify as movie")
+	identifyCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	identifyCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	identifyCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
+
+	// Group metadata flags
+	metadataFlags := []string{"title", "year", "season", "episode"}
+	for _, f := range metadataFlags {
+		identifyCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
+	}
+
+	// Group ID flags
+	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
+	for _, f := range idFlags {
+		identifyCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+	}
+
+	// Disable sorting to keep the defined order
+	identifyCmd.Flags().SortFlags = false
 }

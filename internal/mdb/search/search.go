@@ -188,6 +188,61 @@ func FuzzySearch(query string, year int, isTV bool) (*mdb.SearchResult, error) {
 	return &results[bestMatchIndex], nil
 }
 
+func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
+	var result *mdb.SearchResult
+	var err error
+
+	mediaType := "movie"
+	if isTV {
+		mediaType = "tv"
+	}
+
+	if imdbID != "" {
+		result, err = tmdb.GetByImdbID(imdbID, isTV)
+		if err != nil {
+			return nil, err
+		}
+	} else if tmdbID > 0 {
+		result, err = tmdb.GetByID(tmdbID, mediaType)
+		if err != nil {
+			return nil, err
+		}
+	} else if tvdbID > 0 {
+		result, err = tvdb.GetByID(tvdbID, mediaType)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if result == nil {
+		return nil, nil
+	}
+
+	// If we have a TMDB result but it's missing TVDB info, try to fetch it if we have a TVDB ID
+	if result.TvdbID > 0 && result.TvdbSlug == "" {
+		tvdbResult, err := tvdb.GetByID(result.TvdbID, mediaType)
+		if err == nil && tvdbResult != nil {
+			result.TvdbSlug = tvdbResult.TvdbSlug
+			if result.TvdbType == "" {
+				result.TvdbType = tvdbResult.TvdbType
+			}
+		}
+	}
+
+	// Vice versa, if we have a TVDB result but it's missing TMDB info
+	if result.TmdbID > 0 && result.TmdbType == "" {
+		tmdbResult, err := tmdb.GetByID(result.TmdbID, mediaType)
+		if err == nil && tmdbResult != nil {
+			result.TmdbType = tmdbResult.TmdbType
+			if result.ImdbID == "" {
+				result.ImdbID = tmdbResult.ImdbID
+			}
+		}
+	}
+
+	return result, nil
+}
+
 func FindEpisode(result mdb.SearchResult, season, episode int) mdb.EpisodeResult {
 	if result.TvdbID > 0 {
 		data, err := tvdb.GetEpisodeMetadata(result.TvdbID, season, episode)
