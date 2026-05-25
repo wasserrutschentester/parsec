@@ -3,10 +3,14 @@ package metadata
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
+
+	"codeberg.org/n0ne/parsec/internal/mdb"
 )
 
 type EbmlMetadata struct {
@@ -38,6 +42,25 @@ type EbmlTrackProperties struct {
 	TextDescriptions bool   `json:"flag_text_descriptions,omitempty"`
 }
 
+type mkvTags struct {
+	XMLName xml.Name `xml:"Tags"`
+	Tags    []mkvTag `xml:"Tag"`
+}
+
+type mkvTag struct {
+	Targets target   `xml:"Targets"`
+	Simple  []simple `xml:"Simple"`
+}
+
+type target struct {
+	TargetTypeValue int `xml:"TargetTypeValue,omitempty"`
+}
+
+type simple struct {
+	Name   string `xml:"Name"`
+	String string `xml:"String"`
+}
+
 func isMatroska(filePath string) (bool, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -58,17 +81,25 @@ func isMatroska(filePath string) (bool, error) {
 	return bytes.Equal(header, ebmlHeader), nil
 }
 
-func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
+func checkForMatroska(filePath string) error {
 	if _, err := os.Stat(filePath); err != nil {
-		return nil, fmt.Errorf("file not found: %w", err)
+		return fmt.Errorf("file not found: %w", err)
 	}
 
 	isMKV, err := isMatroska(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if file is Matroska: %w", err)
+		return fmt.Errorf("failed to check if file is Matroska: %w", err)
 	}
 	if !isMKV {
-		return nil, fmt.Errorf("file is not a Matroska file: %s", filePath)
+		return fmt.Errorf("file is not a Matroska file: %s", filePath)
+	}
+	return nil
+}
+
+func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
+	err := checkForMatroska(filePath)
+	if err != nil {
+		return nil, err
 	}
 
 	cmd := exec.Command("mkvmerge", "-J", filePath)
@@ -84,4 +115,73 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 		return nil, fmt.Errorf("failed to unmarshal ebml metadata: %w", err)
 	}
 	return &metadata, nil
+}
+
+func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
+	err := checkForMatroska(filePath)
+	if err != nil {
+		return err
+	}
+
+	tagsXML, err := createTagsXML(filePath, tags)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tagsXML)
+
+	cmd := exec.Command("mkvpropedit", filePath, "--tags", "global:"+tagsXML)
+	if err := cmd.Run(); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+		return fmt.Errorf("failed to set global tags: %w", err)
+	}
+
+	return nil
+}
+
+func createTagsXML(filePath string, tags mdb.MatroskaTags) (string, error) {
+	mkvTags := mkvTags{
+		Tags: []mkvTag{
+			{
+				Targets: target{TargetTypeValue: 50},
+				Simple:  []simple{},
+			},
+		},
+	}
+
+	if tags.Title != "" {
+		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TITLE", String: tags.Title})
+	}
+	if tags.Imdb != "" {
+		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "IMDB", String: tags.Imdb})
+	}
+	if tags.Tmdb != "" {
+		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TMDB", String: tags.Tmdb})
+	}
+	if tags.Tvdb != 0 {
+		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TVDB", String: strconv.Itoa(tags.Tvdb)})
+	}
+	if tags.Tvdb2 != "" {
+		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TVDB2", String: tags.Tvdb2})
+	}
+
+	output, err := xml.MarshalIndent(mkvTags, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal tags to XML: %w", err)
+	}
+
+	xmlContent := []byte(xml.Header + string(output))
+
+	tmpFile, err := os.CreateTemp("", "parsec-tags-*.xml")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file for tags: %w", err)
+	}
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.Write(xmlContent); err != nil {
+		return "", fmt.Errorf("failed to write tags to temp file: %w", err)
+	}
+
+	return tmpFile.Name(), nil
 }

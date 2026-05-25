@@ -14,12 +14,13 @@ import (
 )
 
 var (
-	titleFlag   string
-	yearFlag    int
-	seasonFlag  int
-	episodeFlag int
-	isTVFlag    bool
-	isMovieFlag bool
+	titleFlag     string
+	yearFlag      int
+	seasonFlag    int
+	episodeFlag   int
+	isTVFlag      bool
+	isMovieFlag   bool
+	writeTagsFlag bool
 )
 
 // identifyCmd represents the identify command
@@ -33,8 +34,9 @@ var identifyCmd = &cobra.Command{
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var meta *metadata.Metadata
+		filePath := ""
 		if len(args) > 0 {
-			filePath := args[0]
+			filePath = args[0]
 			filenameNoExt := filename.GetBaseName(filePath)
 			meta = filename.Parse(filenameNoExt)
 		} else {
@@ -86,10 +88,21 @@ var identifyCmd = &cobra.Command{
 		}
 
 		mdb.PrintResult(*result)
+		tags := mdb.GetMatroskaTags(*result)
 
 		if meta.IsTV && (meta.Season > 0 || meta.Episode > 0) {
-			data := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
-			mdb.PrintEpisodeResult(data)
+			episodeResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
+			mdb.PrintEpisodeResult(episodeResult)
+			tags.SetEpisodeTags(episodeResult);
+		}
+
+		if writeTagsFlag {
+			err := metadata.SetGlobalTags(filePath, tags)
+			if err != nil {
+				fmt.Printf("Error writing tags: %v\n", err)
+			} else {
+				fmt.Println("Tags written successfully")
+			}
 		}
 	},
 }
@@ -103,4 +116,5 @@ func init() {
 	identifyCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
 	identifyCmd.Flags().BoolVar(&isTVFlag, "tv", false, "identify as TV show")
 	identifyCmd.Flags().BoolVar(&isMovieFlag, "movie", false, "identify as movie")
+	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 }

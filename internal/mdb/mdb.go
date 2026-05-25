@@ -27,6 +27,14 @@ type EpisodeResult struct {
 	TvdbID   int
 }
 
+type MatroskaTags struct {
+	Title string
+	Imdb  string
+	Tmdb  string
+	Tvdb  int
+	Tvdb2 string
+}
+
 func PrintResult(result SearchResult) {
 	fmt.Println()
 	fmt.Printf("Found: %s (%d)\n", result.Title, result.Year)
@@ -57,4 +65,36 @@ func PrintEpisodeResult(result EpisodeResult) {
 		fmt.Printf("TVDB: https://thetvdb.com/?tab=episode&id=%d\n", result.TvdbID)
 	}
 
+}
+
+func GetMatroskaTags(result SearchResult) MatroskaTags {
+	tags := MatroskaTags{}
+	if result.Title != "" {
+		tags.Title = result.Title
+	}
+	if result.ImdbID != "" {
+		tags.Imdb = result.ImdbID
+	}
+	if result.TmdbID > 0 && result.TmdbType != "" {
+		tags.Tmdb = fmt.Sprintf("%s/%d", result.TmdbType, result.TmdbID)
+	}
+	if result.TvdbID > 0 {
+		if result.IsTV {
+			tags.Tvdb = result.TvdbID
+		}
+
+		if result.TvdbType != "" {
+			tags.Tvdb2 = fmt.Sprintf("%s/%d", result.TvdbType, result.TvdbID)
+		}
+	}
+	return tags
+}
+
+func (tags *MatroskaTags) SetEpisodeTags(result EpisodeResult) {
+	if result.Name != "" {
+		tags.Title = result.Name
+	}
+	if result.TvdbID > 0 {
+		tags.Tvdb2 = fmt.Sprintf("episodes/%d", result.TvdbID)
+	}
 }
