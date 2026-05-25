@@ -31,6 +31,10 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 			return err
 		}
 
+		if err := checkTrackNameQuality(*track); err != nil {
+			fmt.Printf("QA Warning: %v\n", err)
+		}
+
 		if err := checkOriginalLanguageConsistency(*track, langHasOriginalFlag); err != nil {
 			return err
 		}
@@ -61,6 +65,17 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 		}
 	}
 
+	return nil
+}
+
+func checkTrackNameQuality(track EbmlTrack) error {
+	junkKeywords := []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
+	nameUpper := strings.ToUpper(track.Properties.Name)
+	for _, junk := range junkKeywords {
+		if strings.Contains(nameUpper, junk) {
+			return fmt.Errorf("track %d (%s) has junk keyword '%s' in Name field: '%s'", track.ID, track.Type, junk, track.Properties.Name)
+		}
+	}
 	return nil
 }
 

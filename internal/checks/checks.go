@@ -3,12 +3,14 @@ package checks
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 )
 
 func RunGenericChecks(meta *metadata.Metadata) {
@@ -29,7 +31,7 @@ func CheckYear(meta *metadata.Metadata) error {
 	}
 
 	if meta.Year > 0 && meta.Season > 1900 {
-		return fmt.Errorf("The Season already is the year")
+		return fmt.Errorf("redundant Year: The Season (%d) already indicates the year", meta.Season)
 	}
 
 	return nil
@@ -58,6 +60,106 @@ func CheckTvSpecial(meta *metadata.Metadata) error {
 		}
 	}
 	return nil
+}
+
+func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
+	var videoTrack *mediainfo.Track
+	for i := range mi.Media.Tracks {
+		if mi.Media.Tracks[i].Type == "Video" {
+			videoTrack = &mi.Media.Tracks[i]
+			break
+		}
+	}
+
+	if videoTrack == nil {
+		return
+	}
+
+	// 1. Interlaced WEB
+	isWeb := strings.Contains(strings.ToUpper(meta.Source), "WEB")
+	if isWeb && strings.Contains(strings.ToUpper(videoTrack.ScanType), "INTERLACED") {
+		fmt.Println("QA Warning: WEB source should not be Interlaced.")
+	}
+
+	// 2. Non-standard Framerate
+	CheckFrameRate(videoTrack)
+
+	// 3. Low Bitrate
+	CheckBitRate(videoTrack)
+
+	// 4. Inconsistent Track Durations
+	checkDurations(mi)
+}
+
+func CheckFrameRate(videoTrack *mediainfo.Track) {
+	if videoTrack.FrameRate == "" {
+		return
+	}
+	fps, err := strconv.ParseFloat(videoTrack.FrameRate, 64)
+	if err != nil {
+		return
+	}
+	standardFPS := []float64{23.976, 24, 25, 29.97, 30, 50, 59.94, 60}
+	isStandard := false
+	for _, s := range standardFPS {
+		if (fps > s-0.1) && (fps < s+0.1) {
+			isStandard = true
+			break
+		}
+	}
+	if !isStandard {
+		fmt.Printf("QA Warning: Non-standard framerate detected: %.3f fps\n", fps)
+	}
+}
+
+func CheckBitRate(videoTrack *mediainfo.Track) {
+	if videoTrack.BitRate == "" {
+		return
+	}
+	bitrate, err := strconv.Atoi(videoTrack.BitRate)
+	if err != nil {
+		return
+	}
+	height, _ := strconv.Atoi(videoTrack.Height)
+	threshold := 0
+	if height >= 1080 {
+		threshold = 2000000 // 2 Mbps
+	} else if height >= 720 {
+		threshold = 1000000 // 1 Mbps
+	} else if height >= 540 {
+		threshold = 500000 // 500 kbps
+	}
+
+	if threshold > 0 && bitrate < threshold {
+		fmt.Printf("QA Warning: Low bitrate detected for %dp: %d bps\n", height, bitrate)
+	}
+}
+
+func checkDurations(mi *mediainfo.MediaInfo) {
+	var videoDur float64
+	for _, track := range mi.Media.Tracks {
+		if track.Type == "Video" && track.Duration != "" {
+			videoDur, _ = strconv.ParseFloat(track.Duration, 64)
+			break
+		}
+	}
+
+	if videoDur == 0 {
+		fmt.Println("Video duration is missing")
+		return
+	}
+
+	for _, track := range mi.Media.Tracks {
+		if (track.Type == "Audio" || track.Type == "Text") && track.Duration != "" {
+			dur, _ := strconv.ParseFloat(track.Duration, 64)
+			diff := dur - videoDur
+			if diff > 5.0 {
+				fmt.Printf("QA Warning: %s track (ID %s) is significantly longer than video (diff: %.1fs)\n", track.Type, track.ID, diff)
+			} else if diff < -20.0 {
+				fmt.Printf("QA Warning: %s track (ID %s) is significantly shorter than video (diff: %.1fs)\n", track.Type, track.ID, diff)
+			}
+		}
+	}
 }
 
 func NormalizeForComparison(s string) string {
@@ -133,6 +235,16 @@ func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) {
 		normOfficial := NormalizeForComparison(epResult.Name)
 		if normParsed != normOfficial {
 			fmt.Printf("MDB Warning: Episode title mismatch.\n  Filename: %s\n  TVDB:     %s\n", meta.EpisodeTitle, epResult.Name)
+		}
+	}
+}
+
+func CheckTitle(meta *metadata.Metadata, result mdb.SearchResult) {
+	if meta.Title != "" {
+		normParsed := NormalizeForComparison(filename.DeobfuscateTitle(meta.Title))
+		normOfficial := NormalizeForComparison(result.Title)
+		if normParsed != normOfficial {
+			fmt.Printf("MDB Warning: Title mismatch.\n  Filename: %s\n  TMDB/TVDB: %s\n", meta.Title, result.Title)
 		}
 	}
 }

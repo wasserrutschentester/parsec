@@ -50,6 +50,8 @@ var checkCmd = &cobra.Command{
 			fmt.Println("The Parsed name fits the specification")
 		}
 
+		checks.RunMediaInfoChecks(mi, match)
+
 		// Verify Track Order
 		ebml, err := metadata.GetEbmlMetadata(filePath)
 		if err == nil {
