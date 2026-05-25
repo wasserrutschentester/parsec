@@ -8,7 +8,7 @@ type SearchResult struct {
 	ImdbID        string
 	TvdbID        int
 	TvdbType      string
-	WikiDataID    string
+	TvdbSlug      string
 	Title         string
 	OriginalTitle string
 	AltTitle      []string
@@ -40,7 +40,9 @@ func PrintResult(result SearchResult) {
 	if result.ImdbID != "" {
 		fmt.Printf("IMDB: https://imdb.com/title/%s\n", result.ImdbID)
 	}
-	if result.TvdbID > 0 && result.TvdbType != "" {
+	if result.TvdbSlug != "" && result.TvdbType != "" {
+		fmt.Printf("TVDB: https://thetvdb.com/%s/%s\n", result.TvdbType, result.TvdbSlug)
+	} else if result.TvdbID > 0 && result.TvdbType != "" {
 		fmt.Printf("TVDB: https://thetvdb.com/?tab=%s&id=%d\n", result.TvdbType, result.TvdbID)
 	}
 }

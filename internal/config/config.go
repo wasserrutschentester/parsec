@@ -30,3 +30,7 @@ func GetGroup() string {
 func GetTmdbApiKey() string {
 	return viper.GetString("tmdb_api_key")
 }
+
+func GetTvdbApiKey() string {
+	return viper.GetString("tvdb_api_key")
+}

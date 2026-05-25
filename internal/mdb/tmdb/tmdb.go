@@ -32,7 +32,6 @@ type tmdbSearchResponse struct {
 type tmdbExternalIDsResponse struct {
 	Tvdb int    `json:"tvdb_id"`
 	Imdb string `json:"imdb_id"`
-	Wiki string `json:"wikidata_id"`
 }
 
 type tmdbEpisodeResponse struct {
@@ -117,9 +116,6 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 			if externalIDs.Tvdb != 0 {
 				result.TvdbID = externalIDs.Tvdb
 				result.TvdbType = "series"
-			}
-			if externalIDs.Wiki != "" {
-				result.WikiDataID = externalIDs.Wiki
 			}
 		}
 

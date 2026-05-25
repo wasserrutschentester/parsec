@@ -76,12 +76,12 @@ var identifyCmd = &cobra.Command{
 
 		result, err := mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
 		if err != nil {
-			fmt.Printf("Error searching TMDB: %v\n", err)
+			fmt.Printf("Error searching: %v\n", err)
 			return
 		}
 
 		if result == nil {
-			fmt.Println("No results found on TMDB.")
+			fmt.Println("No results found")
 			return
 		}
 
