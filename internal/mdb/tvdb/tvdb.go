@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
@@ -24,20 +25,43 @@ type loginResponse struct {
 }
 
 type tvdbMedia struct {
-	ID       string `json:"tvdb_id"` // Note: Search returns string, but some extended calls return int.
-	IDInt    int    `json:"id"`      // For extended/GetByID calls
-	Slug     string `json:"slug"`
-	Name     string `json:"name"`
-	Year     string `json:"year"`
-	Type     string `json:"type"`
-	Overview string `json:"overview"`
+	TvdbID   string      `json:"tvdb_id"` // Reliable in Search results (numeric string)
+	ID       interface{} `json:"id"`      // Integer in GetByID, String in Search (e.g. "series-123")
+	Slug     string      `json:"slug"`
+	Name     string      `json:"name"`
+	Year     string      `json:"year"`
+	Type     string      `json:"type"`
+	Overview string      `json:"overview"`
+}
+
+func parseTvdbID(m *tvdbMedia) int {
+	// 1. Try tvdb_id first (numeric string, but occasionally missing in v4)
+	if m.TvdbID != "" {
+		if id, err := strconv.Atoi(m.TvdbID); err == nil {
+			return id
+		}
+	}
+
+	// 2. Fallback to id (primary field, but requires parsing if it's a string like "series-123")
+	if m.ID != nil {
+		switch v := m.ID.(type) {
+		case float64:
+			return int(v)
+		case string:
+			if parts := strings.Split(v, "-"); len(parts) > 1 {
+				id, _ := strconv.Atoi(parts[len(parts)-1])
+				return id
+			}
+			id, _ := strconv.Atoi(v)
+			return id
+		}
+	}
+
+	return 0
 }
 
 func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
-	tvdbID := m.IDInt
-	if tvdbID == 0 {
-		tvdbID, _ = strconv.Atoi(m.ID)
-	}
+	tvdbID := parseTvdbID(m)
 	resYear := 0
 	if len(m.Year) >= 4 {
 		resYear, _ = strconv.Atoi(m.Year[:4])
@@ -149,12 +173,14 @@ func get(endpoint string, target interface{}) error {
 }
 
 func toTvdbType(mediaType string) string {
-	if mediaType == "movie" {
+	switch mediaType {
+	case "movie":
 		return "movies"
-	} else if mediaType == "tv" {
+	case "tv":
 		return "series"
+	default:
+		return mediaType
 	}
-	return mediaType
 }
 
 func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
