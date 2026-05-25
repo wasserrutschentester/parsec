@@ -14,7 +14,7 @@ func TestLanguageName(t *testing.T) {
 		{"de", "GERMAN"},
 		{"en", "ENGLISH"},
 		{"fr", "FRENCH"},
-		{"es", "es"},
+		{"es", "SPANISH"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.lang, func(t *testing.T) {

@@ -3,8 +3,11 @@ package metadata
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 )
 
 type Metadata struct {
@@ -27,16 +30,28 @@ type Metadata struct {
 }
 
 func LanguageName(lang string) string {
-	switch lang {
-	case "de":
-		return "GERMAN"
-	case "en":
-		return "ENGLISH"
-	case "fr":
-		return "FRENCH"
-	default:
-		return lang
+	if lang == "" {
+		return ""
 	}
+	parts := strings.Split(lang, ".")
+	tag := language.Make(parts[0])
+	if tag != language.Und {
+		if tag == language.Make("mul") {
+			parts[0] = "MULTi"
+		} else if tag == language.Make("zxx") {
+			parts[0] = "SiLENT"
+		} else {
+			name := display.English.Languages().Name(tag)
+			if name != "" {
+				parts[0] = strings.ToUpper(name)
+			} else {
+				parts[0] = strings.ToUpper(parts[0])
+			}
+		}
+	} else {
+		parts[0] = strings.ToUpper(parts[0])
+	}
+	return strings.Join(parts, ".")
 }
 
 func ChanToNotation(channels int) string {

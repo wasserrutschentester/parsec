@@ -93,16 +93,16 @@ func TestVerifyTrackOrder(t *testing.T) {
 		{
 			name: "Alphabetical language order",
 			tracks: []EbmlTrack{
-				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ita", Default: true}},
-				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "spa", Default: true}},
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "spa", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ita", Default: true}},
 			},
 			wantErr: false,
 		},
 		{
 			name: "Alphabetical language order (wrong)",
 			tracks: []EbmlTrack{
-				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "spa", Default: true}},
-				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ita", Default: true}},
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ita", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "spa", Default: true}},
 			},
 			wantErr: true,
 		},

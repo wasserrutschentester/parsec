@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
+	"golang.org/x/text/language"
 )
 
 type MediaInfo struct {
@@ -147,21 +148,23 @@ func (mi *MediaInfo) GetLanguageTag() string {
 		fmt.Println("no audio languages found")
 		return ""
 	}
-	firstAudioLanguage := languages[0]
+
+	prefTag := language.Make(preferredLanguage)
+	firstAudioTag := language.Make(languages[0])
 
 	// check for preferred language subs if it's not the first audio language
-	if preferredLanguage != firstAudioLanguage {
+	if prefTag != firstAudioTag {
 		subtitleLanguages := mi.GetSubtitleLanguages()
 		if len(subtitleLanguages) > 0 {
 			for _, lang := range subtitleLanguages {
-				if lang == preferredLanguage {
+				if language.Make(lang) == prefTag {
 					return fmt.Sprintf("%s.SUBBED", metadata.LanguageName(preferredLanguage))
 				}
 			}
 		}
 	}
 
-	languageTag := metadata.LanguageName(firstAudioLanguage)
+	languageTag := metadata.LanguageName(languages[0])
 	if len(languages) > 2 {
 		languageTag += ".ML"
 	} else if len(languages) == 2 {

@@ -3,6 +3,9 @@ package metadata
 import (
 	"fmt"
 	"strings"
+
+	"codeberg.org/n0ne/parsec/internal/config"
+	"golang.org/x/text/language"
 )
 
 func VerifyTrackOrder(tracks []EbmlTrack) error {
@@ -172,10 +175,11 @@ func isRelevantTrack(track EbmlTrack) bool {
 
 func validateTrackBasics(track EbmlTrack) error {
 	lang := track.Properties.Language
-	if lang == "" || lang == "und" {
-		return fmt.Errorf("track %d (%s) is missing a valid language tag", track.ID, track.Type)
+	tag := language.Make(lang)
+	if tag == language.Und {
+		return fmt.Errorf("track %d (%s) is missing a valid language tag (got: %s)", track.ID, track.Type, lang)
 	}
-	if lang == "mul" && track.Properties.Name == "" {
+	if tag == language.Make("mul") && track.Properties.Name == "" {
 		return fmt.Errorf("track %d (%s) with language 'mul' must have a Name field", track.ID, track.Type)
 	}
 	return nil
@@ -223,27 +227,34 @@ func checkNameKeywords(track EbmlTrack) error {
 
 func getTrackPriority(track EbmlTrack) int {
 	lang := track.Properties.Language
+	tag := language.Make(lang)
+	prefTag := language.Make(config.GetPreferredLanguage())
 
 	// Language Score (1000s)
-	// Preferred (ger): 1000
+	// Preferred: 1000
 	// Original (if flag_original is set): 2000
 	// Multiple (mul): 3000
 	// English (eng): 4000
 	// Alphabetical: 5000 + (char sum or similar to keep relative order)
 
 	langScore := 5000
-	if lang == "ger" {
+	if tag == prefTag {
 		langScore = 1000
 	} else if track.Properties.OriginalLanguage {
 		langScore = 2000
-	} else if lang == "mul" {
+	} else if tag == language.Make("mul") {
 		langScore = 3000
-	} else if lang == "eng" {
+	} else if tag == language.English {
 		langScore = 4000
 	} else {
 		// Basic alphabetical offset for the rest
-		if len(lang) >= 3 {
-			langScore += int(lang[0]-'a')*100 + int(lang[1]-'a')*10 + int(lang[2]-'a')
+		base, _ := tag.Base()
+		s := base.String()
+		if len(s) >= 2 {
+			langScore += int(s[0]-'a')*100 + int(s[1]-'a')*10
+			if len(s) >= 3 {
+				langScore += int(s[2] - 'a')
+			}
 		}
 	}
 
