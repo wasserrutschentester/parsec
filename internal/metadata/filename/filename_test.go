@@ -285,3 +285,29 @@ func TestMissingYear(t *testing.T) {
 		})
 	}
 }
+
+func TestDeobfuscateTitle(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Gloeckner", "Glöckner"},
+		{"Ueber", "über"},
+		{"neue", "neue"},
+		{"Aerzte", "ärzte"},
+		{"Koeln", "Köln"},
+		{"Muenchen", "München"},
+		{"Baeume", "Bäume"},
+		{"Modehaeuser", "Modehäuser"},
+		{"Bloede Buehnenduesen", "Blöde Bühnendüsen"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := DeobfuscateTitle(tt.input)
+			if got != tt.expected {
+				t.Errorf("DeobfuscateTitle(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}

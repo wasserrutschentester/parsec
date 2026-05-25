@@ -252,3 +252,35 @@ func CheckCharacterSequences(filename string) []string {
 	}
 	return nil
 }
+
+func DeobfuscateTitle(title string) string {
+	result := title
+	result = strings.ReplaceAll(result, ".", " ")
+
+	// replace umlaut replacements (ae, oe, ue) with their corresponding characters,
+	// unless preceded by a vowel
+	re := regexp.MustCompile(`(?i)(^|[^aeou])(ae|oe|ue)`)
+	result = re.ReplaceAllStringFunc(result, func(m string) string {
+		lower := strings.ToLower(m)
+		var r string
+		switch {
+		case strings.HasSuffix(lower, "ae"):
+			r = "ä"
+		case strings.HasSuffix(lower, "oe"):
+			r = "ö"
+		case strings.HasSuffix(lower, "ue"):
+			r = "ü"
+		}
+		if len(m) > 2 {
+			return m[:1] + r
+		}
+		return r
+	})
+
+	// umlaut at the start of the word (capitalized)
+	result = strings.ReplaceAll(result, "Ae", "ä")
+	result = strings.ReplaceAll(result, "Oe", "ö")
+	result = strings.ReplaceAll(result, "Ue", "ü")
+
+	return result
+}
