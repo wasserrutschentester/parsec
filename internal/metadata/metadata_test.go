@@ -182,14 +182,16 @@ func TestMetadata_String(t *testing.T) {
 
 func TestMetadata_Override(t *testing.T) {
 	meta := &Metadata{
-		Title: "Old",
-		Year:  2000,
+		Title:  "Old",
+		Year:   2000,
+		Repack: true,
 	}
 	newMeta := &Metadata{
-		Title: "New",
+		Title:  "New",
+		Repack: false,
 	}
 
-	updated := meta.Override(newMeta)
+	updated := meta.Override(newMeta, true)
 	if !updated {
 		t.Errorf("Override() should return true when updated")
 	}
@@ -200,7 +202,11 @@ func TestMetadata_Override(t *testing.T) {
 		t.Errorf("Override() Year should remain 2000, got %v", meta.Year)
 	}
 
-	updated = meta.Override(&Metadata{})
+	if meta.Repack == false {
+		t.Errorf("Override() bool flags should not get overridden by default")
+	}
+
+	updated = meta.Override(&Metadata{}, true)
 	if updated {
 		t.Errorf("Override() should return false when nothing changed")
 	}

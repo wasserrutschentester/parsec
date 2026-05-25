@@ -41,7 +41,7 @@ var checkCmd = &cobra.Command{
 			return
 		}
 		mediaMeta := mi.GetMetadata()
-		updated := match.Override(mediaMeta) // keep only the fields that can't be parsed from MediaInfo
+		updated := match.Override(mediaMeta, false) // keep only the fields that can't be parsed from MediaInfo
 		if updated {
 			fmt.Println("After Applying those updates the name looks like this:")
 			fmt.Printf("Generated Name:\t%s\n", match)

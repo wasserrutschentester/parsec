@@ -145,7 +145,7 @@ func (meta *Metadata) String() string {
 	return name
 }
 
-func (meta *Metadata) Override(newMeta *Metadata) bool {
+func (meta *Metadata) Override(newMeta *Metadata, quiet bool) bool {
 	updated := false
 	mVal := reflect.ValueOf(meta).Elem()
 	nVal := reflect.ValueOf(newMeta).Elem()
@@ -157,14 +157,18 @@ func (meta *Metadata) Override(newMeta *Metadata) bool {
 		f := typ.Field(i)
 
 		if f.Type.Kind() == reflect.Bool {
-			if mField.Bool() != nField.Bool() {
-				fmt.Printf("Update %s: %t -> %t\n", f.Name, mField.Bool(), nField.Bool())
+			if mField.Bool() != nField.Bool() && nField.Bool() {
+				if !quiet {
+					fmt.Printf("Update %s: %t -> %t\n", f.Name, mField.Bool(), nField.Bool())
+				}
 				mField.SetBool(nField.Bool())
 				updated = true
 			}
 		} else {
 			if !nField.IsZero() && mField.Interface() != nField.Interface() {
-				fmt.Printf("Update %s: %v -> %v\n", f.Name, mField.Interface(), nField.Interface())
+				if !quiet {
+					fmt.Printf("Update %s: %v -> %v\n", f.Name, mField.Interface(), nField.Interface())
+				}
 				mField.Set(nField)
 				updated = true
 			}
