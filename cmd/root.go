@@ -27,7 +27,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/parsec/config.toml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/parsec/config.toml)")
 
 	config.InitDefaults()
 
@@ -79,14 +79,21 @@ Examples:
 Available Commands:{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 {{$metadataFlags := (filterFlags .LocalFlags "group" "metadata") -}}
+{{$p2pInfoFlags := (filterFlags .LocalFlags "group" "p2p") -}}
 {{$idFlags := (filterFlags .LocalFlags "group" "id") -}}
 {{$otherFlags := (ungroupedFlags .LocalFlags) -}}
-{{if or (hasFlags $metadataFlags) (hasFlags $idFlags)}}
+{{if or (hasFlags $metadataFlags) (hasFlags $idFlags) }}
 {{- if (hasFlags $metadataFlags)}}
 
 Metadata Flags:
 {{$metadataFlags.FlagUsages | trimTrailingWhitespaces}}
 {{- end}}
+{{- if (hasFlags $p2pInfoFlags)}}
+
+P2P Info Flags:
+{{$p2pInfoFlags.FlagUsages | trimTrailingWhitespaces}}
+{{- end}}
+
 {{- if (hasFlags $idFlags)}}
 
 ID Flags:

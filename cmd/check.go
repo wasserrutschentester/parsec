@@ -10,12 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	checkTmdbIDFlag int
-	checkTvdbIDFlag int
-	checkImdbIDFlag string
-)
-
 var checkCmd = &cobra.Command{
 	Use:   "check [file]",
 	Short: "Check if the file fits the specification",
@@ -72,13 +66,18 @@ var checkCmd = &cobra.Command{
 		}
 
 		checks.RunGenericChecks(match)
-		checks.RunMdbChecks(match, checkImdbIDFlag, checkTmdbIDFlag, checkTvdbIDFlag)
+		checks.RunMdbChecks(match, imdbIDFlag, tmdbIDFlag, tvdbIDFlag)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(checkCmd)
-	checkCmd.Flags().IntVar(&checkTmdbIDFlag, "tmdb", 0, "TMDB ID")
-	checkCmd.Flags().IntVar(&checkTvdbIDFlag, "tvdb", 0, "TVDB ID")
-	checkCmd.Flags().StringVar(&checkImdbIDFlag, "imdb", "", "IMDb ID")
+	checkCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	checkCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+
+	idFlags := []string{"imdb", "tmdb", "tvdb"}
+	for _, f := range idFlags {
+		checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+	}
 }

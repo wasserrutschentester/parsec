@@ -1,6 +1,3 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -14,15 +11,6 @@ import (
 )
 
 var (
-	titleFlag     string
-	yearFlag      int
-	seasonFlag    int
-	episodeFlag   int
-	isTVFlag      bool
-	isMovieFlag   bool
-	imdbIDFlag    string
-	tmdbIDFlag    int
-	tvdbIDFlag    int
 	writeTagsFlag bool
 )
 
@@ -57,6 +45,15 @@ var identifyCmd = &cobra.Command{
 		}
 		if episodeFlag != 0 {
 			meta.Episode = episodeFlag
+		}
+		if serviceFlag != "" {
+			meta.Service = serviceFlag
+		}
+		if sourceFlag != "" {
+			meta.Source = sourceFlag
+		}
+		if groupFlag != "" {
+			meta.Group = groupFlag
 		}
 
 		if cmd.Flags().Changed("tv") {
@@ -107,6 +104,18 @@ var identifyCmd = &cobra.Command{
 			tags.SetEpisodeTags(episodeResult)
 		}
 
+		if !unattendedFlag && !dryRunFlag {
+			fmt.Print("Do you want to write the tags to the file? [y/N] ")
+			var response string
+			fmt.Scanln(&response)
+			if response != "y" && response != "Y" {
+				fmt.Println("Skipping...")
+				return
+			} else {
+				writeTagsFlag = true
+			}
+		}
+
 		if writeTagsFlag {
 			err := metadata.SetGlobalTags(filePath, tags)
 			if err != nil {
@@ -120,20 +129,24 @@ var identifyCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(identifyCmd)
-
+	// Title flags
 	identifyCmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
 	identifyCmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
 	identifyCmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
 	identifyCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
-	identifyCmd.Flags().BoolVar(&isTVFlag, "tv", false, "identify as TV show")
-	identifyCmd.Flags().BoolVar(&isMovieFlag, "movie", false, "identify as movie")
+	identifyCmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date")
+	identifyCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
+	// Mdb IDs
+	identifyCmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")
+	identifyCmd.Flags().BoolVarP(&isMovieFlag, "movie", "M", false, "identify as movie")
 	identifyCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	identifyCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	identifyCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	// Other
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
-
+	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
 	// Group metadata flags
-	metadataFlags := []string{"title", "year", "season", "episode"}
+	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
 		identifyCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
