@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -55,18 +56,19 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 
 	fmt.Println("\nMultiple results found:")
 	for i, r := range results {
-		fmt.Printf("%d. %s (%d) [Match: %.0f%%] [Popularity: %.1f] [OV: %s]\n", i+1, r.Title, r.Year, r.Similarity*100, r.Popularity, r.OriginalLanguage)
+		fmt.Printf("%d. %s (%d) [Match: %.0f%%] [Popularity: %.1f] [OV: %s]\n", i, r.Title, r.Year, r.Similarity*100, r.Popularity, r.OriginalLanguage)
 	}
-	fmt.Print("\nSelect a result (0 to cancel): ")
-	var choice int
-	_, err = fmt.Scanln(&choice)
-	if err != nil || choice == 0 {
-		return nil, fmt.Errorf("cancelled")
+	fmt.Print("\nSelect a result [default 0]: ")
+	var input string
+	fmt.Scanln(&input)
+	if input == "" {
+		return &results[0], nil
 	}
-	if choice < 1 || choice > len(results) {
+	choice, err := strconv.Atoi(input)
+	if err != nil || choice < 1 || choice > len(results) {
 		return nil, fmt.Errorf("invalid selection")
 	}
-	return &results[choice-1], nil
+	return &results[choice], nil
 }
 
 func SearchMovie(query string, year int) ([]mdb.SearchResult, error) {
