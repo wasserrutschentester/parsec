@@ -83,12 +83,25 @@ func Get(filePath string) (*MediaInfo, error) {
 		return nil, fmt.Errorf("no video track found")
 	}
 
+	if !mi.hasAudio() {
+		return nil, fmt.Errorf("no audio track found")
+	}
+
 	return &mi, nil
 }
 
 func (mi *MediaInfo) isVideo() bool {
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" {
+			return true
+		}
+	}
+	return false
+}
+
+func (mi *MediaInfo) hasAudio() bool {
+	for _, track := range mi.Media.Tracks {
+		if track.Type == "Audio" {
 			return true
 		}
 	}
