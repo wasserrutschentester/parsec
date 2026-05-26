@@ -72,6 +72,8 @@ var identifyCmd = &cobra.Command{
 			mediaType = "tv"
 		}
 
+		meta.SetDefaults()
+
 		var result *mdb.SearchResult
 		var err error
 

@@ -115,7 +115,10 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		meta.Service = filename.NormalizeService(meta.Service)
 	}
 
-	// 7. Generate new name
+	// 7. Set defaults for missing fields (Source, Group)
+	meta.SetDefaults()
+
+	// 8. Generate new name
 	newName := meta.String() + ext
 	newPath := filepath.Join(filepath.Dir(filePath), newName)
 

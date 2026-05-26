@@ -55,3 +55,31 @@ Rename files based on metadata and naming conventions.
 ## Configuration
 
 By default, `parsec` looks for a configuration file at `$HOME/.config/parsec/config.toml` or `.parsec.toml` in the current directory.
+
+### Presets
+
+Presets allow you to override global configuration values for specific use cases, such as different naming conventions for different release groups or sources.
+
+Example `config.toml`:
+
+```toml
+template = "{title}.{year}.{resolution}.{source}.{audio_codec}{audio_channels}.{video_codec}-{group}"
+group = "DefaultGroup"
+source = "WEB-DL"
+
+[presets.remux]
+source = "BluRay"
+video_codec_avc = "AVC"
+video_codec_hevc = "H265"
+template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_codec}{audio_channels}.{group}"
+
+[presets.webrip]
+source = "WEBRip"
+group = "OtherGroup"
+```
+
+You can apply a preset using the `--preset` flag:
+
+```bash
+parsec rename --preset remux movie.mkv
+```

@@ -107,9 +107,6 @@ func HeightToResolution(height int) string {
 }
 
 func (meta *Metadata) SetDefaults() {
-	if meta.Title == "" {
-		meta.Title = "Missing.Title"
-	}
 	if meta.Source == "" {
 		meta.Source = config.GetSource()
 	}

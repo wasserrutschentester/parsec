@@ -13,28 +13,44 @@ func InitDefaults() {
 	viper.SetDefault("video_codec_hevc", "H.265")
 }
 
+var activePreset string
+
+func SetPreset(name string) {
+	activePreset = name
+}
+
+func getString(key string) string {
+	if activePreset != "" {
+		presetKey := "preset." + activePreset + "." + key
+		if viper.IsSet(presetKey) {
+			return viper.GetString(presetKey)
+		}
+	}
+	return viper.GetString(key)
+}
+
 func GetTemplate() string {
-	return viper.GetString("template")
+	return getString("template")
 }
 
 func GetPreferredLanguage() string {
-	return viper.GetString("preferred_language")
+	return getString("preferred_language")
 }
 
 func GetSource() string {
-	return viper.GetString("source")
+	return getString("source")
 }
 
 func GetGroup() string {
-	return viper.GetString("group")
+	return getString("group")
 }
 
 func GetVideoCodecAVC() string {
-	return viper.GetString("video_codec_avc")
+	return getString("video_codec_avc")
 }
 
 func GetVideoCodecHEVC() string {
-	return viper.GetString("video_codec_hevc")
+	return getString("video_codec_hevc")
 }
 
 func GetTmdbApiKey() string {

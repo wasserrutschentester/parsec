@@ -67,6 +67,7 @@ func TestAudioCodecName(t *testing.T) {
 }
 
 func TestVideoCodecName(t *testing.T) {
+	config.InitDefaults()
 	tests := []struct {
 		codec string
 		want  string
@@ -108,9 +109,6 @@ func TestMetadata_SetDefaults(t *testing.T) {
 	meta := &Metadata{}
 	meta.SetDefaults()
 
-	if meta.Title != "Missing.Title" {
-		t.Errorf("SetDefaults() Title = %v, want Missing.Title", meta.Title)
-	}
 	if meta.Source != config.GetSource() {
 		t.Errorf("SetDefaults() Source = %v, want %v", meta.Source, config.GetSource())
 	}

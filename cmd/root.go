@@ -28,6 +28,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/parsec/config.toml)")
+	rootCmd.PersistentFlags().StringVar(&presetFlag, "preset", "", "configuration preset to use")
 
 	config.InitDefaults()
 
@@ -145,4 +146,7 @@ func initConfig() {
 
 	viper.AutomaticEnv()
 
+	if presetFlag != "" {
+		config.SetPreset(presetFlag)
+	}
 }

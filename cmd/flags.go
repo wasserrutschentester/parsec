@@ -24,4 +24,5 @@ var (
 	unattendedFlag bool
 	verboseFlag    bool
 	quietFlag      bool
+	presetFlag     string
 )
