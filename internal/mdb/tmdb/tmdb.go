@@ -260,10 +260,15 @@ func GetAlternativeTitles(tmdbID int, mediaType string, originalLanguage string)
 	return titles, nil
 }
 
-func GetEpisodeMetadata(seriesID int, season, episode int) (mdb.EpisodeResult, error) {
+func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tmdbEpisodeResponse
+	params := url.Values{}
+	if lang != "" {
+		params.Set("language", lang)
+	}
+
 	endpoint := fmt.Sprintf("tv/%d/season/%d/episode/%d", seriesID, season, episode)
-	if err := get(endpoint, nil, &data); err != nil {
+	if err := get(endpoint, params, &data); err != nil {
 		return mdb.EpisodeResult{}, err
 	}
 

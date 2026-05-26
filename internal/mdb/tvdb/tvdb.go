@@ -266,9 +266,14 @@ func GetExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, erro
 	return data, nil
 }
 
-func GetEpisodeMetadata(seriesID int, season, episode int) (mdb.EpisodeResult, error) {
+func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tvdbEpisodeResponse
-	if err := get(fmt.Sprintf("series/%d/episodes/default?season=%d", seriesID, season), &data); err != nil {
+	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
+	if lang != "" {
+		endpoint = fmt.Sprintf("%s/%s", endpoint, lang)
+	}
+
+	if err := get(fmt.Sprintf("%s?season=%d", endpoint, season), &data); err != nil {
 		return mdb.EpisodeResult{}, err
 	}
 

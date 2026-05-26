@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	"codeberg.org/n0ne/parsec/internal/mdb/tmdb"
 	"codeberg.org/n0ne/parsec/internal/mdb/tvdb"
@@ -295,18 +296,35 @@ func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchRe
 }
 
 func FindEpisode(result mdb.SearchResult, season, episode int) mdb.EpisodeResult {
+	preferred := config.GetPreferredLanguage()
+	langs := []string{preferred, result.OriginalLanguage, "en"}
+
+	// Remove duplicates and empty strings
+	uniqueLangs := []string{}
+	seen := make(map[string]bool)
+	for _, l := range langs {
+		if l != "" && !seen[l] {
+			uniqueLangs = append(uniqueLangs, l)
+			seen[l] = true
+		}
+	}
+
 	if result.TvdbID > 0 {
-		data, err := tvdb.GetEpisodeMetadata(result.TvdbID, season, episode)
-		if err == nil {
-			return data
+		for _, lang := range uniqueLangs {
+			data, err := tvdb.GetEpisodeMetadata(result.TvdbID, season, episode, lang)
+			if err == nil && data.Name != "" {
+				return data
+			}
 		}
 	}
 
 	// Fallback to TMDB if TVDB id is missing or fails
 	if result.TmdbID > 0 {
-		data, err := tmdb.GetEpisodeMetadata(result.TmdbID, season, episode)
-		if err == nil {
-			return data
+		for _, lang := range uniqueLangs {
+			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, season, episode, lang)
+			if err == nil && data.Name != "" {
+				return data
+			}
 		}
 	}
 	return mdb.EpisodeResult{}
