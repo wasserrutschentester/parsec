@@ -84,7 +84,7 @@ func isMatroska(filePath string) (bool, error) {
 	return bytes.Equal(header, ebmlHeader), nil
 }
 
-func checkForMatroska(filePath string) error {
+func CheckForMatroska(filePath string) error {
 	if _, err := os.Stat(filePath); err != nil {
 		return fmt.Errorf("file not found: %w", err)
 	}
@@ -100,7 +100,7 @@ func checkForMatroska(filePath string) error {
 }
 
 func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
-	err := checkForMatroska(filePath)
+	err := CheckForMatroska(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (metadata *EbmlMetadata) countTypes() {
 }
 
 func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
-	err := checkForMatroska(filePath)
+	err := CheckForMatroska(filePath)
 	if err != nil {
 		return err
 	}

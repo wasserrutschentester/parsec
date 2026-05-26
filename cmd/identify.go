@@ -92,7 +92,7 @@ var identifyCmd = &cobra.Command{
 			tags.SetEpisodeTags(episodeResult)
 		}
 
-		if !unattendedFlag && !dryRunFlag {
+		if !unattendedFlag && !dryRunFlag && filePath != "" && metadata.CheckForMatroska(filePath) == nil {
 			fmt.Print("Do you want to write the tags to the file? [y/N] ")
 			var response string
 			fmt.Scanln(&response)
