@@ -134,6 +134,16 @@ func TestCheckDefaultFlags(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Missing default flags for first non-special subs track",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "eng", Default: true}},
+				{ID: 3, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", Forced: true, Name: "Forced"}},
+				{ID: 4, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", Default: false}},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Missing default flag for first audio",
 			tracks: []EbmlTrack{
 				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: false}},

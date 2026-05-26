@@ -25,6 +25,7 @@ type EbmlTrack struct {
 	Codec      string              `json:"codec,omitempty"`
 	Type       string              `json:"type,omitempty"`
 	Properties EbmlTrackProperties `json:"properties,omitempty"`
+	TypeOrder  int
 }
 
 type EbmlTrackProperties struct {
@@ -32,6 +33,8 @@ type EbmlTrackProperties struct {
 	LanguageIetf     string `json:"language_ietf,omitempty"`
 	Name             string `json:"track_name,omitempty"`
 	Source           string `json:"tag_source,omitempty"`
+	Number           int    `json:"number,omitempty"`
+	IndexEntries     int    `json:"num_index_entries,omitempty"`
 	Enabled          bool   `json:"flag_enabled,omitempty"`
 	Default          bool   `json:"flag_default,omitempty"`
 	Forced           bool   `json:"flag_forced,omitempty"`
@@ -114,7 +117,25 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 	if err := json.Unmarshal(output, &metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal ebml metadata: %w", err)
 	}
+	metadata.countTypes()
 	return &metadata, nil
+}
+
+func (metadata *EbmlMetadata) countTypes() {
+	numVideo, numAudio, numSubtitles := 0, 0, 0
+	for i := range metadata.Tracks {
+		switch metadata.Tracks[i].Type {
+		case "video":
+			numVideo += 1
+			metadata.Tracks[i].TypeOrder = numVideo
+		case "audio":
+			numAudio += 1
+			metadata.Tracks[i].TypeOrder = numAudio
+		case "subtitles", "subtitle":
+			numSubtitles += 1
+			metadata.Tracks[i].TypeOrder = numSubtitles
+		}
+	}
 }
 
 func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {

@@ -62,3 +62,24 @@ func TestCreateTagsXML(t *testing.T) {
 	}
 
 }
+
+func TestCountTypes(t *testing.T) {
+	metadata := &EbmlMetadata{
+		Tracks: []EbmlTrack{
+			{Type: "video"},
+			{Type: "audio"},
+			{Type: "audio"},
+			{Type: "subtitles"},
+			{Type: "subtitle"},
+		},
+	}
+
+	metadata.countTypes()
+
+	expected := []int{1, 1, 2, 1, 2}
+	for i, track := range metadata.Tracks {
+		if track.TypeOrder != expected[i] {
+			t.Errorf("track %d (type %s) expected TypeNumber %d, got %d", i, track.Type, expected[i], track.TypeOrder)
+		}
+	}
+}

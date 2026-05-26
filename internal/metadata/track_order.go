@@ -61,15 +61,15 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 			priority := getTrackPriority(*track)
 			if track.Type == "audio" {
 				if priority < lastAudioPriority {
-					return fmt.Errorf("audio track %d is out of order.\n  Previous: %s\n  Current:  %s",
-						track.ID, formatTrackInfo(lastAudio), formatTrackInfo(track))
+					return fmt.Errorf("audio track #%02d (ID: %d) is out of order.\n  Previous: %s\n  Current:  %s",
+						track.TypeOrder, track.Properties.Number, formatTrackInfo(lastAudio), formatTrackInfo(track))
 				}
 				lastAudio = track
 				lastAudioPriority = priority
 			} else if track.Type == "subtitles" {
 				if priority < lastSubPriority {
-					return fmt.Errorf("subtitle track %d is out of order.\n  Previous: %s\n  Current:  %s",
-						track.ID, formatTrackInfo(lastSub), formatTrackInfo(track))
+					return fmt.Errorf("subtitle track #%02d (ID: %d) is out of order.\n  Previous: %s\n  Current:  %s",
+						track.TypeOrder, track.Properties.Number, formatTrackInfo(lastSub), formatTrackInfo(track))
 				}
 				lastSub = track
 				lastSubPriority = priority
@@ -85,7 +85,7 @@ func checkTrackNameQuality(track EbmlTrack) error {
 	nameUpper := strings.ToUpper(track.Properties.Name)
 	for _, junk := range junkKeywords {
 		if strings.Contains(nameUpper, junk) {
-			return fmt.Errorf("track %d (%s) has junk keyword '%s' in Name field: '%s'", track.ID, track.Type, junk, track.Properties.Name)
+			return fmt.Errorf("%s track #%02d (ID: %d) has junk keyword '%s' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, junk, track.Properties.Name)
 		}
 	}
 	return nil
@@ -144,12 +144,12 @@ func CheckDefaultFlags(tracks []EbmlTrack) error {
 
 		if props.Default != shouldBeDefault {
 			if shouldBeDefault {
-				return fmt.Errorf("track %d (%s, %s) should have the Default flag set (it is the first standard track for this language)", track.ID, track.Type, props.Language)
+				return fmt.Errorf("%s track #%02d (ID: %d lang: %s) should have the Default flag set (it is the first standard track for this language)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
 			}
 			if isSpecialized {
-				return fmt.Errorf("track %d (%s, %s) should NOT have the Default flag set because it is a specialized track (Forced/AD/SDH/Commentary/Simple)", track.ID, track.Type, props.Language)
+				return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set because it is a specialized track (Forced/AD/SDH/Commentary/Simple)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
 			}
-			return fmt.Errorf("track %d (%s, %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.ID, track.Type, props.Language)
+			return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
 		}
 	}
 	return nil
@@ -159,7 +159,7 @@ func CheckSubtitleFormat(tracks []EbmlTrack) error {
 	for _, track := range tracks {
 		codec := track.Codec
 		if track.Type == "subtitles" && !strings.Contains(codec, "SRT") {
-			return fmt.Errorf("track %d (%s, %s) is not a SRT subtitle track", track.ID, track.Type, track.Codec)
+			return fmt.Errorf("%s track #%d (ID: %d, lang: %s) is not a SRT subtitle track", track.Type, track.TypeOrder, track.Properties.Number, track.Codec)
 		}
 	}
 	return nil
@@ -193,7 +193,7 @@ func formatTrackInfo(track *EbmlTrack) string {
 		flags += " [Simple]"
 	}
 
-	return fmt.Sprintf("ID: %d, Lang: %s, Name: '%s', Flags:%s", track.ID, props.Language, props.Name, flags)
+	return fmt.Sprintf("#%02d (ID: %d) Lang: %s, Name: '%s', Flags:%s", track.TypeOrder, track.Properties.Number, props.Language, props.Name, flags)
 }
 
 func isRelevantTrack(track EbmlTrack) bool {
@@ -204,10 +204,10 @@ func validateTrackBasics(track EbmlTrack) error {
 	lang := track.Properties.Language
 	tag := language.Make(lang)
 	if config.IsCheckEnabled("matroska_language_tag") && tag == language.Und {
-		return fmt.Errorf("track %d (%s) is missing a valid language tag (got: %s)", track.ID, track.Type, lang)
+		return fmt.Errorf("%s track #%d (ID: %d) is missing a valid language tag (got: %s)", track.Type, track.TypeOrder, track.Properties.Number, lang)
 	}
 	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
-		return fmt.Errorf("track %d (%s) with language 'mul' must have a Name field", track.ID, track.Type)
+		return fmt.Errorf("%s track #%d (ID: %d) with language 'mul' must have a Name field", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	return nil
 }
@@ -215,7 +215,7 @@ func validateTrackBasics(track EbmlTrack) error {
 func checkOriginalLanguageConsistency(track EbmlTrack, langHasOriginalFlag map[string]bool) error {
 	lang := track.Properties.Language
 	if langHasOriginalFlag[lang] && !track.Properties.OriginalLanguage {
-		return fmt.Errorf("track %d (%s, %s) is missing the OriginalLanguage flag (other tracks in this language have it)", track.ID, track.Type, lang)
+		return fmt.Errorf("%s track #%d (ID: %d, lang: %s) is missing the OriginalLanguage flag (other tracks in this language have it)", track.Type, track.TypeOrder, track.Properties.Number, lang)
 	}
 	return nil
 }
@@ -227,7 +227,7 @@ func checkDuplicateTracks(track EbmlTrack, seenTracks map[string]bool) error {
 		props.HearingImpaired, props.VisualImpaired,
 		props.Commentary, props.OriginalLanguage, props.Name)
 	if seenTracks[trackKey] {
-		return fmt.Errorf("track %d (%s) is a duplicate of a previous track (same language, flags, and name)", track.ID, track.Type)
+		return fmt.Errorf("%s track #%d (ID: %d) is a duplicate of a previous track (same language, flags, and name)", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	seenTracks[trackKey] = true
 	return nil
@@ -238,16 +238,16 @@ func checkNameKeywords(track EbmlTrack) error {
 	nameUpper := strings.ToUpper(props.Name)
 
 	if props.HearingImpaired && !strings.Contains(nameUpper, "SDH") {
-		return fmt.Errorf("track %d (%s) is hearing impaired but Name field does not contain 'SDH'", track.ID, track.Type)
+		return fmt.Errorf("%s track #%d (ID: %d) is hearing impaired but Name field does not contain 'SDH'", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	if props.Forced && !strings.Contains(nameUpper, "FORCED") {
-		return fmt.Errorf("track %d (%s) is forced but Name field does not contain 'Forced'", track.ID, track.Type)
+		return fmt.Errorf("%s track #%d (ID: %d) is forced but Name field does not contain 'Forced'", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	if props.Commentary && !strings.Contains(nameUpper, "COMMENTARY") {
-		return fmt.Errorf("track %d (%s) is commentary but Name field does not contain 'Commentary'", track.ID, track.Type)
+		return fmt.Errorf("%s track #%d (ID: %d) is commentary but Name field does not contain 'Commentary'", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	if props.VisualImpaired && props.Name == "" {
-		return fmt.Errorf("track %d (%s) is visual impaired but Name field is empty", track.ID, track.Type)
+		return fmt.Errorf("%s track #%d (ID: %d) is visual impaired but Name field is empty", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	return nil
 }

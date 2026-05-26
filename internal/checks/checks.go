@@ -235,11 +235,12 @@ func checkDurations(mi *mediainfo.MediaInfo) {
 			diff := dur - videoDur
 			percentDiff := diff / videoDur * -100
 			if diff > 5.0 {
-				fmt.Printf("QA Warning: %s track (ID %s) is significantly longer than video (diff: %.1fs)\n", track.Type, track.ID, diff)
+				fmt.Printf("QA Warning: %s track #%02d (ID %s) is significantly longer than video (diff: %.1fs)\n", track.Type, *track.TypeOrder, track.ID, diff)
 			} else if diff < -20.0 && track.Type == "Audio" {
-				fmt.Printf("QA Warning: Audio track (ID %s) is significantly shorter than video (diff: %.1fs)\n", track.ID, diff)
+				fmt.Printf("QA Warning: Audio track #%02d (ID %s) is significantly shorter than video (diff: %.1fs)\n", *track.TypeOrder, track.ID, diff)
+
 			} else if percentDiff > 10.0 {
-				fmt.Printf("QA Warning: Subtitle track (ID %s) is %.1f%% shorter than video (diff: %.1fs)\n", track.ID, percentDiff, diff)
+				fmt.Printf("QA Warning: Subtitle track #%02d (ID %s) is %.1f%% shorter than video (diff: %.1fs)\n", *track.TypeOrder, track.ID, percentDiff, diff)
 			}
 		}
 	}
