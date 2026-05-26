@@ -11,7 +11,63 @@ import (
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	"codeberg.org/n0ne/parsec/internal/mdb/tmdb"
 	"codeberg.org/n0ne/parsec/internal/mdb/tvdb"
+	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 )
+
+func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
+	if meta.Title == "" && meta.ImdbID == "" && meta.TmdbID == 0 && meta.TvdbID == 0 {
+		return nil, fmt.Errorf("title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
+	}
+
+	mediaType := "movie"
+	if meta.IsTV {
+		mediaType = "tv"
+	}
+
+	if meta.ImdbID != "" || meta.TmdbID > 0 || meta.TvdbID > 0 {
+		fmt.Printf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...\n", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)
+		result, err := SearchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
+		if err != nil {
+			return nil, err
+		}
+		if result == nil {
+			return nil, fmt.Errorf("no results found")
+		}
+		return result, nil
+	}
+
+	// Replace dots with spaces for the search query
+	searchQuery := filename.DeobfuscateTitle(meta.Title)
+	fmt.Printf("Searching for %s (%d) [%s]...\n", searchQuery, meta.Year, mediaType)
+	results, err := FuzzySearch(searchQuery, meta.Year, meta.IsTV)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no results found")
+	}
+
+	if len(results) == 1 || unattended {
+		return &results[0], nil
+	}
+
+	fmt.Println("\nMultiple results found:")
+	for i, r := range results {
+		fmt.Printf("%d. %s (%d) [Match: %.0f%%] [Popularity: %.1f] [OV: %s]\n", i+1, r.Title, r.Year, r.Similarity*100, r.Popularity, r.OriginalLanguage)
+	}
+	fmt.Print("\nSelect a result (0 to cancel): ")
+	var choice int
+	_, err = fmt.Scanln(&choice)
+	if err != nil || choice == 0 {
+		return nil, fmt.Errorf("cancelled")
+	}
+	if choice < 1 || choice > len(results) {
+		return nil, fmt.Errorf("invalid selection")
+	}
+	return &results[choice-1], nil
+}
 
 func SearchMovie(query string, year int) ([]mdb.SearchResult, error) {
 	return search("movie", query, year)
@@ -158,7 +214,7 @@ func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...strin
 }
 
 // FuzzySearch combines search and filtering/sorting to find the best match
-func FuzzySearch(query string, year int, isTV bool) (*mdb.SearchResult, error) {
+func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
 	var results []mdb.SearchResult
 	var err error
 
@@ -176,46 +232,87 @@ func FuzzySearch(query string, year int, isTV bool) (*mdb.SearchResult, error) {
 		return nil, nil
 	}
 
-	// Sort results by popularity descending as a baseline
+	queryLower := strings.ToLower(query)
+
+	for i := range results {
+		titleSim := calculateSimilarity(queryLower, strings.ToLower(results[i].Title))
+		origSim := calculateSimilarity(queryLower, strings.ToLower(results[i].OriginalTitle))
+		results[i].Similarity = math.Max(titleSim, origSim)
+
+		// Bonus for year match
+		if year > 0 && results[i].Year == year {
+			results[i].Similarity += 0.05 // Slight boost for exact year match
+		}
+	}
+
+	// Sort results by similarity, then popularity
 	sort.Slice(results, func(i, j int) bool {
+		if math.Abs(results[i].Similarity-results[j].Similarity) > 0.001 {
+			return results[i].Similarity > results[j].Similarity
+		}
 		return results[i].Popularity > results[j].Popularity
 	})
 
-	// If year is provided, prioritize exact year matches
-	if year > 0 {
-		var yearMatches []mdb.SearchResult
-		for _, r := range results {
-			if r.Year == year {
-				yearMatches = append(yearMatches, r)
+	// Return top 5 results
+	if len(results) > 5 {
+		results = results[:5]
+	}
+
+	return results, nil
+}
+
+func calculateSimilarity(s1, s2 string) float64 {
+	if s1 == s2 {
+		return 1.0
+	}
+	if len(s1) == 0 || len(s2) == 0 {
+		return 0.0
+	}
+
+	dist := levenshteinDistance(s1, s2)
+	maxLen := math.Max(float64(len(s1)), float64(len(s2)))
+	return 1.0 - (float64(dist) / maxLen)
+}
+
+func levenshteinDistance(s1, s2 string) int {
+	r1, r2 := []rune(s1), []rune(s2)
+	n, m := len(r1), len(r2)
+
+	if n > m {
+		r1, r2 = r2, r1
+		n, m = m, n
+	}
+
+	row := make([]int, n+1)
+	for i := 0; i <= n; i++ {
+		row[i] = i
+	}
+
+	for j := 1; j <= m; j++ {
+		prev := j
+		for i := 1; i <= n; i++ {
+			var cost int
+			if r1[i-1] != r2[j-1] {
+				cost = 1
 			}
+			newVal := min(row[i]+1, prev+1, row[i-1]+cost)
+			row[i-1] = prev
+			prev = newVal
 		}
-		if len(yearMatches) > 0 {
-			results = yearMatches
-		}
+		row[n] = prev
 	}
 
-	// Simple fuzzy title matching: prefer result with title closest in length or matching exactly (ignoring case)
-	queryLower := strings.ToLower(query)
-	bestMatchIndex := 0
-	minDiff := math.MaxInt32
+	return row[n]
+}
 
-	for i, r := range results {
-		titleLower := strings.ToLower(r.Title)
-		origLower := strings.ToLower(r.OriginalTitle)
-
-		if titleLower == queryLower || origLower == queryLower {
-			return &results[i], nil
-		}
-
-		// Calculate a simple difference in length as a proxy for "fuzziness"
-		diff := int(math.Abs(float64(len(titleLower) - len(queryLower))))
-		if diff < minDiff {
-			minDiff = diff
-			bestMatchIndex = i
-		}
+func min(a, b, c int) int {
+	if a <= b && a <= c {
+		return a
 	}
-
-	return &results[bestMatchIndex], nil
+	if b <= a && b <= c {
+		return b
+	}
+	return c
 }
 
 func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchResult, error) {

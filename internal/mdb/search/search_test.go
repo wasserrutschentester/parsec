@@ -13,7 +13,7 @@ func TestFuzzySearchEmpty(t *testing.T) {
 		t.Logf("Expected error or empty result: %v", err)
 		return
 	}
-	if res != nil {
-		t.Errorf("Expected nil result for non-existent movie, got %v", res)
+	if len(res) > 0 {
+		t.Errorf("Expected empty result for non-existent movie, got %v", res)
 	}
 }

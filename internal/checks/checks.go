@@ -259,19 +259,11 @@ func NormalizeForComparison(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata, imdbID string, tmdbID, tvdbID int) {
-	var searchResult *mdb.SearchResult
-	var searchErr error
-
-	if imdbID != "" || tmdbID > 0 || tvdbID > 0 {
-		searchResult, searchErr = mdbSearch.SearchByID(imdbID, tmdbID, tvdbID, meta.IsTV)
-	} else {
-		searchQuery := filename.DeobfuscateTitle(meta.Title)
-		searchResult, searchErr = mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
-	}
+func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
+	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true)
 
 	if searchErr != nil {
-		fmt.Printf("MDB Error: Could not fetch metadata from TMDB/TVDB: %v\n", searchErr)
+		fmt.Printf("MDB Error: %v\n", searchErr)
 		return
 	}
 	if searchResult == nil {

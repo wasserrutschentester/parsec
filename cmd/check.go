@@ -77,19 +77,17 @@ var checkCmd = &cobra.Command{
 
 		checks.RunGenericChecks(match)
 
-		imdbID := imdbIDFlag
-		if imdbID == "" {
-			imdbID = config.GetImdbID()
+		if imdbIDFlag != "" {
+			match.ImdbID = imdbIDFlag
 		}
-		tmdbID := tmdbIDFlag
-		if tmdbID == 0 {
-			tmdbID = config.GetTmdbID()
+		if tmdbIDFlag != 0 {
+			match.TmdbID = tmdbIDFlag
 		}
-		tvdbID := tvdbIDFlag
-		if tvdbID == 0 {
-			tvdbID = config.GetTvdbID()
+		if tvdbIDFlag != 0 {
+			match.TvdbID = tvdbIDFlag
 		}
-		checks.RunMdbChecks(mi, match, imdbID, tmdbID, tvdbID)
+
+		checks.RunMdbChecks(mi, match)
 	},
 }
 

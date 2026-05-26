@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -63,50 +62,21 @@ var identifyCmd = &cobra.Command{
 			meta.IsTV = !isMovieFlag
 		}
 
-		if imdbIDFlag == "" && config.GetImdbID() != "" {
-			imdbIDFlag = config.GetImdbID()
+		if imdbIDFlag != "" {
+			meta.ImdbID = imdbIDFlag
 		}
-		if tmdbIDFlag == 0 && config.GetTmdbID() != 0 {
-			tmdbIDFlag = config.GetTmdbID()
+		if tmdbIDFlag != 0 {
+			meta.TmdbID = tmdbIDFlag
 		}
-		if tvdbIDFlag == 0 && config.GetTvdbID() != 0 {
-			tvdbIDFlag = config.GetTvdbID()
-		}
-
-		meta.SetDefaults()
-
-		if meta.Title == "" && imdbIDFlag == "" && tmdbIDFlag == 0 && tvdbIDFlag == 0 {
-			fmt.Println("Error: Title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
-			return
-		}
-
-		mediaType := "movie"
-		if meta.IsTV {
-			mediaType = "tv"
+		if tvdbIDFlag != 0 {
+			meta.TvdbID = tvdbIDFlag
 		}
 
 		meta.SetDefaults()
 
-		var result *mdb.SearchResult
-		var err error
-
-		if imdbIDFlag != "" || tmdbIDFlag > 0 || tvdbIDFlag > 0 {
-			fmt.Printf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...\n", imdbIDFlag, tmdbIDFlag, tvdbIDFlag, mediaType)
-			result, err = mdbSearch.SearchByID(imdbIDFlag, tmdbIDFlag, tvdbIDFlag, meta.IsTV)
-		} else {
-			// Replace dots with spaces for the search query
-			searchQuery := filename.DeobfuscateTitle(meta.Title)
-			fmt.Printf("Searching for %s (%d) [%s]...\n", searchQuery, meta.Year, mediaType)
-			result, err = mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
-		}
-
+		result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 		if err != nil {
-			fmt.Printf("Error searching: %v\n", err)
-			return
-		}
-
-		if result == nil {
-			fmt.Println("No results found")
+			fmt.Printf("Error: %v\n", err)
 			return
 		}
 

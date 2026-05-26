@@ -8,8 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
@@ -85,27 +83,19 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		meta.Group = groupFlag
 	}
 
-	// 4. MDB Search to get "correct" title and year
-	var result *mdb.SearchResult
-	imdbID := imdbIDFlag
-	if imdbID == "" {
-		imdbID = config.GetImdbID()
+	if imdbIDFlag != "" {
+		meta.ImdbID = imdbIDFlag
 	}
-	tmdbID := tmdbIDFlag
-	if tmdbID == 0 {
-		tmdbID = config.GetTmdbID()
+	if tmdbIDFlag != 0 {
+		meta.TmdbID = tmdbIDFlag
 	}
-	tvdbID := tvdbIDFlag
-	if tvdbID == 0 {
-		tvdbID = config.GetTvdbID()
+	if tvdbIDFlag != 0 {
+		meta.TvdbID = tvdbIDFlag
 	}
 
-	if imdbID != "" || tmdbID > 0 || tvdbID > 0 {
-		result, _ = mdbSearch.SearchByID(imdbID, tmdbID, tvdbID, meta.IsTV)
-	} else {
-		searchQuery := filename.DeobfuscateTitle(meta.Title)
-		result, _ = mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
-	}
+	// 4. MDB Search to get "correct" title and year
+	meta.SetDefaults()
+	result, _ := mdbSearch.InteractiveSearch(meta, true)
 
 	if result != nil {
 		meta.Title = result.Title

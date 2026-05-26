@@ -28,6 +28,9 @@ type Metadata struct {
 	VideoCodec    string
 	Group         string
 	CRC           string
+	ImdbID        string
+	TmdbID        int
+	TvdbID        int
 	IsTV          bool
 }
 
@@ -136,6 +139,15 @@ func (meta *Metadata) SetDefaults() {
 	}
 	if meta.Group == "" {
 		meta.Group = config.GetGroup()
+	}
+	if meta.ImdbID == "" {
+		meta.ImdbID = config.GetImdbID()
+	}
+	if meta.TmdbID == 0 {
+		meta.TmdbID = config.GetTmdbID()
+	}
+	if meta.TvdbID == 0 {
+		meta.TvdbID = config.GetTvdbID()
 	}
 	if !meta.IsTV && config.GetIsTV() {
 		meta.IsTV = true

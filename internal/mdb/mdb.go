@@ -16,6 +16,7 @@ type SearchResult struct {
 	Year             int
 	IsTV             bool
 	Popularity       float64
+	Similarity       float64
 	Overview         string
 }
 
@@ -38,7 +39,11 @@ type MatroskaTags struct {
 
 func PrintResult(result SearchResult) {
 	fmt.Println()
-	fmt.Printf("Found: %s (%d)\n", result.Title, result.Year)
+	if result.Similarity > 0 {
+		fmt.Printf("Found: %s (%d) [Match: %.0f%%]\n", result.Title, result.Year, result.Similarity*100)
+	} else {
+		fmt.Printf("Found: %s (%d)\n", result.Title, result.Year)
+	}
 	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
 		fmt.Printf("Original Title: %s\n", result.OriginalTitle)
 	}
