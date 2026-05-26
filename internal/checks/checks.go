@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -17,20 +18,24 @@ func RunGenericChecks(meta *metadata.Metadata) {
 	if err := CheckYear(meta); err != nil {
 		fmt.Println(err)
 	}
-	if err := CheckStreaming(meta); err != nil {
-		fmt.Println(err)
+	if config.IsCheckEnabled("generic_streaming") {
+		if err := CheckStreaming(meta); err != nil {
+			fmt.Println(err)
+		}
 	}
-	if err := CheckTvSpecial(meta); err != nil {
-		fmt.Println(err)
+	if config.IsCheckEnabled("generic_tv_special") {
+		if err := CheckTvSpecial(meta); err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 
 func CheckYear(meta *metadata.Metadata) error {
-	if meta.Year == 0 && !meta.IsTV {
+	if config.IsCheckEnabled("generic_year_missing") && meta.Year == 0 && !meta.IsTV {
 		return fmt.Errorf("year is missing for this Movie")
 	}
 
-	if meta.Year > 0 && meta.Season > 1900 {
+	if config.IsCheckEnabled("generic_year_redundant") && meta.Year > 0 && meta.Season > 1900 {
 		return fmt.Errorf("redundant Year: The Season (%d) already indicates the year", meta.Season)
 	}
 
@@ -76,25 +81,37 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
 	}
 
 	// 1. Interlaced WEB
-	isWeb := strings.Contains(strings.ToUpper(meta.Source), "WEB")
-	if isWeb && strings.Contains(strings.ToUpper(videoTrack.ScanType), "INTERLACED") {
-		fmt.Println("QA Warning: WEB source should not be Interlaced.")
+	if config.IsCheckEnabled("mediainfo_interlaced_web") {
+		isWeb := strings.Contains(strings.ToUpper(meta.Source), "WEB")
+		if isWeb && strings.Contains(strings.ToUpper(videoTrack.ScanType), "INTERLACED") {
+			fmt.Println("QA Warning: WEB source should not be Interlaced.")
+		}
 	}
 
 	// 2. Non-standard Framerate
-	CheckFrameRate(videoTrack)
+	if config.IsCheckEnabled("mediainfo_framerate") {
+		CheckFrameRate(videoTrack)
+	}
 
 	// 3. Low Bitrate
-	CheckBitRate(videoTrack)
+	if config.IsCheckEnabled("mediainfo_bitrate") {
+		CheckBitRate(videoTrack)
+	}
 
 	// 4. Inconsistent Track Durations
-	checkDurations(mi)
+	if config.IsCheckEnabled("mediainfo_durations") {
+		checkDurations(mi)
+	}
 
 	// 5. Redundant Audio Tracks
-	CheckRedundantAudio(mi)
+	if config.IsCheckEnabled("mediainfo_redundant_audio") {
+		CheckRedundantAudio(mi)
+	}
 
 	// 6. Non-standard Resolution
-	CheckResolution(videoTrack)
+	if config.IsCheckEnabled("mediainfo_resolution") {
+		CheckResolution(videoTrack)
+	}
 }
 
 func CheckRedundantAudio(mi *mediainfo.MediaInfo) {
@@ -262,10 +279,16 @@ func RunMdbChecks(meta *metadata.Metadata, imdbID string, tmdbID, tvdbID int) {
 
 	fmt.Printf("MDB Matched: %s (%d)\n", searchResult.Title, searchResult.Year)
 
-	CheckTitle(meta, searchResult)
-	CheckMovieYear(meta, searchResult)
-	if meta.IsTV {
+	if config.IsCheckEnabled("mdb_title") {
+		CheckTitle(meta, searchResult)
+	}
+	if config.IsCheckEnabled("mdb_movie_year") {
+		CheckMovieYear(meta, searchResult)
+	}
+	if meta.IsTV && config.IsCheckEnabled("mdb_series_year") {
 		CheckSeriesYear(meta, searchResult)
+	}
+	if meta.IsTV {
 		CheckEpisode(meta, searchResult)
 	}
 }
@@ -286,11 +309,17 @@ func CheckEpisode(meta *metadata.Metadata, result *mdb.SearchResult) {
 	if meta.Season > 0 || meta.Episode > 0 {
 		epResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
 		if epResult.Name == "" {
-			fmt.Printf("MDB Warning: Episode S%02dE%02d not found on TVDB/TMDB.\n", meta.Season, meta.Episode)
+			if config.IsCheckEnabled("mdb_episode_existence") {
+				fmt.Printf("MDB Warning: Episode S%02dE%02d not found on TVDB/TMDB.\n", meta.Season, meta.Episode)
+			}
 		} else {
 			fmt.Printf("MDB Episode: %s (S%02dE%02d)\n", epResult.Name, epResult.Season, epResult.Episode)
-			CheckEpisodeTitle(meta, epResult)
-			CheckSpecialDate(meta, epResult)
+			if config.IsCheckEnabled("mdb_episode_title") {
+				CheckEpisodeTitle(meta, epResult)
+			}
+			if config.IsCheckEnabled("mdb_episode_date") {
+				CheckSpecialDate(meta, epResult)
+			}
 		}
 	}
 }

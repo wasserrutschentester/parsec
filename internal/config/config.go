@@ -125,6 +125,37 @@ func GetVideoCodecHEVC() string {
 	return getString("video_codec_hevc")
 }
 
+func IsCheckEnabled(checkName string) bool {
+	enabledChecks := getStringSlice("enabled_checks")
+	if len(enabledChecks) > 0 {
+		for _, c := range enabledChecks {
+			if c == checkName {
+				return true
+			}
+		}
+		return false
+	}
+
+	disabledChecks := getStringSlice("disabled_checks")
+	for _, c := range disabledChecks {
+		if c == checkName {
+			return false
+		}
+	}
+
+	return true
+}
+
+func getStringSlice(key string) []string {
+	if activePreset != "" {
+		presetKey := "preset." + activePreset + "." + key
+		if viper.IsSet(presetKey) {
+			return viper.GetStringSlice(presetKey)
+		}
+	}
+	return viper.GetStringSlice(key)
+}
+
 func GetTmdbApiKey() string {
 	return viper.GetString("api_keys.tmdb")
 }

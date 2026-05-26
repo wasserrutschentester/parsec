@@ -27,41 +27,53 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 			continue
 		}
 
-		if err := validateTrackBasics(*track); err != nil {
-			return err
-		}
-
-		if err := checkTrackNameQuality(*track); err != nil {
-			fmt.Printf("QA Warning: %v\n", err)
-		}
-
-		if err := checkOriginalLanguageConsistency(*track, langHasOriginalFlag); err != nil {
-			return err
-		}
-
-		if err := checkDuplicateTracks(*track, seenTracks); err != nil {
-			return err
-		}
-
-		if err := checkNameKeywords(*track); err != nil {
-			return err
-		}
-
-		priority := getTrackPriority(*track)
-		if track.Type == "audio" {
-			if priority < lastAudioPriority {
-				return fmt.Errorf("audio track %d is out of order.\n  Previous: %s\n  Current:  %s",
-					track.ID, formatTrackInfo(lastAudio), formatTrackInfo(track))
+		if config.IsCheckEnabled("matroska_language_tag") || config.IsCheckEnabled("matroska_multi_lang") {
+			if err := validateTrackBasics(*track); err != nil {
+				return err
 			}
-			lastAudio = track
-			lastAudioPriority = priority
-		} else if track.Type == "subtitles" {
-			if priority < lastSubPriority {
-				return fmt.Errorf("subtitle track %d is out of order.\n  Previous: %s\n  Current:  %s",
-					track.ID, formatTrackInfo(lastSub), formatTrackInfo(track))
+		}
+
+		if config.IsCheckEnabled("matroska_name_quality") {
+			if err := checkTrackNameQuality(*track); err != nil {
+				fmt.Printf("QA Warning: %v\n", err)
 			}
-			lastSub = track
-			lastSubPriority = priority
+		}
+
+		if config.IsCheckEnabled("matroska_original_language") {
+			if err := checkOriginalLanguageConsistency(*track, langHasOriginalFlag); err != nil {
+				return err
+			}
+		}
+
+		if config.IsCheckEnabled("matroska_duplicate_tracks") {
+			if err := checkDuplicateTracks(*track, seenTracks); err != nil {
+				return err
+			}
+		}
+
+		if config.IsCheckEnabled("matroska_name_keywords") {
+			if err := checkNameKeywords(*track); err != nil {
+				return err
+			}
+		}
+
+		if config.IsCheckEnabled("matroska_track_order") {
+			priority := getTrackPriority(*track)
+			if track.Type == "audio" {
+				if priority < lastAudioPriority {
+					return fmt.Errorf("audio track %d is out of order.\n  Previous: %s\n  Current:  %s",
+						track.ID, formatTrackInfo(lastAudio), formatTrackInfo(track))
+				}
+				lastAudio = track
+				lastAudioPriority = priority
+			} else if track.Type == "subtitles" {
+				if priority < lastSubPriority {
+					return fmt.Errorf("subtitle track %d is out of order.\n  Previous: %s\n  Current:  %s",
+						track.ID, formatTrackInfo(lastSub), formatTrackInfo(track))
+				}
+				lastSub = track
+				lastSubPriority = priority
+			}
 		}
 	}
 
@@ -191,10 +203,10 @@ func isRelevantTrack(track EbmlTrack) bool {
 func validateTrackBasics(track EbmlTrack) error {
 	lang := track.Properties.Language
 	tag := language.Make(lang)
-	if tag == language.Und {
+	if config.IsCheckEnabled("matroska_language_tag") && tag == language.Und {
 		return fmt.Errorf("track %d (%s) is missing a valid language tag (got: %s)", track.ID, track.Type, lang)
 	}
-	if tag == language.Make("mul") && track.Properties.Name == "" {
+	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
 		return fmt.Errorf("track %d (%s) with language 'mul' must have a Name field", track.ID, track.Type)
 	}
 	return nil

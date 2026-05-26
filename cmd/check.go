@@ -19,8 +19,13 @@ var checkCmd = &cobra.Command{
 		filePath := args[0]
 		filenameNoExt := filename.GetBaseName(filePath)
 		fmt.Printf("Current Name:\t%s\n", filenameNoExt)
-		filename.CheckAllowedCharacters(filenameNoExt)
-		filename.CheckCharacterSequences(filenameNoExt)
+
+		if config.IsCheckEnabled("filename_characters") {
+			filename.CheckAllowedCharacters(filenameNoExt)
+		}
+		if config.IsCheckEnabled("filename_sequences") {
+			filename.CheckCharacterSequences(filenameNoExt)
+		}
 
 		// match filename against spec
 		match := filename.Parse(filenameNoExt)
@@ -54,12 +59,16 @@ var checkCmd = &cobra.Command{
 				fmt.Printf("Track Order Error: %v\n", err)
 			}
 
-			if err := metadata.CheckDefaultFlags(ebml.Tracks); err != nil {
-				fmt.Printf("Default Flag Error: %v\n", err)
+			if config.IsCheckEnabled("matroska_default_flags") {
+				if err := metadata.CheckDefaultFlags(ebml.Tracks); err != nil {
+					fmt.Printf("Default Flag Error: %v\n", err)
+				}
 			}
 
-			if err := metadata.CheckSubtitleFormat(ebml.Tracks); err != nil {
-				fmt.Printf("Subtitle Format Error: %v\n", err)
+			if config.IsCheckEnabled("matroska_subtitle_format") {
+				if err := metadata.CheckSubtitleFormat(ebml.Tracks); err != nil {
+					fmt.Printf("Subtitle Format Error: %v\n", err)
+				}
 			}
 
 		} else {

@@ -97,3 +97,71 @@ Provide specific IDs to ensure the correct metadata is fetched from databases.
 | `imdb_id` | string | IMDb ID (e.g., `tt1234567`). |
 | `tmdb_id` | integer | TMDB ID. |
 | `tvdb_id` | integer | TVDB ID. |
+
+#### Check Control
+
+You can enable or disable specific quality checks on a per-preset basis.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `enabled_checks` | array of strings | If set, only the listed checks will be performed. |
+| `disabled_checks` | array of strings | Listed checks will be skipped. (Ignored if `enabled_checks` is set) |
+
+##### Available Checks
+
+-   `filename_characters`: Check for disallowed characters in filename.
+-   `filename_sequences`: Check for disallowed character sequences (e.g., `..`).
+-   `mediainfo_interlaced_web`: Warn if WEB source is interlaced.
+-   `mediainfo_framerate`: Check for non-standard framerates.
+-   `mediainfo_bitrate`: Check for low bitrates.
+-   `mediainfo_durations`: Check for inconsistent track durations.
+-   `mediainfo_redundant_audio`: Check for redundant audio tracks.
+-   `mediainfo_resolution`: Check for non-standard resolutions.
+-   `matroska_track_order`: Verify track ordering rules.
+-   `matroska_language_tag`: Verify valid ISO language tags on tracks.
+-   `matroska_multi_lang`: Ensure 'mul' tracks have a descriptive name.
+-   `matroska_original_language`: Verify consistent OriginalLanguage flag.
+-   `matroska_name_quality`: Check for junk keywords in track names.
+-   `matroska_name_keywords`: Ensure names match flags (SDH, Forced, etc.).
+-   `matroska_duplicate_tracks`: Identify identical tracks.
+-   `matroska_default_flags`: Verify first-standard-track default rules.
+-   `matroska_subtitle_format`: Verify SRT-only requirement.
+-   `generic_year_missing`: Ensure movies have a year tag.
+-   `generic_year_redundant`: Check for redundant year tags in series.
+-   `generic_streaming`: Check for service tags on WEB sources.
+-   `generic_tv_special`: Check required tags for TV Specials.
+-   `mdb_title`: Verify title against TMDB/TVDB.
+-   `mdb_movie_year`: Verify movie release year.
+-   `mdb_series_year`: Verify series start year.
+-   `mdb_episode_existence`: Check if episode exists in database.
+-   `mdb_episode_title`: Verify episode title.
+-   `mdb_episode_date`: Verify episode air date.
+
+##### Examples
+
+**Blacklisting (Disable specific checks globally)**
+
+```toml
+# Skip bitrate and resolution warnings by default
+disabled_checks = ["mediainfo_bitrate", "mediainfo_resolution"]
+```
+
+**Whitelisting (Enable only specific checks in a preset)**
+
+```toml
+[preset.fast]
+# For this preset, skip everything EXCEPT filename and track order
+enabled_checks = ["filename_characters", "matroska_track_order"]
+```
+
+**Overriding global settings in a preset**
+
+```toml
+# Global setting
+disabled_checks = ["mediainfo_bitrate"]
+
+[preset.strict]
+# Enable everything (including bitrate) for this preset
+disabled_checks = []
+```
+
