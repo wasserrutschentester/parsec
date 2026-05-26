@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"codeberg.org/n0ne/parsec/internal/checks"
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
@@ -66,7 +67,20 @@ var checkCmd = &cobra.Command{
 		}
 
 		checks.RunGenericChecks(match)
-		checks.RunMdbChecks(match, imdbIDFlag, tmdbIDFlag, tvdbIDFlag)
+
+		imdbID := imdbIDFlag
+		if imdbID == "" {
+			imdbID = config.GetImdbID()
+		}
+		tmdbID := tmdbIDFlag
+		if tmdbID == 0 {
+			tmdbID = config.GetTmdbID()
+		}
+		tvdbID := tvdbIDFlag
+		if tvdbID == 0 {
+			tvdbID = config.GetTvdbID()
+		}
+		checks.RunMdbChecks(match, imdbID, tmdbID, tvdbID)
 	},
 }
 

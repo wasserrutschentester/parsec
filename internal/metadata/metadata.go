@@ -107,11 +107,40 @@ func HeightToResolution(height int) string {
 }
 
 func (meta *Metadata) SetDefaults() {
+	if meta.Title == "" {
+		meta.Title = config.GetTitle()
+	}
+	if meta.Year == 0 {
+		meta.Year = config.GetYear()
+	}
+	if meta.Season == 0 {
+		meta.Season = config.GetSeason()
+	}
+	if meta.Episode == 0 {
+		meta.Episode = config.GetEpisode()
+	}
+	if meta.Date == "" {
+		meta.Date = config.GetDate()
+	}
+	if meta.EpisodeTitle == "" {
+		meta.EpisodeTitle = config.GetEpisodeTitle()
+	}
+	if meta.Service == "" {
+		meta.Service = config.GetService()
+	}
 	if meta.Source == "" {
 		meta.Source = config.GetSource()
 	}
+	if !meta.Repack {
+		meta.Repack = config.GetRepack()
+	}
 	if meta.Group == "" {
 		meta.Group = config.GetGroup()
+	}
+	if !meta.IsTV && config.GetIsTV() {
+		meta.IsTV = true
+	} else if meta.IsTV && config.GetIsMovie() {
+		meta.IsTV = false
 	}
 }
 

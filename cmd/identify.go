@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -61,6 +62,18 @@ var identifyCmd = &cobra.Command{
 		} else if cmd.Flags().Changed("movie") {
 			meta.IsTV = !isMovieFlag
 		}
+
+		if imdbIDFlag == "" && config.GetImdbID() != "" {
+			imdbIDFlag = config.GetImdbID()
+		}
+		if tmdbIDFlag == 0 && config.GetTmdbID() != 0 {
+			tmdbIDFlag = config.GetTmdbID()
+		}
+		if tvdbIDFlag == 0 && config.GetTvdbID() != 0 {
+			tvdbIDFlag = config.GetTvdbID()
+		}
+
+		meta.SetDefaults()
 
 		if meta.Title == "" && imdbIDFlag == "" && tmdbIDFlag == 0 && tvdbIDFlag == 0 {
 			fmt.Println("Error: Title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")

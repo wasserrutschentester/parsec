@@ -29,6 +29,26 @@ func getString(key string) string {
 	return viper.GetString(key)
 }
 
+func getInt(key string) int {
+	if activePreset != "" {
+		presetKey := "preset." + activePreset + "." + key
+		if viper.IsSet(presetKey) {
+			return viper.GetInt(presetKey)
+		}
+	}
+	return viper.GetInt(key)
+}
+
+func getBool(key string) bool {
+	if activePreset != "" {
+		presetKey := "preset." + activePreset + "." + key
+		if viper.IsSet(presetKey) {
+			return viper.GetBool(presetKey)
+		}
+	}
+	return viper.GetBool(key)
+}
+
 func GetTemplate() string {
 	return getString("template")
 }
@@ -37,12 +57,64 @@ func GetPreferredLanguage() string {
 	return getString("preferred_language")
 }
 
+func GetTitle() string {
+	return getString("title")
+}
+
+func GetYear() int {
+	return getInt("year")
+}
+
+func GetSeason() int {
+	return getInt("season")
+}
+
+func GetEpisode() int {
+	return getInt("episode")
+}
+
+func GetDate() string {
+	return getString("date")
+}
+
+func GetEpisodeTitle() string {
+	return getString("episode_title")
+}
+
+func GetService() string {
+	return getString("service")
+}
+
 func GetSource() string {
 	return getString("source")
 }
 
+func GetRepack() bool {
+	return getBool("repack")
+}
+
 func GetGroup() string {
 	return getString("group")
+}
+
+func GetIsTV() bool {
+	return getBool("is_tv")
+}
+
+func GetIsMovie() bool {
+	return getBool("is_movie")
+}
+
+func GetImdbID() string {
+	return getString("imdb_id")
+}
+
+func GetTmdbID() int {
+	return getInt("tmdb_id")
+}
+
+func GetTvdbID() int {
+	return getInt("tvdb_id")
 }
 
 func GetVideoCodecAVC() string {

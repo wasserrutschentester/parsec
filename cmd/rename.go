@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
@@ -86,8 +87,21 @@ func renameFile(cmd *cobra.Command, filePath string) {
 
 	// 4. MDB Search to get "correct" title and year
 	var result *mdb.SearchResult
-	if imdbIDFlag != "" || tmdbIDFlag > 0 || tvdbIDFlag > 0 {
-		result, _ = mdbSearch.SearchByID(imdbIDFlag, tmdbIDFlag, tvdbIDFlag, meta.IsTV)
+	imdbID := imdbIDFlag
+	if imdbID == "" {
+		imdbID = config.GetImdbID()
+	}
+	tmdbID := tmdbIDFlag
+	if tmdbID == 0 {
+		tmdbID = config.GetTmdbID()
+	}
+	tvdbID := tvdbIDFlag
+	if tvdbID == 0 {
+		tvdbID = config.GetTvdbID()
+	}
+
+	if imdbID != "" || tmdbID > 0 || tvdbID > 0 {
+		result, _ = mdbSearch.SearchByID(imdbID, tmdbID, tvdbID, meta.IsTV)
 	} else {
 		searchQuery := filename.DeobfuscateTitle(meta.Title)
 		result, _ = mdbSearch.FuzzySearch(searchQuery, meta.Year, meta.IsTV)
