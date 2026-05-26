@@ -54,11 +54,13 @@ Rename files based on metadata and naming conventions.
 
 ## Configuration
 
-By default, `parsec` looks for a configuration file at `$HOME/.config/parsec/config.toml` or `.parsec.toml` in the current directory.
+`parsec` uses a TOML-based configuration system. By default, it looks for a configuration file at `$HOME/.config/parsec/config.toml` or `config.toml` in the current directory.
+
+For a full list of available options and detailed information on the preset system, see the [Configuration Documentation](docs/config.md).
 
 ### Presets
 
-Presets allow you to override global configuration values for specific use cases, such as different naming conventions for different release groups or sources.
+Presets allow you to define groups of settings that can be activated via the `--preset` flag. This is useful for recurring release types or specific shows.
 
 Example `config.toml`:
 
@@ -67,15 +69,14 @@ template = "{title}.{year}.{resolution}.{source}.{audio_codec}{audio_channels}.{
 group = "DefaultGroup"
 source = "WEB-DL"
 
-[presets.remux]
+[preset.remux]
 source = "BluRay"
-video_codec_avc = "AVC"
-video_codec_hevc = "H265"
 template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_codec}{audio_channels}.{group}"
 
-[presets.webrip]
-source = "WEBRip"
-group = "OtherGroup"
+[preset.marvel]
+title = "Loki"
+is_tv = true
+tmdb_id = 84958
 ```
 
 You can apply a preset using the `--preset` flag:
