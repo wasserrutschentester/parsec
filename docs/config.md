@@ -136,6 +136,7 @@ You can enable or disable specific quality checks on a per-preset basis.
 -   `mdb_episode_existence`: Check if episode exists in database.
 -   `mdb_episode_title`: Verify episode title.
 -   `mdb_episode_date`: Verify episode air date.
+-   `mdb_track_languages`: Verify presence of preferred and original language tracks.
 
 ##### Examples
 

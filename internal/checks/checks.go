@@ -12,6 +12,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"golang.org/x/text/language"
 )
 
 func RunGenericChecks(meta *metadata.Metadata) {
@@ -257,7 +258,7 @@ func NormalizeForComparison(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func RunMdbChecks(meta *metadata.Metadata, imdbID string, tmdbID, tvdbID int) {
+func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata, imdbID string, tmdbID, tvdbID int) {
 	var searchResult *mdb.SearchResult
 	var searchErr error
 
@@ -290,6 +291,45 @@ func RunMdbChecks(meta *metadata.Metadata, imdbID string, tmdbID, tvdbID int) {
 	}
 	if meta.IsTV {
 		CheckEpisode(meta, searchResult)
+	}
+
+	if mi != nil && config.IsCheckEnabled("mdb_track_languages") {
+		CheckTrackLanguages(mi, searchResult)
+	}
+}
+
+func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) {
+	prefLang := config.GetPreferredLanguage()
+	origLang := result.OriginalLanguage
+
+	audioLangs := mi.GetAudioLanguages()
+	subLangs := mi.GetSubtitleLanguages()
+
+	prefTag := language.Make(prefLang)
+	origTag := language.Make(origLang)
+
+	check := func(trackType string, langs []string, targetTag language.Tag, targetStr string, label string) {
+		if targetStr == "" {
+			return
+		}
+		found := false
+		for _, l := range langs {
+			if language.Make(l) == targetTag {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fmt.Printf("QA Warning: %s track in %s language '%s' is missing.\n", trackType, label, targetStr)
+		}
+	}
+
+	check("Audio", audioLangs, prefTag, prefLang, "preferred")
+	check("Subtitle", subLangs, prefTag, prefLang, "preferred")
+
+	if origLang != "" && origTag != prefTag {
+		check("Audio", audioLangs, origTag, origLang, "original")
+		check("Subtitle", subLangs, origTag, origLang, "original")
 	}
 }
 

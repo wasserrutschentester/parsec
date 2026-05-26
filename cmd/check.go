@@ -89,7 +89,7 @@ var checkCmd = &cobra.Command{
 		if tvdbID == 0 {
 			tvdbID = config.GetTvdbID()
 		}
-		checks.RunMdbChecks(match, imdbID, tmdbID, tvdbID)
+		checks.RunMdbChecks(mi, match, imdbID, tmdbID, tvdbID)
 	},
 }
 

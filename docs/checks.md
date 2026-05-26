@@ -62,5 +62,6 @@ This document lists all individual checks performed by the `parsec check` comman
 | Episode Existence | `checks.CheckEpisode` | `mdb_episode_existence` | Verifies that the Season/Episode exists in the database. |
 | Episode Title Match | `checks.CheckEpisodeTitle` | `mdb_episode_title` | Compares filename episode title with the official database title. |
 | Special Date Match | `checks.CheckSpecialDate` | `mdb_episode_date` | Verifies air date for TV specials against database records. |
+| Track Languages | `checks.CheckTrackLanguages` | `mdb_track_languages` | Verifies presence of audio and subtitle tracks in both preferred and original languages. |
 
 
