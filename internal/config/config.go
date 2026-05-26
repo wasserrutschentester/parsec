@@ -126,9 +126,9 @@ func GetVideoCodecHEVC() string {
 }
 
 func GetTmdbApiKey() string {
-	return viper.GetString("tmdb_api_key")
+	return viper.GetString("api_keys.tmdb")
 }
 
 func GetTvdbApiKey() string {
-	return viper.GetString("tvdb_api_key")
+	return viper.GetString("api_keys.tvdb")
 }
