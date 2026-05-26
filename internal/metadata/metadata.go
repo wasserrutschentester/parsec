@@ -91,9 +91,9 @@ func AudioCodecName(codec string) string {
 func VideoCodecName(codec string) string {
 	switch codec {
 	case "AVC":
-		return "H.264"
+		return config.GetVideoCodecAVC()
 	case "HEVC":
-		return "H.265"
+		return config.GetVideoCodecHEVC()
 	default:
 		return codec
 	}

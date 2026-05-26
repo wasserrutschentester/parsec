@@ -9,6 +9,8 @@ func InitDefaults() {
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("source", "WEB-DL")
 	viper.SetDefault("group", "4Rocket")
+	viper.SetDefault("video_codec_avc", "H.264")
+	viper.SetDefault("video_codec_hevc", "H.265")
 }
 
 func GetTemplate() string {
@@ -25,6 +27,14 @@ func GetSource() string {
 
 func GetGroup() string {
 	return viper.GetString("group")
+}
+
+func GetVideoCodecAVC() string {
+	return viper.GetString("video_codec_avc")
+}
+
+func GetVideoCodecHEVC() string {
+	return viper.GetString("video_codec_hevc")
 }
 
 func GetTmdbApiKey() string {
