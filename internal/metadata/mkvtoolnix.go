@@ -35,9 +35,9 @@ type EbmlTrackProperties struct {
 	Source           string `json:"tag_source,omitempty"`
 	Number           int    `json:"number,omitempty"`
 	IndexEntries     int    `json:"num_index_entries,omitempty"`
-	Enabled          bool   `json:"flag_enabled,omitempty"`
-	Default          bool   `json:"flag_default,omitempty"`
-	Forced           bool   `json:"flag_forced,omitempty"`
+	Enabled          bool   `json:"enabled_track,omitempty"`
+	Default          bool   `json:"default_track,omitempty"`
+	Forced           bool   `json:"forced_track,omitempty"`
 	HearingImpaired  bool   `json:"flag_hearing_impaired,omitempty"`
 	VisualImpaired   bool   `json:"flag_visual_impaired,omitempty"`
 	Commentary       bool   `json:"flag_commentary,omitempty"`
