@@ -3,6 +3,7 @@ package metadata
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
@@ -26,6 +27,7 @@ type Metadata struct {
 	AudioChannels string
 	VideoCodec    string
 	Group         string
+	CRC           string
 	IsTV          bool
 }
 
@@ -117,46 +119,84 @@ func (meta *Metadata) SetDefaults() {
 }
 
 func (meta *Metadata) String() string {
-	name := meta.Title
+	return meta.Render(config.GetTemplate())
+}
+
+func (meta *Metadata) Render(template string) string {
+	replacements := map[string]string{
+		"{title}":          meta.Title,
+		"{date}":           meta.Date,
+		"{episode_title}":  meta.EpisodeTitle,
+		"{language}":       LanguageName(meta.Language),
+		"{resolution}":     meta.Resolution,
+		"{service}":        meta.Service,
+		"{source}":         meta.Source,
+		"{audio_codec}":    meta.AudioCodec,
+		"{audio_channels}": meta.AudioChannels,
+		"{video_codec}":    meta.VideoCodec,
+		"{group}":          meta.Group,
+		"{crc}":            meta.CRC,
+	}
+
 	if meta.Year > 0 {
-		name += fmt.Sprintf(".%d", meta.Year)
+		replacements["{year}"] = fmt.Sprintf("%d", meta.Year)
 	}
-	if meta.Season > 0 || meta.Episode > 0 {
-		name += fmt.Sprintf(".S%02dE%02d", meta.Season, meta.Episode)
+	if meta.Season > 0 || meta.IsTV {
+		replacements["{season_raw}"] = fmt.Sprintf("%d", meta.Season)
+		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
+		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
 	}
-	if meta.Date != "" {
-		name += fmt.Sprintf(".%s", meta.Date)
-	}
-	if meta.EpisodeTitle != "" {
-		name += fmt.Sprintf(".%s", meta.EpisodeTitle)
-	}
-	if meta.Language != "" {
-		name += fmt.Sprintf(".%s", LanguageName(meta.Language))
+	if meta.Episode > 0 {
+		replacements["{episode_raw}"] = fmt.Sprintf("%d", meta.Episode)
+		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
+		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
+		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)
 	}
 	if meta.Repack {
-		name += fmt.Sprintf(".REPACK")
+		replacements["{repack}"] = "REPACK"
 	}
-	if meta.Resolution != "" {
-		name += fmt.Sprintf(".%s", meta.Resolution)
+
+	result := template
+	for tag, val := range replacements {
+		result = strings.ReplaceAll(result, tag, val)
 	}
-	if meta.Service != "" {
-		name += fmt.Sprintf(".%s", meta.Service)
+
+	return CleanName(result)
+}
+
+func CleanName(name string) string {
+	// 0. remove remaining keys
+	reKeys := []*regexp.Regexp{
+		regexp.MustCompile(`\{[^}]*\}`),
 	}
-	if meta.Source != "" {
-		name += fmt.Sprintf(".%s", meta.Source)
+	for _, re := range reKeys {
+		name = re.ReplaceAllString(name, "")
 	}
-	if meta.AudioCodec != "" {
-		name += fmt.Sprintf(".%s", meta.AudioCodec)
+
+	// 1. Remove empty enclosures (parentheses, brackets, braces) that might contain only separators
+	reEmptyEnclosures := []*regexp.Regexp{
+		regexp.MustCompile(`\(\s*[\.\-]*\s*\)`),
+		regexp.MustCompile(`\[\s*[\.\-]*\s*\]`),
+		regexp.MustCompile(`\{\s*[\.\-]*\s*\}`),
 	}
-	if meta.AudioChannels != "" {
-		name += fmt.Sprintf("%s", meta.AudioChannels)
+	for _, re := range reEmptyEnclosures {
+		name = re.ReplaceAllString(name, "")
 	}
-	if meta.VideoCodec != "" {
-		name += fmt.Sprintf(".%s", meta.VideoCodec)
-	}
-	if meta.Group != "" {
-		name += fmt.Sprintf("-%s", meta.Group)
-	}
+
+	// 2. Collapse multiple separators
+	name = regexp.MustCompile(`\.+`).ReplaceAllString(name, ".")
+	name = regexp.MustCompile(`-+`).ReplaceAllString(name, "-")
+	name = regexp.MustCompile(`\s+`).ReplaceAllString(name, " ")
+
+	// 3. Clean up separator combinations
+	name = strings.ReplaceAll(name, ".-", "-")
+	name = strings.ReplaceAll(name, "-.", "-")
+	name = strings.ReplaceAll(name, ". ", ".")
+	name = strings.ReplaceAll(name, " .", ".")
+
+	// 4. Trim leading/trailing separators and spaces
+	name = strings.Trim(name, ". -")
+
 	return name
 }
 
