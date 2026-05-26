@@ -7,6 +7,7 @@ import (
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 	"github.com/spf13/cobra"
 )
 
@@ -80,6 +81,8 @@ var identifyCmd = &cobra.Command{
 			return
 		}
 
+		warnOnIDMismatch(filePath, result)
+
 		mdb.PrintResult(*result)
 		tags := mdb.GetMatroskaTags(*result)
 
@@ -144,4 +147,31 @@ func init() {
 
 	// Disable sorting to keep the defined order
 	identifyCmd.Flags().SortFlags = false
+}
+
+func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
+	if filePath == "" {
+		return
+	}
+
+	mi, err := mediainfo.Get(filePath)
+	if err != nil {
+		return
+	}
+
+	tagImdb, tagTmdb, tagTvdb, _ := mi.GetMdbIDs()
+	if (tagImdb != "" && result.ImdbID != "" && tagImdb != result.ImdbID) ||
+		(tagTmdb != 0 && result.TmdbID != 0 && tagTmdb != result.TmdbID) ||
+		(tagTvdb != 0 && result.TvdbID != 0 && tagTvdb != result.TvdbID) {
+		fmt.Printf("\nWARNING: Selected result IDs do not match file tags:\n")
+		if tagImdb != "" && tagImdb != result.ImdbID {
+			fmt.Printf("  IMDB: File=%s, Selected=%s\n", tagImdb, result.ImdbID)
+		}
+		if tagTmdb != 0 && tagTmdb != result.TmdbID {
+			fmt.Printf("  TMDB: File=%d, Selected=%d\n", tagTmdb, result.TmdbID)
+		}
+		if tagTvdb != 0 && tagTvdb != result.TvdbID {
+			fmt.Printf("  TVDB: File=%d, Selected=%d\n", tagTvdb, result.TvdbID)
+		}
+	}
 }

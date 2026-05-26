@@ -83,6 +83,21 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		meta.Group = groupFlag
 	}
 
+	// Get IDs from file tags
+	tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
+	if meta.ImdbID == "" {
+		meta.ImdbID = tagImdb
+	}
+	if meta.TmdbID == 0 {
+		meta.TmdbID = tagTmdb
+	}
+	if meta.TvdbID == 0 {
+		meta.TvdbID = tagTvdb
+	}
+	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
+		meta.IsTV = true
+	}
+
 	if imdbIDFlag != "" {
 		meta.ImdbID = imdbIDFlag
 	}

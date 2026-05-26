@@ -77,6 +77,21 @@ var checkCmd = &cobra.Command{
 
 		checks.RunGenericChecks(match)
 
+		// Get IDs from file tags
+		tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
+		if match.ImdbID == "" {
+			match.ImdbID = tagImdb
+		}
+		if match.TmdbID == 0 {
+			match.TmdbID = tagTmdb
+		}
+		if match.TvdbID == 0 {
+			match.TvdbID = tagTvdb
+		}
+		if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
+			match.IsTV = true
+		}
+
 		if imdbIDFlag != "" {
 			match.ImdbID = imdbIDFlag
 		}

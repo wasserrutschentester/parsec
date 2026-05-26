@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -88,6 +89,80 @@ func Get(filePath string) (*MediaInfo, error) {
 	}
 
 	return &mi, nil
+}
+
+func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb int, tvdb int, isTV bool) {
+	extra := mi.getGeneralExtra()
+	if extra == nil {
+		return
+	}
+
+	imdb = getExtraString(extra, "IMDB")
+
+	// TMDB
+	tmdbVal := getExtraString(extra, "TMDB")
+	tmdb, tmdbType := parseID(tmdbVal)
+	if tmdbType == "tv" {
+		isTV = true
+	}
+
+	// TVDB
+	tvdbTag := getExtraString(extra, "TVDB")
+	tvdb, tvdbType := parseID(tvdbTag)
+	if tvdbType == "series" || tvdbType == "tv" {
+		isTV = true
+	}
+
+	// TVDB2
+	tvdb2 := getExtraString(extra, "TVDB2")
+	tvdb2ID, tvdb2Type := parseID(tvdb2)
+	if tvdb2Type == "series" {
+		if tvdb == 0 {
+			tvdb = tvdb2ID
+		}
+		isTV = true
+	} else if tvdb2Type == "episodes" {
+		isTV = true
+	}
+
+	return imdb, tmdb, tvdb, isTV
+}
+
+func (mi *MediaInfo) getGeneralExtra() map[string]interface{} {
+	for i := range mi.Media.Tracks {
+		if mi.Media.Tracks[i].Type == "General" {
+			return mi.Media.Tracks[i].Extra
+		}
+	}
+	return nil
+}
+
+func getExtraString(extra map[string]interface{}, key string) string {
+	v, ok := extra[key]
+	if !ok {
+		return ""
+	}
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', 0, 64)
+	default:
+		return ""
+	}
+}
+
+func parseID(val string) (int, string) {
+	if val == "" {
+		return 0, ""
+	}
+	parts := strings.Split(val, "/")
+	if len(parts) > 1 {
+		id, _ := strconv.Atoi(parts[1])
+		return id, parts[0]
+	}
+	id, _ := strconv.Atoi(val)
+	return id, ""
 }
 
 func (mi *MediaInfo) isVideo() bool {
