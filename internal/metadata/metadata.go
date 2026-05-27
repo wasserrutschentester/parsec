@@ -108,11 +108,47 @@ func VideoCodecName(codec string) string {
 	}
 }
 
-func HeightToResolution(height int) string {
+func HeightToResolution(height int, scanType string, frameRate float64) string {
 	if height <= 0 {
 		return ""
 	}
-	return fmt.Sprintf("%dp", height)
+
+	suffix := "p"
+	if strings.Contains(strings.ToLower(scanType), "interlaced") || strings.Contains(strings.ToLower(scanType), "mbaff") {
+		suffix = "i"
+	}
+
+	switch {
+	case height >= 3200:
+		return "4320p"
+	case height >= 1600:
+		return "2160p"
+	case height >= 1164:
+		return "1440p"
+	case height >= 800:
+		return "1080" + suffix
+	case height >= 640:
+		return "720p"
+	case height >= 576:
+		return "576" + suffix
+	case height >= 480 && frameRate < 24.9:
+		// If it's at least 480 but frame rate is NTSC-like, it's 480
+		return "480" + suffix
+	case height >= 480 && frameRate >= 24.9:
+		// If it's at least 480 and frame rate is PAL-like, it's 576 (likely cropped 576)
+		return "576" + suffix
+	default:
+		// Logic for SD/DVD to differentiate PAL/NTSC based on frame rate if height is non-standard (cropped below 480)
+		if frameRate > 0 {
+			if frameRate >= 24.9 && frameRate <= 25.1 || frameRate >= 49.9 && frameRate <= 50.1 {
+				return "576" + suffix
+			}
+			if frameRate >= 23.9 && frameRate <= 24.1 || frameRate >= 29.9 && frameRate <= 30.1 || frameRate >= 59.9 && frameRate <= 60.1 {
+				return "480" + suffix
+			}
+		}
+		return fmt.Sprintf("%d%s", height, suffix)
+	}
 }
 
 func (meta *Metadata) SetDefaults() {

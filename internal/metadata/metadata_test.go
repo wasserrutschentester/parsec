@@ -87,18 +87,29 @@ func TestVideoCodecName(t *testing.T) {
 
 func TestHeightToResolution(t *testing.T) {
 	tests := []struct {
-		height int
-		want   string
+		name      string
+		height    int
+		scanType  string
+		frameRate float64
+		want      string
 	}{
-		{1080, "1080p"},
-		{720, "720p"},
-		{0, ""},
-		{-1, ""},
+		{"1080p", 1080, "Progressive", 23.976, "1080p"},
+		{"1080i", 1080, "Interlaced", 25.000, "1080i"},
+		{"1080mbaff", 1080, "MBAFF", 25.000, "1080i"},
+		{"720p", 720, "Progressive", 50.000, "720p"},
+		{"576p PAL", 576, "Progressive", 25.000, "576p"},
+		{"576i PAL", 576, "Interlaced", 25.000, "576i"},
+		{"480p NTSC", 480, "Progressive", 23.976, "480p"},
+		{"Cropped PAL", 544, "Progressive", 25.000, "576p"},
+		{"Cropped NTSC", 400, "Progressive", 23.976, "480p"},
+		{"4K", 2160, "Progressive", 60.000, "2160p"},
+		{"8K", 4320, "Progressive", 60.000, "4320p"},
+		{"Invalid", 0, "", 0, ""},
 	}
 	for _, tt := range tests {
-		t.Run(string(rune(tt.height)), func(t *testing.T) {
-			if got := HeightToResolution(tt.height); got != tt.want {
-				t.Errorf("HeightToResolution(%d) = %v, want %v", tt.height, got, tt.want)
+		t.Run(tt.name, func(t *testing.T) {
+			if got := HeightToResolution(tt.height, tt.scanType, tt.frameRate); got != tt.want {
+				t.Errorf("HeightToResolution(%d, %s, %f) = %v, want %v", tt.height, tt.scanType, tt.frameRate, got, tt.want)
 			}
 		})
 	}
