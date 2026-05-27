@@ -69,17 +69,23 @@ func TestAudioCodecName(t *testing.T) {
 func TestVideoCodecName(t *testing.T) {
 	config.InitDefaults()
 	tests := []struct {
-		codec string
-		want  string
+		format  string
+		version string
+		hint    string
+		want    string
 	}{
-		{"AVC", "H.264"},
-		{"HEVC", "H.265"},
-		{"AV1", "AV1"},
+		{"AVC", "", "", "H.264"},
+		{"HEVC", "", "", "H.265"},
+		{"AV1", "", "", "AV1"},
+		{"MPEG Video", "Version 2", "", "MPEG2"},
+		{"MPEG-4 Visual", "", "XviD", "XviD"},
+		{"MPEG-4 Visual", "", "divx", "DivX"},
+		{"MPEG-4 Visual", "", "", "MPEG4"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.codec, func(t *testing.T) {
-			if got := VideoCodecName(tt.codec); got != tt.want {
-				t.Errorf("VideoCodecName() = %v, want %v", got, tt.want)
+		t.Run(tt.format, func(t *testing.T) {
+			if got := VideoCodecName(tt.format, tt.version, tt.hint); got != tt.want {
+				t.Errorf("VideoCodecName(%s, %s, %s) = %v, want %v", tt.format, tt.version, tt.hint, got, tt.want)
 			}
 		})
 	}

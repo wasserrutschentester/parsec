@@ -97,14 +97,27 @@ func AudioCodecName(codec string) string {
 	}
 }
 
-func VideoCodecName(codec string) string {
-	switch codec {
+func VideoCodecName(format, formatVersion, codecIDHint string) string {
+	switch format {
 	case "AVC":
 		return config.GetVideoCodecAVC()
 	case "HEVC":
 		return config.GetVideoCodecHEVC()
+	case "MPEG Video":
+		if strings.Contains(formatVersion, "2") {
+			return "MPEG2"
+		}
+		return "MPEG"
+	case "MPEG-4 Visual":
+		if strings.Contains(strings.ToUpper(codecIDHint), "XVID") {
+			return "XviD"
+		}
+		if strings.Contains(strings.ToUpper(codecIDHint), "DIVX") {
+			return "DivX"
+		}
+		return "MPEG4"
 	default:
-		return codec
+		return format
 	}
 }
 

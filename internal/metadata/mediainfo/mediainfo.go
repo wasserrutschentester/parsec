@@ -267,7 +267,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" && meta.Resolution == "" {
 			meta.Resolution = metadata.HeightToResolution(track.Height, track.ScanType, track.FrameRate)
-			meta.VideoCodec = metadata.VideoCodecName(track.Format)
+			meta.VideoCodec = metadata.VideoCodecName(track.Format, track.Format_Version, track.CodecID_Hint)
 			if track.BitDepth != 8 {
 				// ignore bit depth if it's 8 (default)
 				meta.BitDepth = track.BitDepth
