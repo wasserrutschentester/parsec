@@ -275,15 +275,9 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 			meta.HDR = track.detectHDR()
 
 		} else if track.Type == "Audio" && meta.AudioCodec == "" {
-			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.Format_Profile)
+			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.Format_Profile, track.Format_AdditionalFeatures)
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
-			if strings.Contains(strings.ToUpper(track.Format_AdditionalFeatures), "ATMOS") ||
-				strings.Contains(strings.ToUpper(track.Title), "ATMOS") {
-				meta.AudioMeta = "Atmos"
-			} else if strings.Contains(strings.ToUpper(track.Format_AdditionalFeatures), "AURO3D") ||
-				strings.Contains(strings.ToUpper(track.Title), "AURO3D") {
-				meta.AudioMeta = "Auro3D"
-			}
+			meta.AudioMeta = metadata.AudioMetaName(track.Title, track.Format_AdditionalFeatures)
 		}
 	}
 	mi.SetLanguageTag(meta)

@@ -84,17 +84,67 @@ func ChanToNotation(channels int) string {
 	}
 }
 
-func AudioCodecName(codec string) string {
-	switch codec {
+func AudioMetaName(title, additionalFeatures string) string {
+	uTitle := strings.ToUpper(title)
+	uFeatures := strings.ToUpper(additionalFeatures)
+
+	if strings.Contains(uFeatures, "ATMOS") || strings.Contains(uFeatures, "JOC") || strings.Contains(uTitle, "ATMOS") {
+		return "Atmos"
+	}
+	if strings.Contains(uFeatures, "AURO3D") || strings.Contains(uTitle, "AURO3D") {
+		return "Auro3D"
+	}
+	return ""
+}
+
+func AudioCodecName(format, profile, additionalFeatures string) string {
+	uFormat := strings.ToUpper(format)
+	uProfile := strings.ToUpper(profile)
+	uFeatures := strings.ToUpper(additionalFeatures)
+
+	switch uFormat {
 	case "AAC":
 		return "AAC"
 	case "AC-3":
+		if strings.Contains(uFeatures, "DEP") || strings.Contains(uFeatures, "DEPENDENT") {
+			return "DDP"
+		}
 		return "DD"
 	case "E-AC-3":
 		return "DDP"
+	case "MLP FBA":
+		return "TrueHD"
+	case "DTS":
+		return detectDTS(uProfile, uFeatures)
 	default:
-		return codec
+		return format
 	}
+}
+
+func detectDTS(uProfile, uFeatures string) string {
+	combined := uProfile + " " + uFeatures
+	isXLL := strings.Contains(combined, "XLL")
+
+	// Check for "X" as a standalone word/token to avoid matching inside "XLL"
+	reX := regexp.MustCompile(`\bX\b`)
+	isX := reX.MatchString(combined)
+
+	if isXLL && isX {
+		return "DTS-X"
+	}
+	if isXLL || strings.Contains(combined, "MA") {
+		return "DTS-HD.MA"
+	}
+	if strings.Contains(combined, "XBR") || strings.Contains(combined, "XXCH") || strings.Contains(combined, "HRA") {
+		return "DTS-HD.HRA"
+	}
+	if strings.Contains(combined, "ES") {
+		return "DTS-ES"
+	}
+	if strings.Contains(combined, "96/24") {
+		return "DTS"
+	}
+	return "DTS"
 }
 
 func VideoCodecName(format, formatVersion, codecIDHint string) string {

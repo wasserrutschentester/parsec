@@ -49,18 +49,35 @@ func TestChanToNotation(t *testing.T) {
 
 func TestAudioCodecName(t *testing.T) {
 	tests := []struct {
-		codec string
-		want  string
+		format   string
+		profile  string
+		features string
+		want     string
 	}{
-		{"AAC", "AAC"},
-		{"AC-3", "DD"},
-		{"E-AC-3", "DDP"},
-		{"DTS", "DTS"},
+		{"AAC", "", "", "AAC"},
+		{"AAC", "HE-AAC", "", "AAC"}, // ignore HE-AAC
+		{"AAC", "", "SBR", "AAC"},    // ignore HE-AAC
+		{"AC-3", "", "", "DD"},
+		{"AC-3", "", "Dependent", "DDP"},
+		{"AC-3", "", "Dep", "DDP"},
+		{"E-AC-3", "", "", "DDP"},
+		{"MLP FBA", "", "", "TrueHD"},
+		{"DTS", "MA", "", "DTS-HD.MA"},
+		{"DTS", "XLL", "", "DTS-HD.MA"},
+		{"DTS", "MA / XLL", "", "DTS-HD.MA"},
+		{"DTS", "HRA", "", "DTS-HD.HRA"},
+		{"DTS", "XBR", "", "DTS-HD.HRA"},
+		{"DTS", "XXCH", "", "DTS-HD.HRA"},
+		{"DTS", "XLL X", "", "DTS-X"},
+		{"DTS", "XLL", "X", "DTS-X"},
+		{"DTS", "ES", "", "DTS-ES"},
+		{"DTS", "96/24", "", "DTS"}, // ignore 96/24
+		{"DTS", "", "", "DTS"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.codec, func(t *testing.T) {
-			if got := AudioCodecName(tt.codec); got != tt.want {
-				t.Errorf("AudioCodecName() = %v, want %v", got, tt.want)
+		t.Run(tt.format+"_"+tt.profile+"_"+tt.features, func(t *testing.T) {
+			if got := AudioCodecName(tt.format, tt.profile, tt.features); got != tt.want {
+				t.Errorf("AudioCodecName(%s, %s, %s) = %v, want %v", tt.format, tt.profile, tt.features, got, tt.want)
 			}
 		})
 	}
