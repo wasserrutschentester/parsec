@@ -31,34 +31,98 @@ type Media struct {
 	Tracks       []Track `json:"track"`
 }
 
+// Extra represents the extra fields in a MediaInfo track.
+type Extra map[string]interface{}
+
+// GetString returns the value of the extra field with the given key as a string.
+func (e Extra) GetString(key string) string {
+	if e == nil {
+		return ""
+	}
+	v, ok := e[key]
+	if !ok {
+		return ""
+	}
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', 0, 64)
+	default:
+		return ""
+	}
+}
+
+// MediaBool represents a boolean value that can be unmarshaled  from "Yes"/"No" or standard boolean strings.
+type MediaBool bool
+
+func (mb *MediaBool) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		// Try unmarshaling as a literal bool
+		var boolean bool
+		if err := json.Unmarshal(b, &boolean); err != nil {
+			return err
+		}
+		*mb = MediaBool(boolean)
+		return nil
+	}
+
+	switch strings.ToLower(s) {
+	case "yes", "true", "1":
+		*mb = true
+	case "no", "false", "0", "":
+		*mb = false
+	default:
+		*mb = false
+	}
+	return nil
+}
+
 type Track struct {
-	Type                      string `json:"@type"`
-	TypeOrder                 *int   `json:"@typeorder,string,omitempty"`
-	ID                        string `json:"ID,omitempty"`
-	UniqueID                  string `json:"UniqueID,omitempty"`
-	Format                    string `json:"Format,omitempty"`
-	Title                     string `json:"Title,omitempty"`
-	Language                  string `json:"Language,omitempty"`
-	Duration                  string `json:"Duration,omitempty"`
-	Channels                  string `json:"Channels,omitempty"`
-	BitRate                   string `json:"BitRate,omitempty"`
-	HDR_Format_Compatibility  string `json:"HDR_Format_Compatibility,omitempty"`
-	HDR_Format                string `json:"HDR_Format,omitempty"`
-	Transfer_Characteristics  string `json:"transfer_characteristics,omitempty"`
-	Format_Version            string `json:"Format_Version,omitempty"`
-	Format_AdditionalFeatures string `json:"Format_AdditionalFeatures,omitempty"`
-	Height                    string `json:"Height,omitempty"`
-	Width                     string `json:"Width,omitempty"`
-	ScanType                  string `json:"ScanType,omitempty"`
-	FrameRate                 string `json:"FrameRate,omitempty"`
-	CodecID                   string `json:"CodecID,omitempty"`
-	CodecID_Hint              string `json:"CodecID_Hint,omitempty"`
-	Default                   string `json:"Default,omitempty"`
-	Forced                    string `json:"Forced,omitempty"`
+	Type                      string    `json:"@type"`
+	TypeOrder                 *int      `json:"@typeorder,string,omitempty"`
+	ID                        string    `json:"ID,omitempty"`
+	UniqueID                  string    `json:"UniqueID,omitempty"`
+	Format                    string    `json:"Format,omitempty"`
+	Format_Profile            string    `json:"Format_Profile,omitempty"`
+	Format_Version            string    `json:"Format_Version,omitempty"`
+	Format_AdditionalFeatures string    `json:"Format_AdditionalFeatures,omitempty"`
+	Title                     string    `json:"Title,omitempty"`
+	Language                  string    `json:"Language,omitempty"`
+	Duration                  float64   `json:"Duration,string,omitempty"`
+	Channels                  int       `json:"Channels,string,omitempty"`
+	BitRate                   int       `json:"BitRate,string,omitempty"`
+	BitRate_Mode              string    `json:"BitRate_Mode,omitempty"`
+	HDR_Format_Compatibility  string    `json:"HDR_Format_Compatibility,omitempty"`
+	HDR_Format                string    `json:"HDR_Format,omitempty"`
+	Transfer_Characteristics  string    `json:"transfer_characteristics,omitempty"`
+	Height                    int       `json:"Height,string,omitempty"`
+	Width                     int       `json:"Width,string,omitempty"`
+	DisplayAspectRatio        string    `json:"DisplayAspectRatio,omitempty"`
+	ScanType                  string    `json:"ScanType,omitempty"`
+	FrameRate                 float64   `json:"FrameRate,string,omitempty"`
+	FrameCount                int       `json:"FrameCount,string,omitempty"`
+	BitDepth                  int       `json:"BitDepth,string,omitempty"`
+	ChromaSubsampling         string    `json:"ChromaSubsampling,omitempty"`
+	SamplingRate              int       `json:"SamplingRate,string,omitempty"`
+	CodecID                   string    `json:"CodecID,omitempty"`
+	CodecID_Hint              string    `json:"CodecID_Hint,omitempty"`
+	Encoded_Library           string    `json:"Encoded_Library,omitempty"`
+	StreamSize                int64     `json:"StreamSize,string,omitempty"`
+	Default                   MediaBool `json:"Default,omitempty"`
+	Forced                    MediaBool `json:"Forced,omitempty"`
+
+	// General track specific
+	VideoCount     int    `json:"VideoCount,string,omitempty"`
+	AudioCount     int    `json:"AudioCount,string,omitempty"`
+	TextCount      int    `json:"TextCount,string,omitempty"`
+	FileSize       int64  `json:"FileSize,string,omitempty"`
+	FileExtension  string `json:"FileExtension,omitempty"`
+	OverallBitRate int    `json:"OverallBitRate,string,omitempty"`
 
 	// Add more fields as needed, matching the JSON keys
-	Extra map[string]interface{} `json:"extra,omitempty"`
-	// For fields you don't want to explicitly type, use map[string]interface{}
+	Extra Extra `json:"extra,omitempty"`
 }
 
 func Get(filePath string) (*MediaInfo, error) {
@@ -66,7 +130,7 @@ func Get(filePath string) (*MediaInfo, error) {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
-	cmd := exec.Command("mediainfo", "--Output=JSON", filePath)
+	cmd := exec.Command("mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
 	out, err := cmd.Output()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
@@ -97,24 +161,24 @@ func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb int, tvdb int, isTV bool) {
 		return
 	}
 
-	imdb = getExtraString(extra, "IMDB")
+	imdb = extra.GetString("IMDB")
 
 	// TMDB
-	tmdbVal := getExtraString(extra, "TMDB")
+	tmdbVal := extra.GetString("TMDB")
 	tmdb, tmdbType := parseID(tmdbVal)
 	if tmdbType == "tv" {
 		isTV = true
 	}
 
 	// TVDB
-	tvdbTag := getExtraString(extra, "TVDB")
+	tvdbTag := extra.GetString("TVDB")
 	tvdb, tvdbType := parseID(tvdbTag)
 	if tvdbType == "series" || tvdbType == "tv" {
 		isTV = true
 	}
 
 	// TVDB2
-	tvdb2 := getExtraString(extra, "TVDB2")
+	tvdb2 := extra.GetString("TVDB2")
 	tvdb2ID, tvdb2Type := parseID(tvdb2)
 	if tvdb2Type == "series" {
 		if tvdb == 0 {
@@ -128,28 +192,13 @@ func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb int, tvdb int, isTV bool) {
 	return imdb, tmdb, tvdb, isTV
 }
 
-func (mi *MediaInfo) getGeneralExtra() map[string]interface{} {
+func (mi *MediaInfo) getGeneralExtra() Extra {
 	for i := range mi.Media.Tracks {
 		if mi.Media.Tracks[i].Type == "General" {
 			return mi.Media.Tracks[i].Extra
 		}
 	}
 	return nil
-}
-
-func getExtraString(extra map[string]interface{}, key string) string {
-	v, ok := extra[key]
-	if !ok {
-		return ""
-	}
-	switch val := v.(type) {
-	case string:
-		return val
-	case float64:
-		return strconv.FormatFloat(val, 'f', 0, 64)
-	default:
-		return ""
-	}
 }
 
 func parseID(val string) (int, string) {
@@ -187,13 +236,11 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	meta := &metadata.Metadata{}
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" {
-			height, _ := strconv.Atoi(track.Height)
-			meta.Resolution = metadata.HeightToResolution(height)
+			meta.Resolution = metadata.HeightToResolution(track.Height)
 			meta.VideoCodec = metadata.VideoCodecName(track.Format)
 		} else if track.Type == "Audio" {
 			meta.AudioCodec = metadata.AudioCodecName(track.Format)
-			channels, _ := strconv.Atoi(track.Channels)
-			meta.AudioChannels = metadata.ChanToNotation(channels)
+			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
 		}
 	}
 	meta.Language = mi.GetLanguageTag()
@@ -259,4 +306,13 @@ func (mi *MediaInfo) GetLanguageTag() string {
 		languageTag += ".DL"
 	}
 	return languageTag
+}
+
+func (mi *MediaInfo) Print() {
+	b, err := json.MarshalIndent(mi, "", "  ")
+	if err != nil {
+		fmt.Printf("Error marshaling to JSON: %v\n", err)
+		return
+	}
+	fmt.Println(string(b))
 }

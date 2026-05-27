@@ -70,38 +70,38 @@ func TestCheckRedundantAudio(t *testing.T) {
 func TestCheckResolution(t *testing.T) {
 	tests := []struct {
 		name     string
-		width    string
-		height   string
+		width    int
+		height   int
 		wantWarn bool
 	}{
 		{
 			name:     "Standard 1080p",
-			width:    "1920",
-			height:   "1080",
+			width:    1920,
+			height:   1080,
 			wantWarn: false,
 		},
 		{
 			name:     "Cropped 1080p",
-			width:    "1920",
-			height:   "800",
+			width:    1920,
+			height:   800,
 			wantWarn: false,
 		},
 		{
 			name:     "Non-mod2",
-			width:    "1919",
-			height:   "800",
+			width:    1919,
+			height:   800,
 			wantWarn: true,
 		},
 		{
 			name:     "Non-standard width",
-			width:    "1900",
-			height:   "800",
+			width:    1900,
+			height:   800,
 			wantWarn: true,
 		},
 		{
 			name:     "Portrait mode",
-			width:    "800",
-			height:   "1920",
+			width:    800,
+			height:   1920,
 			wantWarn: true,
 		},
 	}

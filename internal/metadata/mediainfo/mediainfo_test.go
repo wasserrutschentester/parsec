@@ -1,12 +1,236 @@
 package mediainfo
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 )
+
+func TestMediaInfo_UnmarshalFields(t *testing.T) {
+	jsonData := `{
+		"media": {
+			"track": [
+				{
+					"@type": "General",
+					"VideoCount": "1",
+					"AudioCount": "2",
+					"FileSize": "12345678",
+					"OverallBitRate": "5000"
+				},
+				{
+					"@type": "Video",
+					"Format_Profile": "High@L4.1",
+					"BitDepth": "8",
+					"ChromaSubsampling": "4:2:0",
+					"StreamSize": "1000000",
+					"FrameCount": "24000",
+					"Encoded_Library": "x264"
+				},
+				{
+					"@type": "Audio",
+					"SamplingRate": "48000",
+					"BitRate_Mode": "CBR"
+				}
+			]
+		}
+	}`
+
+	var mi MediaInfo
+	err := json.Unmarshal([]byte(jsonData), &mi)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	gen := mi.Media.Tracks[0]
+	if gen.VideoCount != 1 || gen.AudioCount != 2 || gen.FileSize != 12345678 || gen.OverallBitRate != 5000 {
+		t.Errorf("General track fields mismatch: %+v", gen)
+	}
+
+	video := mi.Media.Tracks[1]
+	if video.Format_Profile != "High@L4.1" || video.BitDepth != 8 || video.ChromaSubsampling != "4:2:0" || video.StreamSize != 1000000 || video.FrameCount != 24000 || video.Encoded_Library != "x264" {
+		t.Errorf("Video track fields mismatch: %+v", video)
+	}
+
+	audio := mi.Media.Tracks[2]
+	if audio.SamplingRate != 48000 || audio.BitRate_Mode != "CBR" {
+		t.Errorf("Audio track fields mismatch: %+v", audio)
+	}
+}
+
+func TestMediaInfo_Unmarshal(t *testing.T) {
+	jsonData := `{
+		"creatingLibrary": {
+			"name": "MediaInfoLib",
+			"version": "24.01",
+			"url": "https://mediaarea.net"
+		},
+		"media": {
+			"@ref": "test.mkv",
+			"track": [
+				{
+					"@type": "General",
+					"Duration": "123.456",
+					"extra": {
+						"IMDB": "tt1234567"
+					}
+				},
+				{
+					"@type": "Video",
+					"Width": "1920",
+					"Height": "1080",
+					"FrameRate": "23.976",
+					"Default": "Yes",
+					"Forced": "No"
+				},
+				{
+					"@type": "Audio",
+					"Channels": "6",
+					"Default": "No",
+					"Forced": "No"
+				}
+			]
+		}
+	}`
+
+	var mi MediaInfo
+	err := json.Unmarshal([]byte(jsonData), &mi)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	if len(mi.Media.Tracks) != 3 {
+		t.Fatalf("Expected 3 tracks, got %d", len(mi.Media.Tracks))
+	}
+
+	video := mi.Media.Tracks[1]
+	if video.Width != 1920 || video.Height != 1080 {
+		t.Errorf("Video dimensions mismatch: %dx%d", video.Width, video.Height)
+	}
+	if video.FrameRate != 23.976 {
+		t.Errorf("Video FrameRate mismatch: %f", video.FrameRate)
+	}
+	if !bool(video.Default) {
+		t.Errorf("Video Default expected true, got false")
+	}
+	if bool(video.Forced) {
+		t.Errorf("Video Forced expected false, got true")
+	}
+
+	audio := mi.Media.Tracks[2]
+	if audio.Channels != 6 {
+		t.Errorf("Audio channels mismatch: %d", audio.Channels)
+	}
+	if bool(audio.Default) {
+		t.Errorf("Audio Default expected false, got true")
+	}
+}
+
+func TestExtra_GetString(t *testing.T) {
+	e := Extra{
+		"stringKey": "stringValue",
+		"floatKey":  float64(123),
+		"otherKey":  123,
+	}
+
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"stringKey", "stringValue"},
+		{"floatKey", "123"},
+		{"otherKey", ""},
+		{"missingKey", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			if got := e.GetString(tt.key); got != tt.want {
+				t.Errorf("GetString(%q) = %q, want %q", tt.key, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMediaInfo_GetMdbIDs(t *testing.T) {
+	tests := []struct {
+		name     string
+		extra    Extra
+		wantImdb string
+		wantTmdb int
+		wantTvdb int
+		wantIsTV bool
+	}{
+		{
+			name: "IMDB only",
+			extra: Extra{
+				"IMDB": "tt1234567",
+			},
+			wantImdb: "tt1234567",
+		},
+		{
+			name: "TMDB Movie",
+			extra: Extra{
+				"TMDB": "movie/123",
+			},
+			wantTmdb: 123,
+		},
+		{
+			name: "TMDB TV",
+			extra: Extra{
+				"TMDB": "tv/456",
+			},
+			wantTmdb: 456,
+			wantIsTV: true,
+		},
+		{
+			name: "TVDB Series",
+			extra: Extra{
+				"TVDB": "series/789",
+			},
+			wantTvdb: 789,
+			wantIsTV: true,
+		},
+		{
+			name: "TVDB2 Series",
+			extra: Extra{
+				"TVDB2": "series/101",
+			},
+			wantTvdb: 101,
+			wantIsTV: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mi := &MediaInfo{
+				Media: Media{
+					Tracks: []Track{
+						{
+							Type:  "General",
+							Extra: tt.extra,
+						},
+					},
+				},
+			}
+			imdb, tmdb, tvdb, isTV := mi.GetMdbIDs()
+			if imdb != tt.wantImdb {
+				t.Errorf("GetMdbIDs() imdb = %v, want %v", imdb, tt.wantImdb)
+			}
+			if tmdb != tt.wantTmdb {
+				t.Errorf("GetMdbIDs() tmdb = %v, want %v", tmdb, tt.wantTmdb)
+			}
+			if tvdb != tt.wantTvdb {
+				t.Errorf("GetMdbIDs() tvdb = %v, want %v", tvdb, tt.wantTvdb)
+			}
+			if isTV != tt.wantIsTV {
+				t.Errorf("GetMdbIDs() isTV = %v, want %v", isTV, tt.wantIsTV)
+			}
+		})
+	}
+}
 
 func TestMediaInfo_GetAudioLanguages(t *testing.T) {
 	mi := &MediaInfo{
@@ -116,13 +340,13 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 			Tracks: []Track{
 				{
 					Type:   "Video",
-					Height: "1080",
+					Height: 1080,
 					Format: "AVC",
 				},
 				{
 					Type:     "Audio",
 					Format:   "E-AC-3",
-					Channels: "6",
+					Channels: 6,
 					Language: "de",
 				},
 			},

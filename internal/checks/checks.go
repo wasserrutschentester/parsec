@@ -3,7 +3,6 @@ package checks
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
@@ -139,8 +138,8 @@ func CheckRedundantAudio(mi *mediainfo.MediaInfo) {
 }
 
 func CheckResolution(videoTrack *mediainfo.Track) {
-	width, _ := strconv.Atoi(videoTrack.Width)
-	height, _ := strconv.Atoi(videoTrack.Height)
+	width := videoTrack.Width
+	height := videoTrack.Height
 
 	if width == 0 || height == 0 {
 		return
@@ -172,11 +171,8 @@ func CheckResolution(videoTrack *mediainfo.Track) {
 }
 
 func CheckFrameRate(videoTrack *mediainfo.Track) {
-	if videoTrack.FrameRate == "" {
-		return
-	}
-	fps, err := strconv.ParseFloat(videoTrack.FrameRate, 64)
-	if err != nil {
+	fps := videoTrack.FrameRate
+	if fps == 0 {
 		return
 	}
 	standardFPS := []float64{23.976, 24, 25, 29.97, 30, 50, 59.94, 60}
@@ -193,14 +189,11 @@ func CheckFrameRate(videoTrack *mediainfo.Track) {
 }
 
 func CheckBitRate(videoTrack *mediainfo.Track) {
-	if videoTrack.BitRate == "" {
+	bitrate := videoTrack.BitRate
+	if bitrate == 0 {
 		return
 	}
-	bitrate, err := strconv.Atoi(videoTrack.BitRate)
-	if err != nil {
-		return
-	}
-	height, _ := strconv.Atoi(videoTrack.Height)
+	height := videoTrack.Height
 	threshold := 0
 	if height >= 1080 {
 		threshold = 2000000 // 2 Mbps
@@ -218,8 +211,8 @@ func CheckBitRate(videoTrack *mediainfo.Track) {
 func checkDurations(mi *mediainfo.MediaInfo) {
 	var videoDur float64
 	for _, track := range mi.Media.Tracks {
-		if track.Type == "Video" && track.Duration != "" {
-			videoDur, _ = strconv.ParseFloat(track.Duration, 64)
+		if track.Type == "Video" && track.Duration != 0 {
+			videoDur = track.Duration
 			break
 		}
 	}
@@ -230,8 +223,8 @@ func checkDurations(mi *mediainfo.MediaInfo) {
 	}
 
 	for _, track := range mi.Media.Tracks {
-		if (track.Type == "Audio" || track.Type == "Text") && track.Duration != "" {
-			dur, _ := strconv.ParseFloat(track.Duration, 64)
+		if (track.Type == "Audio" || track.Type == "Text") && track.Duration != 0 {
+			dur := track.Duration
 			diff := dur - videoDur
 			percentDiff := diff / videoDur * -100
 			if diff > 5.0 {
