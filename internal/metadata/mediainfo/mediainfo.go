@@ -238,7 +238,10 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 		if track.Type == "Video" {
 			meta.Resolution = metadata.HeightToResolution(track.Height)
 			meta.VideoCodec = metadata.VideoCodecName(track.Format)
-			meta.BitDepth = track.BitDepth
+			if track.BitDepth != 8 {
+				// ignore bit depth if it's 8 (default)
+				meta.BitDepth = track.BitDepth
+			}
 
 			hdr := strings.ToUpper(track.HDR_Format)
 			if strings.Contains(hdr, "DOLBY VISION") {
