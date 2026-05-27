@@ -72,7 +72,7 @@ func Parse(filename string) *metadata.Metadata {
 	meta.Service = matchStreamingService(filename)
 
 	// Source
-	sourceRegex := regexp.MustCompile(`\.(WEB-?(\w+)|BluRay|DVD)\.`)
+	sourceRegex := regexp.MustCompile(`\.(WEB-?(\w+)|BluRay|DVD|HDTV|DVDRip|HDDVD)\.`)
 	if match := sourceRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Source = match[1]
 	}
@@ -123,6 +123,11 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 }
 
 func matchStreamingService(filename string) string {
+	serviceRegex := regexp.MustCompile(`(?i)\.(hmax|hbom|hbo[ ._-]?max|hbo|amzn|amazon(hd)?|atvp|aptv|apple[ ._-]?tv\+?|atv|cnlp|canp|canal\+|dsnp|dsny|disney(\+)?|hulu|itunes|nf|netflix(u?hd)?|pcok|peacock([ ._-]?tv)?|pmtp|paramount(\+)?|sho|showtime|stan|syfy|wowtv|cr|crunchyroll|adn|joyn|rtlp|rtl\+|ardp|ard\+|ard|br|hr|mdr|ndr|rbb|sr|swr|wdr|ardmediathek|3sat|kika|arte)\.`)
+	if match := serviceRegex.FindStringSubmatch(filename); len(match) > 1 {
+		return match[1]
+	}
+
 	// only match the filename after the resolution
 	resolutionRegex := regexp.MustCompile(`\.\d{3,4}p\.`)
 	if loc := resolutionRegex.FindStringIndex(filename); loc != nil {
@@ -356,16 +361,55 @@ func removeDiacritics(title string) string {
 }
 
 func NormalizeService(service string) string {
-	// ARD channels == ARDMediathek
-	reARD := regexp.MustCompile(`(?i)^(SWR|RBB|WDR|MDR|NDR|BR|HR|rbtv)$`)
-	if reARD.MatchString(service) {
+	s := strings.ToLower(service)
+
+	if regexp.MustCompile(`^(hmax|hbom|hbo[ ._-]?max)$`).MatchString(s) {
+		return "HMAX"
+	}
+	if regexp.MustCompile(`^(amzn|amazon(hd)?)$`).MatchString(s) {
+		return "AMZN"
+	}
+	if regexp.MustCompile(`^(atvp|aptv|apple[ ._-]?tv\+?)$`).MatchString(s) {
+		return "ATVP"
+	}
+	if regexp.MustCompile(`^(cnlp|canp|canal\+)$`).MatchString(s) {
+		return "CNLP"
+	}
+	if regexp.MustCompile(`^(dsnp|dsny|disney(\+)?)$`).MatchString(s) {
+		return "DSNP"
+	}
+	if regexp.MustCompile(`^(it|itunes)$`).MatchString(s) {
+		return "iT"
+	}
+	if regexp.MustCompile(`^(nf|netflix(u?hd)?)$`).MatchString(s) {
+		return "NF"
+	}
+	if regexp.MustCompile(`^(pcok|peacock([ ._-]?tv)?)$`).MatchString(s) {
+		return "PCOK"
+	}
+	if regexp.MustCompile(`^(pmtp|paramount(\+)?)$`).MatchString(s) {
+		return "PMTP"
+	}
+	if regexp.MustCompile(`^(sho|showtime)$`).MatchString(s) {
+		return "SHO"
+	}
+	if regexp.MustCompile(`^(cr|crunchyroll)$`).MatchString(s) {
+		return "CR"
+	}
+	if regexp.MustCompile(`^(rtlp|rtl\+)$`).MatchString(s) {
+		return "RTLP"
+	}
+	if regexp.MustCompile(`^(ardp|ard\+)$`).MatchString(s) {
+		return "ARDP"
+	}
+	if regexp.MustCompile(`^(ard(mediathek)?|br|hr|mdr|ndr|rbb|sr|swr|wdr|rbtv)$`).MatchString(s) {
 		return "ARD"
 	}
-
-	// ZDFtivi, -kultur and -neo are ZDF
-	if strings.HasPrefix(service, "ZDF") {
+	if strings.HasPrefix(s, "zdf") {
 		return "ZDF"
 	}
-
-	return service
+	if regexp.MustCompile(`^kika$`).MatchString(s) {
+		return "KiKA"
+	}
+	return strings.ToUpper(service)
 }

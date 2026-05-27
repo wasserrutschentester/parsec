@@ -361,7 +361,7 @@ func TestNormalizeService(t *testing.T) {
 		{"ZDFkultur", "ZDF"},
 		{"ZDFtivi", "ZDF"},
 		{"ZDF", "ZDF"},
-		{"Netflix", "Netflix"},
+		{"Netflix", "NF"},
 		{"ARD", "ARD"},
 	}
 
