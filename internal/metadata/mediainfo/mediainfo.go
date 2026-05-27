@@ -275,7 +275,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 			meta.HDR = track.detectHDR()
 
 		} else if track.Type == "Audio" && meta.AudioCodec == "" {
-			meta.AudioCodec = metadata.AudioCodecName(track.Format)
+			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.Format_Profile)
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
 			if strings.Contains(strings.ToUpper(track.Format_AdditionalFeatures), "ATMOS") ||
 				strings.Contains(strings.ToUpper(track.Title), "ATMOS") {
@@ -291,7 +291,11 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 }
 
 func (track *Track) detectHDR() string {
-	hdr := strings.ToUpper(track.HDR_Format)
+	hdrFormat := strings.ToUpper(track.HDR_Format)
+	hdrCompat := strings.ToUpper(track.HDR_Format_Compatibility)
+	hdr := fmt.Sprintf("%s %s", hdrFormat, hdrCompat)
+
+	transfer := strings.ToUpper(track.Transfer_Characteristics)
 	var result string
 	if strings.Contains(hdr, "DOLBY VISION") {
 		result = "DV."
@@ -300,9 +304,12 @@ func (track *Track) detectHDR() string {
 		result += "HDR10Plus"
 	} else if strings.Contains(hdr, "HDR10") {
 		result += "HDR"
-	} else if strings.Contains(strings.ToUpper(track.Transfer_Characteristics), "HLG") {
+	} else if strings.Contains(transfer, "HLG") {
 		result += "HLG"
+	} else if strings.Contains(hdr, "PQ10") || strings.Contains(transfer, "PQ") {
+		result += "PQ10"
 	}
+
 	return strings.Trim(result, ".")
 }
 

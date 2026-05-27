@@ -431,3 +431,56 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 		t.Errorf("GetMetadata() mismatch. got: %+v, want: %+v", got, want)
 	}
 }
+
+func TestTrack_detectHDR(t *testing.T) {
+	tests := []struct {
+		name     string
+		track    Track
+		expected string
+	}{
+		{
+			name: "Dolby Vision and HDR10",
+			track: Track{
+				HDR_Format:               "Dolby Vision",
+				HDR_Format_Compatibility: "HDR10",
+			},
+			expected: "DV.HDR",
+		},
+		{
+			name: "HDR10+",
+			track: Track{
+				HDR_Format: "HDR10+",
+			},
+			expected: "HDR10Plus",
+		},
+		{
+			name: "HLG",
+			track: Track{
+				Transfer_Characteristics: "HLG",
+			},
+			expected: "HLG",
+		},
+		{
+			name: "PQ10",
+			track: Track{
+				Transfer_Characteristics: "PQ",
+			},
+			expected: "PQ10",
+		},
+		{
+			name: "No HDR",
+			track: Track{
+				HDR_Format: "",
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.track.detectHDR(); got != tt.expected {
+				t.Errorf("detectHDR() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
