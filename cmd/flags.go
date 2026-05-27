@@ -8,12 +8,15 @@ var (
 	episodeFlag      int
 	dateFlag         string
 	episodeTitleFlag string
+	cutEditionFlag   string
+	hdrFlag          string
 	// P2P
-	serviceFlag  string
-	sourceFlag   string
-	isRepackFlag bool
-	isSubbedFlag bool
-	groupFlag    string
+	serviceFlag     string
+	sourceFlag      string
+	isRepackFlag    bool
+	isSubbedFlag    bool
+	isAudioDescFlag bool
+	groupFlag       string
 	// MDB IDs
 	isTVFlag    bool
 	isMovieFlag bool

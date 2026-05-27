@@ -5,9 +5,10 @@ import (
 )
 
 func InitDefaults() {
-	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{video_codec}-{group}")
+	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("subbed_tagging", true)
+	viper.SetDefault("audio_description", false)
 	viper.SetDefault("source", "WEB-DL")
 	viper.SetDefault("group", "4Rocket")
 	viper.SetDefault("video_codec_avc", "H.264")
@@ -86,6 +87,14 @@ func GetEpisodeTitle() string {
 	return getString("episode_title")
 }
 
+func GetCutEdition() string {
+	return getString("cut_edition")
+}
+
+func GetHDR() string {
+	return getString("hdr")
+}
+
 func GetService() string {
 	return getString("service")
 }
@@ -96,6 +105,10 @@ func GetSource() string {
 
 func GetRepack() bool {
 	return getBool("repack")
+}
+
+func GetAudioDescription() bool {
+	return getBool("audio_description")
 }
 
 func GetGroup() string {

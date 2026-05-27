@@ -21,14 +21,18 @@ type Metadata struct {
 	Language      string
 	LanguageExt   string
 	Subbed        bool
+	CutEdition    string
 	Accessibility string
 	HasAudioDesc  bool
 	Repack        bool
 	Resolution    string
 	Service       string
 	Source        string
+	HDR           string
+	BitDepth      int
 	AudioCodec    string
 	AudioChannels string
+	AudioMeta     string
 	VideoCodec    string
 	Group         string
 	CRC           string
@@ -130,6 +134,12 @@ func (meta *Metadata) SetDefaults() {
 	if meta.EpisodeTitle == "" {
 		meta.EpisodeTitle = config.GetEpisodeTitle()
 	}
+	if meta.CutEdition == "" {
+		meta.CutEdition = config.GetCutEdition()
+	}
+	if meta.HDR == "" {
+		meta.HDR = config.GetHDR()
+	}
 	if meta.Service == "" {
 		meta.Service = config.GetService()
 	}
@@ -138,6 +148,9 @@ func (meta *Metadata) SetDefaults() {
 	}
 	if !meta.Repack {
 		meta.Repack = config.GetRepack()
+	}
+	if !meta.HasAudioDesc {
+		meta.HasAudioDesc = config.GetAudioDescription()
 	}
 	if meta.Group == "" {
 		meta.Group = config.GetGroup()
@@ -169,15 +182,22 @@ func (meta *Metadata) Render(template string) string {
 		"{episode_title}":  meta.EpisodeTitle,
 		"{language}":       LanguageName(meta.Language),
 		"{language_ext}":   meta.LanguageExt,
+		"{cut_edition}":    meta.CutEdition,
 		"{accessibility}":  meta.Accessibility,
 		"{resolution}":     meta.Resolution,
 		"{service}":        meta.Service,
 		"{source}":         meta.Source,
+		"{hdr}":            meta.HDR,
 		"{audio_codec}":    meta.AudioCodec,
 		"{audio_channels}": meta.AudioChannels,
+		"{audio_meta}":     meta.AudioMeta,
 		"{video_codec}":    meta.VideoCodec,
 		"{group}":          meta.Group,
 		"{crc}":            meta.CRC,
+	}
+
+	if meta.BitDepth > 8 {
+		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
 	}
 
 	if meta.Year > 0 {
@@ -197,7 +217,9 @@ func (meta *Metadata) Render(template string) string {
 	if meta.Repack {
 		replacements["{repack}"] = "REPACK"
 	}
-
+	if meta.HasAudioDesc && meta.Accessibility == "" {
+		replacements["{accessibility}"] = "with.Audio.Description"
+	}
 	result := template
 	for tag, val := range replacements {
 		result = strings.ReplaceAll(result, tag, val)

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
+	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 	"github.com/spf13/cobra"
@@ -49,6 +50,14 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		fmt.Printf("Warning: Could not get MediaInfo for %s: %v\n", filePath, err)
 	}
 
+	// 2.1 Get EBML Metadata for Visual Impaired flag
+	ebml, err := metadata.GetEbmlMetadata(filePath)
+	if err == nil {
+		if ebml.HasVisualImpairedAudio() {
+			meta.HasAudioDesc = true
+		}
+	}
+
 	// 3. Override with CLI flags
 	if titleFlag != "" {
 		meta.Title = titleFlag
@@ -64,6 +73,12 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	}
 	if episodeTitleFlag != "" {
 		meta.EpisodeTitle = episodeTitleFlag
+	}
+	if cutEditionFlag != "" {
+		meta.CutEdition = cutEditionFlag
+	}
+	if hdrFlag != "" {
+		meta.HDR = hdrFlag
 	}
 	if cmd.Flags().Changed("tv") {
 		meta.IsTV = isTVFlag
@@ -81,6 +96,9 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	}
 	if isSubbedFlag {
 		meta.Subbed = isSubbedFlag
+	}
+	if isAudioDescFlag {
+		meta.HasAudioDesc = isAudioDescFlag
 	}
 	if groupFlag != "" {
 		meta.Group = groupFlag
@@ -184,11 +202,14 @@ func init() {
 	renameCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
 	renameCmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date (YYYY-MM-DD)")
 	renameCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
+	renameCmd.Flags().StringVar(&cutEditionFlag, "cut-edition", "", "special edition or cut")
+	renameCmd.Flags().StringVar(&hdrFlag, "hdr", "", "HDR format")
 	// P2P
 	renameCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
 	renameCmd.Flags().StringVarP(&sourceFlag, "source", "o", "", "source (WEB-DL, BluRay, etc.)")
 	renameCmd.Flags().BoolVarP(&isRepackFlag, "repack", "R", false, "is repack")
 	renameCmd.Flags().BoolVar(&isSubbedFlag, "subbed", false, "has subtitles in the preferred language")
+	renameCmd.Flags().BoolVar(&isAudioDescFlag, "audio-description", false, "add audio description tag")
 	renameCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
 	// MDB ID
 	renameCmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")

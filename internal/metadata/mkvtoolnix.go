@@ -138,6 +138,15 @@ func (metadata *EbmlMetadata) countTypes() {
 	}
 }
 
+func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
+	for _, track := range metadata.Tracks {
+		if track.Type == "audio" && track.Properties.VisualImpaired {
+			return true
+		}
+	}
+	return false
+}
+
 func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	err := CheckForMatroska(filePath)
 	if err != nil {

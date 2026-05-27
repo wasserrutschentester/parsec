@@ -43,6 +43,18 @@ var checkCmd = &cobra.Command{
 		}
 		mediaMeta := mi.GetMetadata()
 		updated := match.Override(mediaMeta, false) // keep only the fields that can't be parsed from MediaInfo
+
+		// 3. Get EBML Metadata for Visual Impaired flag
+		ebml, err := metadata.GetEbmlMetadata(filePath)
+		if err == nil {
+			if ebml.HasVisualImpairedAudio() {
+				if !match.HasAudioDesc {
+					match.HasAudioDesc = true
+					updated = true
+				}
+			}
+		}
+
 		if updated {
 			fmt.Println("After Applying those updates the name looks like this:")
 			fmt.Printf("Generated Name:\t%s\n\n", match)
@@ -52,8 +64,7 @@ var checkCmd = &cobra.Command{
 
 		checks.RunMediaInfoChecks(mi, match)
 
-		// Verify Track Order
-		ebml, err := metadata.GetEbmlMetadata(filePath)
+		// 4. Run EBML specific checks
 		if err == nil {
 			if err := metadata.VerifyTrackOrder(ebml.Tracks); err != nil {
 				fmt.Printf("Track Order Error: %v\n", err)

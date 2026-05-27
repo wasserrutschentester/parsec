@@ -67,6 +67,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `template` | string | The naming template used for renaming and checking. |
 | `preferred_language` | string | Preferred language code (default: `de`). |
 | `subbed_tagging` | boolean | Enable the preferred language subbed override (default: `true`). |
+| `audio_description` | boolean | Force the audio description tag (default: `false`). |
 | `source` | string | Default source (e.g., `WEB-DL`, `BluRay`). |
 | `group` | string | Default release group name. |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |

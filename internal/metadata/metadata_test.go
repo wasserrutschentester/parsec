@@ -138,8 +138,12 @@ func TestMetadata_String(t *testing.T) {
 				AudioChannels: "5.1",
 				VideoCodec:    "H.265",
 				Group:         "GRP",
+				HDR:           "DV.HDR",
+				AudioMeta:     "Atmos",
+				BitDepth:      10,
+				CutEdition:    "Unrated",
 			},
-			want: "Movie.2024.S01E02.GERMAN.1080p.Netflix.WEB-DL.DDP5.1.H.265-GRP",
+			want: "Movie.2024.S01E02.Unrated.GERMAN.1080p.Netflix.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-GRP",
 		},
 		{
 			name: "Minimal metadata",

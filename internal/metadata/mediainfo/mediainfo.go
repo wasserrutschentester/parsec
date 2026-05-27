@@ -238,9 +238,33 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 		if track.Type == "Video" {
 			meta.Resolution = metadata.HeightToResolution(track.Height)
 			meta.VideoCodec = metadata.VideoCodecName(track.Format)
+			meta.BitDepth = track.BitDepth
+
+			hdr := strings.ToUpper(track.HDR_Format)
+			if strings.Contains(hdr, "DOLBY VISION") {
+				meta.HDR = "DV."
+			} else {
+				meta.HDR = ""
+			}
+			if strings.Contains(hdr, "HDR10+") {
+				meta.HDR += "HDR10Plus"
+			} else if strings.Contains(hdr, "HDR10") {
+				meta.HDR += "HDR"
+			} else if strings.Contains(strings.ToUpper(track.Transfer_Characteristics), "HLG") {
+				meta.HDR += "HLG"
+			}
+			meta.HDR = strings.Trim(meta.HDR, ".")
+
 		} else if track.Type == "Audio" {
 			meta.AudioCodec = metadata.AudioCodecName(track.Format)
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
+			if strings.Contains(strings.ToUpper(track.Format_AdditionalFeatures), "ATMOS") ||
+				strings.Contains(strings.ToUpper(track.Title), "ATMOS") {
+				meta.AudioMeta = "Atmos"
+			} else if strings.Contains(strings.ToUpper(track.Format_AdditionalFeatures), "AURO3D") ||
+				strings.Contains(strings.ToUpper(track.Title), "AURO3D") {
+				meta.AudioMeta = "Auro3D"
+			}
 		}
 	}
 	mi.SetLanguageTag(meta)

@@ -359,15 +359,19 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 		Media: Media{
 			Tracks: []Track{
 				{
-					Type:   "Video",
-					Height: 1080,
-					Format: "AVC",
+					Type:       "Video",
+					Height:     1080,
+					Format:     "AVC",
+					HDR_Format: "Dolby Vision / HDR10",
+					BitDepth:   10,
 				},
 				{
-					Type:     "Audio",
-					Format:   "E-AC-3",
-					Channels: 6,
-					Language: "de",
+					Type:                      "Audio",
+					Format:                    "E-AC-3",
+					Format_AdditionalFeatures: "JOC", // Atmos
+					Title:                     "Atmos",
+					Channels:                  6,
+					Language:                  "de",
 				},
 			},
 		},
@@ -380,9 +384,12 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 		AudioCodec:    "DDP",
 		AudioChannels: "5.1",
 		Language:      "GERMAN",
+		HDR:           "DV.HDR",
+		AudioMeta:     "Atmos",
+		BitDepth:      10,
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("GetMetadata() mismatch")
+		t.Errorf("GetMetadata() mismatch. got: %+v, want: %+v", got, want)
 	}
 }
