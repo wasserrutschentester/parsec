@@ -109,6 +109,46 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			filename: "Movie.Name.2023.2160p.DIRECTORS.CUT.mkv",
+			expected: metadata.Metadata{
+				Title:      "Movie.Name",
+				Year:       2023,
+				Resolution: "2160p",
+				CutEdition: "DIRECTORS.CUT",
+				IsTV:       false,
+			},
+		},
+		{
+			filename: "Show.S01E01.1080p.Open.Matte.mkv",
+			expected: metadata.Metadata{
+				Title:      "Show",
+				Season:     1,
+				Episode:    1,
+				Resolution: "1080p",
+				CutEdition: "OPEN.MATTE",
+				IsTV:       true,
+			},
+		},
+		{
+			filename: "Movie.3D.HSBS.1080p.mkv",
+			expected: metadata.Metadata{
+				Title:      "Movie",
+				Resolution: "1080p",
+				CutEdition: "3D.HSBS",
+				IsTV:       false,
+			},
+		},
+		{
+			filename: "Avatar.The.Way.of.Water.2022.3D.SBS.DIRECTORS.CUT.2160p.mkv",
+			expected: metadata.Metadata{
+				Title:      "Avatar.The.Way.of.Water",
+				Year:       2022,
+				Resolution: "2160p",
+				CutEdition: "DIRECTORS.CUT.3D.SBS",
+				IsTV:       false,
+			},
+		},
+		{
 			filename: "Movie.2024.1080p.BluRay.DDP5.1.x264-GRP",
 			expected: metadata.Metadata{
 				Title:         "Movie",

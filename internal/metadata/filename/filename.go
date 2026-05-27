@@ -77,6 +77,9 @@ func Parse(filename string) *metadata.Metadata {
 		meta.Source = match[1]
 	}
 
+	// Edition
+	matchEdition(filename, meta)
+
 	// Group after last - in the filename
 	groupRegex := regexp.MustCompile(`\-([^-]+)$`)
 	if match := groupRegex.FindStringSubmatch(filename); len(match) > 1 {
@@ -101,6 +104,7 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 		meta.Resolution,
 		meta.Service,
 		meta.Source,
+		meta.CutEdition,
 	}
 	if meta.Repack {
 		tags = append(tags, "REPACK")
@@ -237,6 +241,25 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 	if match := audioDescriptionRegex.FindStringSubmatch(filename); len(match) > 0 {
 		meta.Accessibility = match[1]
 		meta.HasAudioDesc = true
+	}
+}
+
+func matchEdition(filename string, meta *metadata.Metadata) {
+	// Regex for Editions
+	editionRegex := regexp.MustCompile(`(?i)\.(Open\.Matte|REMASTERED|IMAX(\.Enhanced)?|DIRECTORS\.CUT|DC|EXTENDED|THEATRICAL|CRITERION|SPECIAL\.EDITION)\.`)
+	if match := editionRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.CutEdition = strings.ToUpper(match[1])
+	}
+
+	// Regex for 3D
+	threeDRegex := regexp.MustCompile(`(?i)\.(3D(\.HSBS|\.SBS|\.HOU)?)\.`)
+	if match := threeDRegex.FindStringSubmatch(filename); len(match) > 1 {
+		tag := strings.ToUpper(match[1])
+		if meta.CutEdition != "" {
+			meta.CutEdition += "." + tag
+		} else {
+			meta.CutEdition = tag
+		}
 	}
 }
 
