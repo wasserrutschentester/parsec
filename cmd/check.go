@@ -115,7 +115,10 @@ var checkCmd = &cobra.Command{
 			match.TvdbID = tvdbIDFlag
 		}
 
-		checks.RunMdbChecks(mi, match)
+		// checks.RunMdbChecks(mi, match)
+		var test string
+		fmt.Scanln(&test)
+		fmt.Println(test)
 	},
 }
 

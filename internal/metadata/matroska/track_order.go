@@ -359,35 +359,21 @@ func checkNameKeywords(track EbmlTrack) error {
 	props := track.Properties
 	nameUpper := strings.ToUpper(props.Name)
 
-	if props.HearingImpaired && !strings.Contains(nameUpper, "SDH") {
-		return fmt.Errorf("%s track #%d (ID: %d) is hearing impaired but Name field does not contain 'SDH'", track.Type, track.TypeOrder, track.Properties.Number)
-	}
-	if !props.HearingImpaired && strings.Contains(nameUpper, "SDH") {
-		return fmt.Errorf("%s track #%d (ID: %d) has 'SDH' in Name field but is not flagged as hearing impaired", track.Type, track.TypeOrder, track.Properties.Number)
+	if err := checkFlagKeyword(track, props.HearingImpaired, "hearing impaired", "SDH", strings.Contains(nameUpper, "SDH")); err != nil {
+		return err
 	}
 
-	if props.Forced && !strings.Contains(nameUpper, "FORCED") {
-		return fmt.Errorf("%s track #%d (ID: %d) is forced but Name field does not contain 'Forced'", track.Type, track.TypeOrder, track.Properties.Number)
-	}
-	if !props.Forced && strings.Contains(nameUpper, "FORCED") {
-		return fmt.Errorf("%s track #%d (ID: %d) has 'Forced' in Name field but is not flagged as forced", track.Type, track.TypeOrder, track.Properties.Number)
+	if err := checkFlagKeyword(track, props.Forced, "forced", "Forced", strings.Contains(nameUpper, "FORCED")); err != nil {
+		return err
 	}
 
-	if props.Commentary && !strings.Contains(nameUpper, "COMMENTARY") {
-		return fmt.Errorf("%s track #%d (ID: %d) is commentary but Name field does not contain 'Commentary'", track.Type, track.TypeOrder, track.Properties.Number)
-	}
-	if !props.Commentary && strings.Contains(nameUpper, "COMMENTARY") {
-		return fmt.Errorf("%s track #%d (ID: %d) has 'Commentary' in Name field but is not flagged as commentary", track.Type, track.TypeOrder, track.Properties.Number)
+	if err := checkFlagKeyword(track, props.Commentary, "commentary", "Commentary", strings.Contains(nameUpper, "COMMENTARY")); err != nil {
+		return err
 	}
 
-	reAD := regexp.MustCompile(`\bAD\b`)
-	if props.VisualImpaired {
-		if !strings.Contains(nameUpper, "DESCRIPTIVE") && !strings.Contains(nameUpper, "DESCRIPTION") && !reAD.MatchString(nameUpper) {
-			return fmt.Errorf("%s track #%d (ID: %d) is visual impaired but Name field does not contain 'Descriptive', 'Description', or 'AD'", track.Type, track.TypeOrder, track.Properties.Number)
-		}
-	}
-	if !props.VisualImpaired && (strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || reAD.MatchString(nameUpper)) {
-		return fmt.Errorf("%s track #%d (ID: %d) has visual impaired keywords in Name field but is not flagged as visual impaired", track.Type, track.TypeOrder, track.Properties.Number)
+	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || adRegex.MatchString(nameUpper)
+	if err := checkFlagKeyword(track, props.VisualImpaired, "visual impaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); err != nil {
+		return err
 	}
 
 	if props.Language == "mul" {
@@ -396,6 +382,16 @@ func checkNameKeywords(track EbmlTrack) error {
 		}
 	}
 
+	return nil
+}
+
+func checkFlagKeyword(track EbmlTrack, flag bool, flagName, keywordStr string, hasKeyword bool) error {
+	if flag && !hasKeyword {
+		return fmt.Errorf("%s track #%d (ID: %d) is %s but Name field does not contain '%s'", track.Type, track.TypeOrder, track.Properties.Number, flagName, keywordStr)
+	}
+	if !flag && hasKeyword {
+		return fmt.Errorf("%s track #%d (ID: %d) has '%s' in Name field but is not flagged as %s", track.Type, track.TypeOrder, track.Properties.Number, keywordStr, flagName)
+	}
 	return nil
 }
 func getTrackPriority(track EbmlTrack) int {
