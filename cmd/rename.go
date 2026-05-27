@@ -41,7 +41,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	// 1. Parse filename for initial metadata
 	meta := filename.Parse(filenameNoExt)
 
-	// 2. Get MediaInfo and merge
+	// 2.1 Get MediaInfo and merge
 	mi, err := mediainfo.Get(filePath)
 	if err == nil {
 		mediaMeta := mi.GetMetadata()
@@ -50,7 +50,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		fmt.Printf("Warning: Could not get MediaInfo for %s: %v\n", filePath, err)
 	}
 
-	// 2.1 Get EBML Metadata for Visual Impaired flag
+	// 2.2 Get EBML Metadata for Visual Impaired flag
 	ebml, err := metadata.GetEbmlMetadata(filePath)
 	if err == nil {
 		if ebml.HasVisualImpairedAudio() {
@@ -58,76 +58,11 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		}
 	}
 
+	// 3.1 Apply MDB IDs from file tags
+	renameApplyMdbIDs(cmd, meta, mi)
+
 	// 3. Override with CLI flags
-	if titleFlag != "" {
-		meta.Title = titleFlag
-	}
-	if yearFlag != 0 {
-		meta.Year = yearFlag
-	}
-	if seasonFlag != 0 {
-		meta.Season = seasonFlag
-	}
-	if episodeFlag != 0 {
-		meta.Episode = episodeFlag
-	}
-	if episodeTitleFlag != "" {
-		meta.EpisodeTitle = episodeTitleFlag
-	}
-	if cutEditionFlag != "" {
-		meta.CutEdition = cutEditionFlag
-	}
-	if hdrFlag != "" {
-		meta.HDR = hdrFlag
-	}
-	if cmd.Flags().Changed("tv") {
-		meta.IsTV = isTVFlag
-	} else if cmd.Flags().Changed("movie") {
-		meta.IsTV = !isMovieFlag
-	}
-	if serviceFlag != "" {
-		meta.Service = serviceFlag
-	}
-	if sourceFlag != "" {
-		meta.Source = sourceFlag
-	}
-	if isRepackFlag {
-		meta.Repack = isRepackFlag
-	}
-	if isSubbedFlag {
-		meta.Subbed = isSubbedFlag
-	}
-	if isAudioDescFlag {
-		meta.HasAudioDesc = isAudioDescFlag
-	}
-	if groupFlag != "" {
-		meta.Group = groupFlag
-	}
-
-	// Get IDs from file tags
-	tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
-	if meta.ImdbID == "" {
-		meta.ImdbID = tagImdb
-	}
-	if meta.TmdbID == 0 {
-		meta.TmdbID = tagTmdb
-	}
-	if meta.TvdbID == 0 {
-		meta.TvdbID = tagTvdb
-	}
-	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
-		meta.IsTV = true
-	}
-
-	if imdbIDFlag != "" {
-		meta.ImdbID = imdbIDFlag
-	}
-	if tmdbIDFlag != 0 {
-		meta.TmdbID = tmdbIDFlag
-	}
-	if tvdbIDFlag != 0 {
-		meta.TvdbID = tvdbIDFlag
-	}
+	renameApplyCliFlags(cmd, meta)
 
 	// 4. MDB Search to get "correct" title and year
 	meta.SetDefaults()
@@ -191,6 +126,78 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		fmt.Println("File renamed successfully.")
 	}
 
+}
+
+func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainfo.MediaInfo) {
+	tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
+	if meta.ImdbID == "" {
+		meta.ImdbID = tagImdb
+	}
+	if meta.TmdbID == 0 {
+		meta.TmdbID = tagTmdb
+	}
+	if meta.TvdbID == 0 {
+		meta.TvdbID = tagTvdb
+	}
+	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
+		meta.IsTV = true
+	}
+}
+
+func renameApplyCliFlags(cmd *cobra.Command, meta *metadata.Metadata) {
+	if titleFlag != "" {
+		meta.Title = titleFlag
+	}
+	if yearFlag != 0 {
+		meta.Year = yearFlag
+	}
+	if seasonFlag != 0 {
+		meta.Season = seasonFlag
+	}
+	if episodeFlag != 0 {
+		meta.Episode = episodeFlag
+	}
+	if episodeTitleFlag != "" {
+		meta.EpisodeTitle = episodeTitleFlag
+	}
+	if cutEditionFlag != "" {
+		meta.CutEdition = cutEditionFlag
+	}
+	if hdrFlag != "" {
+		meta.HDR = hdrFlag
+	}
+	if cmd.Flags().Changed("tv") {
+		meta.IsTV = isTVFlag
+	} else if cmd.Flags().Changed("movie") {
+		meta.IsTV = !isMovieFlag
+	}
+	if serviceFlag != "" {
+		meta.Service = serviceFlag
+	}
+	if sourceFlag != "" {
+		meta.Source = sourceFlag
+	}
+	if isRepackFlag {
+		meta.Repack = isRepackFlag
+	}
+	if isSubbedFlag {
+		meta.Subbed = isSubbedFlag
+	}
+	if isAudioDescFlag {
+		meta.HasAudioDesc = isAudioDescFlag
+	}
+	if groupFlag != "" {
+		meta.Group = groupFlag
+	}
+	if imdbIDFlag != "" {
+		meta.ImdbID = imdbIDFlag
+	}
+	if tmdbIDFlag != 0 {
+		meta.TmdbID = tmdbIDFlag
+	}
+	if tvdbIDFlag != 0 {
+		meta.TvdbID = tvdbIDFlag
+	}
 }
 
 func init() {
