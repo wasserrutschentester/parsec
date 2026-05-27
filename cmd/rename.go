@@ -11,6 +11,7 @@ import (
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +52,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	}
 
 	// 2.2 Get EBML Metadata for Visual Impaired flag
-	ebml, err := metadata.GetEbmlMetadata(filePath)
+	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err == nil {
 		if ebml.HasVisualImpairedAudio() {
 			meta.HasAudioDesc = true

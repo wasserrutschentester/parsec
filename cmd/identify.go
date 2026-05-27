@@ -7,7 +7,9 @@ import (
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+
 	"github.com/spf13/cobra"
 )
 
@@ -92,7 +94,7 @@ var identifyCmd = &cobra.Command{
 			tags.SetEpisodeTags(episodeResult)
 		}
 
-		if !unattendedFlag && !dryRunFlag && filePath != "" && metadata.CheckForMatroska(filePath) == nil {
+		if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
 			fmt.Print("Do you want to write the tags to the file? [y/N] ")
 			var response string
 			fmt.Scanln(&response)
@@ -105,7 +107,7 @@ var identifyCmd = &cobra.Command{
 		}
 
 		if writeTagsFlag {
-			err := metadata.SetGlobalTags(filePath, tags)
+			err := matroska.SetGlobalTags(filePath, tags)
 			if err != nil {
 				fmt.Printf("Error writing tags: %v\n", err)
 			} else {

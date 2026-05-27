@@ -5,9 +5,10 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/checks"
 	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +46,7 @@ var checkCmd = &cobra.Command{
 		updated := match.Override(mediaMeta, false) // keep only the fields that can't be parsed from MediaInfo
 
 		// 3. Get EBML Metadata for Visual Impaired flag
-		ebml, err := metadata.GetEbmlMetadata(filePath)
+		ebml, err := matroska.GetEbmlMetadata(filePath)
 		if err == nil {
 			if ebml.HasVisualImpairedAudio() {
 				if !match.HasAudioDesc {
@@ -66,18 +67,19 @@ var checkCmd = &cobra.Command{
 
 		// 4. Run EBML specific checks
 		if err == nil {
-			if err := metadata.VerifyTrackOrder(ebml.Tracks); err != nil {
+			if err := matroska.VerifyTrackOrder(ebml.Tracks); err != nil {
+
 				fmt.Printf("Track Order Error: %v\n", err)
 			}
 
 			if config.IsCheckEnabled("matroska_default_flags") {
-				if err := metadata.CheckDefaultFlags(ebml.Tracks); err != nil {
+				if err := matroska.CheckDefaultFlags(ebml.Tracks); err != nil {
 					fmt.Printf("Default Flag Error: %v\n", err)
 				}
 			}
 
 			if config.IsCheckEnabled("matroska_subtitle_format") {
-				if err := metadata.CheckSubtitleFormat(ebml.Tracks); err != nil {
+				if err := matroska.CheckSubtitleFormat(ebml.Tracks); err != nil {
 					fmt.Printf("Subtitle Format Error: %v\n", err)
 				}
 			}
