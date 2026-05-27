@@ -11,6 +11,44 @@ import (
 	"github.com/spf13/viper"
 )
 
+func TestSanitizeUTF8(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected string
+	}{
+		{
+			name:     "Valid UTF-8",
+			input:    []byte("Hello, World!"),
+			expected: "Hello, World!",
+		},
+		{
+			name:     "Valid UTF-8 with multi-byte",
+			input:    []byte("Hellö, Wörld! ©"),
+			expected: "Hellö, Wörld! ©",
+		},
+		{
+			name:     "Windows-1252 invalid UTF-8 bytes",
+			input:    []byte{0xA9, 0xAE, 0xBD, 0xE9}, // ©, ®, ½, é in Windows-1252
+			expected: "©®½é",
+		},
+		{
+			name:     "Mixed UTF-8 and Windows-1252",
+			input:    append([]byte("Valid UTF-8: "), 0xA9),
+			expected: "Valid UTF-8: ©",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SanitizeUTF8(string(tt.input))
+			if got != tt.expected {
+				t.Errorf("SanitizeUTF8() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	jsonData := `{
 		"media": {

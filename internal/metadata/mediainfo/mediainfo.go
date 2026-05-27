@@ -1,6 +1,7 @@
 package mediainfo
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,11 +9,38 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
+	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/language"
 )
+
+// SanitizeUTF8Bytes ensures a byte slice is valid UTF-8, converting invalid sequences from Windows-1252.
+func SanitizeUTF8Bytes(b []byte) []byte {
+	if utf8.Valid(b) {
+		return b
+	}
+
+	var res bytes.Buffer
+	res.Grow(len(b))
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		if r == utf8.RuneError && size == 1 {
+			// Invalid UTF-8, treat as Windows-1252
+			r = charmap.Windows1252.DecodeByte(b[0])
+		}
+		res.WriteRune(r)
+		b = b[size:]
+	}
+	return res.Bytes()
+}
+
+// SanitizeUTF8 ensures a string is valid UTF-8, converting invalid sequences from Windows-1252.
+func SanitizeUTF8(s string) string {
+	return string(SanitizeUTF8Bytes([]byte(s)))
+}
 
 type MediaInfo struct {
 	CreatingLibrary CreatingLibrary `json:"creatingLibrary"`
@@ -138,6 +166,8 @@ func Get(filePath string) (*MediaInfo, error) {
 		}
 		return nil, fmt.Errorf("failed to run mediainfo: %w", err)
 	}
+
+	out = SanitizeUTF8Bytes(out)
 
 	var mi MediaInfo
 	if err := json.Unmarshal(out, &mi); err != nil {
