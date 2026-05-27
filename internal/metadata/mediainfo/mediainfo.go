@@ -242,21 +242,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 				// ignore bit depth if it's 8 (default)
 				meta.BitDepth = track.BitDepth
 			}
-
-			hdr := strings.ToUpper(track.HDR_Format)
-			if strings.Contains(hdr, "DOLBY VISION") {
-				meta.HDR = "DV."
-			} else {
-				meta.HDR = ""
-			}
-			if strings.Contains(hdr, "HDR10+") {
-				meta.HDR += "HDR10Plus"
-			} else if strings.Contains(hdr, "HDR10") {
-				meta.HDR += "HDR"
-			} else if strings.Contains(strings.ToUpper(track.Transfer_Characteristics), "HLG") {
-				meta.HDR += "HLG"
-			}
-			meta.HDR = strings.Trim(meta.HDR, ".")
+			meta.HDR = track.detectHDR()
 
 		} else if track.Type == "Audio" && meta.AudioCodec == "" {
 			meta.AudioCodec = metadata.AudioCodecName(track.Format)
@@ -272,6 +258,22 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	}
 	mi.SetLanguageTag(meta)
 	return meta
+}
+
+func (track *Track) detectHDR() string {
+	hdr := strings.ToUpper(track.HDR_Format)
+	var result string
+	if strings.Contains(hdr, "DOLBY VISION") {
+		result = "DV."
+	}
+	if strings.Contains(hdr, "HDR10+") {
+		result += "HDR10Plus"
+	} else if strings.Contains(hdr, "HDR10") {
+		result += "HDR"
+	} else if strings.Contains(strings.ToUpper(track.Transfer_Characteristics), "HLG") {
+		result += "HLG"
+	}
+	return strings.Trim(result, ".")
 }
 
 func (mi *MediaInfo) GetAudioLanguages() []string {
