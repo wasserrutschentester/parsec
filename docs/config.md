@@ -121,10 +121,12 @@ You can enable or disable specific quality checks on a per-preset basis.
 -   `mediainfo_resolution`: Check for non-standard resolutions.
 -   `matroska_track_order`: Verify track ordering rules.
 -   `matroska_language_tag`: Verify valid ISO language tags on tracks.
--   `matroska_multi_lang`: Ensure 'mul' tracks have a descriptive name.
+-   `matroska_multi_lang`: Ensure 'mul' tracks have at least two full language names.
 -   `matroska_original_language`: Verify consistent OriginalLanguage flag.
--   `matroska_name_quality`: Check for junk keywords in track names.
--   `matroska_name_keywords`: Ensure names match flags (SDH, Forced, etc.).
+-   `matroska_name_quality`: Check for junk keywords (STEREO, ENCODED, etc.).
+-   `matroska_name_codecs`: Detect simple codecs (AC3, AAC, DTS) in track names.
+-   `matroska_name_redundant_lang`: Detect redundant language names (matching track tag).
+-   `matroska_name_keywords`: Ensure names match flags (SDH, Forced, AD, etc.).
 -   `matroska_duplicate_tracks`: Identify identical tracks.
 -   `matroska_default_flags`: Verify first-standard-track default rules.
 -   `matroska_subtitle_format`: Verify SRT-only requirement.

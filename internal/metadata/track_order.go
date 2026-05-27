@@ -2,10 +2,12 @@ package metadata
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 )
 
 func VerifyTrackOrder(tracks []EbmlTrack) error {
@@ -35,6 +37,18 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 
 		if config.IsCheckEnabled("matroska_name_quality") {
 			if err := checkTrackNameQuality(*track); err != nil {
+				fmt.Printf("QA Warning: %v\n", err)
+			}
+		}
+
+		if config.IsCheckEnabled("matroska_name_codecs") {
+			if err := checkTrackNameCodecs(*track); err != nil {
+				fmt.Printf("QA Warning: %v\n", err)
+			}
+		}
+
+		if config.IsCheckEnabled("matroska_name_redundant_lang") {
+			if err := checkTrackNameRedundantLang(*track); err != nil {
 				fmt.Printf("QA Warning: %v\n", err)
 			}
 		}
@@ -91,6 +105,109 @@ func checkTrackNameQuality(track EbmlTrack) error {
 	return nil
 }
 
+func checkTrackNameCodecs(track EbmlTrack) error {
+	nameUpper := strings.ToUpper(track.Properties.Name)
+	// Simple Codecs
+	simpleCodecs := []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
+	for _, codec := range simpleCodecs {
+		if strings.Contains(nameUpper, codec) {
+			return fmt.Errorf("%s track #%02d (ID: %d) contains simple codec '%s' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, codec, track.Properties.Name)
+		}
+	}
+	// Special handling for DTS (allow DTS-HD, DTS:X etc)
+	if strings.Contains(nameUpper, "DTS") && !strings.Contains(nameUpper, "DTS-HD") && !strings.Contains(nameUpper, "DTS:X") && !strings.Contains(nameUpper, "DTS-ES") {
+		re := regexp.MustCompile(`\bDTS\b`)
+		if re.MatchString(nameUpper) {
+			return fmt.Errorf("%s track #%02d (ID: %d) contains simple codec 'DTS' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Name)
+		}
+	}
+	return nil
+}
+
+func checkTrackNameRedundantLang(track EbmlTrack) error {
+	// Redundant Language Name
+	if isRedundantLanguageName(track.Properties.Name, track.Properties.Language) {
+		return fmt.Errorf("%s track #%02d (ID: %d) has redundant language name in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Name)
+	}
+	return nil
+}
+
+func isRedundantLanguageName(name, trackLang string) bool {
+	if name == "" {
+		return false
+	}
+
+	tag := language.Make(trackLang)
+	base, _ := tag.Base()
+	target := base.String()
+
+	// Split by space and punctuation
+	re := regexp.MustCompile(`[\s/.,;()]+`)
+	words := re.Split(name, -1)
+
+	for _, word := range words {
+		if getLanguageCodeFromName(word) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func countLanguagesInString(name string) int {
+	if name == "" {
+		return 0
+	}
+
+	re := regexp.MustCompile(`[\s/.,;()]+`)
+	words := re.Split(name, -1)
+
+	count := 0
+	for _, word := range words {
+		if isLanguageName(word) {
+			count++
+		}
+	}
+	return count
+}
+
+func isLanguageName(word string) bool {
+	return getLanguageCodeFromName(word) != ""
+}
+
+func getLanguageCodeFromName(word string) string {
+	if len(word) <= 3 {
+		return ""
+	}
+
+	wordLower := strings.ToLower(word)
+
+	commonNames := map[string]string{
+		"english": "en", "german": "de", "french": "fr", "spanish": "es",
+		"italian": "it", "japanese": "ja", "chinese": "zh", "korean": "ko",
+		"russian": "ru", "portuguese": "pt", "dutch": "nl", "polish": "pl",
+		"swedish": "sv", "danish": "da", "norwegian": "no", "finnish": "fi",
+		"arabic": "ar", "hindi": "hi", "turkish": "tr", "thai": "th",
+		"vietnamese": "vi", "indonesian": "id", "hebrew": "he", "czech": "cs",
+		"hungarian": "hu", "romanian": "ro", "greek": "el", "bulgarian": "bg",
+		"deutsch": "de", "français": "fr", "francais": "fr", "español": "es",
+		"espanol": "es", "italiano": "it", "日本語": "ja", "中文": "zh",
+		"한국어": "ko", "русский": "ru",
+	}
+
+	if base := commonNames[wordLower]; base != "" {
+		return base
+	}
+
+	tag, err := language.Parse(word)
+	if err == nil {
+		langName := display.English.Languages().Name(tag)
+		if strings.EqualFold(langName, word) {
+			base, _ := tag.Base()
+			return base.String()
+		}
+	}
+	return ""
+}
 func CheckDefaultFlags(tracks []EbmlTrack) error {
 	seenAudioLangs := make(map[string]bool)
 	seenSubLangs := make(map[string]bool)
@@ -240,18 +357,42 @@ func checkNameKeywords(track EbmlTrack) error {
 	if props.HearingImpaired && !strings.Contains(nameUpper, "SDH") {
 		return fmt.Errorf("%s track #%d (ID: %d) is hearing impaired but Name field does not contain 'SDH'", track.Type, track.TypeOrder, track.Properties.Number)
 	}
+	if !props.HearingImpaired && strings.Contains(nameUpper, "SDH") {
+		return fmt.Errorf("%s track #%d (ID: %d) has 'SDH' in Name field but is not flagged as hearing impaired", track.Type, track.TypeOrder, track.Properties.Number)
+	}
+
 	if props.Forced && !strings.Contains(nameUpper, "FORCED") {
 		return fmt.Errorf("%s track #%d (ID: %d) is forced but Name field does not contain 'Forced'", track.Type, track.TypeOrder, track.Properties.Number)
 	}
+	if !props.Forced && strings.Contains(nameUpper, "FORCED") {
+		return fmt.Errorf("%s track #%d (ID: %d) has 'Forced' in Name field but is not flagged as forced", track.Type, track.TypeOrder, track.Properties.Number)
+	}
+
 	if props.Commentary && !strings.Contains(nameUpper, "COMMENTARY") {
 		return fmt.Errorf("%s track #%d (ID: %d) is commentary but Name field does not contain 'Commentary'", track.Type, track.TypeOrder, track.Properties.Number)
 	}
-	if props.VisualImpaired && props.Name == "" {
-		return fmt.Errorf("%s track #%d (ID: %d) is visual impaired but Name field is empty", track.Type, track.TypeOrder, track.Properties.Number)
+	if !props.Commentary && strings.Contains(nameUpper, "COMMENTARY") {
+		return fmt.Errorf("%s track #%d (ID: %d) has 'Commentary' in Name field but is not flagged as commentary", track.Type, track.TypeOrder, track.Properties.Number)
 	}
+
+	reAD := regexp.MustCompile(`\bAD\b`)
+	if props.VisualImpaired {
+		if !strings.Contains(nameUpper, "DESCRIPTIVE") && !strings.Contains(nameUpper, "DESCRIPTION") && !reAD.MatchString(nameUpper) {
+			return fmt.Errorf("%s track #%d (ID: %d) is visual impaired but Name field does not contain 'Descriptive', 'Description', or 'AD'", track.Type, track.TypeOrder, track.Properties.Number)
+		}
+	}
+	if !props.VisualImpaired && (strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || reAD.MatchString(nameUpper)) {
+		return fmt.Errorf("%s track #%d (ID: %d) has visual impaired keywords in Name field but is not flagged as visual impaired", track.Type, track.TypeOrder, track.Properties.Number)
+	}
+
+	if props.Language == "mul" {
+		if countLanguagesInString(props.Name) < 2 {
+			return fmt.Errorf("%s track #%d (ID: %d) has language 'mul' but Name field does not contain at least two language names", track.Type, track.TypeOrder, track.Properties.Number)
+		}
+	}
+
 	return nil
 }
-
 func getTrackPriority(track EbmlTrack) int {
 	lang := track.Properties.Language
 	tag := language.Make(lang)

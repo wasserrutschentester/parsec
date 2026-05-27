@@ -35,10 +35,13 @@ This document lists all individual checks performed by the `parsec check` comman
 | Matroska Format | `metadata.GetEbmlMetadata` | *Core* | Verifies that the file is a valid Matroska (MKV) container. |
 | Track Order | `metadata.VerifyTrackOrder` | `matroska_track_order` | Ensures audio and subtitle tracks are sorted by language priority and type. |
 | Language Tags | `metadata.validateTrackBasics` | `matroska_language_tag` | Verifies that all tracks have a valid ISO language tag. |
-| 'mul' Track Name | `metadata.validateTrackBasics` | `matroska_multi_lang` | Ensures that tracks with language 'mul' (Multiple) have a descriptive Name field. |
+| 'mul' Track Name | `metadata.validateTrackBasics` | `matroska_multi_lang` | Ensures that tracks with language 'mul' (Multiple) have a Name field listing at least two full language names. |
 | Original Language Consistency | `metadata.checkOriginalLanguageConsistency` | `matroska_original_language` | Verifies that the `OriginalLanguage` flag is applied consistently. |
-| Name Quality | `metadata.checkTrackNameQuality` | `matroska_name_quality` | Detects "junk" keywords (e.g., "STEREO", "ENCODED") in track names. |
-| Flag Keywords | `metadata.checkNameKeywords` | `matroska_name_keywords` | Ensures track names contain appropriate keywords matching their flags. |
+| Name Quality | `metadata.checkTrackNameQuality` | `matroska_name_quality` | Detects "junk" keywords (STEREO, ENCODED, SURROUND, etc.) in track names. |
+| Simple Codecs | `metadata.checkTrackNameCodecs` | `matroska_name_codecs` | Detects simple codecs (AC3, AAC, DTS) in track names that are easily identified from technical metadata. |
+| Redundant Language | `metadata.checkTrackNameRedundantLang` | `matroska_name_redundant_lang` | Flags full language names (e.g., "German") in the track title that match the track's language tag. |
+| Flag Keywords | `metadata.checkNameKeywords` | `matroska_name_keywords` | Enforces strict two-way correlation between flags and keywords (SDH, Forced, Commentary, Descriptive/AD) in track names. |
+
 | Duplicate Tracks | `metadata.checkDuplicateTracks` | `matroska_duplicate_tracks` | Identifies identical tracks (same language, flags, and name). |
 | Default Flags | `metadata.CheckDefaultFlags` | `matroska_default_flags` | Ensures only the first standard track per language is marked as Default. |
 | Subtitle Format | `metadata.CheckSubtitleFormat` | `matroska_subtitle_format` | Verifies that all subtitle tracks are in SRT format. |

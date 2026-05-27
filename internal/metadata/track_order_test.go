@@ -63,9 +63,17 @@ func TestVerifyTrackOrder(t *testing.T) {
 			name: "SDH with keyword",
 			tracks: []EbmlTrack{
 				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
-				{ID: 2, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", HearingImpaired: true, Name: "German SDH"}},
+				{ID: 2, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", HearingImpaired: true, Name: "SDH"}},
 			},
 			wantErr: false,
+		},
+		{
+			name: "SDH keyword without flag",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+				{ID: 2, Type: "subtitles", Properties: EbmlTrackProperties{Language: "ger", Name: "SDH"}},
+			},
+			wantErr: true,
 		},
 		{
 			name: "OriginalLanguage inconsistency",
@@ -86,7 +94,44 @@ func TestVerifyTrackOrder(t *testing.T) {
 			name: "Commentary with keyword",
 			tracks: []EbmlTrack{
 				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
-				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Director's Commentary"}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Visual impaired missing keyword",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", VisualImpaired: true, Default: true}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Visual impaired with Descriptive",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", VisualImpaired: true, Name: "Descriptive"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Visual impaired keyword without flag",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Default: true}},
+				{ID: 2, Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Name: "AD"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "mul language with 1 language in name",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "mul", Name: "English", Default: true}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "mul language with 2 languages in name",
+			tracks: []EbmlTrack{
+				{ID: 1, Type: "audio", Properties: EbmlTrackProperties{Language: "mul", Name: "English / German", Default: true}},
 			},
 			wantErr: false,
 		},
@@ -115,6 +160,57 @@ func TestVerifyTrackOrder(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTrackNameChecks(t *testing.T) {
+	t.Run("Quality (Junk)", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			track   EbmlTrack
+			wantErr bool
+		}{
+			{"Junk keyword", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Name: "German Stereo"}}, true},
+			{"Valid name", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Name: "Swissgerman / SDH"}}, false},
+		}
+		for _, tt := range tests {
+			if err := checkTrackNameQuality(tt.track); (err != nil) != tt.wantErr {
+				t.Errorf("%s: checkTrackNameQuality() error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			}
+		}
+	})
+
+	t.Run("Codecs", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			track   EbmlTrack
+			wantErr bool
+		}{
+			{"Simple codec AC3", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Name: "AC3"}}, true},
+			{"Simple codec DTS", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Name: "DTS 5.1"}}, true},
+			{"Complex codec DTS-HD", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Name: "DTS-HD Master Audio"}}, false},
+		}
+		for _, tt := range tests {
+			if err := checkTrackNameCodecs(tt.track); (err != nil) != tt.wantErr {
+				t.Errorf("%s: checkTrackNameCodecs() error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			}
+		}
+	})
+
+	t.Run("Redundant Lang", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			track   EbmlTrack
+			wantErr bool
+		}{
+			{"Redundant German", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Name: "German"}}, true},
+			{"Non-redundant English", EbmlTrack{Type: "audio", Properties: EbmlTrackProperties{Language: "ger", Name: "English"}}, false},
+		}
+		for _, tt := range tests {
+			if err := checkTrackNameRedundantLang(tt.track); (err != nil) != tt.wantErr {
+				t.Errorf("%s: checkTrackNameRedundantLang() error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			}
+		}
+	})
 }
 
 func TestCheckDefaultFlags(t *testing.T) {
