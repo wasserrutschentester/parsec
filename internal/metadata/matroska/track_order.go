@@ -75,15 +75,15 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 			priority := getTrackPriority(*track)
 			if track.Type == "audio" {
 				if priority < lastAudioPriority {
-					return fmt.Errorf("audio track #%02d (ID: %d) is out of order.\n  Previous: %s\n  Current:  %s",
-						track.TypeOrder, track.Properties.Number, formatTrackInfo(lastAudio), formatTrackInfo(track))
+					return fmt.Errorf("audio track is out of order.\n  Previous: %s\n  Current:  %s",
+						lastAudio.formatTrackInfo(), track.formatTrackInfo())
 				}
 				lastAudio = track
 				lastAudioPriority = priority
 			} else if track.Type == "subtitles" {
 				if priority < lastSubPriority {
-					return fmt.Errorf("subtitle track #%02d (ID: %d) is out of order.\n  Previous: %s\n  Current:  %s",
-						track.TypeOrder, track.Properties.Number, formatTrackInfo(lastSub), formatTrackInfo(track))
+					return fmt.Errorf("subtitle track is out of order.\n  Previous: %s\n  Current:  %s",
+						lastSub.formatTrackInfo(), track.formatTrackInfo())
 				}
 				lastSub = track
 				lastSubPriority = priority
@@ -264,7 +264,7 @@ func CheckDefaultFlags(tracks []EbmlTrack) error {
 				return fmt.Errorf("%s track #%02d (ID: %d lang: %s) should have the Default flag set (it is the first standard track for this language)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
 			}
 			if isSpecialized {
-				return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set because it is a specialized track (Forced/AD/SDH/Commentary/Simple)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
+				return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set because it is a specialized track %s", track.Type, track.TypeOrder, track.Properties.Number, props.Language, track.getFlags())
 			}
 			return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
 		}
@@ -275,14 +275,14 @@ func CheckDefaultFlags(tracks []EbmlTrack) error {
 func CheckSubtitleFormat(tracks []EbmlTrack) error {
 	for _, track := range tracks {
 		codec := track.Codec
-		if track.Type == "subtitles" && !strings.Contains(codec, "SRT") {
-			return fmt.Errorf("%s track #%d (ID: %d, lang: %s) is not a SRT subtitle track", track.Type, track.TypeOrder, track.Properties.Number, track.Codec)
+		if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
+			return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) is text-based but not a SRT subtitle track (codec: %s)", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Language, track.Codec)
 		}
 	}
 	return nil
 }
 
-func formatTrackInfo(track *EbmlTrack) string {
+func (track *EbmlTrack) getFlags() string {
 	if track == nil {
 		return "None"
 	}
@@ -295,10 +295,10 @@ func formatTrackInfo(track *EbmlTrack) string {
 		flags += " [Forced]"
 	}
 	if props.HearingImpaired {
-		flags += " [SDH]"
+		flags += " [Hearing Impaired]"
 	}
 	if props.VisualImpaired {
-		flags += " [AD]"
+		flags += " [Visual Impaired]"
 	}
 	if props.Commentary {
 		flags += " [Commentary]"
@@ -307,9 +307,18 @@ func formatTrackInfo(track *EbmlTrack) string {
 		flags += " [Original]"
 	}
 	if props.TextDescriptions {
-		flags += " [Simple]"
+		flags += " [Text Descriptions]"
 	}
 
+	return flags
+}
+
+func (track *EbmlTrack) formatTrackInfo() string {
+	if track == nil {
+		return "None"
+	}
+	props := track.Properties
+	flags := track.getFlags()
 	return fmt.Sprintf("#%02d (ID: %d) Lang: %s, Name: '%s', Flags:%s", track.TypeOrder, track.Properties.Number, props.Language, props.Name, flags)
 }
 
@@ -321,10 +330,10 @@ func validateTrackBasics(track EbmlTrack) error {
 	lang := track.Properties.Language
 	tag := language.Make(lang)
 	if config.IsCheckEnabled("matroska_language_tag") && tag == language.Und {
-		return fmt.Errorf("%s track #%d (ID: %d) is missing a valid language tag (got: %s)", track.Type, track.TypeOrder, track.Properties.Number, lang)
+		return fmt.Errorf("%s track #%02d (ID: %d) is missing a valid language tag (got: %s) Name: '%s'", track.Type, track.TypeOrder, track.Properties.Number, lang, track.Properties.Name)
 	}
 	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
-		return fmt.Errorf("%s track #%d (ID: %d) with language 'mul' must have a Name field", track.Type, track.TypeOrder, track.Properties.Number)
+		return fmt.Errorf("%s track #%02d (ID: %d) with language 'mul' must have a Name field", track.Type, track.TypeOrder, track.Properties.Number)
 	}
 	return nil
 }
@@ -332,7 +341,7 @@ func validateTrackBasics(track EbmlTrack) error {
 func checkOriginalLanguageConsistency(track EbmlTrack, langHasOriginalFlag map[string]bool) error {
 	lang := track.Properties.Language
 	if langHasOriginalFlag[lang] && !track.Properties.OriginalLanguage {
-		return fmt.Errorf("%s track #%d (ID: %d, lang: %s) is missing the OriginalLanguage flag (other tracks in this language have it)", track.Type, track.TypeOrder, track.Properties.Number, lang)
+		return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) is missing the OriginalLanguage flag (other tracks in this language have it)", track.Type, track.TypeOrder, track.Properties.Number, lang)
 	}
 	return nil
 }

@@ -43,6 +43,7 @@ type EbmlTrackProperties struct {
 	Commentary       bool   `json:"flag_commentary,omitempty"`
 	OriginalLanguage bool   `json:"flag_original,omitempty"`
 	TextDescriptions bool   `json:"flag_text_descriptions,omitempty"`
+	TextSubtitles    bool   `json:"text_subtitles,omitempty"`
 }
 
 type mkvTags struct {
