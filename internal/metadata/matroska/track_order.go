@@ -10,6 +10,24 @@ import (
 	"golang.org/x/text/language/display"
 )
 
+var (
+	dtsRegex        = regexp.MustCompile(`\bDTS\b`)
+	adRegex         = regexp.MustCompile(`\bAD\b`)
+	wordSplitRegex  = regexp.MustCompile(`[\s/.,;()]+`)
+	commonLangNames = map[string]string{
+		"english": "en", "german": "de", "french": "fr", "spanish": "es",
+		"italian": "it", "japanese": "ja", "chinese": "zh", "korean": "ko",
+		"russian": "ru", "portuguese": "pt", "dutch": "nl", "polish": "pl",
+		"swedish": "sv", "danish": "da", "norwegian": "no", "finnish": "fi",
+		"arabic": "ar", "hindi": "hi", "turkish": "tr", "thai": "th",
+		"vietnamese": "vi", "indonesian": "id", "hebrew": "he", "czech": "cs",
+		"hungarian": "hu", "romanian": "ro", "greek": "el", "bulgarian": "bg",
+		"deutsch": "de", "français": "fr", "francais": "fr", "español": "es",
+		"espanol": "es", "italiano": "it", "日本語": "ja", "中文": "zh",
+		"한국어": "ko", "русский": "ru",
+	}
+)
+
 func VerifyTrackOrder(tracks []EbmlTrack) error {
 	var lastAudio, lastSub *EbmlTrack
 	var lastAudioPriority, lastSubPriority int
@@ -116,8 +134,7 @@ func checkTrackNameCodecs(track EbmlTrack) error {
 	}
 	// Special handling for DTS (allow DTS-HD, DTS:X etc)
 	if strings.Contains(nameUpper, "DTS") && !strings.Contains(nameUpper, "DTS-HD") && !strings.Contains(nameUpper, "DTS:X") && !strings.Contains(nameUpper, "DTS-ES") {
-		re := regexp.MustCompile(`\bDTS\b`)
-		if re.MatchString(nameUpper) {
+		if dtsRegex.MatchString(nameUpper) {
 			return fmt.Errorf("%s track #%02d (ID: %d) contains simple codec 'DTS' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Name)
 		}
 	}
@@ -133,19 +150,11 @@ func checkTrackNameRedundantLang(track EbmlTrack) error {
 }
 
 func isRedundantLanguageName(name, trackLang string) bool {
-	if name == "" {
-		return false
-	}
-
 	tag := language.Make(trackLang)
 	base, _ := tag.Base()
 	target := base.String()
 
-	// Split by space and punctuation
-	re := regexp.MustCompile(`[\s/.,;()]+`)
-	words := re.Split(name, -1)
-
-	for _, word := range words {
+	for _, word := range tokenizeTrackName(name) {
 		if getLanguageCodeFromName(word) == target {
 			return true
 		}
@@ -154,20 +163,20 @@ func isRedundantLanguageName(name, trackLang string) bool {
 }
 
 func countLanguagesInString(name string) int {
-	if name == "" {
-		return 0
-	}
-
-	re := regexp.MustCompile(`[\s/.,;()]+`)
-	words := re.Split(name, -1)
-
 	count := 0
-	for _, word := range words {
+	for _, word := range tokenizeTrackName(name) {
 		if isLanguageName(word) {
 			count++
 		}
 	}
 	return count
+}
+
+func tokenizeTrackName(name string) []string {
+	if name == "" {
+		return nil
+	}
+	return wordSplitRegex.Split(name, -1)
 }
 
 func isLanguageName(word string) bool {
@@ -181,20 +190,7 @@ func getLanguageCodeFromName(word string) string {
 
 	wordLower := strings.ToLower(word)
 
-	commonNames := map[string]string{
-		"english": "en", "german": "de", "french": "fr", "spanish": "es",
-		"italian": "it", "japanese": "ja", "chinese": "zh", "korean": "ko",
-		"russian": "ru", "portuguese": "pt", "dutch": "nl", "polish": "pl",
-		"swedish": "sv", "danish": "da", "norwegian": "no", "finnish": "fi",
-		"arabic": "ar", "hindi": "hi", "turkish": "tr", "thai": "th",
-		"vietnamese": "vi", "indonesian": "id", "hebrew": "he", "czech": "cs",
-		"hungarian": "hu", "romanian": "ro", "greek": "el", "bulgarian": "bg",
-		"deutsch": "de", "français": "fr", "francais": "fr", "español": "es",
-		"espanol": "es", "italiano": "it", "日本語": "ja", "中文": "zh",
-		"한국어": "ko", "русский": "ru",
-	}
-
-	if base := commonNames[wordLower]; base != "" {
+	if base := commonLangNames[wordLower]; base != "" {
 		return base
 	}
 
