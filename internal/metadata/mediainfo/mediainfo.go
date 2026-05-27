@@ -243,7 +243,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
 		}
 	}
-	meta.Language = mi.GetLanguageTag()
+	mi.SetLanguageTag(meta)
 	return meta
 }
 
@@ -276,12 +276,14 @@ func (mi *MediaInfo) GetSubtitleLanguages() []string {
 	return languages
 }
 
-func (mi *MediaInfo) GetLanguageTag() string {
+func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	languages := mi.GetAudioLanguages()
 	preferredLanguage := config.GetPreferredLanguage()
 	if len(languages) == 0 {
 		fmt.Println("no audio languages found")
-		return ""
+		meta.Language = ""
+		meta.LanguageExt = ""
+		return
 	}
 
 	prefTag := language.Make(preferredLanguage)
@@ -293,19 +295,25 @@ func (mi *MediaInfo) GetLanguageTag() string {
 		if len(subtitleLanguages) > 0 {
 			for _, lang := range subtitleLanguages {
 				if language.Make(lang) == prefTag {
-					return fmt.Sprintf("%s.SUBBED", metadata.LanguageName(preferredLanguage))
+					meta.Language = metadata.LanguageName(preferredLanguage)
+					meta.LanguageExt = "SUBBED"
+					meta.Subbed = true
+					return
 				}
 			}
 		}
 	}
 
-	languageTag := metadata.LanguageName(languages[0])
-	if len(languages) > 2 {
-		languageTag += ".ML"
-	} else if len(languages) == 2 {
-		languageTag += ".DL"
+	meta.Language = metadata.LanguageName(languages[0])
+	switch len(languages) {
+	case 0:
+	case 1:
+	case 2:
+		meta.LanguageExt = "DL"
+	default:
+		meta.LanguageExt = "ML"
 	}
-	return languageTag
+
 }
 
 func (mi *MediaInfo) Print() {

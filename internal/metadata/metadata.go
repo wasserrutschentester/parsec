@@ -19,6 +19,10 @@ type Metadata struct {
 	Date          string
 	EpisodeTitle  string
 	Language      string
+	LanguageExt   string
+	Subbed        bool
+	Accessibility string
+	HasAudioDesc  bool
 	Repack        bool
 	Resolution    string
 	Service       string
@@ -38,25 +42,23 @@ func LanguageName(lang string) string {
 	if lang == "" {
 		return ""
 	}
-	parts := strings.Split(lang, ".")
-	tag := language.Make(parts[0])
+	tag := language.Make(lang)
 	if tag != language.Und {
 		if tag == language.Make("mul") {
-			parts[0] = "MULTi"
+			return "MULTI"
 		} else if tag == language.Make("zxx") {
-			parts[0] = "SiLENT"
+			return "SILENT"
 		} else {
 			name := display.English.Languages().Name(tag)
 			if name != "" {
-				parts[0] = strings.ToUpper(name)
+				return strings.ToUpper(name)
 			} else {
-				parts[0] = strings.ToUpper(parts[0])
+				return strings.ToUpper(lang)
 			}
 		}
 	} else {
-		parts[0] = strings.ToUpper(parts[0])
+		return strings.ToUpper(lang)
 	}
-	return strings.Join(parts, ".")
 }
 
 func ChanToNotation(channels int) string {
@@ -166,6 +168,8 @@ func (meta *Metadata) Render(template string) string {
 		"{date}":           meta.Date,
 		"{episode_title}":  meta.EpisodeTitle,
 		"{language}":       LanguageName(meta.Language),
+		"{language_ext}":   meta.LanguageExt,
+		"{accessibility}":  meta.Accessibility,
 		"{resolution}":     meta.Resolution,
 		"{service}":        meta.Service,
 		"{source}":         meta.Source,

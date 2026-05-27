@@ -3,6 +3,7 @@ package mediainfo
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"codeberg.org/n0ne/parsec/internal/config"
@@ -327,7 +328,9 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 					Tracks: tt.tracks,
 				},
 			}
-			if got := mi.GetLanguageTag(); got != tt.want {
+			meta := &metadata.Metadata{}
+			mi.SetLanguageTag(meta)
+			if got := strings.Trim(meta.Language+"."+meta.LanguageExt, "."); got != tt.want {
 				t.Errorf("GetLanguageTag() = %v, want %v", got, tt.want)
 			}
 		})

@@ -12,6 +12,7 @@ var (
 	serviceFlag  string
 	sourceFlag   string
 	isRepackFlag bool
+	isSubbedFlag bool
 	groupFlag    string
 	// MDB IDs
 	isTVFlag    bool

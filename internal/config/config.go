@@ -5,7 +5,7 @@ import (
 )
 
 func InitDefaults() {
-	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{language}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{video_codec}-{group}")
+	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("source", "WEB-DL")
 	viper.SetDefault("group", "4Rocket")

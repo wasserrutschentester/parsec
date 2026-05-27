@@ -41,7 +41,7 @@ func Parse(filename string) *metadata.Metadata {
 	}
 
 	// Language
-	meta.Language = matchLanguage(filename)
+	matchLanguage(filename, meta)
 
 	// match REPACK
 	repackRegex := regexp.MustCompile(`\.REPACK(\.|-|$|\d)`)
@@ -215,22 +215,24 @@ func matchSeasonEpisode(filename string) (int, int) {
 	return 0, 0
 }
 
-func matchLanguage(filename string) string {
+func matchLanguage(filename string, meta *metadata.Metadata) {
 	re := regexp.MustCompile(`(?i)\.(GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:\.(DL|ML|SUBBED))?\.`)
-	languageTag := ""
+
 	if match := re.FindStringSubmatch(filename); len(match) > 0 {
-		languageTag = match[1]
+		meta.Language = match[1]
 		if len(match) > 2 && match[2] != "" {
-			languageTag += "." + match[2]
+			meta.LanguageExt = match[2]
+			if match[2] == "SUBBED" {
+				meta.Subbed = true
+			}
 		}
 	}
 
 	audioDescriptionRegex := regexp.MustCompile(`(?i)\.(WiTH\.AD|with\.Audio\.Description)\.`)
 	if match := audioDescriptionRegex.FindStringSubmatch(filename); len(match) > 0 {
-		languageTag += "." + match[1]
+		meta.Accessibility = match[1]
+		meta.HasAudioDesc = true
 	}
-
-	return languageTag
 }
 
 func CheckAllowedCharacters(filename string) []string {

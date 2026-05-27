@@ -144,7 +144,10 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Film",
 				Year:          2024,
-				Language:      "GERMAN.DL.WITH.AD",
+				Language:      "GERMAN",
+				LanguageExt:   "DL",
+				Accessibility: "WITH.AD",
+				HasAudioDesc:  true,
 				Resolution:    "1080p",
 				Source:        "BluRay",
 				AudioCodec:    "DDP",
@@ -159,7 +162,10 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Moneyland.Die.dunklen.Geschaefte.der.Finanzindustrie",
 				Year:          2025,
-				Language:      "GERMAN.DL.with.Audio.Description",
+				Language:      "GERMAN",
+				LanguageExt:   "DL",
+				Accessibility: "with.Audio.Description",
+				HasAudioDesc:  true,
 				Resolution:    "1080p",
 				Service:       "ARTE",
 				Source:        "WEB-DL",

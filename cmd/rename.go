@@ -79,6 +79,9 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	if isRepackFlag {
 		meta.Repack = isRepackFlag
 	}
+	if isSubbedFlag {
+		meta.Subbed = isSubbedFlag
+	}
 	if groupFlag != "" {
 		meta.Group = groupFlag
 	}
@@ -185,6 +188,7 @@ func init() {
 	renameCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
 	renameCmd.Flags().StringVarP(&sourceFlag, "source", "o", "", "source (WEB-DL, BluRay, etc.)")
 	renameCmd.Flags().BoolVarP(&isRepackFlag, "repack", "R", false, "is repack")
+	renameCmd.Flags().BoolVar(&isSubbedFlag, "subbed", false, "has subtitles in the preferred language")
 	renameCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
 	// MDB ID
 	renameCmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")
