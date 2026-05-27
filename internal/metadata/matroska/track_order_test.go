@@ -1,8 +1,16 @@
 package matroska
 
 import (
+	"os"
 	"testing"
+
+	"codeberg.org/n0ne/parsec/internal/config"
 )
+
+func TestMain(m *testing.M) {
+	config.InitDefaults()
+	os.Exit(m.Run())
+}
 
 func TestVerifyTrackOrder(t *testing.T) {
 	tests := []struct {
@@ -298,8 +306,8 @@ func TestCheckSubtitleFormat(t *testing.T) {
 		{
 			name: "Contains non-SRT subtitle",
 			tracks: []EbmlTrack{
-				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT"},
-				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS"},
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: EbmlTrackProperties{TextSubtitles: true}},
+				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS", Properties: EbmlTrackProperties{TextSubtitles: true}},
 			},
 			wantErr: true,
 		},
