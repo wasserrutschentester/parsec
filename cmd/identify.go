@@ -37,44 +37,7 @@ var identifyCmd = &cobra.Command{
 			meta = &metadata.Metadata{}
 		}
 
-		if titleFlag != "" {
-			meta.Title = titleFlag
-		}
-		if yearFlag != 0 {
-			meta.Year = yearFlag
-		}
-		if seasonFlag != 0 {
-			meta.Season = seasonFlag
-		}
-		if episodeFlag != 0 {
-			meta.Episode = episodeFlag
-		}
-		if serviceFlag != "" {
-			meta.Service = serviceFlag
-		}
-		if sourceFlag != "" {
-			meta.Source = sourceFlag
-		}
-		if groupFlag != "" {
-			meta.Group = groupFlag
-		}
-
-		if cmd.Flags().Changed("tv") {
-			meta.IsTV = isTVFlag
-		} else if cmd.Flags().Changed("movie") {
-			meta.IsTV = !isMovieFlag
-		}
-
-		if imdbIDFlag != "" {
-			meta.ImdbID = imdbIDFlag
-		}
-		if tmdbIDFlag != 0 {
-			meta.TmdbID = tmdbIDFlag
-		}
-		if tvdbIDFlag != 0 {
-			meta.TvdbID = tvdbIDFlag
-		}
-
+		applyMetadataFlags(cmd, meta)
 		meta.SetDefaults()
 
 		result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
@@ -132,6 +95,10 @@ func init() {
 	identifyCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	identifyCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	identifyCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	// P2P Info
+	identifyCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
+	identifyCmd.Flags().StringVarP(&sourceFlag, "source", "O", "", "source (e.g. BluRay, Web-DL)")
+	identifyCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
 	// Other
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
@@ -139,6 +106,12 @@ func init() {
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
 		identifyCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
+	}
+
+	// Group P2P flags
+	p2pFlags := []string{"service", "source", "group"}
+	for _, f := range p2pFlags {
+		identifyCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
 	// Group ID flags
