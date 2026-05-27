@@ -7,6 +7,7 @@ import (
 func InitDefaults() {
 	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
+	viper.SetDefault("subbed_tagging", true)
 	viper.SetDefault("source", "WEB-DL")
 	viper.SetDefault("group", "4Rocket")
 	viper.SetDefault("video_codec_avc", "H.264")
@@ -55,6 +56,10 @@ func GetTemplate() string {
 
 func GetPreferredLanguage() string {
 	return getString("preferred_language")
+}
+
+func GetSubbedTagging() bool {
+	return getBool("subbed_tagging")
 }
 
 func GetTitle() string {

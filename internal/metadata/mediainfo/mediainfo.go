@@ -290,7 +290,7 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	firstAudioTag := language.Make(languages[0])
 
 	// check for preferred language subs if it's not the first audio language
-	if prefTag != firstAudioTag {
+	if config.GetSubbedTagging() && prefTag != firstAudioTag {
 		subtitleLanguages := mi.GetSubtitleLanguages()
 		if len(subtitleLanguages) > 0 {
 			for _, lang := range subtitleLanguages {

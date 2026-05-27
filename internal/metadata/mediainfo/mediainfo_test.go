@@ -8,6 +8,7 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
+	"github.com/spf13/viper"
 )
 
 func TestMediaInfo_UnmarshalFields(t *testing.T) {
@@ -274,16 +275,18 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 	config.InitDefaults() // preferred_language = "de"
 
 	tests := []struct {
-		name   string
-		tracks []Track
-		want   string
+		name          string
+		tracks        []Track
+		subbedTagging bool
+		want          string
 	}{
 		{
 			name: "Single language (German)",
 			tracks: []Track{
 				{Type: "Audio", Language: "de"},
 			},
-			want: "GERMAN",
+			subbedTagging: true,
+			want:          "GERMAN",
 		},
 		{
 			name: "Dual language (German/English)",
@@ -292,7 +295,8 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 				{Type: "Audio", Language: "de"},
 				{Type: "Audio", Language: "en"},
 			},
-			want: "GERMAN.DL",
+			subbedTagging: true,
+			want:          "GERMAN.DL",
 		},
 		{
 			name: "Multi language (3+)",
@@ -301,7 +305,8 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 				{Type: "Audio", Language: "en"},
 				{Type: "Audio", Language: "fr"},
 			},
-			want: "GERMAN.ML",
+			subbedTagging: true,
+			want:          "GERMAN.ML",
 		},
 		{
 			name: "Subbed (English audio, German subs)",
@@ -309,7 +314,17 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 				{Type: "Audio", Language: "en"},
 				{Type: "Text", Language: "de"},
 			},
-			want: "GERMAN.SUBBED",
+			subbedTagging: true,
+			want:          "GERMAN.SUBBED",
+		},
+		{
+			name: "Subbed override disabled (English audio, German subs)",
+			tracks: []Track{
+				{Type: "Audio", Language: "en"},
+				{Type: "Text", Language: "de"},
+			},
+			subbedTagging: false,
+			want:          "ENGLISH",
 		},
 		{
 			name: "Not subbed (English audio, French subs, preferred is de)",
@@ -317,12 +332,14 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 				{Type: "Audio", Language: "en"},
 				{Type: "Text", Language: "fr"},
 			},
-			want: "ENGLISH",
+			subbedTagging: true,
+			want:          "ENGLISH",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			viper.Set("subbed_tagging", tt.subbedTagging)
 			mi := &MediaInfo{
 				Media: Media{
 					Tracks: tt.tracks,
