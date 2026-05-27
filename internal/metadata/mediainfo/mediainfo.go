@@ -235,7 +235,7 @@ func (mi *MediaInfo) hasAudio() bool {
 func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	meta := &metadata.Metadata{}
 	for _, track := range mi.Media.Tracks {
-		if track.Type == "Video" {
+		if track.Type == "Video" && meta.Resolution == "" {
 			meta.Resolution = metadata.HeightToResolution(track.Height)
 			meta.VideoCodec = metadata.VideoCodecName(track.Format)
 			if track.BitDepth != 8 {
@@ -258,7 +258,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 			}
 			meta.HDR = strings.Trim(meta.HDR, ".")
 
-		} else if track.Type == "Audio" {
+		} else if track.Type == "Audio" && meta.AudioCodec == "" {
 			meta.AudioCodec = metadata.AudioCodecName(track.Format)
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
 			if strings.Contains(strings.ToUpper(track.Format_AdditionalFeatures), "ATMOS") ||
