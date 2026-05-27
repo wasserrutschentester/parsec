@@ -13,8 +13,9 @@ import (
 	"golang.org/x/text/language"
 )
 
-const (
-	baseURL = "https://api.themoviedb.org/3"
+var (
+	BaseURL    = "https://api.themoviedb.org/3"
+	HTTPClient = http.DefaultClient
 )
 
 type tmdbMedia struct {
@@ -90,8 +91,8 @@ func get(endpoint string, query url.Values, target interface{}) error {
 		query.Set("language", config.GetPreferredLanguage())
 	}
 
-	u := fmt.Sprintf("%s/%s?%s", baseURL, endpoint, query.Encode())
-	resp, err := http.Get(u)
+	u := fmt.Sprintf("%s/%s?%s", BaseURL, endpoint, query.Encode())
+	resp, err := HTTPClient.Get(u)
 	if err != nil {
 		return err
 	}

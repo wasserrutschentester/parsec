@@ -13,8 +13,9 @@ import (
 	"golang.org/x/text/language"
 )
 
-const (
-	baseURL = "https://api4.thetvdb.com/v4"
+var (
+	BaseURL    = "https://api4.thetvdb.com/v4"
+	HTTPClient = http.DefaultClient
 )
 
 type loginResponse struct {
@@ -127,7 +128,7 @@ func login() (string, error) {
 		return "", err
 	}
 
-	resp, err := http.Post(baseURL+"/login", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := HTTPClient.Post(BaseURL+"/login", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
 	}
@@ -151,15 +152,14 @@ func get(endpoint string, target interface{}) error {
 		return err
 	}
 
-	u := fmt.Sprintf("%s/%s", baseURL, endpoint)
+	u := fmt.Sprintf("%s/%s", BaseURL, endpoint)
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
