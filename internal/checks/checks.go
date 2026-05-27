@@ -14,20 +14,22 @@ import (
 	"golang.org/x/text/language"
 )
 
-func RunGenericChecks(meta *metadata.Metadata) {
+func RunGenericChecks(meta *metadata.Metadata) []string {
+	var warnings []string
 	if err := CheckYear(meta); err != nil {
-		fmt.Println(err)
+		warnings = append(warnings, err.Error())
 	}
 	if config.IsCheckEnabled("generic_streaming") {
 		if err := CheckStreaming(meta); err != nil {
-			fmt.Println(err)
+			warnings = append(warnings, err.Error())
 		}
 	}
 	if config.IsCheckEnabled("generic_tv_special") {
 		if err := CheckTvSpecial(meta); err != nil {
-			fmt.Println(err)
+			warnings = append(warnings, err.Error())
 		}
 	}
+	return warnings
 }
 
 func CheckYear(meta *metadata.Metadata) error {
@@ -90,31 +92,42 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
 
 	// 2. Non-standard Framerate
 	if config.IsCheckEnabled("mediainfo_framerate") {
-		CheckFrameRate(videoTrack)
+		for _, w := range CheckFrameRate(videoTrack) {
+			fmt.Println(w)
+		}
 	}
 
 	// 3. Low Bitrate
 	if config.IsCheckEnabled("mediainfo_bitrate") {
-		CheckBitRate(videoTrack)
+		for _, w := range CheckBitRate(videoTrack) {
+			fmt.Println(w)
+		}
 	}
 
 	// 4. Inconsistent Track Durations
 	if config.IsCheckEnabled("mediainfo_durations") {
-		checkDurations(mi)
+		for _, w := range checkDurations(mi) {
+			fmt.Println(w)
+		}
 	}
 
 	// 5. Redundant Audio Tracks
 	if config.IsCheckEnabled("mediainfo_redundant_audio") {
-		CheckRedundantAudio(mi)
+		for _, w := range CheckRedundantAudio(mi) {
+			fmt.Println(w)
+		}
 	}
 
 	// 6. Non-standard Resolution
 	if config.IsCheckEnabled("mediainfo_resolution") {
-		CheckResolution(videoTrack)
+		for _, w := range CheckResolution(videoTrack) {
+			fmt.Println(w)
+		}
 	}
 }
 
-func CheckRedundantAudio(mi *mediainfo.MediaInfo) {
+func CheckRedundantAudio(mi *mediainfo.MediaInfo) []string {
+	var warnings []string
 	langCounts := make(map[string]int)
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Audio" {
@@ -132,22 +145,24 @@ func CheckRedundantAudio(mi *mediainfo.MediaInfo) {
 
 	for lang, count := range langCounts {
 		if count > 1 {
-			fmt.Printf("QA Warning: Redundant audio tracks detected for language '%s' (%d tracks)\n", lang, count)
+			warnings = append(warnings, fmt.Sprintf("QA Warning: Redundant audio tracks detected for language '%s' (%d tracks)", lang, count))
 		}
 	}
+	return warnings
 }
 
-func CheckResolution(videoTrack *mediainfo.Track) {
+func CheckResolution(videoTrack *mediainfo.Track) []string {
+	var warnings []string
 	width := videoTrack.Width
 	height := videoTrack.Height
 
 	if width == 0 || height == 0 {
-		return
+		return nil
 	}
 
 	// 1. Modulo check (should be at least mod-2)
 	if width%2 != 0 || height%2 != 0 {
-		fmt.Printf("QA Warning: Non-standard resolution: %dx%d (not divisible by 2)\n", width, height)
+		warnings = append(warnings, fmt.Sprintf("QA Warning: Non-standard resolution: %dx%d (not divisible by 2)", width, height))
 	}
 
 	// 2. Standard Widths (common for scene/P2P)
@@ -161,19 +176,21 @@ func CheckResolution(videoTrack *mediainfo.Track) {
 	}
 
 	if !isStandardWidth {
-		fmt.Printf("QA Warning: Non-standard width detected: %d\n", width)
+		warnings = append(warnings, fmt.Sprintf("QA Warning: Non-standard width detected: %d", width))
 	}
 
 	// 3. Aspect Ratio check (sanity)
 	if height > width {
-		fmt.Printf("QA Warning: Unusual aspect ratio: height (%d) is greater than width (%d)\n", height, width)
+		warnings = append(warnings, fmt.Sprintf("QA Warning: Unusual aspect ratio: height (%d) is greater than width (%d)", height, width))
 	}
+	return warnings
 }
 
-func CheckFrameRate(videoTrack *mediainfo.Track) {
+func CheckFrameRate(videoTrack *mediainfo.Track) []string {
+	var warnings []string
 	fps := videoTrack.FrameRate
 	if fps == 0 {
-		return
+		return nil
 	}
 	standardFPS := []float64{23.976, 24, 25, 29.97, 30, 50, 59.94, 60}
 	isStandard := false
@@ -184,14 +201,16 @@ func CheckFrameRate(videoTrack *mediainfo.Track) {
 		}
 	}
 	if !isStandard {
-		fmt.Printf("QA Warning: Non-standard framerate detected: %.3f fps\n", fps)
+		warnings = append(warnings, fmt.Sprintf("QA Warning: Non-standard framerate detected: %.3f fps", fps))
 	}
+	return warnings
 }
 
-func CheckBitRate(videoTrack *mediainfo.Track) {
+func CheckBitRate(videoTrack *mediainfo.Track) []string {
+	var warnings []string
 	bitrate := videoTrack.BitRate
 	if bitrate == 0 {
-		return
+		return nil
 	}
 	height := videoTrack.Height
 	threshold := 0
@@ -204,11 +223,13 @@ func CheckBitRate(videoTrack *mediainfo.Track) {
 	}
 
 	if threshold > 0 && bitrate < threshold {
-		fmt.Printf("QA Warning: Low bitrate detected for %dp: %d bps\n", height, bitrate)
+		warnings = append(warnings, fmt.Sprintf("QA Warning: Low bitrate detected for %dp: %d bps", height, bitrate))
 	}
+	return warnings
 }
 
-func checkDurations(mi *mediainfo.MediaInfo) {
+func checkDurations(mi *mediainfo.MediaInfo) []string {
+	var warnings []string
 	var videoDur float64
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" && track.Duration != 0 {
@@ -218,8 +239,8 @@ func checkDurations(mi *mediainfo.MediaInfo) {
 	}
 
 	if videoDur == 0 {
-		fmt.Println("Video duration is missing")
-		return
+		warnings = append(warnings, "Video duration is missing")
+		return warnings
 	}
 
 	for _, track := range mi.Media.Tracks {
@@ -228,15 +249,16 @@ func checkDurations(mi *mediainfo.MediaInfo) {
 			diff := dur - videoDur
 			percentDiff := diff / videoDur * -100
 			if diff > 5.0 {
-				fmt.Printf("QA Warning: %s track #%02d (ID %s) is significantly longer than video (diff: %.1fs)\n", track.Type, *track.TypeOrder, track.ID, diff)
+				warnings = append(warnings, fmt.Sprintf("QA Warning: %s track #%02d (ID %s) is significantly longer than video (diff: %.1fs)", track.Type, *track.TypeOrder, track.ID, diff))
 			} else if diff < -20.0 && track.Type == "Audio" {
-				fmt.Printf("QA Warning: Audio track #%02d (ID %s) is significantly shorter than video (diff: %.1fs)\n", *track.TypeOrder, track.ID, diff)
+				warnings = append(warnings, fmt.Sprintf("QA Warning: Audio track #%02d (ID %s) is significantly shorter than video (diff: %.1fs)", *track.TypeOrder, track.ID, diff))
 
 			} else if percentDiff > 10.0 {
-				fmt.Printf("QA Warning: Subtitle track #%02d (ID %s) is %.1f%% shorter than video (diff: %.1fs)\n", *track.TypeOrder, track.ID, percentDiff, diff)
+				warnings = append(warnings, fmt.Sprintf("QA Warning: Subtitle track #%02d (ID %s) is %.1f%% shorter than video (diff: %.1fs)", *track.TypeOrder, track.ID, percentDiff, diff))
 			}
 		}
 	}
+	return warnings
 }
 
 func NormalizeForComparison(s string) string {
@@ -252,39 +274,40 @@ func NormalizeForComparison(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
+func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []string {
+	var warnings []string
 	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true)
 
 	if searchErr != nil {
-		fmt.Printf("MDB Error: %v\n", searchErr)
-		return
+		warnings = append(warnings, fmt.Sprintf("MDB Error: %v", searchErr))
+		return warnings
 	}
 	if searchResult == nil {
-		fmt.Println("MDB Warning: No matching metadata found on TMDB/TVDB.")
-		return
+		warnings = append(warnings, "MDB Warning: No matching metadata found on TMDB/TVDB.")
+		return warnings
 	}
-
-	fmt.Printf("MDB Matched: %s (%d)\n", searchResult.Title, searchResult.Year)
 
 	if config.IsCheckEnabled("mdb_title") {
-		CheckTitle(meta, searchResult)
+		warnings = append(warnings, CheckTitle(meta, searchResult)...)
 	}
 	if config.IsCheckEnabled("mdb_movie_year") {
-		CheckMovieYear(meta, searchResult)
+		warnings = append(warnings, CheckMovieYear(meta, searchResult)...)
 	}
 	if meta.IsTV && config.IsCheckEnabled("mdb_series_year") {
-		CheckSeriesYear(meta, searchResult)
+		warnings = append(warnings, CheckSeriesYear(meta, searchResult)...)
 	}
 	if meta.IsTV {
-		CheckEpisode(meta, searchResult)
+		warnings = append(warnings, CheckEpisode(meta, searchResult)...)
 	}
 
 	if mi != nil && config.IsCheckEnabled("mdb_track_languages") {
-		CheckTrackLanguages(mi, searchResult)
+		warnings = append(warnings, CheckTrackLanguages(mi, searchResult)...)
 	}
+	return warnings
 }
 
-func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) {
+func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []string {
+	var warnings []string
 	prefLang := config.GetPreferredLanguage()
 	origLang := result.OriginalLanguage
 
@@ -306,7 +329,7 @@ func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) {
 			}
 		}
 		if !found {
-			fmt.Printf("QA Warning: %s track in %s language '%s' is missing.\n", trackType, label, targetStr)
+			warnings = append(warnings, fmt.Sprintf("QA Warning: %s track in %s language '%s' is missing.", trackType, label, targetStr))
 		}
 	}
 
@@ -317,63 +340,75 @@ func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) {
 		check("Audio", audioLangs, origTag, origLang, "original")
 		check("Subtitle", subLangs, origTag, origLang, "original")
 	}
+	return warnings
 }
 
-func CheckMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) {
+func CheckMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []string {
+	var warnings []string
 	if !meta.IsTV && meta.Year > 0 && result.Year > 0 && meta.Year != result.Year {
-		fmt.Printf("MDB Warning: Year mismatch. Filename: %d, TMDB: %d\n", meta.Year, result.Year)
+		warnings = append(warnings, fmt.Sprintf("MDB Warning: Year mismatch. Filename: %d, TMDB: %d", meta.Year, result.Year))
 	}
+	return warnings
 }
 
-func CheckSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) {
+func CheckSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []string {
+	var warnings []string
 	if meta.Year > 0 && result.Year > 0 && meta.Year != result.Year && meta.Season < 1900 {
-		fmt.Printf("MDB Warning: Series start year mismatch. Filename: %d, TMDB/TVDB: %d\n", meta.Year, result.Year)
+		warnings = append(warnings, fmt.Sprintf("MDB Warning: Series start year mismatch. Filename: %d, TMDB/TVDB: %d", meta.Year, result.Year))
 	}
+	return warnings
 }
 
-func CheckEpisode(meta *metadata.Metadata, result *mdb.SearchResult) {
+func CheckEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []string {
+	var warnings []string
 	if meta.Season > 0 || meta.Episode > 0 {
 		epResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
 		if epResult.Name == "" {
 			if config.IsCheckEnabled("mdb_episode_existence") {
-				fmt.Printf("MDB Warning: Episode S%02dE%02d not found on TVDB/TMDB.\n", meta.Season, meta.Episode)
+				warnings = append(warnings, fmt.Sprintf("MDB Warning: Episode S%02dE%02d not found on TVDB/TMDB.", meta.Season, meta.Episode))
 			}
 		} else {
-			fmt.Printf("MDB Episode: %s (S%02dE%02d)\n", epResult.Name, epResult.Season, epResult.Episode)
 			if config.IsCheckEnabled("mdb_episode_title") {
-				CheckEpisodeTitle(meta, epResult)
+				warnings = append(warnings, CheckEpisodeTitle(meta, epResult)...)
 			}
 			if config.IsCheckEnabled("mdb_episode_date") {
-				CheckSpecialDate(meta, epResult)
+				warnings = append(warnings, CheckSpecialDate(meta, epResult)...)
 			}
 		}
 	}
+	return warnings
 }
 
-func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) {
+func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []string {
+	var warnings []string
 	if meta.EpisodeTitle != "" {
 		normParsed := NormalizeForComparison(filename.DeobfuscateTitle(meta.EpisodeTitle))
 		normOfficial := NormalizeForComparison(epResult.Name)
 		if normParsed != normOfficial {
-			fmt.Printf("MDB Warning: Episode title mismatch.\n  Filename: %s\n  TVDB:     %s\n", meta.EpisodeTitle, epResult.Name)
+			warnings = append(warnings, fmt.Sprintf("MDB Warning: Episode title mismatch.\n  Filename: %s\n  TVDB:     %s", meta.EpisodeTitle, epResult.Name))
 		}
 	}
+	return warnings
 }
 
-func CheckTitle(meta *metadata.Metadata, result *mdb.SearchResult) {
+func CheckTitle(meta *metadata.Metadata, result *mdb.SearchResult) []string {
+	var warnings []string
 	if meta.Title != "" {
 		normParsed := NormalizeForComparison(filename.DeobfuscateTitle(meta.Title))
 		normOfficial := NormalizeForComparison(result.Title)
 		if normParsed != normOfficial {
-			fmt.Printf("MDB Warning: Title mismatch.\n  Filename: %s\n  TMDB/TVDB: %s\n", meta.Title, result.Title)
+			warnings = append(warnings, fmt.Sprintf("MDB Warning: Title mismatch.\n  Filename: %s\n  TMDB/TVDB: %s", meta.Title, result.Title))
 		}
 	}
+	return warnings
 }
 
-func CheckSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) {
+func CheckSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []string {
+	var warnings []string
 	if meta.Season == 0 && meta.Date != "" {
 		if epResult.Airdate != meta.Date {
-			fmt.Printf("MDB Warning: Special episode date mismatch. Filename: %s, TVDB: %s\n", meta.Date, epResult.Airdate)
+			warnings = append(warnings, fmt.Sprintf("MDB Warning: Special episode date mismatch. Filename: %s, TVDB: %s", meta.Date, epResult.Airdate))
 		}
 	}
+	return warnings
 }
