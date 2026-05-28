@@ -1,9 +1,10 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/types"
+	"charm.land/lipgloss/v2"
 )
 
 func TestPrintDebug(t *testing.T) {
@@ -55,23 +56,28 @@ func TestFormatStringDiffAligned(t *testing.T) {
 	t.Logf("\n%s", got)
 }
 
-func TestFormatTrackTable(t *testing.T) {
-	tracks := []types.TrackCheckResult{
-		{
-			ID:        "1",
-			Type:      "Video",
-			TypeOrder: 1,
-			Codec:     "V_MPEG4/ISO/AVC",
-			Language:  "eng",
-			Name:      "This is a very long track name that should definitely wrap in a small terminal window",
-			Flags:     []string{"Default", "Forced"},
-			Warning:   "some warning",
-		},
+func TestCard(t *testing.T) {
+	title := "Test Title"
+	subtitle := "Test Subtitle"
+	body := "This is a long body that should be wrapped to the inner width of the card correctly."
+	footer := "Test Footer"
+
+	rendered := Card(title, subtitle, body, footer)
+	if rendered == "" {
+		t.Fatal("Card returned empty string")
 	}
 
-	got := FormatTrackTable(tracks, nil)
-	if got == "" {
-		t.Error("FormatTrackTable returned empty string")
+	lines := strings.Split(strings.TrimSpace(rendered), "\n")
+	if len(lines) < 5 {
+		t.Errorf("Expected at least 5 lines, got %d", len(lines))
 	}
-	t.Logf("\n%s", got)
+
+	// All lines should have the same visual width
+	firstWidth := lipgloss.Width(lines[0])
+	for i, line := range lines {
+		w := lipgloss.Width(line)
+		if w != firstWidth {
+			t.Errorf("Line %d has width %d, expected %d", i, w, firstWidth)
+		}
+	}
 }

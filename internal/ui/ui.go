@@ -65,7 +65,7 @@ var (
 			MarginRight(1)
 
 	CardStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(lipgloss.DoubleBorder()).
 			BorderForeground(purple).
 			Padding(0, 1)
 
@@ -109,24 +109,45 @@ func ErrorBadge(msg string) string {
 
 // Card renders a visual card with title, subtitle, body and footer.
 func Card(title, subtitle, body, footer string) string {
-	width := 80 // Default width
+	// Determine card width based on terminal size
+	width, _, _ := term.GetSize(os.Stdout.Fd())
+	if width <= 0 {
+		width = 80
+	}
+	if width > 100 {
+		width = 100
+	}
+
+	// Overhead: 2 for borders, 2 for padding
+	const overhead = 4
+	innerWidth := width - overhead
+	if innerWidth < 40 {
+		innerWidth = 40
+		width = innerWidth + overhead
+	}
 
 	t := lipgloss.NewStyle().Bold(true).Foreground(purple).Render(title)
 	s := lipgloss.NewStyle().Foreground(yellow).Render(subtitle)
 
-	header := lipgloss.JoinHorizontal(lipgloss.Top, t, strings.Repeat(" ", max(0, width-lipgloss.Width(t)-lipgloss.Width(s))), s)
-	divider := lipgloss.NewStyle().Foreground(gray).Render(strings.Repeat("─", width))
+	// Header alignment
+	spaceWidth := max(0, innerWidth-lipgloss.Width(t)-lipgloss.Width(s))
+	header := lipgloss.JoinHorizontal(lipgloss.Top, t, strings.Repeat(" ", spaceWidth), s)
+	divider := lipgloss.NewStyle().Foreground(gray).Render(strings.Repeat("─", innerWidth))
+
+	// Ensure body and footer are wrapped to innerWidth
+	bodyStyle := lipgloss.NewStyle().Width(innerWidth)
+	footerStyle := Muted.Width(innerWidth)
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		header,
 		divider,
 		"",
-		body,
+		bodyStyle.Render(body),
 		"",
-		Muted.Render(footer),
+		footerStyle.Render(footer),
 	)
 
-	return CardStyle.Width(width + 2).Render(content)
+	return CardStyle.Width(width).Render(content)
 }
 
 // FormatDiff visualizes a mismatch between an expected and actual value.
@@ -374,6 +395,16 @@ func PropertyLayout(pairs [][2]string) string {
 		return ""
 	}
 
+	// Determine available width
+	width, _, _ := term.GetSize(os.Stdout.Fd())
+	if width <= 0 {
+		width = 80
+	}
+	if width > 100 {
+		width = 100
+	}
+	innerWidth := width - 4 // Match Card inner width
+
 	maxLabelLen := 0
 	for _, p := range pairs {
 		if len(p[0]) > maxLabelLen {
@@ -381,10 +412,16 @@ func PropertyLayout(pairs [][2]string) string {
 		}
 	}
 
+	labelWidth := maxLabelLen + 2
+	valueWidth := innerWidth - labelWidth
+	if valueWidth < 20 {
+		valueWidth = 20
+	}
+
 	var lines []string
 	for _, p := range pairs {
-		label := LabelStyle.Width(maxLabelLen + 2).Render(p[0] + ":")
-		value := ValueStyle.Render(p[1])
+		label := LabelStyle.Width(labelWidth).Render(p[0] + ":")
+		value := ValueStyle.Width(valueWidth).Render(p[1])
 		lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Top, label, value))
 	}
 
