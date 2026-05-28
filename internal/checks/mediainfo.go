@@ -7,6 +7,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/n0ne/parsec/internal/ui"
 )
 
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
@@ -138,8 +139,11 @@ func CheckResolution(videoTrack *mediainfo.Track) []CheckResult {
 	var trackWarnings []string
 
 	// 1. Modulo check (should be at least mod-2)
-	if width%2 != 0 || height%2 != 0 {
-		trackWarnings = append(trackWarnings, fmt.Sprintf("non-standard: %dx%d (not mod-2)", width, height))
+	if width%2 != 0 {
+		trackWarnings = append(trackWarnings, "odd width")
+	}
+	if height%2 != 0 {
+		trackWarnings = append(trackWarnings, "odd height")
 	}
 
 	// 2. Standard Widths (common for scene/P2P)
@@ -153,19 +157,18 @@ func CheckResolution(videoTrack *mediainfo.Track) []CheckResult {
 	}
 
 	if !isStandardWidth {
-		trackWarnings = append(trackWarnings, fmt.Sprintf("non-standard width: %d", width))
+		trackWarnings = append(trackWarnings, "non-standard width")
 	}
 
 	// 3. Aspect Ratio check (sanity)
 	if height > width {
-		trackWarnings = append(trackWarnings, fmt.Sprintf("unusual aspect ratio (h > w): %d > %d", height, width))
+		trackWarnings = append(trackWarnings, "vertical (h > w)")
 	}
 
 	if len(trackWarnings) > 0 {
 		res.Passed = false
 		res.Severity = "warning"
-		res.Warning = "Non-standard resolution or modulo"
-		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, strings.Join(trackWarnings, "; "))}
+		res.Warning = fmt.Sprintf("Non-standard Resolution (%dx%d): %s", width, height, strings.Join(trackWarnings, " / "))
 	}
 
 	return []CheckResult{res}
@@ -192,7 +195,7 @@ func CheckFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 		res.Passed = false
 		res.Severity = "warning"
 		res.Warning = "Non-standard framerate"
-		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, fmt.Sprintf("non-standard framerate: %.3f fps", fps))}
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, fmt.Sprintf("non-standard %s: %.3f fps", ui.Warning.Render("framerate"), fps))}
 	}
 	return []CheckResult{res}
 }
@@ -253,12 +256,12 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 			percentDiff := diff / videoDur * -100
 			var trackWarning string
 			if diff > 5.0 {
-				trackWarning = fmt.Sprintf("significantly longer (diff: %.1fs)", diff)
+				trackWarning = fmt.Sprintf("%s (diff: %.1fs)", ui.Error.Render("significantly longer"), diff)
 				res.Severity = "error"
 			} else if diff < -20.0 && track.Type == "Audio" {
-				trackWarning = fmt.Sprintf("significantly shorter (diff: %.1fs)", diff)
+				trackWarning = fmt.Sprintf("%s (diff: %.1fs)", ui.Warning.Render("significantly shorter"), diff)
 			} else if percentDiff > 10.0 {
-				trackWarning = fmt.Sprintf("%.1f%% shorter (diff: %.1fs)", percentDiff, diff)
+				trackWarning = fmt.Sprintf("%.1f%% %s (diff: %.1fs)", percentDiff, ui.Warning.Render("shorter"), diff)
 			}
 
 			if trackWarning != "" {

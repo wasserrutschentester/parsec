@@ -244,7 +244,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult) string {
 			t.Language,
 			t.Name,
 			strings.Join(t.Flags, ", "),
-			Warning.Render(t.Warning),
+			t.Warning,
 		})
 	}
 
