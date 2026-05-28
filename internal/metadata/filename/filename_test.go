@@ -241,7 +241,7 @@ func TestCheckAllowedCharacters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			got := CheckAllowedCharacters(tt.filename)
-			if (got != nil) != tt.want {
+			if (got != "") != tt.want {
 				t.Errorf("CheckAllowedCharacters() = %v, want %v", got, tt.want)
 			}
 		})
@@ -261,7 +261,7 @@ func TestCheckCharacterSequences(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			got := CheckCharacterSequences(tt.filename)
-			if (got != nil) != tt.want {
+			if (got != "") != tt.want {
 				t.Errorf("CheckCharacterSequences() = %v, want %v", got, tt.want)
 			}
 		})
