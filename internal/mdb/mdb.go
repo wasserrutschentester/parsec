@@ -1,6 +1,11 @@
 package mdb
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	"codeberg.org/n0ne/parsec/internal/ui"
+)
 
 type SearchResult struct {
 	TmdbID           int
@@ -38,48 +43,64 @@ type MatroskaTags struct {
 }
 
 func PrintResult(result SearchResult) {
-	fmt.Println()
+	title := fmt.Sprintf("%s (%d)", result.Title, result.Year)
+	subtitle := ""
 	if result.Similarity > 0 {
-		fmt.Printf("Found: %s (%d) [Match: %.0f%%]\n", result.Title, result.Year, result.Similarity*100)
-	} else {
-		fmt.Printf("Found: %s (%d)\n", result.Title, result.Year)
-	}
-	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
-		fmt.Printf("Original Title: %s\n", result.OriginalTitle)
-	}
-	if result.OriginalLanguage != "" {
-		fmt.Printf("Original Language: %s\n", result.OriginalLanguage)
-	}
-	if len(result.AltTitle) > 0 {
-		fmt.Printf("Alternative Titles: %v\n", result.AltTitle)
-	}
-	if result.Overview != "" {
-		fmt.Printf("Overview: %s\n", result.Overview)
+		subtitle = fmt.Sprintf("[ %.0f%% MATCH ]", result.Similarity*100)
 	}
 
+	var props [][2]string
+	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
+		props = append(props, [2]string{"Original Title", result.OriginalTitle})
+	}
+	if result.OriginalLanguage != "" {
+		props = append(props, [2]string{"Language", result.OriginalLanguage})
+	}
+	if len(result.AltTitle) > 0 {
+		props = append(props, [2]string{"Alt Titles", strings.Join(result.AltTitle, ", ")})
+	}
+
+	body := ui.PropertyLayout(props)
+	if result.Overview != "" {
+		if body != "" {
+			body += "\n\n"
+		}
+		body += ui.LabelStyle.Render("OVERVIEW") + "\n" + result.Overview
+	}
+
+	var links []string
 	if result.TmdbID > 0 && result.TmdbType != "" {
-		fmt.Printf("TMDB: https://tmdb.org/%s/%d\n", result.TmdbType, result.TmdbID)
+		links = append(links, ui.Link.Render(fmt.Sprintf("https://tmdb.org/%s/%d", result.TmdbType, result.TmdbID)))
 	}
 	if result.ImdbID != "" {
-		fmt.Printf("IMDB: https://imdb.com/title/%s\n", result.ImdbID)
+		links = append(links, ui.Link.Render(fmt.Sprintf("https://imdb.com/title/%s", result.ImdbID)))
 	}
 	if result.TvdbSlug != "" && result.TvdbType != "" {
-		fmt.Printf("TVDB: https://thetvdb.com/%s/%s\n", result.TvdbType, result.TvdbSlug)
+		links = append(links, ui.Link.Render(fmt.Sprintf("https://thetvdb.com/%s/%s", result.TvdbType, result.TvdbSlug)))
 	} else if result.TvdbID > 0 && result.TvdbType != "" {
-		fmt.Printf("TVDB: https://thetvdb.com/?tab=%s&id=%d\n", result.TvdbType, result.TvdbID)
+		links = append(links, ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=%s&id=%d", result.TvdbType, result.TvdbID)))
 	}
+
+	footer := strings.Join(links, "  ")
+
+	ui.Println(ui.Card(title, subtitle, body, footer))
 }
 
 func PrintEpisodeResult(result EpisodeResult) {
-	fmt.Println()
-	fmt.Printf("%s (S%02dE%02d) Aired on %s\n", result.Name, result.Season, result.Episode, result.Airdate)
+	title := fmt.Sprintf("%s (S%02dE%02d)", result.Name, result.Season, result.Episode)
+	subtitle := fmt.Sprintf("Aired: %s", result.Airdate)
+
+	body := ""
 	if result.Overview != "" {
-		fmt.Printf("Overview: %s\n", result.Overview)
-	}
-	if result.TvdbID > 0 {
-		fmt.Printf("TVDB: https://thetvdb.com/?tab=episode&id=%d\n", result.TvdbID)
+		body = ui.LabelStyle.Render("OVERVIEW") + "\n" + result.Overview
 	}
 
+	footer := ""
+	if result.TvdbID > 0 {
+		footer = ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=episode&id=%d", result.TvdbID))
+	}
+
+	ui.Println(ui.Card(title, subtitle, body, footer))
 }
 
 func GetMatroskaTags(result SearchResult) MatroskaTags {

@@ -28,7 +28,8 @@ var (
 	}
 )
 
-func VerifyTrackOrder(tracks []EbmlTrack) error {
+func VerifyTrackOrder(tracks []EbmlTrack) []string {
+	var warnings []string
 	var lastAudio, lastSub *EbmlTrack
 	var lastAudioPriority, lastSubPriority int
 	seenTracks := make(map[string]bool)
@@ -49,43 +50,43 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 
 		if config.IsCheckEnabled("matroska_language_tag") || config.IsCheckEnabled("matroska_multi_lang") {
 			if err := validateTrackBasics(*track); err != nil {
-				return err
+				warnings = append(warnings, err.Error())
 			}
 		}
 
 		if config.IsCheckEnabled("matroska_name_quality") {
 			if err := checkTrackNameQuality(*track); err != nil {
-				fmt.Printf("QA Warning: %v\n", err)
+				warnings = append(warnings, err.Error())
 			}
 		}
 
 		if config.IsCheckEnabled("matroska_name_codecs") {
 			if err := checkTrackNameCodecs(*track); err != nil {
-				fmt.Printf("QA Warning: %v\n", err)
+				warnings = append(warnings, err.Error())
 			}
 		}
 
 		if config.IsCheckEnabled("matroska_name_redundant_lang") {
 			if err := checkTrackNameRedundantLang(*track); err != nil {
-				fmt.Printf("QA Warning: %v\n", err)
+				warnings = append(warnings, err.Error())
 			}
 		}
 
 		if config.IsCheckEnabled("matroska_original_language") {
 			if err := checkOriginalLanguageConsistency(*track, langHasOriginalFlag); err != nil {
-				return err
+				warnings = append(warnings, err.Error())
 			}
 		}
 
 		if config.IsCheckEnabled("matroska_duplicate_tracks") {
 			if err := checkDuplicateTracks(*track, seenTracks); err != nil {
-				return err
+				warnings = append(warnings, err.Error())
 			}
 		}
 
 		if config.IsCheckEnabled("matroska_name_keywords") {
 			if err := checkNameKeywords(*track); err != nil {
-				return err
+				warnings = append(warnings, err.Error())
 			}
 		}
 
@@ -93,15 +94,15 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 			priority := getTrackPriority(*track)
 			if track.Type == "audio" {
 				if priority < lastAudioPriority {
-					return fmt.Errorf("audio track is out of order.\n  Previous: %s\n  Current:  %s",
-						lastAudio.formatTrackInfo(), track.formatTrackInfo())
+					warnings = append(warnings, fmt.Sprintf("audio track is out of order.\n  Previous: %s\n  Current:  %s",
+						lastAudio.formatTrackInfo(), track.formatTrackInfo()))
 				}
 				lastAudio = track
 				lastAudioPriority = priority
 			} else if track.Type == "subtitles" {
 				if priority < lastSubPriority {
-					return fmt.Errorf("subtitle track is out of order.\n  Previous: %s\n  Current:  %s",
-						lastSub.formatTrackInfo(), track.formatTrackInfo())
+					warnings = append(warnings, fmt.Sprintf("subtitle track is out of order.\n  Previous: %s\n  Current:  %s",
+						lastSub.formatTrackInfo(), track.formatTrackInfo()))
 				}
 				lastSub = track
 				lastSubPriority = priority
@@ -109,7 +110,7 @@ func VerifyTrackOrder(tracks []EbmlTrack) error {
 		}
 	}
 
-	return nil
+	return warnings
 }
 
 func checkTrackNameQuality(track EbmlTrack) error {
@@ -204,7 +205,8 @@ func getLanguageCodeFromName(word string) string {
 	}
 	return ""
 }
-func CheckDefaultFlags(tracks []EbmlTrack) error {
+func CheckDefaultFlags(tracks []EbmlTrack) []string {
+	var warnings []string
 	seenAudioLangs := make(map[string]bool)
 	seenSubLangs := make(map[string]bool)
 	audioLangCount := make(map[string]int)
@@ -257,25 +259,26 @@ func CheckDefaultFlags(tracks []EbmlTrack) error {
 
 		if props.Default != shouldBeDefault {
 			if shouldBeDefault {
-				return fmt.Errorf("%s track #%02d (ID: %d lang: %s) should have the Default flag set (it is the first standard track for this language)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
+				warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d lang: %s) should have the Default flag set (it is the first standard track for this language)", track.Type, track.TypeOrder, track.Properties.Number, props.Language))
+			} else if isSpecialized {
+				warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set because it is a specialized track %s", track.Type, track.TypeOrder, track.Properties.Number, props.Language, track.getFlags()))
+			} else {
+				warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.Type, track.TypeOrder, track.Properties.Number, props.Language))
 			}
-			if isSpecialized {
-				return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set because it is a specialized track %s", track.Type, track.TypeOrder, track.Properties.Number, props.Language, track.getFlags())
-			}
-			return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.Type, track.TypeOrder, track.Properties.Number, props.Language)
 		}
 	}
-	return nil
+	return warnings
 }
 
-func CheckSubtitleFormat(tracks []EbmlTrack) error {
+func CheckSubtitleFormat(tracks []EbmlTrack) []string {
+	var warnings []string
 	for _, track := range tracks {
 		codec := track.Codec
 		if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
-			return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) is text-based but not a SRT subtitle track (codec: %s)", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Language, track.Codec)
+			warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d, lang: %s) is text-based but not a SRT subtitle track (codec: %s)", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Language, track.Codec))
 		}
 	}
-	return nil
+	return warnings
 }
 
 func (track *EbmlTrack) getFlags() string {

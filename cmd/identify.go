@@ -144,13 +144,13 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 		(tagTvdb != 0 && result.TvdbID != 0 && tagTvdb != result.TvdbID) {
 		ui.Println("\n" + ui.FormatWarning("Selected result IDs do not match file tags:"))
 		if tagImdb != "" && tagImdb != result.ImdbID {
-			fmt.Printf("  IMDB: File=%s, Selected=%s\n", tagImdb, result.ImdbID)
+			ui.Println("  " + ui.LabelValue("IMDB (File vs Selected):", fmt.Sprintf("%s / %s", tagImdb, result.ImdbID)))
 		}
 		if tagTmdb != 0 && tagTmdb != result.TmdbID {
-			fmt.Printf("  TMDB: File=%d, Selected=%d\n", tagTmdb, result.TmdbID)
+			ui.Println("  " + ui.LabelValue("TMDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTmdb, result.TmdbID)))
 		}
 		if tagTvdb != 0 && tagTvdb != result.TvdbID {
-			fmt.Printf("  TVDB: File=%d, Selected=%d\n", tagTvdb, result.TvdbID)
+			ui.Println("  " + ui.LabelValue("TVDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTvdb, result.TvdbID)))
 		}
 	}
 }

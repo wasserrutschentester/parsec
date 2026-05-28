@@ -13,6 +13,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type issueGroup struct {
+	Category string
+	Issues   []string
+}
+
 var checkCmd = &cobra.Command{
 	Use:   "check [file]",
 	Short: "Check if the file fits the specification",
@@ -24,76 +29,82 @@ var checkCmd = &cobra.Command{
 		ui.Println(ui.Header.Render("Parsec File Check"))
 		ui.Println(ui.LabelValue("Current Name:", filenameNoExt))
 
+		var allIssues []issueGroup
+
+		// 1. Filename Basic Checks
+		var fnIssues []string
 		if config.IsCheckEnabled("filename_characters") {
-			filename.CheckAllowedCharacters(filenameNoExt)
+			if msg := filename.CheckAllowedCharacters(filenameNoExt); msg != "" {
+				fnIssues = append(fnIssues, msg)
+			}
 		}
 		if config.IsCheckEnabled("filename_sequences") {
-			filename.CheckCharacterSequences(filenameNoExt)
+			if msg := filename.CheckCharacterSequences(filenameNoExt); msg != "" {
+				fnIssues = append(fnIssues, msg)
+			}
 		}
 
-		// match filename against spec
 		match := filename.Parse(filenameNoExt)
-		matchName := match.String()
-		if matchName != filenameNoExt {
-			ui.Println(ui.Warning.Render("\nSome Tags weren't parsed correctly from the filename"))
-			ui.Println(ui.LabelValue("Parsed Name:", match.String()))
+		if match.String() != filenameNoExt {
+			fnIssues = append(fnIssues, ui.Warning.Render("Some tags weren't parsed correctly from the filename"))
+			fnIssues = append(fnIssues, ui.LabelValue("Parsed Name:", match.String()))
+		}
+		if len(fnIssues) > 0 {
+			allIssues = append(allIssues, issueGroup{"FILENAME", fnIssues})
 		}
 
-		// Generate Name from mediainfo
+		// 2. MediaInfo & EBML Checks
 		mi, err := mediainfo.Get(filePath)
 		if err != nil {
 			ui.PrintError(fmt.Sprintf("Error getting mediainfo: %v", err))
 			return
 		}
 		mediaMeta := mi.GetMetadata()
-		updated := match.Override(mediaMeta, false) // keep only the fields that can't be parsed from MediaInfo
+		updated := match.Override(mediaMeta, false)
 
-		// 3. Get EBML Metadata for Visual Impaired flag
-		ebml, err := matroska.GetEbmlMetadata(filePath)
-		if err == nil {
-			if ebml.HasVisualImpairedAudio() {
-				if !match.HasAudioDesc {
-					match.HasAudioDesc = true
-					updated = true
-				}
+		ebml, ebmlErr := matroska.GetEbmlMetadata(filePath)
+		if ebmlErr == nil {
+			if ebml.HasVisualImpairedAudio() && !match.HasAudioDesc {
+				match.HasAudioDesc = true
+				updated = true
 			}
 		}
 
 		if updated {
 			ui.Println(ui.Info.Render("\nUpdates applied from MediaInfo/EBML:"))
 			ui.Println(ui.LabelValue("Generated Name:", match.String()))
-			ui.Println()
-		} else {
-			ui.Println(ui.Success.Render("\nThe parsed name fits the specification"))
 		}
 
-		checks.RunMediaInfoChecks(mi, match)
+		// Collect MediaInfo issues
+		miIssues := checks.RunMediaInfoChecks(mi, match)
+		if len(miIssues) > 0 {
+			allIssues = append(allIssues, issueGroup{"MEDIAINFO", miIssues})
+		}
 
-		// 4. Run EBML specific checks
-		if err == nil {
-			if err := matroska.VerifyTrackOrder(ebml.Tracks); err != nil {
-				ui.PrintWarning(fmt.Sprintf("Track Order Error: %v", err))
-			}
-
+		// Collect EBML issues
+		var ebmlIssues []string
+		if ebmlErr == nil {
+			ebmlIssues = append(ebmlIssues, matroska.VerifyTrackOrder(ebml.Tracks)...)
 			if config.IsCheckEnabled("matroska_default_flags") {
-				if err := matroska.CheckDefaultFlags(ebml.Tracks); err != nil {
-					ui.PrintWarning(fmt.Sprintf("Default Flag Error: %v", err))
-				}
+				ebmlIssues = append(ebmlIssues, matroska.CheckDefaultFlags(ebml.Tracks)...)
 			}
-
 			if config.IsCheckEnabled("matroska_subtitle_format") {
-				if err := matroska.CheckSubtitleFormat(ebml.Tracks); err != nil {
-					ui.PrintWarning(fmt.Sprintf("Subtitle Format Error: %v", err))
-				}
+				ebmlIssues = append(ebmlIssues, matroska.CheckSubtitleFormat(ebml.Tracks)...)
 			}
-
 		} else {
-			ui.PrintWarning(fmt.Sprintf("Error getting EBML metadata: %v", err))
+			ebmlIssues = append(ebmlIssues, fmt.Sprintf("Error getting EBML metadata: %v", ebmlErr))
+		}
+		if len(ebmlIssues) > 0 {
+			allIssues = append(allIssues, issueGroup{"MATROSKA", ebmlIssues})
 		}
 
-		checks.RunGenericChecks(match)
+		// 3. Generic Checks
+		genericIssues := checks.RunGenericChecks(match)
+		if len(genericIssues) > 0 {
+			allIssues = append(allIssues, issueGroup{"GENERIC", genericIssues})
+		}
 
-		// Get IDs from file tags
+		// 4. MDB Checks
 		tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
 		if match.ImdbID == "" {
 			match.ImdbID = tagImdb
@@ -118,11 +129,33 @@ var checkCmd = &cobra.Command{
 			match.TvdbID = tvdbIDFlag
 		}
 
-		// checks.RunMdbChecks(mi, match)
-		var test string
-		fmt.Scanln(&test)
-		fmt.Println(test)
+		mdbIssues := checks.RunMdbChecks(mi, match)
+		if len(mdbIssues) > 0 {
+			allIssues = append(allIssues, issueGroup{"MDB", mdbIssues})
+		}
+
+		// Final Output
+		if len(allIssues) == 0 {
+			ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All checks passed! The file fits the specification."))
+		} else {
+			ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", countIssues(allIssues))))
+			for _, group := range allIssues {
+				ui.Println(ui.ReportSection(group.Category))
+				for _, issue := range group.Issues {
+					ui.Println("  " + ui.IconWarn + " " + issue)
+				}
+			}
+		}
+		ui.Println()
 	},
+}
+
+func countIssues(groups []issueGroup) int {
+	count := 0
+	for _, g := range groups {
+		count += len(g.Issues)
+	}
+	return count
 }
 
 func init() {

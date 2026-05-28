@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/n0ne/parsec/internal/ui"
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
 )
@@ -377,7 +378,7 @@ func (meta *Metadata) Override(newMeta *Metadata, quiet bool) bool {
 		if f.Type.Kind() == reflect.Bool {
 			if mField.Bool() != nField.Bool() && nField.Bool() {
 				if !quiet {
-					fmt.Printf("Update %s: %t -> %t\n", f.Name, mField.Bool(), nField.Bool())
+					ui.Println(fmt.Sprintf("  %s %s: %t %s %t", ui.IconArrow, f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
 				}
 				mField.SetBool(nField.Bool())
 				updated = true
@@ -385,7 +386,7 @@ func (meta *Metadata) Override(newMeta *Metadata, quiet bool) bool {
 		} else {
 			if !nField.IsZero() && mField.Interface() != nField.Interface() {
 				if !quiet {
-					fmt.Printf("Update %s: %v -> %v\n", f.Name, mField.Interface(), nField.Interface())
+					ui.Println(fmt.Sprintf("  %s %s: %v %s %v", ui.IconArrow, f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
 				}
 				mField.Set(nField)
 				updated = true

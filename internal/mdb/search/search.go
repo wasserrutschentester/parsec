@@ -14,6 +14,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/mdb/tvdb"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
+	"codeberg.org/n0ne/parsec/internal/ui"
 )
 
 func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
@@ -27,7 +28,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 	}
 
 	if meta.ImdbID != "" || meta.TmdbID > 0 || meta.TvdbID > 0 {
-		fmt.Printf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...\n", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)
+		ui.Println(ui.Info.Render(fmt.Sprintf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)))
 		result, err := SearchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
 		if err != nil {
 			return nil, err
@@ -40,7 +41,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 
 	// Replace dots with spaces for the search query
 	searchQuery := filename.DeobfuscateTitle(meta.Title)
-	fmt.Printf("Searching for %s (%d) [%s]...\n", searchQuery, meta.Year, mediaType)
+	ui.Println(ui.Info.Render(fmt.Sprintf("Searching for %s (%d) [%s]...", searchQuery, meta.Year, mediaType)))
 	results, err := FuzzySearch(searchQuery, meta.Year, meta.IsTV)
 	if err != nil {
 		return nil, err
@@ -54,11 +55,21 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 		return &results[0], nil
 	}
 
-	fmt.Println("\nMultiple results found:")
+	ui.Println("\n" + ui.Header.Render("Multiple results found:"))
+	headers := []string{"#", "Title", "Year", "Match", "Language"}
+	var rows [][]string
 	for i, r := range results {
-		fmt.Printf("%d. %s (%d) [Match: %.0f%%] [Popularity: %.1f] [OV: %s]\n", i, r.Title, r.Year, r.Similarity*100, r.Popularity, r.OriginalLanguage)
+		rows = append(rows, []string{
+			strconv.Itoa(i),
+			r.Title,
+			strconv.Itoa(r.Year),
+			fmt.Sprintf("%.0f%%", r.Similarity*100),
+			r.OriginalLanguage,
+		})
 	}
-	fmt.Print("\nSelect a result [default 0]: ")
+	ui.Println(ui.TrackTable(headers, rows))
+
+	fmt.Print(ui.Info.Render("\nSelect a result [default 0]: "))
 	var input string
 	fmt.Scanln(&input)
 	if input == "" {
