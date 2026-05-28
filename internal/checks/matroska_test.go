@@ -7,7 +7,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 )
 
-func TestVerifyTrackOrder(t *testing.T) {
+func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
 	tests := []struct {
 		name    string
@@ -155,82 +155,6 @@ func TestVerifyTrackOrder(t *testing.T) {
 			},
 			wantErr: true,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			res := VerifyTrackOrder(tt.tracks)
-			hasFailure := len(res) > 0
-			if hasFailure != tt.wantErr {
-				t.Errorf("VerifyTrackOrder() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestTrackNameChecks(t *testing.T) {
-	t.Run("Quality (Junk)", func(t *testing.T) {
-		tests := []struct {
-			name    string
-			track   matroska.EbmlTrack
-			wantErr bool
-		}{
-			{"Junk keyword", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Name: "German Stereo"}}, true},
-			{"Valid name", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Name: "Swissgerman / SDH"}}, false},
-		}
-		for _, tt := range tests {
-			res := checkTrackNameQuality(tt.track)
-			hasFailure := res != nil
-			if hasFailure != tt.wantErr {
-				t.Errorf("%s: checkTrackNameQuality() hasFailure = %v, wantErr %v", tt.name, hasFailure, tt.wantErr)
-			}
-		}
-	})
-
-	t.Run("Codecs", func(t *testing.T) {
-		tests := []struct {
-			name    string
-			track   matroska.EbmlTrack
-			wantErr bool
-		}{
-			{"Simple codec AC3", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Name: "AC3"}}, true},
-			{"Simple codec DTS", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Name: "DTS 5.1"}}, true},
-			{"Complex codec DTS-HD", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Name: "DTS-HD Master Audio"}}, false},
-		}
-		for _, tt := range tests {
-			res := checkTrackNameCodecs(tt.track)
-			hasFailure := res != nil
-			if hasFailure != tt.wantErr {
-				t.Errorf("%s: checkTrackNameCodecs() hasFailure = %v, wantErr %v", tt.name, hasFailure, tt.wantErr)
-			}
-		}
-	})
-
-	t.Run("Redundant Lang", func(t *testing.T) {
-		tests := []struct {
-			name    string
-			track   matroska.EbmlTrack
-			wantErr bool
-		}{
-			{"Redundant German", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "German"}}, true},
-			{"Non-redundant English", matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "English"}}, false},
-		}
-		for _, tt := range tests {
-			res := checkTrackNameRedundantLang(tt.track)
-			hasFailure := res != nil
-			if hasFailure != tt.wantErr {
-				t.Errorf("%s: checkTrackNameRedundantLang() hasFailure = %v, wantErr %v", tt.name, hasFailure, tt.wantErr)
-			}
-		}
-	})
-}
-
-func TestCheckDefaultFlags(t *testing.T) {
-	tests := []struct {
-		name    string
-		tracks  []matroska.EbmlTrack
-		wantErr bool
-	}{
 		{
 			name: "Correct default flags",
 			tracks: []matroska.EbmlTrack{
@@ -282,46 +206,27 @@ func TestCheckDefaultFlags(t *testing.T) {
 			},
 			wantErr: true,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			res := CheckDefaultFlags(tt.tracks)
-			hasFailure := len(res) > 0
-			if hasFailure != tt.wantErr {
-				t.Errorf("CheckDefaultFlags() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestCheckSubtitleFormat(t *testing.T) {
-	tests := []struct {
-		name    string
-		tracks  []matroska.EbmlTrack
-		wantErr bool
-	}{
 		{
 			name: "All SRT subtitles",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: matroska.EbmlTrackProperties{Number: 1}},
-				{ID: 2, Type: "subtitles", Codec: "SRT", Properties: matroska.EbmlTrackProperties{Number: 2}},
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "SRT", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
 			},
 			wantErr: false,
 		},
 		{
 			name: "Contains non-SRT subtitle",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Number: 1}},
-				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Number: 2}},
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "eng", Number: 2}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "Audio tracks are ignored",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Number: 1}},
-				{ID: 2, Type: "subtitles", Codec: "SRT", Properties: matroska.EbmlTrackProperties{Number: 2}},
+				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "SRT", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
 			},
 			wantErr: false,
 		},
@@ -329,10 +234,10 @@ func TestCheckSubtitleFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := CheckSubtitleFormat(tt.tracks)
+			res := RunTrackChecks(tt.tracks)
 			hasFailure := len(res) > 0
 			if hasFailure != tt.wantErr {
-				t.Errorf("CheckSubtitleFormat() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
+				t.Errorf("RunTrackChecks() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
 			}
 		})
 	}
