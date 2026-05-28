@@ -80,10 +80,10 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	// Run Checks
 	var allIssues []issueGroup
 	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
-	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
-	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath))
 	appendFailed(&allIssues, "GENERIC", checks.RunGenericChecks(match))
 	appendFailed(&allIssues, "MDB", checks.RunMdbChecks(mi, match))
+	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
+	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath))
 
 	return checkReport{
 		File:          filePath,
@@ -160,7 +160,12 @@ func printInteractiveReport(report checkReport) {
 
 		ui.Println(ui.ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
 		for _, res := range group.Results {
-			ui.PrintWarning(res.Warning)
+			switch res.Severity {
+			case "error":
+				ui.PrintError(res.Warning)
+			default:
+				ui.PrintWarning(res.Warning)
+			}
 			if len(res.Tracks) == 0 {
 				printUnexpectedDiff(res)
 				continue
