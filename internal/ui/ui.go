@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -9,6 +10,9 @@ import (
 )
 
 var (
+	// IsSilent suppresses all UI output
+	IsSilent bool
+
 	// Base Colors
 	blue   = lipgloss.Color("12")
 	green  = lipgloss.Color("10")
@@ -228,15 +232,19 @@ func FormatError(msg string) string {
 }
 
 func PrintWarning(msg string) {
-	lipgloss.Println(FormatWarning(msg))
+	if !IsSilent {
+		lipgloss.Println(FormatWarning(msg))
+	}
 }
 
 func PrintError(msg string) {
-	lipgloss.Println(FormatError(msg))
+	fmt.Fprintln(os.Stderr, FormatError(msg))
 }
 
 func Println(a ...any) {
-	lipgloss.Println(a...)
+	if !IsSilent {
+		lipgloss.Println(a...)
+	}
 }
 
 func max(a, b int) int {

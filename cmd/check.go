@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"codeberg.org/n0ne/parsec/internal/checks"
 	"codeberg.org/n0ne/parsec/internal/config"
@@ -14,15 +16,26 @@ import (
 )
 
 type issueGroup struct {
-	Category string
-	Results  []checks.CheckResult
+	Category string               `json:"category"`
+	Results  []checks.CheckResult `json:"results"`
 }
+
+type checkReport struct {
+	File          string       `json:"file"`
+	Passed        bool         `json:"passed"`
+	ReleaseName   string       `json:"filename"`
+	GeneratedName string       `json:"generated_name"`
+	Issues        []issueGroup `json:"issues"`
+}
+
+var jsonOutputFlag bool
 
 var checkCmd = &cobra.Command{
 	Use:   "check [file]",
 	Short: "Check if the file fits the specification",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		ui.IsSilent = jsonOutputFlag
 		filePath := args[0]
 		filenameNoExt := filename.GetBaseName(filePath)
 
@@ -159,6 +172,26 @@ var checkCmd = &cobra.Command{
 		}
 
 		// Final Output
+		if jsonOutputFlag {
+			report := checkReport{
+				File:          filePath,
+				Passed:        len(allIssues) == 0,
+				ReleaseName:   filenameNoExt,
+				GeneratedName: match.String(),
+				Issues:        allIssues,
+			}
+
+			var data []byte
+			var err error
+			data, err = json.MarshalIndent(report, "", "  ")
+			if err != nil {
+				ui.PrintError(fmt.Sprintf("Error generating output: %v", err))
+				os.Exit(1)
+			}
+			fmt.Println(string(data))
+			return
+		}
+
 		if len(allIssues) == 0 {
 			ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All checks passed! The file fits the specification."))
 		} else {
@@ -228,6 +261,7 @@ func init() {
 	checkCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	checkCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output format (json)")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
