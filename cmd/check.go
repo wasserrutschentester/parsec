@@ -62,10 +62,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 
 	// 1. Filename Basic Checks
 	match := filename.Parse(filenameNoExt)
-	fnIssues := checks.RunFilenameChecks(filenameNoExt, match)
-	if len(fnIssues) > 0 {
-		allIssues = append(allIssues, issueGroup{"FILENAME", fnIssues})
-	}
+	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
 
 	// 2. MediaInfo & EBML Checks
 	mi, err := mediainfo.Get(filePath)
@@ -88,63 +85,15 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 		ui.Println(ui.LabelValue("Generated Name:", match.String()))
 	}
 
-	// Collect MediaInfo issues
-	miResults := checks.RunMediaInfoChecks(mi, match)
-	if len(miResults) > 0 {
-		var failed []checks.CheckResult
-		for _, r := range miResults {
-			if !r.Passed {
-				failed = append(failed, r)
-			}
-		}
-		if len(failed) > 0 {
-			allIssues = append(allIssues, issueGroup{"MEDIAINFO", failed})
-		}
-	}
-
-	// Collect Matroska issues
-	ebmlResults := checks.RunMatroskaChecks(filePath)
-	if len(ebmlResults) > 0 {
-		var failed []checks.CheckResult
-		for _, r := range ebmlResults {
-			if !r.Passed {
-				failed = append(failed, r)
-			}
-		}
-		if len(failed) > 0 {
-			allIssues = append(allIssues, issueGroup{"MATROSKA", failed})
-		}
-	}
+	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
+	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath))
 
 	// 3. Generic Checks
-	genericResults := checks.RunGenericChecks(match)
-	if len(genericResults) > 0 {
-		var failed []checks.CheckResult
-		for _, r := range genericResults {
-			if !r.Passed {
-				failed = append(failed, r)
-			}
-		}
-		if len(failed) > 0 {
-			allIssues = append(allIssues, issueGroup{"GENERIC", failed})
-		}
-	}
+	appendFailed(&allIssues, "GENERIC", checks.RunGenericChecks(match))
 
 	// 4. MDB Checks
 	setupMdbIDs(cmd, mi, match)
-
-	mdbResults := checks.RunMdbChecks(mi, match)
-	if len(mdbResults) > 0 {
-		var failed []checks.CheckResult
-		for _, r := range mdbResults {
-			if !r.Passed {
-				failed = append(failed, r)
-			}
-		}
-		if len(failed) > 0 {
-			allIssues = append(allIssues, issueGroup{"MDB", failed})
-		}
-	}
+	appendFailed(&allIssues, "MDB", checks.RunMdbChecks(mi, match))
 
 	return checkReport{
 		File:          filePath,
@@ -153,6 +102,18 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 		GeneratedName: match.String(),
 		Issues:        allIssues,
 	}, nil
+}
+
+func appendFailed(allIssues *[]issueGroup, category string, results []checks.CheckResult) {
+	var failed []checks.CheckResult
+	for _, r := range results {
+		if !r.Passed {
+			failed = append(failed, r)
+		}
+	}
+	if len(failed) > 0 {
+		*allIssues = append(*allIssues, issueGroup{category, failed})
+	}
 }
 
 func setupMdbIDs(cmd *cobra.Command, mi *mediainfo.MediaInfo, match *metadata.Metadata) {
