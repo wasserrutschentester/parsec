@@ -21,13 +21,13 @@ var (
 	IsDebug bool
 
 	// Base Colors
-	blue   = lipgloss.Color("12")
-	green  = lipgloss.Color("10")
+	blue   = lipgloss.Color("51")
+	green  = lipgloss.Color("118")
 	yellow = lipgloss.Color("11")
-	red    = lipgloss.Color("9")
-	gray   = lipgloss.Color("8")
-	purple = lipgloss.Color("63")
-	white  = lipgloss.Color("15")
+	red    = lipgloss.Color("196")
+	gray   = lipgloss.Color("244")
+	purple = lipgloss.Color("141")
+	white  = lipgloss.Color("255")
 
 	// Functional Styles
 	Info    = lipgloss.NewStyle().Foreground(blue)
@@ -43,7 +43,9 @@ var (
 		Bold(true).
 		Foreground(purple).
 		MarginBottom(1).
-		Underline(true)
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderBottom(true).
+		BorderForeground(purple)
 
 	LabelStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -79,12 +81,12 @@ var (
 	WarningTag = BadgeStyle.
 			Background(yellow).
 			Foreground(lipgloss.Color("0")).
-			Render("WARNING")
+			Render("ANOMALY")
 
 	ErrorTag = BadgeStyle.
 			Background(red).
 			Foreground(white).
-			Render("ERROR")
+			Render("CRITICAL")
 
 	DebugTag = BadgeStyle.
 			Background(gray).
@@ -94,7 +96,7 @@ var (
 
 // Status Badges
 func SuccessBadge(msg string) string {
-	return BadgeStyle.Background(green).Foreground(lipgloss.Color("0")).Render("OK") + " " + Success.Render(msg)
+	return BadgeStyle.Background(green).Foreground(lipgloss.Color("0")).Render("NOMINAL") + " " + Success.Render(msg)
 }
 
 func WarningBadge(msg string) string {
@@ -214,8 +216,8 @@ func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualVa
 // TrackTable renders a table of track information.
 func TrackTable(headers []string, rows [][]string) string {
 	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(gray)).
+		Border(lipgloss.DoubleBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(white)).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row < 0 { // Header row
 				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
@@ -315,7 +317,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(gray)).
+		BorderStyle(lipgloss.NewStyle().Foreground(white)).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			style := lipgloss.NewStyle().Padding(0, 1)
 			if row < 0 { // Header row
@@ -340,8 +342,30 @@ func ReportSection(name string) string {
 	return "\n" + lipgloss.NewStyle().
 		Bold(true).
 		Foreground(blue).
-		Border(lipgloss.NormalBorder(), false, false, true, false).
-		Render(fmt.Sprintf("[ %s ]", strings.ToUpper(name)))
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(blue).
+		Render(fmt.Sprintf(" %s ", strings.ToUpper(name)))
+}
+
+// Banner returns a themed ASCII art header with a custom tagline.
+func Banner(tagline string) string {
+	banner := `    ____
+   / __ \____ __________ ___  _____
+  / /_/ / __ ` + "`" + `/ ___/ ___/ _ \/ ___/
+ / ____/ /_/ / /  (__  )  __/ /__
+/_/    \__,_|_|  |___/\___|\___/`
+
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(purple).
+		Render(banner)
+
+	sub := lipgloss.NewStyle().
+		Foreground(blue).
+		Bold(true).
+		Render("     " + tagline)
+
+	return lipgloss.JoinVertical(lipgloss.Center, title, sub, "")
 }
 
 // PropertyLayout takes pairs of labels and values and aligns them.

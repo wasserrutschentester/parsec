@@ -55,7 +55,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 		return &results[0], nil
 	}
 
-	ui.Println("\n" + ui.Header.Render("Multiple results found:"))
+	ui.Println("\n" + ui.Header.Render("AMBIGUOUS CORRELATIONS DETECTED:"))
 	headers := []string{"#", "Title", "Year", "Match", "Language"}
 	var rows [][]string
 	for i, r := range results {

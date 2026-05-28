@@ -100,13 +100,13 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	newPath := filepath.Join(filepath.Dir(filePath), newName)
 
 	if filepath.Base(filePath) == newName {
-		ui.Println(ui.Success.Render(fmt.Sprintf("File '%s' already has the correct name.", filepath.Base(filePath))))
+		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' already has the correct name.", filepath.Base(filePath))))
 		return
 	}
 
-	ui.Println(ui.Header.Render("Renaming File"))
-	ui.Println(ui.LabelValue("Old:", filepath.Base(filePath)))
-	ui.Println(ui.LabelValue("New:", newName))
+	ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
+	ui.Println(ui.LabelValue("Current Heading:", filepath.Base(filePath)))
+	ui.Println(ui.LabelValue("Proposed Vector:", newName))
 
 	if dryRunFlag {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))
@@ -127,7 +127,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", filePath, renameErr))
 	} else {
-		ui.Println(ui.Success.Render("File renamed successfully."))
+		ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
 	}
 
 }

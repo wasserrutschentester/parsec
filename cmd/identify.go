@@ -34,11 +34,11 @@ var identifyCmd = &cobra.Command{
 			filePath = args[0]
 			filenameNoExt := filename.GetBaseName(filePath)
 			meta = filename.Parse(filenameNoExt)
-			ui.Println(ui.Header.Render("Identifying File"))
-			ui.Println(ui.LabelValue("Current Name:", filenameNoExt))
+			ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
+			ui.Println(ui.LabelValue("Target Name:", filenameNoExt))
 		} else {
 			meta = &metadata.Metadata{}
-			ui.Println(ui.Header.Render("Identifying Metadata"))
+			ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
 		}
 
 		applyMetadataFlags(cmd, meta)
@@ -78,7 +78,7 @@ var identifyCmd = &cobra.Command{
 			if err != nil {
 				ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
 			} else {
-				ui.Println(ui.Success.Render("Tags written successfully"))
+				ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
 			}
 		}
 	},

@@ -57,8 +57,8 @@ var checkCmd = &cobra.Command{
 func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) {
 	filenameNoExt := filename.GetBaseName(filePath)
 
-	ui.Println(ui.Header.Render("Parsec File Check"))
-	ui.Println(ui.LabelValue("Current Name:", filenameNoExt))
+	ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
+	ui.Println(ui.LabelValue("Target Name:", filenameNoExt))
 
 	match := filename.Parse(filenameNoExt)
 	mi, err := mediainfo.Get(filePath)
@@ -144,7 +144,7 @@ func printJSONReport(report checkReport) {
 
 func printInteractiveReport(report checkReport) {
 	if report.Passed {
-		ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All checks passed! The file fits the specification."))
+		ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All systems nominal! The file fits the specification."))
 		ui.Println()
 		return
 	}

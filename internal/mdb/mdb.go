@@ -51,13 +51,13 @@ func PrintResult(result SearchResult) {
 
 	var props [][2]string
 	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
-		props = append(props, [2]string{"Original Title", result.OriginalTitle})
+		props = append(props, [2]string{"Alias", result.OriginalTitle})
 	}
 	if result.OriginalLanguage != "" {
-		props = append(props, [2]string{"Language", result.OriginalLanguage})
+		props = append(props, [2]string{"Origin Lang", result.OriginalLanguage})
 	}
 	if len(result.AltTitle) > 0 {
-		props = append(props, [2]string{"Alt Titles", strings.Join(result.AltTitle, ", ")})
+		props = append(props, [2]string{"Sensor Readings", strings.Join(result.AltTitle, ", ")})
 	}
 
 	body := ui.PropertyLayout(props)
@@ -88,7 +88,7 @@ func PrintResult(result SearchResult) {
 
 func PrintEpisodeResult(result EpisodeResult) {
 	title := fmt.Sprintf("%s (S%02dE%02d)", result.Name, result.Season, result.Episode)
-	subtitle := fmt.Sprintf("Aired: %s", result.Airdate)
+	subtitle := fmt.Sprintf("Transmission Date: %s", result.Airdate)
 
 	body := ""
 	if result.Overview != "" {
