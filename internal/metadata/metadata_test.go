@@ -261,7 +261,7 @@ func TestMetadata_Override(t *testing.T) {
 		Repack: false,
 	}
 
-	updated := meta.Override(newMeta, true)
+	updated := meta.Override(newMeta)
 	if !updated {
 		t.Errorf("Override() should return true when updated")
 	}
@@ -276,7 +276,7 @@ func TestMetadata_Override(t *testing.T) {
 		t.Errorf("Override() bool flags should not get overridden by default")
 	}
 
-	updated = meta.Override(&Metadata{}, true)
+	updated = meta.Override(&Metadata{})
 	if updated {
 		t.Errorf("Override() should return false when nothing changed")
 	}

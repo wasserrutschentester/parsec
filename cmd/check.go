@@ -70,7 +70,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 		return checkReport{}, fmt.Errorf("error getting mediainfo: %v", err)
 	}
 	mediaMeta := mi.GetMetadata()
-	updated := match.Override(mediaMeta, verboseFlag)
+	updated := match.Override(mediaMeta)
 
 	ebml, ebmlErr := matroska.GetEbmlMetadata(filePath)
 	if ebmlErr == nil {

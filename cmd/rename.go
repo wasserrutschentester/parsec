@@ -47,7 +47,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	mi, err := mediainfo.Get(filePath)
 	if err == nil {
 		mediaMeta := mi.GetMetadata()
-		meta.Override(mediaMeta, true)
+		meta.Override(mediaMeta)
 	} else {
 		fmt.Printf("Warning: Could not get MediaInfo for %s: %v\n", filePath, err)
 	}
