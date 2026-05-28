@@ -11,6 +11,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/n0ne/parsec/internal/ui"
 	"golang.org/x/text/language"
 )
 
@@ -86,42 +87,42 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) {
 	if config.IsCheckEnabled("mediainfo_interlaced_web") {
 		isWeb := strings.Contains(strings.ToUpper(meta.Source), "WEB")
 		if isWeb && strings.Contains(strings.ToUpper(videoTrack.ScanType), "INTERLACED") {
-			fmt.Println("QA Warning: WEB source should not be Interlaced.")
+			ui.PrintWarning("QA Warning: WEB source should not be Interlaced.")
 		}
 	}
 
 	// 2. Non-standard Framerate
 	if config.IsCheckEnabled("mediainfo_framerate") {
 		for _, w := range CheckFrameRate(videoTrack) {
-			fmt.Println(w)
+			ui.PrintWarning(w)
 		}
 	}
 
 	// 3. Low Bitrate
 	if config.IsCheckEnabled("mediainfo_bitrate") {
 		for _, w := range CheckBitRate(videoTrack) {
-			fmt.Println(w)
+			ui.PrintWarning(w)
 		}
 	}
 
 	// 4. Inconsistent Track Durations
 	if config.IsCheckEnabled("mediainfo_durations") {
 		for _, w := range checkDurations(mi) {
-			fmt.Println(w)
+			ui.PrintWarning(w)
 		}
 	}
 
 	// 5. Redundant Audio Tracks
 	if config.IsCheckEnabled("mediainfo_redundant_audio") {
 		for _, w := range CheckRedundantAudio(mi) {
-			fmt.Println(w)
+			ui.PrintWarning(w)
 		}
 	}
 
 	// 6. Non-standard Resolution
 	if config.IsCheckEnabled("mediainfo_resolution") {
 		for _, w := range CheckResolution(videoTrack) {
-			fmt.Println(w)
+			ui.PrintWarning(w)
 		}
 	}
 }

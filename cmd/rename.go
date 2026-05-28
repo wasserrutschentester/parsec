@@ -13,6 +13,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/n0ne/parsec/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -99,32 +100,34 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	newPath := filepath.Join(filepath.Dir(filePath), newName)
 
 	if filepath.Base(filePath) == newName {
-		fmt.Printf("File '%s' already has the correct name.\n", filepath.Base(filePath))
+		ui.Println(ui.Success.Render(fmt.Sprintf("File '%s' already has the correct name.", filepath.Base(filePath))))
 		return
 	}
 
-	fmt.Printf("Renaming:\n  Old: %s\n  New: %s\n", filepath.Base(filePath), newName)
+	ui.Println(ui.Header.Render("Renaming File"))
+	ui.Println(ui.LabelValue("Old:", filepath.Base(filePath)))
+	ui.Println(ui.LabelValue("New:", newName))
 
 	if dryRunFlag {
-		fmt.Println("Dry run: no changes made.")
+		ui.Println(ui.Muted.Render("Dry run: no changes made."))
 		return
 	}
 
 	if !unattendedFlag {
-		fmt.Print("Proceed with rename? [y/N] ")
+		fmt.Print(ui.Info.Render("Proceed with rename? [y/N] "))
 		var response string
 		fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
-			fmt.Println("Skipping...")
+			ui.Println(ui.Muted.Render("Skipping..."))
 			return
 		}
 	}
 
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
-		fmt.Printf("Error renaming file %s: %v\n", filePath, renameErr)
+		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", filePath, renameErr))
 	} else {
-		fmt.Println("File renamed successfully.")
+		ui.Println(ui.Success.Render("File renamed successfully."))
 	}
 
 }

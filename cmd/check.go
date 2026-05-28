@@ -8,6 +8,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/n0ne/parsec/internal/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,9 @@ var checkCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
 		filenameNoExt := filename.GetBaseName(filePath)
-		fmt.Printf("Current Name:\t%s\n", filenameNoExt)
+
+		ui.Println(ui.Header.Render("Parsec File Check"))
+		ui.Println(ui.LabelValue("Current Name:", filenameNoExt))
 
 		if config.IsCheckEnabled("filename_characters") {
 			filename.CheckAllowedCharacters(filenameNoExt)
@@ -32,14 +35,14 @@ var checkCmd = &cobra.Command{
 		match := filename.Parse(filenameNoExt)
 		matchName := match.String()
 		if matchName != filenameNoExt {
-			fmt.Println("Some Tags weren't parsed correctly from the filename")
-			fmt.Printf("Parsed Name:\t%s\n", match)
+			ui.Println(ui.Warning.Render("\nSome Tags weren't parsed correctly from the filename"))
+			ui.Println(ui.LabelValue("Parsed Name:", match.String()))
 		}
 
 		// Generate Name from mediainfo
 		mi, err := mediainfo.Get(filePath)
 		if err != nil {
-			fmt.Printf("Error getting mediainfo: %v\n", err)
+			ui.PrintError(fmt.Sprintf("Error getting mediainfo: %v", err))
 			return
 		}
 		mediaMeta := mi.GetMetadata()
@@ -57,10 +60,11 @@ var checkCmd = &cobra.Command{
 		}
 
 		if updated {
-			fmt.Println("After Applying those updates the name looks like this:")
-			fmt.Printf("Generated Name:\t%s\n\n", match)
+			ui.Println(ui.Info.Render("\nUpdates applied from MediaInfo/EBML:"))
+			ui.Println(ui.LabelValue("Generated Name:", match.String()))
+			ui.Println()
 		} else {
-			fmt.Println("The Parsed name fits the specification")
+			ui.Println(ui.Success.Render("\nThe parsed name fits the specification"))
 		}
 
 		checks.RunMediaInfoChecks(mi, match)
@@ -68,24 +72,23 @@ var checkCmd = &cobra.Command{
 		// 4. Run EBML specific checks
 		if err == nil {
 			if err := matroska.VerifyTrackOrder(ebml.Tracks); err != nil {
-
-				fmt.Printf("Track Order Error: %v\n", err)
+				ui.PrintWarning(fmt.Sprintf("Track Order Error: %v", err))
 			}
 
 			if config.IsCheckEnabled("matroska_default_flags") {
 				if err := matroska.CheckDefaultFlags(ebml.Tracks); err != nil {
-					fmt.Printf("Default Flag Error: %v\n", err)
+					ui.PrintWarning(fmt.Sprintf("Default Flag Error: %v", err))
 				}
 			}
 
 			if config.IsCheckEnabled("matroska_subtitle_format") {
 				if err := matroska.CheckSubtitleFormat(ebml.Tracks); err != nil {
-					fmt.Printf("Subtitle Format Error: %v\n", err)
+					ui.PrintWarning(fmt.Sprintf("Subtitle Format Error: %v", err))
 				}
 			}
 
 		} else {
-			fmt.Printf("Error getting EBML metadata: %v\n", err)
+			ui.PrintWarning(fmt.Sprintf("Error getting EBML metadata: %v", err))
 		}
 
 		checks.RunGenericChecks(match)

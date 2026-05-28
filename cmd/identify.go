@@ -9,6 +9,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/n0ne/parsec/internal/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -33,8 +34,11 @@ var identifyCmd = &cobra.Command{
 			filePath = args[0]
 			filenameNoExt := filename.GetBaseName(filePath)
 			meta = filename.Parse(filenameNoExt)
+			ui.Println(ui.Header.Render("Identifying File"))
+			ui.Println(ui.LabelValue("Current Name:", filenameNoExt))
 		} else {
 			meta = &metadata.Metadata{}
+			ui.Println(ui.Header.Render("Identifying Metadata"))
 		}
 
 		applyMetadataFlags(cmd, meta)
@@ -42,7 +46,7 @@ var identifyCmd = &cobra.Command{
 
 		result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			ui.PrintError(err.Error())
 			return
 		}
 
@@ -58,11 +62,11 @@ var identifyCmd = &cobra.Command{
 		}
 
 		if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
-			fmt.Print("Do you want to write the tags to the file? [y/N] ")
+			fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
 			var response string
 			fmt.Scanln(&response)
 			if response != "y" && response != "Y" {
-				fmt.Println("Skipping...")
+				ui.Println(ui.Muted.Render("Skipping..."))
 				return
 			} else {
 				writeTagsFlag = true
@@ -72,9 +76,9 @@ var identifyCmd = &cobra.Command{
 		if writeTagsFlag {
 			err := matroska.SetGlobalTags(filePath, tags)
 			if err != nil {
-				fmt.Printf("Error writing tags: %v\n", err)
+				ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
 			} else {
-				fmt.Println("Tags written successfully")
+				ui.Println(ui.Success.Render("Tags written successfully"))
 			}
 		}
 	},
@@ -138,7 +142,7 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 	if (tagImdb != "" && result.ImdbID != "" && tagImdb != result.ImdbID) ||
 		(tagTmdb != 0 && result.TmdbID != 0 && tagTmdb != result.TmdbID) ||
 		(tagTvdb != 0 && result.TvdbID != 0 && tagTvdb != result.TvdbID) {
-		fmt.Printf("\nWARNING: Selected result IDs do not match file tags:\n")
+		ui.Println("\n" + ui.FormatWarning("Selected result IDs do not match file tags:"))
 		if tagImdb != "" && tagImdb != result.ImdbID {
 			fmt.Printf("  IMDB: File=%s, Selected=%s\n", tagImdb, result.ImdbID)
 		}
