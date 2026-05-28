@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"codeberg.org/n0ne/parsec/internal/checks"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -171,15 +172,32 @@ func printInteractiveReport(report checkReport) {
 		ui.Println(ui.ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
 		for _, res := range group.Results {
 			if len(res.Tracks) == 0 {
-				ui.Println("  " + ui.IconWarn + " " + res.Warning)
+				ui.PrintWarning(res.Warning)
+				printUnexpectedDiff(res)
 				continue
 			}
 
-			ui.Println("  " + ui.IconWarn + " " + res.Description)
+			ui.PrintWarning(res.Description)
 			ui.Println(ui.FormatTrackTable(res.Tracks))
 		}
 	}
 	ui.Println()
+}
+
+func printUnexpectedDiff(res checks.CheckResult) {
+	if res.Expected != "" && res.Actual != "" {
+		labelE := "Expected"
+		labelA := "Actual"
+
+		// Use Official/Parsed for all MDB related checks
+		if strings.HasPrefix(res.Identifier, "mdb_") {
+			labelE, labelA = "Official", "Parsed"
+		}
+
+		diff := ui.FormatStringDiffAligned(labelE, res.Expected, labelA, res.Actual)
+		indentedDiff := "      " + strings.ReplaceAll(diff, "\n", "\n      ")
+		ui.Println(indentedDiff)
+	}
 }
 
 func countIssues(groups []issueGroup) int {

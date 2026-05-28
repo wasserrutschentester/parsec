@@ -20,3 +20,35 @@ func TestFormatDebug(t *testing.T) {
 		t.Error("FormatDebug returned empty string")
 	}
 }
+
+func TestFormatStringDiff(t *testing.T) {
+	tests := []struct {
+		name string
+		old  string
+		new  string
+	}{
+		{"Simple", "Hello World", "Hello User"},
+		{"Insertion", "Hello", "Hello World"},
+		{"Deletion", "Hello World", "Hello"},
+		{"Replacement", "The quick brown fox", "The fast brown fox"},
+		{"UTF8", "Hello 世界", "Hello Go"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatStringDiff(tt.old, tt.new)
+			if got == "" {
+				t.Error("FormatStringDiff returned empty string")
+			}
+			t.Logf("\n%s", got)
+		})
+	}
+}
+
+func TestFormatStringDiffAligned(t *testing.T) {
+	got := FormatStringDiffAligned("Expected", "The quick brown fox", "Actual", "The fast brown fox")
+	if got == "" {
+		t.Error("FormatStringDiffAligned returned empty string")
+	}
+	t.Logf("\n%s", got)
+}

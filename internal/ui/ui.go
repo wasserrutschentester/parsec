@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
 	"codeberg.org/n0ne/parsec/internal/types"
+	"github.com/aymanbagabas/go-udiff"
 )
 
 var (
@@ -53,9 +54,6 @@ var (
 	// Icons
 	IconCheck = Success.Render("✓")
 	IconCross = Error.Render("✗")
-	IconWarn  = Warning.Render("!")
-	IconInfo  = Info.Render("i")
-	IconArrow = Info.Render("→")
 
 	// Component Styles
 	BadgeStyle = lipgloss.NewStyle().
@@ -133,6 +131,83 @@ func FormatDiff(expectedLabel, expectedValue, actualLabel, actualValue string) s
 	expectedLine := lipgloss.NewStyle().Foreground(green).Render(fmt.Sprintf("+ %s: %s", expectedLabel, expectedValue))
 	actualLine := lipgloss.NewStyle().Foreground(red).Render(fmt.Sprintf("- %s: %s", actualLabel, actualValue))
 	return lipgloss.JoinVertical(lipgloss.Left, actualLine, expectedLine)
+}
+
+// FormatStringDiff visualizes a mismatch between two strings with character-level alignment.
+func FormatStringDiff(oldStr, newStr string) string {
+	edits := udiff.Strings(oldStr, newStr)
+
+	var line1, line2 strings.Builder
+	pos := 0
+
+	for _, edit := range edits {
+		// Add unchanged part
+		if edit.Start > pos {
+			unchanged := oldStr[pos:edit.Start]
+			line1.WriteString(unchanged)
+			line2.WriteString(unchanged)
+		}
+
+		oldText := oldStr[edit.Start:edit.End]
+		newText := edit.New
+
+		// Calculate visual widths for alignment
+		oldW := lipgloss.Width(oldText)
+		newW := lipgloss.Width(newText)
+		maxW := oldW
+		if newW > maxW {
+			maxW = newW
+		}
+
+		// Add deleted part (red) to line 1
+		if oldW > 0 {
+			line1.WriteString(lipgloss.NewStyle().Foreground(red).Render(oldText))
+			if maxW > oldW {
+				line1.WriteString(strings.Repeat(" ", maxW-oldW))
+			}
+		} else if maxW > 0 {
+			line1.WriteString(strings.Repeat(" ", maxW))
+		}
+
+		// Add inserted part (green) to line 2
+		if newW > 0 {
+			line2.WriteString(lipgloss.NewStyle().Foreground(green).Render(newText))
+			if maxW > newW {
+				line2.WriteString(strings.Repeat(" ", maxW-newW))
+			}
+		} else if maxW > 0 {
+			line2.WriteString(strings.Repeat(" ", maxW))
+		}
+
+		pos = edit.End
+	}
+
+	// Add remaining unchanged part
+	if pos < len(oldStr) {
+		remaining := oldStr[pos:]
+		line1.WriteString(remaining)
+		line2.WriteString(remaining)
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, line1.String(), line2.String())
+}
+
+// FormatStringDiffAligned visualizes a mismatch between two strings with labels and character-level alignment.
+func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualValue string) string {
+	diff := FormatStringDiff(expectedValue, actualValue)
+	lines := strings.Split(diff, "\n")
+	if len(lines) != 2 {
+		return diff
+	}
+
+	maxLabelLen := max(len(expectedLabel), len(actualLabel))
+	expectedPrefix := LabelStyle.Width(maxLabelLen + 2).Render(expectedLabel + ":")
+	actualPrefix := LabelStyle.Width(maxLabelLen + 2).Render(actualLabel + ":")
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.JoinHorizontal(lipgloss.Top, expectedPrefix, lines[0]),
+		lipgloss.JoinHorizontal(lipgloss.Top, actualPrefix, lines[1]),
+	)
 }
 
 // TrackTable renders a table of track information.

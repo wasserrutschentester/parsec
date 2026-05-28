@@ -377,13 +377,13 @@ func (meta *Metadata) Override(newMeta *Metadata) bool {
 
 		if f.Type.Kind() == reflect.Bool {
 			if mField.Bool() != nField.Bool() && nField.Bool() {
-				ui.PrintDebug(fmt.Sprintf("  %s %s: %t %s %t", ui.IconArrow, f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
+				ui.PrintDebug(fmt.Sprintf("%s: %t %s %t", f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
 				mField.SetBool(nField.Bool())
 				updated = true
 			}
 		} else {
 			if !nField.IsZero() && mField.Interface() != nField.Interface() {
-				ui.PrintDebug(fmt.Sprintf("  %s %s: %v %s %v", ui.IconArrow, f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
+				ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
 				mField.Set(nField)
 				updated = true
 			}

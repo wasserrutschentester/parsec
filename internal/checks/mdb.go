@@ -10,7 +10,6 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
-	"codeberg.org/n0ne/parsec/internal/ui"
 	"golang.org/x/text/language"
 )
 
@@ -117,7 +116,7 @@ func CheckMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckRe
 		if meta.Year != result.Year {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = ui.FormatDiff("MDB Year", res.Expected, "File Year", res.Actual)
+			res.Warning = "Year Mismatch"
 		}
 	}
 	return []CheckResult{res}
@@ -135,7 +134,7 @@ func CheckSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 		if meta.Year != result.Year {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = ui.FormatDiff("MDB Start Year", res.Expected, "File Year", res.Actual)
+			res.Warning = "Year Mismatch"
 		}
 	}
 	return []CheckResult{res}
@@ -186,7 +185,7 @@ func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 		if normParsed != normOfficial {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = ui.FormatDiff("Official Title", res.Expected, "Parsed Title", res.Actual)
+			res.Warning = "Title Mismatch"
 		}
 	}
 	return []CheckResult{res}
@@ -206,7 +205,7 @@ func CheckTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 		if normParsed != normOfficial {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = ui.FormatDiff("Official Title", res.Expected, "Parsed Title", res.Actual)
+			res.Warning = "Title Mismatch"
 		}
 	}
 	return []CheckResult{res}
@@ -224,7 +223,7 @@ func CheckSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Che
 		if epResult.Airdate != meta.Date {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = ui.FormatDiff("Official Date", res.Expected, "File Date", res.Actual)
+			res.Warning = "Date Mismatch"
 		}
 	}
 	return []CheckResult{res}
