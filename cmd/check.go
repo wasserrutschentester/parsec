@@ -15,7 +15,7 @@ import (
 
 type issueGroup struct {
 	Category string
-	Issues   []string
+	Results  []checks.CheckResult
 }
 
 var checkCmd = &cobra.Command{
@@ -32,22 +32,22 @@ var checkCmd = &cobra.Command{
 		var allIssues []issueGroup
 
 		// 1. Filename Basic Checks
-		var fnIssues []string
+		var fnIssues []checks.CheckResult
 		if config.IsCheckEnabled("filename_characters") {
 			if msg := filename.CheckAllowedCharacters(filenameNoExt); msg != "" {
-				fnIssues = append(fnIssues, msg)
+				fnIssues = append(fnIssues, checks.CheckResult{Warning: msg, Passed: false})
 			}
 		}
 		if config.IsCheckEnabled("filename_sequences") {
 			if msg := filename.CheckCharacterSequences(filenameNoExt); msg != "" {
-				fnIssues = append(fnIssues, msg)
+				fnIssues = append(fnIssues, checks.CheckResult{Warning: msg, Passed: false})
 			}
 		}
 
 		match := filename.Parse(filenameNoExt)
 		if match.String() != filenameNoExt {
-			fnIssues = append(fnIssues, ui.Warning.Render("Some tags weren't parsed correctly from the filename"))
-			fnIssues = append(fnIssues, ui.LabelValue("Parsed Name:", match.String()))
+			fnIssues = append(fnIssues, checks.CheckResult{Warning: ui.Warning.Render("Some tags weren't parsed correctly from the filename"), Passed: false})
+			fnIssues = append(fnIssues, checks.CheckResult{Warning: ui.LabelValue("Parsed Name:", match.String()), Passed: false})
 		}
 		if len(fnIssues) > 0 {
 			allIssues = append(allIssues, issueGroup{"FILENAME", fnIssues})
@@ -76,13 +76,21 @@ var checkCmd = &cobra.Command{
 		}
 
 		// Collect MediaInfo issues
-		miIssues := checks.RunMediaInfoChecks(mi, match)
-		if len(miIssues) > 0 {
-			allIssues = append(allIssues, issueGroup{"MEDIAINFO", miIssues})
+		miResults := checks.RunMediaInfoChecks(mi, match)
+		if len(miResults) > 0 {
+			var failed []checks.CheckResult
+			for _, r := range miResults {
+				if !r.Passed {
+					failed = append(failed, r)
+				}
+			}
+			if len(failed) > 0 {
+				allIssues = append(allIssues, issueGroup{"MEDIAINFO", failed})
+			}
 		}
 
 		// Collect EBML issues
-		var ebmlIssues []string
+		var ebmlIssues []checks.CheckResult
 		if ebmlErr == nil {
 			ebmlIssues = append(ebmlIssues, matroska.VerifyTrackOrder(ebml.Tracks)...)
 			if config.IsCheckEnabled("matroska_default_flags") {
@@ -92,16 +100,24 @@ var checkCmd = &cobra.Command{
 				ebmlIssues = append(ebmlIssues, matroska.CheckSubtitleFormat(ebml.Tracks)...)
 			}
 		} else {
-			ebmlIssues = append(ebmlIssues, fmt.Sprintf("Error getting EBML metadata: %v", ebmlErr))
+			ebmlIssues = append(ebmlIssues, checks.CheckResult{Warning: fmt.Sprintf("Error getting EBML metadata: %v", ebmlErr), Passed: false})
 		}
 		if len(ebmlIssues) > 0 {
 			allIssues = append(allIssues, issueGroup{"MATROSKA", ebmlIssues})
 		}
 
 		// 3. Generic Checks
-		genericIssues := checks.RunGenericChecks(match)
-		if len(genericIssues) > 0 {
-			allIssues = append(allIssues, issueGroup{"GENERIC", genericIssues})
+		genericResults := checks.RunGenericChecks(match)
+		if len(genericResults) > 0 {
+			var failed []checks.CheckResult
+			for _, r := range genericResults {
+				if !r.Passed {
+					failed = append(failed, r)
+				}
+			}
+			if len(failed) > 0 {
+				allIssues = append(allIssues, issueGroup{"GENERIC", failed})
+			}
 		}
 
 		// 4. MDB Checks
@@ -129,20 +145,69 @@ var checkCmd = &cobra.Command{
 			match.TvdbID = tvdbIDFlag
 		}
 
-		mdbIssues := checks.RunMdbChecks(mi, match)
-		if len(mdbIssues) > 0 {
-			allIssues = append(allIssues, issueGroup{"MDB", mdbIssues})
+		mdbResults := checks.RunMdbChecks(mi, match)
+		if len(mdbResults) > 0 {
+			var failed []checks.CheckResult
+			for _, r := range mdbResults {
+				if !r.Passed {
+					failed = append(failed, r)
+				}
+			}
+			if len(failed) > 0 {
+				allIssues = append(allIssues, issueGroup{"MDB", failed})
+			}
 		}
 
 		// Final Output
 		if len(allIssues) == 0 {
 			ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All checks passed! The file fits the specification."))
 		} else {
-			ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", countIssues(allIssues))))
+			totalIssues := 0
+			for _, g := range allIssues {
+				totalIssues += len(g.Results)
+			}
+			ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
 			for _, group := range allIssues {
 				ui.Println(ui.ReportSection(group.Category))
-				for _, issue := range group.Issues {
-					ui.Println("  " + ui.IconWarn + " " + issue)
+				for _, res := range group.Results {
+					if len(res.Tracks) > 0 {
+						ui.Println("  " + ui.IconWarn + " " + res.Description)
+						// Convert checks.TrackCheckResult to the anonymous struct expected by FormatTrackTable
+						var uiTracks []struct {
+							ID        string
+							Type      string
+							TypeOrder int
+							Codec     string
+							Name      string
+							Language  string
+							Flags     []string
+							Warning   string
+						}
+						for _, t := range res.Tracks {
+							uiTracks = append(uiTracks, struct {
+								ID        string
+								Type      string
+								TypeOrder int
+								Codec     string
+								Name      string
+								Language  string
+								Flags     []string
+								Warning   string
+							}{
+								ID:        t.ID,
+								Type:      t.Type,
+								TypeOrder: t.TypeOrder,
+								Codec:     t.Codec,
+								Name:      t.Name,
+								Language:  t.Language,
+								Flags:     t.Flags,
+								Warning:   t.Warning,
+							})
+						}
+						ui.Println(ui.FormatTrackTable(uiTracks))
+					} else {
+						ui.Println("  " + ui.IconWarn + " " + res.Warning)
+					}
 				}
 			}
 		}
@@ -152,8 +217,8 @@ var checkCmd = &cobra.Command{
 
 func countIssues(groups []issueGroup) int {
 	count := 0
-	for _, g := range groups {
-		count += len(g.Issues)
+	for _, group := range groups {
+		count += len(group.Results)
 	}
 	return count
 }

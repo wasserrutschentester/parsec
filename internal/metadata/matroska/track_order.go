@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"codeberg.org/n0ne/parsec/internal/checks"
 	"codeberg.org/n0ne/parsec/internal/config"
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
@@ -28,12 +29,31 @@ var (
 	}
 )
 
-func VerifyTrackOrder(tracks []EbmlTrack) []string {
-	var warnings []string
-	var lastAudio, lastSub *EbmlTrack
+func VerifyTrackOrder(tracks []EbmlTrack) []checks.CheckResult {
+	var results []checks.CheckResult
 	var lastAudioPriority, lastSubPriority int
 	seenTracks := make(map[string]bool)
 	langHasOriginalFlag := make(map[string]bool)
+
+	// Aggregators for per-track checks
+	aggregated := make(map[string]*checks.CheckResult)
+	mergeResult := func(res *checks.CheckResult) {
+		if res == nil {
+			return
+		}
+		target, ok := aggregated[res.Identifier]
+		if !ok {
+			target = &checks.CheckResult{
+				Identifier:  res.Identifier,
+				Description: res.Description,
+				Passed:      true,
+			}
+			aggregated[res.Identifier] = target
+		}
+		target.Passed = false
+		target.Severity = res.Severity
+		target.Tracks = append(target.Tracks, res.Tracks...)
+	}
 
 	// First pass for consistency info
 	for _, track := range tracks {
@@ -49,103 +69,175 @@ func VerifyTrackOrder(tracks []EbmlTrack) []string {
 		}
 
 		if config.IsCheckEnabled("matroska_language_tag") || config.IsCheckEnabled("matroska_multi_lang") {
-			if err := validateTrackBasics(*track); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(validateTrackBasics(*track))
 		}
 
 		if config.IsCheckEnabled("matroska_name_quality") {
-			if err := checkTrackNameQuality(*track); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(checkTrackNameQuality(*track))
 		}
 
 		if config.IsCheckEnabled("matroska_name_codecs") {
-			if err := checkTrackNameCodecs(*track); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(checkTrackNameCodecs(*track))
 		}
 
 		if config.IsCheckEnabled("matroska_name_redundant_lang") {
-			if err := checkTrackNameRedundantLang(*track); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(checkTrackNameRedundantLang(*track))
 		}
 
 		if config.IsCheckEnabled("matroska_original_language") {
-			if err := checkOriginalLanguageConsistency(*track, langHasOriginalFlag); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(checkOriginalLanguageConsistency(*track, langHasOriginalFlag))
 		}
 
 		if config.IsCheckEnabled("matroska_duplicate_tracks") {
-			if err := checkDuplicateTracks(*track, seenTracks); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(checkDuplicateTracks(*track, seenTracks))
 		}
 
 		if config.IsCheckEnabled("matroska_name_keywords") {
-			if err := checkNameKeywords(*track); err != nil {
-				warnings = append(warnings, err.Error())
-			}
+			mergeResult(checkNameKeywords(*track))
 		}
 
 		if config.IsCheckEnabled("matroska_track_order") {
 			priority := getTrackPriority(*track)
 			if track.Type == "audio" {
 				if priority < lastAudioPriority {
-					warnings = append(warnings, fmt.Sprintf("audio track is out of order.\n  Previous: %s\n  Current:  %s",
-						lastAudio.formatTrackInfo(), track.formatTrackInfo()))
+					warning := fmt.Sprintf("score: %d, prev: %d", priority, lastAudioPriority)
+					mergeResult(&checks.CheckResult{
+						Identifier:  "matroska_track_order",
+						Description: "Audio tracks order consistency",
+						Severity:    "warning",
+						Tracks:      []checks.TrackCheckResult{trackToResult(track, false, warning)},
+					})
 				}
-				lastAudio = track
 				lastAudioPriority = priority
 			} else if track.Type == "subtitles" {
 				if priority < lastSubPriority {
-					warnings = append(warnings, fmt.Sprintf("subtitle track is out of order.\n  Previous: %s\n  Current:  %s",
-						lastSub.formatTrackInfo(), track.formatTrackInfo()))
+					warning := fmt.Sprintf("score: %d, prev: %d", priority, lastSubPriority)
+					mergeResult(&checks.CheckResult{
+						Identifier:  "matroska_track_order",
+						Description: "Subtitle tracks order consistency",
+						Severity:    "warning",
+						Tracks:      []checks.TrackCheckResult{trackToResult(track, false, warning)},
+					})
 				}
-				lastSub = track
 				lastSubPriority = priority
 			}
 		}
 	}
 
-	return warnings
+	// Convert aggregated map to slice in stable order
+	ids := []string{
+		"matroska_language_tag",
+		"matroska_multi_lang",
+		"matroska_name_quality",
+		"matroska_name_codecs",
+		"matroska_name_redundant_lang",
+		"matroska_original_language",
+		"matroska_duplicate_tracks",
+		"matroska_name_keywords",
+		"matroska_track_order",
+	}
+	for _, id := range ids {
+		if res, ok := aggregated[id]; ok && !res.Passed {
+			results = append(results, *res)
+		}
+	}
+
+	return results
 }
 
-func checkTrackNameQuality(track EbmlTrack) error {
+func trackToResult(t *EbmlTrack, passed bool, warning string) checks.TrackCheckResult {
+	return checks.TrackCheckResult{
+		ID:        fmt.Sprintf("%d", t.Properties.Number),
+		Type:      t.Type,
+		TypeOrder: t.TypeOrder,
+		Codec:     t.Codec,
+		Name:      t.Properties.Name,
+		Language:  t.Properties.Language,
+		Flags:     t.getFlagsSlice(),
+		Passed:    passed,
+		Warning:   warning,
+	}
+}
+
+func (track *EbmlTrack) getFlagsSlice() []string {
+	var flags []string
+	if track.Properties.Default {
+		flags = append(flags, "Default")
+	}
+	if track.Properties.Forced {
+		flags = append(flags, "Forced")
+	}
+	if track.Properties.HearingImpaired {
+		flags = append(flags, "SDH")
+	}
+	if track.Properties.VisualImpaired {
+		flags = append(flags, "AD")
+	}
+	if track.Properties.Commentary {
+		flags = append(flags, "Commentary")
+	}
+	if track.Properties.OriginalLanguage {
+		flags = append(flags, "Original")
+	}
+	return flags
+}
+
+func checkTrackNameQuality(track EbmlTrack) *checks.CheckResult {
 	junkKeywords := []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
 	nameUpper := strings.ToUpper(track.Properties.Name)
 	for _, junk := range junkKeywords {
 		if strings.Contains(nameUpper, junk) {
-			return fmt.Errorf("%s track #%02d (ID: %d) has junk keyword '%s' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, junk, track.Properties.Name)
+			shortWarning := fmt.Sprintf("junk keyword '%s' in Name", junk)
+			return &checks.CheckResult{
+				Identifier:  "matroska_name_quality",
+				Description: "Track Name contains junk keywords",
+				Severity:    "info",
+				Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+			}
 		}
 	}
 	return nil
 }
 
-func checkTrackNameCodecs(track EbmlTrack) error {
+func checkTrackNameCodecs(track EbmlTrack) *checks.CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
 	// Simple Codecs
 	simpleCodecs := []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
 	for _, codec := range simpleCodecs {
 		if strings.Contains(nameUpper, codec) {
-			return fmt.Errorf("%s track #%02d (ID: %d) contains simple codec '%s' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, codec, track.Properties.Name)
+			shortWarning := fmt.Sprintf("simple codec '%s' in Name", codec)
+			return &checks.CheckResult{
+				Identifier:  "matroska_name_codecs",
+				Description: "Track Name contains simple codec",
+				Severity:    "info",
+				Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+			}
 		}
 	}
 	// Special handling for DTS (allow DTS-HD, DTS:X etc)
 	if strings.Contains(nameUpper, "DTS") && !strings.Contains(nameUpper, "DTS-HD") && !strings.Contains(nameUpper, "DTS:X") && !strings.Contains(nameUpper, "DTS-ES") {
 		if dtsRegex.MatchString(nameUpper) {
-			return fmt.Errorf("%s track #%02d (ID: %d) contains simple codec 'DTS' in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Name)
+			shortWarning := "simple codec 'DTS' in Name"
+			return &checks.CheckResult{
+				Identifier:  "matroska_name_codecs",
+				Description: "Track Name contains simple codec",
+				Severity:    "info",
+				Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+			}
 		}
 	}
 	return nil
 }
 
-func checkTrackNameRedundantLang(track EbmlTrack) error {
-	// Redundant Language Name
+func checkTrackNameRedundantLang(track EbmlTrack) *checks.CheckResult {
 	if isRedundantLanguageName(track.Properties.Name, track.Properties.Language) {
-		return fmt.Errorf("%s track #%02d (ID: %d) has redundant language name in Name field: '%s'", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Name)
+		shortWarning := "redundant language in Name"
+		return &checks.CheckResult{
+			Identifier:  "matroska_name_redundant_lang",
+			Description: "Track Name contains redundant language name",
+			Severity:    "info",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	return nil
 }
@@ -205,8 +297,9 @@ func getLanguageCodeFromName(word string) string {
 	}
 	return ""
 }
-func CheckDefaultFlags(tracks []EbmlTrack) []string {
-	var warnings []string
+
+func CheckDefaultFlags(tracks []EbmlTrack) []checks.CheckResult {
+	var results []checks.CheckResult
 	seenAudioLangs := make(map[string]bool)
 	seenSubLangs := make(map[string]bool)
 	audioLangCount := make(map[string]int)
@@ -221,6 +314,12 @@ func CheckDefaultFlags(tracks []EbmlTrack) []string {
 		} else if track.Type == "subtitles" {
 			subLangCount[track.Properties.Language]++
 		}
+	}
+
+	res := checks.CheckResult{
+		Identifier:  "matroska_default_flags",
+		Description: "Proper Default flag assignment",
+		Passed:      true,
 	}
 
 	for i := range tracks {
@@ -258,27 +357,50 @@ func CheckDefaultFlags(tracks []EbmlTrack) []string {
 		}
 
 		if props.Default != shouldBeDefault {
+			res.Passed = false
+			res.Severity = "warning"
+
+			var warning string
 			if shouldBeDefault {
-				warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d lang: %s) should have the Default flag set (it is the first standard track for this language)", track.Type, track.TypeOrder, track.Properties.Number, props.Language))
+				warning = fmt.Sprintf("[+] first standard track for %s", props.Language)
 			} else if isSpecialized {
-				warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set because it is a specialized track %s", track.Type, track.TypeOrder, track.Properties.Number, props.Language, track.getFlags()))
+				warning = "[-] specialized track"
 			} else {
-				warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d, lang: %s) should NOT have the Default flag set (only the first standard track per language should be default)", track.Type, track.TypeOrder, track.Properties.Number, props.Language))
+				warning = fmt.Sprintf("[-] redundant standard track for %s", props.Language)
 			}
+
+			res.Tracks = append(res.Tracks, trackToResult(track, false, warning))
 		}
 	}
-	return warnings
+
+	if !res.Passed {
+		results = append(results, res)
+	}
+	return results
 }
 
-func CheckSubtitleFormat(tracks []EbmlTrack) []string {
-	var warnings []string
-	for _, track := range tracks {
+func CheckSubtitleFormat(tracks []EbmlTrack) []checks.CheckResult {
+	res := checks.CheckResult{
+		Identifier:  "matroska_subtitle_format",
+		Description: "Text subtitles should be in SRT format",
+		Passed:      true,
+	}
+
+	for i := range tracks {
+		track := &tracks[i]
 		codec := track.Codec
 		if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
-			warnings = append(warnings, fmt.Sprintf("%s track #%02d (ID: %d, lang: %s) is text-based but not a SRT subtitle track (codec: %s)", track.Type, track.TypeOrder, track.Properties.Number, track.Properties.Language, track.Codec))
+			warning := fmt.Sprintf("text-based but codec is %s", codec)
+			res.Passed = false
+			res.Severity = "warning"
+			res.Tracks = append(res.Tracks, trackToResult(track, false, warning))
 		}
 	}
-	return warnings
+
+	if !res.Passed {
+		return []checks.CheckResult{res}
+	}
+	return nil
 }
 
 func (track *EbmlTrack) getFlags() string {
@@ -325,75 +447,124 @@ func isRelevantTrack(track EbmlTrack) bool {
 	return track.Type == "audio" || track.Type == "subtitles"
 }
 
-func validateTrackBasics(track EbmlTrack) error {
+func validateTrackBasics(track EbmlTrack) *checks.CheckResult {
 	lang := track.Properties.Language
 	tag := language.Make(lang)
 	if config.IsCheckEnabled("matroska_language_tag") && tag == language.Und {
-		return fmt.Errorf("%s track #%02d (ID: %d) is missing a valid language tag (got: %s) Name: '%s'", track.Type, track.TypeOrder, track.Properties.Number, lang, track.Properties.Name)
+		shortWarning := "missing or invalid language tag"
+		return &checks.CheckResult{
+			Identifier:  "matroska_language_tag",
+			Description: "Track has valid language tag",
+			Passed:      false,
+			Severity:    "warning",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
-		return fmt.Errorf("%s track #%02d (ID: %d) with language 'mul' must have a Name field", track.Type, track.TypeOrder, track.Properties.Number)
+		shortWarning := "missing Name for 'mul' language"
+		return &checks.CheckResult{
+			Identifier:  "matroska_multi_lang",
+			Description: "Multi-language track must have a Name",
+			Passed:      false,
+			Severity:    "warning",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	return nil
 }
 
-func checkOriginalLanguageConsistency(track EbmlTrack, langHasOriginalFlag map[string]bool) error {
+func checkOriginalLanguageConsistency(track EbmlTrack, langHasOriginalFlag map[string]bool) *checks.CheckResult {
 	lang := track.Properties.Language
 	if langHasOriginalFlag[lang] && !track.Properties.OriginalLanguage {
-		return fmt.Errorf("%s track #%02d (ID: %d, lang: %s) is missing the OriginalLanguage flag (other tracks in this language have it)", track.Type, track.TypeOrder, track.Properties.Number, lang)
+		shortWarning := "missing Original flag"
+		return &checks.CheckResult{
+			Identifier:  "matroska_original_language",
+			Description: "Consistency of Original language flag",
+			Passed:      false,
+			Severity:    "info",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	return nil
 }
 
-func checkDuplicateTracks(track EbmlTrack, seenTracks map[string]bool) error {
+func checkDuplicateTracks(track EbmlTrack, seenTracks map[string]bool) *checks.CheckResult {
 	props := track.Properties
 	trackKey := fmt.Sprintf("%s-%s-%t-%t-%t-%t-%t-%t-%s",
 		track.Type, props.Language, props.Default, props.Forced,
 		props.HearingImpaired, props.VisualImpaired,
 		props.Commentary, props.OriginalLanguage, props.Name)
 	if seenTracks[trackKey] {
-		return fmt.Errorf("%s track #%d (ID: %d) is a duplicate of a previous track (same language, flags, and name)", track.Type, track.TypeOrder, track.Properties.Number)
+		shortWarning := "duplicate track"
+		return &checks.CheckResult{
+			Identifier:  "matroska_duplicate_tracks",
+			Description: "No duplicate tracks",
+			Passed:      false,
+			Severity:    "warning",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	seenTracks[trackKey] = true
 	return nil
 }
 
-func checkNameKeywords(track EbmlTrack) error {
+func checkNameKeywords(track EbmlTrack) *checks.CheckResult {
 	props := track.Properties
 	nameUpper := strings.ToUpper(props.Name)
 
-	if err := checkFlagKeyword(track, props.HearingImpaired, "hearing impaired", "SDH", strings.Contains(nameUpper, "SDH")); err != nil {
-		return err
+	if res := checkFlagKeywordResult(track, props.HearingImpaired, "HearingImpaired", "SDH", strings.Contains(nameUpper, "SDH")); res != nil {
+		return res
 	}
 
-	if err := checkFlagKeyword(track, props.Forced, "forced", "Forced", strings.Contains(nameUpper, "FORCED")); err != nil {
-		return err
+	if res := checkFlagKeywordResult(track, props.Forced, "Forced", "Forced", strings.Contains(nameUpper, "FORCED")); res != nil {
+		return res
 	}
 
-	if err := checkFlagKeyword(track, props.Commentary, "commentary", "Commentary", strings.Contains(nameUpper, "COMMENTARY")); err != nil {
-		return err
+	if res := checkFlagKeywordResult(track, props.Commentary, "Commentary", "Commentary", strings.Contains(nameUpper, "COMMENTARY")); res != nil {
+		return res
 	}
 
 	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || adRegex.MatchString(nameUpper)
-	if err := checkFlagKeyword(track, props.VisualImpaired, "visual impaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); err != nil {
-		return err
+	if res := checkFlagKeywordResult(track, props.VisualImpaired, "VisualImpaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); res != nil {
+		return res
 	}
 
 	if props.Language == "mul" {
 		if countLanguagesInString(props.Name) < 2 {
-			return fmt.Errorf("%s track #%d (ID: %d) has language 'mul' but Name field does not contain at least two language names", track.Type, track.TypeOrder, track.Properties.Number)
+			shortWarning := "'mul' but Name has <2 language names"
+			return &checks.CheckResult{
+				Identifier:  "matroska_name_keywords",
+				Description: "Multi-language track contains language names in Name field",
+				Passed:      false,
+				Severity:    "warning",
+				Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+			}
 		}
 	}
 
 	return nil
 }
 
-func checkFlagKeyword(track EbmlTrack, flag bool, flagName, keywordStr string, hasKeyword bool) error {
+func checkFlagKeywordResult(track EbmlTrack, flag bool, flagName, keywordStr string, hasKeyword bool) *checks.CheckResult {
 	if flag && !hasKeyword {
-		return fmt.Errorf("%s track #%d (ID: %d) is %s but Name field does not contain '%s'", track.Type, track.TypeOrder, track.Properties.Number, flagName, keywordStr)
+		shortWarning := fmt.Sprintf("is %s but Name missing '%s'", flagName, keywordStr)
+		return &checks.CheckResult{
+			Identifier:  "matroska_name_keywords",
+			Description: "Track Name contains relevant flag keywords",
+			Passed:      false,
+			Severity:    "info",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	if !flag && hasKeyword {
-		return fmt.Errorf("%s track #%d (ID: %d) has '%s' in Name field but is not flagged as %s", track.Type, track.TypeOrder, track.Properties.Number, keywordStr, flagName)
+		shortWarning := fmt.Sprintf("'%s' in Name but no %s flag", keywordStr, flagName)
+		return &checks.CheckResult{
+			Identifier:  "matroska_name_keywords",
+			Description: "Track Name contains relevant flag keywords",
+			Passed:      false,
+			Severity:    "info",
+			Tracks:      []checks.TrackCheckResult{trackToResult(&track, false, shortWarning)},
+		}
 	}
 	return nil
 }

@@ -46,12 +46,19 @@ func TestCheckRedundantAudio(t *testing.T) {
 					Tracks: tt.tracks,
 				},
 			}
-			got := CheckRedundantAudio(mi)
-			if tt.wantWarn && len(got) == 0 {
+			results := CheckRedundantAudio(mi)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("CheckRedundantAudio() expected warnings, got none")
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("CheckRedundantAudio() expected no warnings, got %v", got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckRedundantAudio() expected no warnings, got failure")
 			}
 		})
 	}
@@ -91,12 +98,19 @@ func TestCheckResolution(t *testing.T) {
 				Width:  tt.width,
 				Height: tt.height,
 			}
-			got := CheckResolution(track)
-			if tt.wantWarn && len(got) == 0 {
+			results := CheckResolution(track)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("CheckResolution() expected warnings, got none")
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("CheckResolution() expected no warnings, got %v", got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckResolution() expected no warnings, got failure")
 			}
 		})
 	}
@@ -123,12 +137,19 @@ func TestCheckFrameRate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			track := &mediainfo.Track{FrameRate: tt.fps}
-			got := CheckFrameRate(track)
-			if tt.wantWarn && len(got) == 0 {
+			results := CheckFrameRate(track)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("CheckFrameRate(%f) expected warning, got none", tt.fps)
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("CheckFrameRate(%f) expected no warning, got %v", tt.fps, got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckFrameRate(%f) expected no warning, got failure", tt.fps)
 			}
 		})
 	}
@@ -152,12 +173,19 @@ func TestCheckBitRate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			track := &mediainfo.Track{Height: tt.height, BitRate: tt.bitrate}
-			got := CheckBitRate(track)
-			if tt.wantWarn && len(got) == 0 {
+			results := CheckBitRate(track)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("CheckBitRate(%d, %d) expected warning, got none", tt.height, tt.bitrate)
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("CheckBitRate(%d, %d) expected no warning, got %v", tt.height, tt.bitrate, got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckBitRate(%d, %d) expected no warning, got failure", tt.height, tt.bitrate)
 			}
 		})
 	}
@@ -219,12 +247,19 @@ func TestCheckDurations(t *testing.T) {
 				}
 			}
 
-			got := checkDurations(mi)
-			if tt.wantWarn && len(got) == 0 {
+			results := checkDurations(mi)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkDurations() expected warnings, got none")
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("checkDurations() expected no warnings, got %v", got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("checkDurations() expected no warnings, got failure")
 			}
 		})
 	}
@@ -247,12 +282,19 @@ func TestCheckYear(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{Year: tt.year, Season: tt.season, IsTV: tt.isTV}
-			err := CheckYear(meta)
-			if tt.wantWarn && err == nil {
-				t.Errorf("CheckYear() expected error, got nil")
+			results := CheckYear(meta)
+			hasFailure := false
+			for _, res := range results {
+				if !res.Passed {
+					hasFailure = true
+					break
+				}
 			}
-			if !tt.wantWarn && err != nil {
-				t.Errorf("CheckYear() expected no error, got %v", err)
+			if tt.wantWarn && !hasFailure {
+				t.Errorf("CheckYear() expected error, got none")
+			}
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckYear() expected no error, got failure")
 			}
 		})
 	}
@@ -274,12 +316,19 @@ func TestCheckStreaming(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{Source: tt.source, Service: tt.service}
-			err := CheckStreaming(meta)
-			if tt.wantWarn && err == nil {
-				t.Errorf("CheckStreaming() expected error, got nil")
+			results := CheckStreaming(meta)
+			hasFailure := false
+			for _, res := range results {
+				if !res.Passed {
+					hasFailure = true
+					break
+				}
 			}
-			if !tt.wantWarn && err != nil {
-				t.Errorf("CheckStreaming() expected no error, got %v", err)
+			if tt.wantWarn && !hasFailure {
+				t.Errorf("CheckStreaming() expected error, got none")
+			}
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckStreaming() expected no error, got failure")
 			}
 		})
 	}
@@ -303,12 +352,19 @@ func TestCheckTvSpecial(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{IsTV: tt.isTV, Season: tt.season, Date: tt.date, EpisodeTitle: tt.episodeTitle}
-			err := CheckTvSpecial(meta)
-			if tt.wantWarn && err == nil {
-				t.Errorf("CheckTvSpecial() expected error, got nil")
+			results := CheckTvSpecial(meta)
+			hasFailure := false
+			for _, res := range results {
+				if !res.Passed {
+					hasFailure = true
+					break
+				}
 			}
-			if !tt.wantWarn && err != nil {
-				t.Errorf("CheckTvSpecial() expected no error, got %v", err)
+			if tt.wantWarn && !hasFailure {
+				t.Errorf("CheckTvSpecial() expected error, got none")
+			}
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckTvSpecial() expected no error, got failure")
 			}
 		})
 	}
@@ -349,12 +405,19 @@ func TestCheckTitle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{Title: tt.metaTitle}
 			res := &mdb.SearchResult{Title: tt.resTitle}
-			got := CheckTitle(meta, res)
-			if tt.wantWarn && len(got) == 0 {
+			results := CheckTitle(meta, res)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("CheckTitle() expected warnings, got none")
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("CheckTitle() expected no warnings, got %v", got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckTitle() expected no warnings, got failure")
 			}
 		})
 	}
@@ -376,12 +439,19 @@ func TestCheckMovieYear(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{Year: tt.metaYear, IsTV: false}
 			res := &mdb.SearchResult{Year: tt.resYear}
-			got := CheckMovieYear(meta, res)
-			if tt.wantWarn && len(got) == 0 {
+			results := CheckMovieYear(meta, res)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
 				t.Errorf("CheckMovieYear() expected warnings, got none")
 			}
-			if !tt.wantWarn && len(got) > 0 {
-				t.Errorf("CheckMovieYear() expected no warnings, got %v", got)
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("CheckMovieYear() expected no warnings, got failure")
 			}
 		})
 	}

@@ -126,7 +126,7 @@ func TrackTable(headers []string, rows [][]string) string {
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(gray)).
 		StyleFunc(func(row, col int) lipgloss.Style {
-			if row == 0 {
+			if row < 0 { // Header row
 				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
 			return lipgloss.NewStyle().Padding(0, 1)
@@ -135,6 +135,51 @@ func TrackTable(headers []string, rows [][]string) string {
 		Rows(rows...)
 
 	return t.Render()
+}
+
+// FormatTrackTable renders a table of track issues.
+func FormatTrackTable(tracks []struct {
+	ID        string
+	Type      string
+	TypeOrder int
+	Codec     string
+	Name      string
+	Language  string
+	Flags     []string
+	Warning   string
+}) string {
+	if len(tracks) == 0 {
+		return ""
+	}
+
+	headers := []string{"ID", "Type", "#", "Codec", "Lang", "Name", "Flags", "Warning"}
+	var rows [][]string
+	for _, t := range tracks {
+		rows = append(rows, []string{
+			t.ID,
+			t.Type,
+			fmt.Sprintf("%d", t.TypeOrder),
+			t.Codec,
+			t.Language,
+			t.Name,
+			strings.Join(t.Flags, ", "),
+			Warning.Render(t.Warning),
+		})
+	}
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(gray)).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row < 0 { // Header row
+				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
+			}
+			return lipgloss.NewStyle().Padding(0, 1)
+		}).
+		Headers(headers...).
+		Rows(rows...)
+
+	return "      " + strings.ReplaceAll(t.Render(), "\n", "\n      ")
 }
 
 // ReportSection returns a header for a specific section in a check report.
