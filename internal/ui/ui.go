@@ -15,6 +15,9 @@ var (
 	// IsSilent suppresses all UI output
 	IsSilent bool
 
+	// IsDebug enables debug output
+	IsDebug bool
+
 	// Base Colors
 	blue   = lipgloss.Color("12")
 	green  = lipgloss.Color("10")
@@ -30,6 +33,7 @@ var (
 	Warning = lipgloss.NewStyle().Foreground(yellow)
 	Error   = lipgloss.NewStyle().Foreground(red)
 	Muted   = lipgloss.NewStyle().Foreground(gray)
+	Debug   = lipgloss.NewStyle().Foreground(gray)
 	Link    = lipgloss.NewStyle().Foreground(blue).Underline(true)
 
 	// Structural Styles
@@ -82,6 +86,11 @@ var (
 			Background(red).
 			Foreground(white).
 			Render("ERROR")
+
+	DebugTag = BadgeStyle.
+			Background(gray).
+			Foreground(white).
+			Render("DEBUG")
 )
 
 // Status Badges
@@ -224,6 +233,10 @@ func FormatError(msg string) string {
 	return ErrorTag + " " + Error.Render(msg)
 }
 
+func FormatDebug(msg string) string {
+	return DebugTag + " " + Debug.Render(msg)
+}
+
 func PrintWarning(msg string) {
 	if !IsSilent {
 		lipgloss.Println(FormatWarning(msg))
@@ -232,6 +245,12 @@ func PrintWarning(msg string) {
 
 func PrintError(msg string) {
 	fmt.Fprintln(os.Stderr, FormatError(msg))
+}
+
+func PrintDebug(msg string) {
+	if IsDebug && !IsSilent {
+		lipgloss.Println(FormatDebug(msg))
+	}
 }
 
 func Println(a ...any) {

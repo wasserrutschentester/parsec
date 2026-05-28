@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/n0ne/parsec/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -15,6 +16,10 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "parsec",
 	Short: "parsec allows you to parse, check and create releases",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		ui.IsDebug = debugFlag
+		ui.PrintDebug("Debug output enabled")
+	},
 }
 
 func Execute() {
@@ -29,6 +34,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/parsec/config.toml)")
 	rootCmd.PersistentFlags().StringVar(&presetFlag, "preset", "", "configuration preset to use")
+	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false, "enable debug output")
 
 	config.InitDefaults()
 

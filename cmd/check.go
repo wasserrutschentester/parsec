@@ -70,7 +70,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 		return checkReport{}, fmt.Errorf("error getting mediainfo: %v", err)
 	}
 	mediaMeta := mi.GetMetadata()
-	updated := match.Override(mediaMeta, false)
+	updated := match.Override(mediaMeta, verboseFlag)
 
 	ebml, ebmlErr := matroska.GetEbmlMetadata(filePath)
 	if ebmlErr == nil {
@@ -197,6 +197,7 @@ func init() {
 	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
 	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
+	checkCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Verbose output")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {

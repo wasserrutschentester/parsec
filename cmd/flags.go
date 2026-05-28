@@ -32,6 +32,7 @@ var (
 	dryRunFlag     bool
 	unattendedFlag bool
 	verboseFlag    bool
+	debugFlag      bool
 	quietFlag      bool
 	presetFlag     string
 )
