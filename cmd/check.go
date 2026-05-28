@@ -11,6 +11,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
 	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/n0ne/parsec/internal/types"
 	"codeberg.org/n0ne/parsec/internal/ui"
 
 	"github.com/spf13/cobra"
@@ -148,6 +149,15 @@ func printInteractiveReport(report checkReport) {
 		return
 	}
 
+	// Calculate shared column widths across all tracks to ensure table alignment
+	var allTracks []types.TrackCheckResult
+	for _, group := range report.Issues {
+		for _, res := range group.Results {
+			allTracks = append(allTracks, res.Tracks...)
+		}
+	}
+	sharedWidths := ui.CalculateTrackTableWidths(allTracks)
+
 	totalIssues := countIssues(report.Issues)
 	ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
 	for _, group := range report.Issues {
@@ -171,7 +181,7 @@ func printInteractiveReport(report checkReport) {
 				continue
 			}
 
-			ui.Println(ui.FormatTrackTable(res.Tracks))
+			ui.Println(ui.FormatTrackTable(res.Tracks, sharedWidths))
 		}
 	}
 	ui.Println()

@@ -2,6 +2,8 @@ package ui
 
 import (
 	"testing"
+
+	"codeberg.org/n0ne/parsec/internal/types"
 )
 
 func TestPrintDebug(t *testing.T) {
@@ -49,6 +51,27 @@ func TestFormatStringDiffAligned(t *testing.T) {
 	got := FormatStringDiffAligned("Expected", "The quick brown fox", "Actual", "The fast brown fox")
 	if got == "" {
 		t.Error("FormatStringDiffAligned returned empty string")
+	}
+	t.Logf("\n%s", got)
+}
+
+func TestFormatTrackTable(t *testing.T) {
+	tracks := []types.TrackCheckResult{
+		{
+			ID:        "1",
+			Type:      "Video",
+			TypeOrder: 1,
+			Codec:     "V_MPEG4/ISO/AVC",
+			Language:  "eng",
+			Name:      "This is a very long track name that should definitely wrap in a small terminal window",
+			Flags:     []string{"Default", "Forced"},
+			Warning:   "some warning",
+		},
+	}
+
+	got := FormatTrackTable(tracks, nil)
+	if got == "" {
+		t.Error("FormatTrackTable returned empty string")
 	}
 	t.Logf("\n%s", got)
 }

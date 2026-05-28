@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2/table"
 	"codeberg.org/n0ne/parsec/internal/types"
 	"github.com/aymanbagabas/go-udiff"
+	"github.com/charmbracelet/x/term"
 )
 
 var (
@@ -227,8 +228,39 @@ func TrackTable(headers []string, rows [][]string) string {
 	return t.Render()
 }
 
+// CalculateTrackTableWidths calculates the maximum width for each column across all provided tracks.
+// It returns a map of column index to its content width (excluding padding and borders).
+func CalculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {
+	headers := []string{"ID", "Type", "#", "Codec", "Lang", "Name", "Flags", "Warning"}
+	widths := make(map[int]int)
+
+	for i, h := range headers {
+		widths[i] = lipgloss.Width(h)
+	}
+
+	for _, t := range tracks {
+		row := []string{
+			t.ID,
+			t.Type,
+			fmt.Sprintf("%d", t.TypeOrder),
+			t.Codec,
+			t.Language,
+			t.Name,
+			strings.Join(t.Flags, ", "),
+			t.Warning,
+		}
+		for i, cell := range row {
+			w := lipgloss.Width(cell)
+			if w > widths[i] {
+				widths[i] = w
+			}
+		}
+	}
+	return widths
+}
+
 // FormatTrackTable renders a table of track issues.
-func FormatTrackTable(tracks []types.TrackCheckResult) string {
+func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int) string {
 	if len(tracks) == 0 {
 		return ""
 	}
@@ -248,17 +280,57 @@ func FormatTrackTable(tracks []types.TrackCheckResult) string {
 		})
 	}
 
+	// Use shared widths if provided, otherwise calculate for this set of tracks
+	contentWidths := sharedWidths
+	if contentWidths == nil {
+		contentWidths = CalculateTrackTableWidths(tracks)
+	}
+
+	// Calculate terminal width and available space for Name
+	termWidth, _, _ := term.GetSize(os.Stdout.Fd())
+	if termWidth <= 0 {
+		termWidth = 120 // Default fallback
+	}
+
+	// Overhead: 6 spaces indentation + 1 border per column + 1 final border + 2 padding per column
+	overhead := 6 + len(headers) + 1 + (len(headers) * 2)
+
+	otherColsWidth := 0
+	for i := range headers {
+		if i == 5 { // Name column
+			continue
+		}
+		otherColsWidth += contentWidths[i]
+	}
+
+	maxNameContentWidth := contentWidths[5]
+
+	nameWidth := termWidth - overhead - otherColsWidth
+	if nameWidth < 20 {
+		nameWidth = 20
+	}
+	if nameWidth > maxNameContentWidth {
+		nameWidth = maxNameContentWidth
+	}
+
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(gray)).
 		StyleFunc(func(row, col int) lipgloss.Style {
+			style := lipgloss.NewStyle().Padding(0, 1)
 			if row < 0 { // Header row
-				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
+				style = style.Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
-			return lipgloss.NewStyle().Padding(0, 1)
+			w := contentWidths[col]
+			if col == 5 { // Name column
+				w = nameWidth
+			}
+			// Fixed width including padding (+2) to ensure alignment
+			return style.Width(w + 2)
 		}).
 		Headers(headers...).
-		Rows(rows...)
+		Rows(rows...).
+		Wrap(true)
 
 	return "      " + strings.ReplaceAll(t.Render(), "\n", "\n      ")
 }
