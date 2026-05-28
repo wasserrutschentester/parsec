@@ -105,8 +105,8 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	}
 
 	ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
-	ui.Println(ui.LabelValue("Current Heading:", filepath.Base(filePath)))
-	ui.Println(ui.LabelValue("Proposed Vector:", newName))
+	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath),"Proposed Vector", newName))
+	ui.Println()
 
 	if dryRunFlag {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))

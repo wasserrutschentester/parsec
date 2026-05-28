@@ -225,8 +225,8 @@ func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualVa
 	}
 
 	maxLabelLen := max(len(expectedLabel), len(actualLabel))
-	expectedPrefix := LabelStyle.Width(maxLabelLen + 2).Render(expectedLabel + ":")
-	actualPrefix := LabelStyle.Width(maxLabelLen + 2).Render(actualLabel + ":")
+	expectedPrefix := LabelStyle.Width(maxLabelLen + 4).Render(expectedLabel + ":")
+	actualPrefix := LabelStyle.Width(maxLabelLen + 4).Render(actualLabel + ":")
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.JoinHorizontal(lipgloss.Top, expectedPrefix, lines[0]),

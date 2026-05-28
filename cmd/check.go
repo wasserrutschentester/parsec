@@ -198,9 +198,9 @@ func printUnexpectedDiff(res checks.CheckResult) {
 		} else if res.Identifier == "filename_generation_mismatch" {
 			labelE, labelA = "Original", "Generated"
 		}
-
+		indent := "   "
 		diff := ui.FormatStringDiffAligned(labelE, res.Expected, labelA, res.Actual)
-		indentedDiff := "      " + strings.ReplaceAll(diff, "\n", "\n      ")
+		indentedDiff := indent + strings.ReplaceAll(diff, "\n", "\n"+indent)
 		ui.Println(indentedDiff)
 	}
 }

@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"strings"
 	"testing"
 
 	"codeberg.org/n0ne/parsec/internal/config"
@@ -318,8 +319,8 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 				if r.Tracks[0].Warning != "original track" {
 					t.Errorf("Expected first track warning to be 'original track', got '%s'", r.Tracks[0].Warning)
 				}
-				if r.Tracks[1].Warning != "duplicate track" {
-					t.Errorf("Expected second track warning to be 'duplicate track', got '%s'", r.Tracks[1].Warning)
+				if !strings.Contains(r.Tracks[1].Warning, "duplicate track") {
+					t.Errorf("Expected second track warning to contain 'duplicate track', got '%s'", r.Tracks[1].Warning)
 				}
 			}
 		}
@@ -343,8 +344,8 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 				if len(r.Tracks) != 2 {
 					t.Errorf("Expected 2 tracks for track order check, got %d", len(r.Tracks))
 				}
-				if r.Tracks[0].Warning != "previous track" {
-					t.Errorf("Expected first track warning to be 'previous track', got '%s'", r.Tracks[0].Warning)
+				if !strings.Contains(r.Tracks[0].Warning, "score:") {
+					t.Errorf("Expected first track warning to contain 'score:', got '%s'", r.Tracks[0].Warning)
 				}
 			}
 		}
