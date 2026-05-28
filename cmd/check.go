@@ -160,13 +160,12 @@ func printInteractiveReport(report checkReport) {
 
 		ui.Println(ui.ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
 		for _, res := range group.Results {
+			ui.PrintWarning(res.Warning)
 			if len(res.Tracks) == 0 {
-				ui.PrintWarning(res.Warning)
 				printUnexpectedDiff(res)
 				continue
 			}
 
-			ui.PrintWarning(res.Description)
 			ui.Println(ui.FormatTrackTable(res.Tracks))
 		}
 	}

@@ -19,21 +19,19 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 
 	if searchErr != nil {
 		results = append(results, CheckResult{
-			Identifier:  "mdb_error",
-			Description: "Error searching MDB",
-			Passed:      false,
-			Severity:    "error",
-			Warning:     fmt.Sprintf("MDB Error: %v", searchErr),
+			Identifier: "mdb_error",
+			Passed:     false,
+			Severity:   "error",
+			Warning:    fmt.Sprintf("MDB Error: %v", searchErr),
 		})
 		return results
 	}
 	if searchResult == nil {
 		return []CheckResult{{
-			Identifier:  "mdb_no_match",
-			Description: "Matching metadata on TMDB/TVDB",
-			Passed:      false,
-			Severity:    "warning",
-			Warning:     "No matching metadata found on TMDB/TVDB.",
+			Identifier: "mdb_no_match",
+			Passed:     false,
+			Severity:   "warning",
+			Warning:    "No matching metadata found on TMDB/TVDB.",
 		}}
 	}
 
@@ -80,16 +78,15 @@ func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		}
 
 		res := CheckResult{
-			Identifier:  fmt.Sprintf("mdb_%s_language_%s", strings.ToLower(trackType), label),
-			Description: fmt.Sprintf("%s track in %s language", trackType, label),
-			Passed:      true,
-			Expected:    targetStr,
+			Identifier: fmt.Sprintf("mdb_%s_language_%s", strings.ToLower(trackType), label),
+			Passed:     true,
+			Expected:   targetStr,
 		}
 
 		if !found {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = fmt.Sprintf("%s track in %s language '%s' is missing.", trackType, label, targetStr)
+			res.Warning = fmt.Sprintf("%s track in %s language '%s' is missing", trackType, label, targetStr)
 		}
 		results = append(results, res)
 	}
@@ -106,9 +103,8 @@ func CheckTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 
 func CheckMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	res := CheckResult{
-		Identifier:  "mdb_movie_year",
-		Description: "Movie Year matches MDB",
-		Passed:      true,
+		Identifier: "mdb_movie_year",
+		Passed:     true,
 	}
 	if !meta.IsTV && meta.Year > 0 && result.Year > 0 {
 		res.Expected = fmt.Sprintf("%d", result.Year)
@@ -124,9 +120,8 @@ func CheckMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckRe
 
 func CheckSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	res := CheckResult{
-		Identifier:  "mdb_series_year",
-		Description: "Series Start Year matches MDB",
-		Passed:      true,
+		Identifier: "mdb_series_year",
+		Passed:     true,
 	}
 	if meta.Year > 0 && result.Year > 0 && meta.Season < 1900 {
 		res.Expected = fmt.Sprintf("%d", result.Year)
@@ -146,9 +141,8 @@ func CheckEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 		epResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
 
 		existenceCheck := CheckResult{
-			Identifier:  "mdb_episode_existence",
-			Description: "Episode exists on TVDB/TMDB",
-			Passed:      true,
+			Identifier: "mdb_episode_existence",
+			Passed:     true,
 		}
 
 		if epResult.Name == "" {
@@ -173,9 +167,8 @@ func CheckEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 
 func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []CheckResult {
 	res := CheckResult{
-		Identifier:  "mdb_episode_title",
-		Description: "Episode Title matches MDB",
-		Passed:      true,
+		Identifier: "mdb_episode_title",
+		Passed:     true,
 	}
 	if meta.EpisodeTitle != "" {
 		res.Expected = epResult.Name
@@ -193,9 +186,8 @@ func CheckEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 
 func CheckTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	res := CheckResult{
-		Identifier:  "mdb_title",
-		Description: "Title matches MDB",
-		Passed:      true,
+		Identifier: "mdb_title",
+		Passed:     true,
 	}
 	if meta.Title != "" {
 		res.Expected = result.Title
@@ -213,9 +205,8 @@ func CheckTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 
 func CheckSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []CheckResult {
 	res := CheckResult{
-		Identifier:  "mdb_episode_date",
-		Description: "Episode Airdate matches MDB",
-		Passed:      true,
+		Identifier: "mdb_episode_date",
+		Passed:     true,
 	}
 	if meta.Season == 0 && meta.Date != "" {
 		res.Expected = epResult.Airdate

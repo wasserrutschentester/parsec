@@ -1,15 +1,13 @@
 package types
 
 type CheckResult struct {
-	Identifier  string             `json:"identifier"`
-	Description string             `json:"description"`
-	Passed      bool               `json:"passed"`
-	Severity    string             `json:"severity,omitempty"` // "info", "warning", "error"
-	Warning     string             `json:"warning,omitempty"`
-	Tracks      []TrackCheckResult `json:"tracks,omitempty"`
-	// For non-track checks (e.g. MDB diffs)
-	Expected string `json:"expected,omitempty"`
-	Actual   string `json:"actual,omitempty"`
+	Identifier string             `json:"identifier"`
+	Passed     bool               `json:"passed"`
+	Severity   string             `json:"severity,omitempty"` // "info", "warning", "error"
+	Warning    string             `json:"warning,omitempty"`
+	Tracks     []TrackCheckResult `json:"tracks,omitempty"`
+	Expected   string             `json:"expected,omitempty"`
+	Actual     string             `json:"actual,omitempty"`
 }
 
 type TrackCheckResult struct {

@@ -64,9 +64,9 @@ func (a *trackResultAggregator) Add(res *CheckResult) {
 	target, ok := a.aggregated[res.Identifier]
 	if !ok {
 		target = &CheckResult{
-			Identifier:  res.Identifier,
-			Description: res.Description,
-			Passed:      true,
+			Identifier: res.Identifier,
+			Warning:    res.Warning,
+			Passed:     true,
 		}
 		a.aggregated[res.Identifier] = target
 	}
@@ -77,11 +77,11 @@ func (a *trackResultAggregator) Add(res *CheckResult) {
 
 func newFailedTrackResult(id, desc, severity string, track *matroska.EbmlTrack, warning string) *CheckResult {
 	return &CheckResult{
-		Identifier:  id,
-		Description: desc,
-		Passed:      false,
-		Severity:    severity,
-		Tracks:      []TrackCheckResult{ebmlTrackToResult(track, false, warning)},
+		Identifier: id,
+		Warning:    desc,
+		Passed:     false,
+		Severity:   severity,
+		Tracks:     []TrackCheckResult{ebmlTrackToResult(track, false, warning)},
 	}
 }
 
@@ -89,11 +89,10 @@ func RunMatroskaChecks(filePath string) []CheckResult {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {
 		return []CheckResult{{
-			Identifier:  "matroska_ebml_error",
-			Description: "Ability to read EBML metadata",
-			Passed:      false,
-			Severity:    "error",
-			Warning:     fmt.Sprintf("Error getting EBML metadata: %v", err),
+			Identifier: "matroska_ebml_error",
+			Passed:     false,
+			Severity:   "error",
+			Warning:    fmt.Sprintf("%v", err),
 		}}
 	}
 
@@ -374,7 +373,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 			warning = fmt.Sprintf("[-] redundant standard track for %s", props.Language)
 		}
 
-		return newFailedTrackResult("matroska_default_flags", "Proper Default flag assignment", "warning", &track, warning)
+		return newFailedTrackResult("matroska_default_flags", "Default flags aren't correctly Assigned", "warning", &track, warning)
 	}
 
 	return nil
@@ -384,7 +383,7 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 	codec := track.Codec
 	if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
 		warning := fmt.Sprintf("text-based but codec is %s", codec)
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitles should be in SRT format", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track isn't in SRT format", "warning", &track, warning)
 	}
 	return nil
 }
@@ -413,7 +412,7 @@ func validateTrackBasics(track matroska.EbmlTrack) *CheckResult {
 	lang := track.Properties.Language
 	tag := language.Make(lang)
 	if config.IsCheckEnabled("matroska_language_tag") && tag == language.Und {
-		return newFailedTrackResult("matroska_language_tag", "Track has valid language tag", "warning", &track, "missing or invalid language tag")
+		return newFailedTrackResult("matroska_language_tag", "Track doesn't have valid language tag", "warning", &track, "missing or invalid language tag")
 	}
 	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
 		return newFailedTrackResult("matroska_multi_lang", "Multi-language track must have a Name", "warning", &track, "missing Name for 'mul' language")
@@ -424,7 +423,7 @@ func validateTrackBasics(track matroska.EbmlTrack) *CheckResult {
 func checkOriginalLanguageConsistency(track matroska.EbmlTrack, langHasOriginalFlag map[string]bool) *CheckResult {
 	lang := track.Properties.Language
 	if langHasOriginalFlag[lang] && !track.Properties.OriginalLanguage {
-		return newFailedTrackResult("matroska_original_language", "Consistency of Original language flag", "info", &track, "missing Original flag")
+		return newFailedTrackResult("matroska_original_language", "Some but not all Original language tracks have the flag set", "info", &track, "missing Original flag")
 	}
 	return nil
 }
@@ -436,7 +435,7 @@ func checkDuplicateTracks(track matroska.EbmlTrack, seenTracks map[string]bool) 
 		props.HearingImpaired, props.VisualImpaired,
 		props.Commentary, props.OriginalLanguage, props.Name)
 	if seenTracks[trackKey] {
-		return newFailedTrackResult("matroska_duplicate_tracks", "No duplicate tracks", "warning", &track, "duplicate track")
+		return newFailedTrackResult("matroska_duplicate_tracks", "Duplicate tracks (same Language, Flags and Name) were found", "warning", &track, "duplicate track")
 	}
 	seenTracks[trackKey] = true
 	return nil
@@ -446,7 +445,7 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 	props := track.Properties
 	nameUpper := strings.ToUpper(props.Name)
 
-	if res := checkFlagKeywordResult(track, props.HearingImpaired, "HearingImpaired", "SDH", strings.Contains(nameUpper, "SDH")); res != nil {
+	if res := checkFlagKeywordResult(track, props.HearingImpaired, "Hearing Impaired", "SDH", strings.Contains(nameUpper, "SDH")); res != nil {
 		return res
 	}
 
@@ -459,13 +458,13 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || adRegex.MatchString(nameUpper)
-	if res := checkFlagKeywordResult(track, props.VisualImpaired, "VisualImpaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); res != nil {
+	if res := checkFlagKeywordResult(track, props.VisualImpaired, "Visual Impaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); res != nil {
 		return res
 	}
 
 	if props.Language == "mul" {
 		if countLanguagesInString(props.Name) < 2 {
-			return newFailedTrackResult("matroska_name_keywords", "Multi-language track contains language names in Name field", "warning", &track, "'mul' but Name has <2 language names")
+			return newFailedTrackResult("matroska_name_keywords", "Track Name and Flags don't match", "warning", &track, "'mul' but Name has <2 language names")
 		}
 	}
 
@@ -473,13 +472,15 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 }
 
 func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywordStr string, hasKeyword bool) *CheckResult {
+	identifier := "matroska_name_keywords"
+	checkWarning := "Track Name and Flags don't match"
 	if flag && !hasKeyword {
 		warning := fmt.Sprintf("is %s but Name missing '%s'", flagName, keywordStr)
-		return newFailedTrackResult("matroska_name_keywords", "Track Name contains relevant flag keywords", "info", &track, warning)
+		return newFailedTrackResult(identifier, checkWarning, "info", &track, warning)
 	}
 	if !flag && hasKeyword {
 		warning := fmt.Sprintf("'%s' in Name but no %s flag", keywordStr, flagName)
-		return newFailedTrackResult("matroska_name_keywords", "Track Name contains relevant flag keywords", "info", &track, warning)
+		return newFailedTrackResult(identifier, checkWarning, "info", &track, warning)
 	}
 	return nil
 }

@@ -26,9 +26,8 @@ func CheckYear(meta *metadata.Metadata) []CheckResult {
 
 	if config.IsCheckEnabled("generic_year_missing") {
 		res := CheckResult{
-			Identifier:  "generic_year_missing",
-			Description: "Year is missing for this Movie",
-			Passed:      true,
+			Identifier: "generic_year_missing",
+			Passed:     true,
 		}
 		if meta.Year == 0 && !meta.IsTV {
 			res.Passed = false
@@ -40,9 +39,8 @@ func CheckYear(meta *metadata.Metadata) []CheckResult {
 
 	if config.IsCheckEnabled("generic_year_redundant") {
 		res := CheckResult{
-			Identifier:  "generic_year_redundant",
-			Description: "Redundant Year: The Season already indicates the year",
-			Passed:      true,
+			Identifier: "generic_year_redundant",
+			Passed:     true,
 		}
 		if meta.Year > 0 && meta.Season > 1900 {
 			res.Passed = false
@@ -57,9 +55,8 @@ func CheckYear(meta *metadata.Metadata) []CheckResult {
 
 func CheckStreaming(meta *metadata.Metadata) []CheckResult {
 	res := CheckResult{
-		Identifier:  "generic_streaming",
-		Description: "Streaming Service Tag for WEB source",
-		Passed:      true,
+		Identifier: "generic_streaming",
+		Passed:     true,
 	}
 
 	isWeb := strings.Contains(meta.Source, "WEB")
@@ -80,20 +77,25 @@ func CheckStreaming(meta *metadata.Metadata) []CheckResult {
 
 func CheckTvSpecial(meta *metadata.Metadata) []CheckResult {
 	res := CheckResult{
-		Identifier:  "generic_tv_special",
-		Description: "Date and Episode Title for TV Specials",
-		Passed:      true,
+		Identifier: "generic_tv_special",
+		Passed:     true,
 	}
 
 	if meta.IsTV && meta.Season == 0 {
-		if meta.Date == "" {
+		if meta.Date == "" || meta.EpisodeTitle == "" {
 			res.Passed = false
 			res.Severity = "warning"
-			res.Warning = "Date is missing for TV Special"
-		} else if meta.EpisodeTitle == "" {
-			res.Passed = false
-			res.Severity = "warning"
-			res.Warning = "Episode Title is missing for TV Special"
+
+			warning := ""
+			if meta.Date == "" {
+				warning = "Date"
+			} else if meta.EpisodeTitle != "" {
+				warning = "Episode Title"
+			} else {
+				warning = "Date and Episode Title"
+			}
+
+			res.Warning = fmt.Sprintf("%s is missing for TV Special", warning)
 		}
 	}
 	return []CheckResult{res}
