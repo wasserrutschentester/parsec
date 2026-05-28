@@ -59,41 +59,30 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	ui.Println(ui.Header.Render("Parsec File Check"))
 	ui.Println(ui.LabelValue("Current Name:", filenameNoExt))
 
-	var allIssues []issueGroup
-
-	// 1. Filename Basic Checks
 	match := filename.Parse(filenameNoExt)
-	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
-
-	// 2. MediaInfo & EBML Checks
 	mi, err := mediainfo.Get(filePath)
 	if err != nil {
 		return checkReport{}, fmt.Errorf("error getting mediainfo: %v", err)
 	}
+
 	mediaMeta := mi.GetMetadata()
-	updated := match.Override(mediaMeta)
+	match.Override(mediaMeta)
 
 	ebml, ebmlErr := matroska.GetEbmlMetadata(filePath)
 	if ebmlErr == nil {
 		if ebml.HasVisualImpairedAudio() && !match.HasAudioDesc {
 			match.HasAudioDesc = true
-			updated = true
 		}
 	}
 
-	if updated {
-		ui.Println(ui.Info.Render("\nUpdates applied from MediaInfo/EBML:"))
-		ui.Println(ui.LabelValue("Generated Name:", match.String()))
-	}
+	setupMdbIDs(cmd, mi, match)
 
+	// Run Checks
+	var allIssues []issueGroup
+	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
 	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
 	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath))
-
-	// 3. Generic Checks
 	appendFailed(&allIssues, "GENERIC", checks.RunGenericChecks(match))
-
-	// 4. MDB Checks
-	setupMdbIDs(cmd, mi, match)
 	appendFailed(&allIssues, "MDB", checks.RunMdbChecks(mi, match))
 
 	return checkReport{
@@ -192,6 +181,8 @@ func printUnexpectedDiff(res checks.CheckResult) {
 		// Use Official/Parsed for all MDB related checks
 		if strings.HasPrefix(res.Identifier, "mdb_") {
 			labelE, labelA = "Official", "Parsed"
+		} else if res.Identifier == "filename_generation_mismatch" {
+			labelE, labelA = "Original", "Generated"
 		}
 
 		diff := ui.FormatStringDiffAligned(labelE, res.Expected, labelA, res.Actual)

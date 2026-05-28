@@ -7,11 +7,23 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
-	"codeberg.org/n0ne/parsec/internal/ui"
 )
 
 func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
+
+	if config.IsCheckEnabled("filename_generation_mismatch") {
+		if name != meta.String() {
+			results = append(results, CheckResult{
+				Identifier: "filename_generation_mismatch",
+				Warning:    "Generated name does not match the original",
+				Passed:     false,
+				Severity:   "warning",
+				Expected:   name,
+				Actual:     meta.String(),
+			})
+		}
+	}
 
 	if config.IsCheckEnabled("filename_characters") {
 		if msg := CheckAllowedCharacters(name); msg != "" {
@@ -35,23 +47,6 @@ func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 				Warning:     msg,
 			})
 		}
-	}
-
-	if meta.String() != name {
-		results = append(results, CheckResult{
-			Identifier:  "filename_parse_mismatch",
-			Description: "Parsed tags should match the original filename",
-			Passed:      false,
-			Severity:    "warning",
-			Warning:     ui.Warning.Render("Some tags weren't parsed correctly from the filename"),
-		})
-		results = append(results, CheckResult{
-			Identifier:  "filename_parsed_output",
-			Description: "The expected filename based on parsed tags",
-			Passed:      false,
-			Severity:    "info",
-			Warning:     ui.LabelValue("Parsed Name:", meta.String()),
-		})
 	}
 
 	return results
