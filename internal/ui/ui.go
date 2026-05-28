@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
+	"codeberg.org/n0ne/parsec/internal/types"
 )
 
 var (
@@ -142,16 +143,7 @@ func TrackTable(headers []string, rows [][]string) string {
 }
 
 // FormatTrackTable renders a table of track issues.
-func FormatTrackTable(tracks []struct {
-	ID        string
-	Type      string
-	TypeOrder int
-	Codec     string
-	Name      string
-	Language  string
-	Flags     []string
-	Warning   string
-}) string {
+func FormatTrackTable(tracks []types.TrackCheckResult) string {
 	if len(tracks) == 0 {
 		return ""
 	}

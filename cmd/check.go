@@ -154,50 +154,22 @@ func printJSONReport(report checkReport) {
 func printInteractiveReport(report checkReport) {
 	if report.Passed {
 		ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All checks passed! The file fits the specification."))
-	} else {
-		totalIssues := countIssues(report.Issues)
-		ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
-		for _, group := range report.Issues {
-			ui.Println(ui.ReportSection(group.Category))
-			for _, res := range group.Results {
-				if len(res.Tracks) > 0 {
-					ui.Println("  " + ui.IconWarn + " " + res.Description)
-					var uiTracks []struct {
-						ID        string
-						Type      string
-						TypeOrder int
-						Codec     string
-						Name      string
-						Language  string
-						Flags     []string
-						Warning   string
-					}
-					for _, t := range res.Tracks {
-						uiTracks = append(uiTracks, struct {
-							ID        string
-							Type      string
-							TypeOrder int
-							Codec     string
-							Name      string
-							Language  string
-							Flags     []string
-							Warning   string
-						}{
-							ID:        t.ID,
-							Type:      t.Type,
-							TypeOrder: t.TypeOrder,
-							Codec:     t.Codec,
-							Name:      t.Name,
-							Language:  t.Language,
-							Flags:     t.Flags,
-							Warning:   t.Warning,
-						})
-					}
-					ui.Println(ui.FormatTrackTable(uiTracks))
-				} else {
-					ui.Println("  " + ui.IconWarn + " " + res.Warning)
-				}
+		ui.Println()
+		return
+	}
+
+	totalIssues := countIssues(report.Issues)
+	ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
+	for _, group := range report.Issues {
+		ui.Println(ui.ReportSection(group.Category))
+		for _, res := range group.Results {
+			if len(res.Tracks) == 0 {
+				ui.Println("  " + ui.IconWarn + " " + res.Warning)
+				continue
 			}
+
+			ui.Println("  " + ui.IconWarn + " " + res.Description)
+			ui.Println(ui.FormatTrackTable(res.Tracks))
 		}
 	}
 	ui.Println()
