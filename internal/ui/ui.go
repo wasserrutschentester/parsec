@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -237,6 +238,41 @@ func Println(a ...any) {
 	if !IsSilent {
 		lipgloss.Println(a...)
 	}
+}
+
+// ConfirmContinue prompts the user to continue.
+// Empty input returns true, "no" returns false.
+func ConfirmContinue(msg string) bool {
+	if IsSilent || !IsTerminal() {
+		return true
+	}
+
+	fmt.Printf("%s [Y/n]: ", msg)
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		input := strings.ToLower(strings.TrimSpace(scanner.Text()))
+		if input == "no" || input == "n" {
+			return false
+		}
+	}
+	return true
+}
+
+// IsTerminal returns true if both stdin and stdout are terminals.
+func IsTerminal() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	if (fi.Mode() & os.ModeCharDevice) == 0 {
+		return false
+	}
+
+	fi, err = os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 func max(a, b int) int {

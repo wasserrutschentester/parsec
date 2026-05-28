@@ -161,7 +161,14 @@ func printInteractiveReport(report checkReport) {
 	totalIssues := countIssues(report.Issues)
 	ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
 	for _, group := range report.Issues {
-		ui.Println(ui.ReportSection(group.Category))
+		count := len(group.Results)
+		if !unattendedFlag {
+			if !ui.ConfirmContinue(fmt.Sprintf("\nDisplay %d %s issues?", count, group.Category)) {
+				return
+			}
+		}
+
+		ui.Println(ui.ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
 		for _, res := range group.Results {
 			if len(res.Tracks) == 0 {
 				ui.Println("  " + ui.IconWarn + " " + res.Warning)
@@ -189,6 +196,7 @@ func init() {
 	checkCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
+	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
