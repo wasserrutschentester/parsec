@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"codeberg.org/n0ne/parsec/internal/checks"
-	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
 	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
@@ -62,23 +61,8 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	var allIssues []issueGroup
 
 	// 1. Filename Basic Checks
-	var fnIssues []checks.CheckResult
-	if config.IsCheckEnabled("filename_characters") {
-		if msg := filename.CheckAllowedCharacters(filenameNoExt); msg != "" {
-			fnIssues = append(fnIssues, checks.CheckResult{Warning: msg, Passed: false})
-		}
-	}
-	if config.IsCheckEnabled("filename_sequences") {
-		if msg := filename.CheckCharacterSequences(filenameNoExt); msg != "" {
-			fnIssues = append(fnIssues, checks.CheckResult{Warning: msg, Passed: false})
-		}
-	}
-
 	match := filename.Parse(filenameNoExt)
-	if match.String() != filenameNoExt {
-		fnIssues = append(fnIssues, checks.CheckResult{Warning: ui.Warning.Render("Some tags weren't parsed correctly from the filename"), Passed: false})
-		fnIssues = append(fnIssues, checks.CheckResult{Warning: ui.LabelValue("Parsed Name:", match.String()), Passed: false})
-	}
+	fnIssues := checks.RunFilenameChecks(filenameNoExt, match)
 	if len(fnIssues) > 0 {
 		allIssues = append(allIssues, issueGroup{"FILENAME", fnIssues})
 	}
@@ -118,21 +102,18 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 		}
 	}
 
-	// Collect EBML issues
-	var ebmlIssues []checks.CheckResult
-	if ebmlErr == nil {
-		ebmlIssues = append(ebmlIssues, matroska.VerifyTrackOrder(ebml.Tracks)...)
-		if config.IsCheckEnabled("matroska_default_flags") {
-			ebmlIssues = append(ebmlIssues, matroska.CheckDefaultFlags(ebml.Tracks)...)
+	// Collect Matroska issues
+	ebmlResults := checks.RunMatroskaChecks(filePath)
+	if len(ebmlResults) > 0 {
+		var failed []checks.CheckResult
+		for _, r := range ebmlResults {
+			if !r.Passed {
+				failed = append(failed, r)
+			}
 		}
-		if config.IsCheckEnabled("matroska_subtitle_format") {
-			ebmlIssues = append(ebmlIssues, matroska.CheckSubtitleFormat(ebml.Tracks)...)
+		if len(failed) > 0 {
+			allIssues = append(allIssues, issueGroup{"MATROSKA", failed})
 		}
-	} else {
-		ebmlIssues = append(ebmlIssues, checks.CheckResult{Warning: fmt.Sprintf("Error getting EBML metadata: %v", ebmlErr), Passed: false})
-	}
-	if len(ebmlIssues) > 0 {
-		allIssues = append(allIssues, issueGroup{"MATROSKA", ebmlIssues})
 	}
 
 	// 3. Generic Checks

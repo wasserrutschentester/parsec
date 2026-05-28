@@ -263,24 +263,6 @@ func matchEdition(filename string, meta *metadata.Metadata) {
 	}
 }
 
-func CheckAllowedCharacters(filename string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9\-\.]`)
-	match := re.FindStringSubmatch(filename)
-	if match != nil {
-		return fmt.Sprintf("disallowed character found: %s", strings.Join(match, " "))
-	}
-	return ""
-}
-
-func CheckCharacterSequences(filename string) string {
-	re := regexp.MustCompile(`\.-*\.+`)
-	match := re.FindStringSubmatch(filename)
-	if match != nil {
-		return fmt.Sprintf("disallowed character sequence found: %s", strings.Join(match, " "))
-	}
-	return ""
-}
-
 func DeobfuscateTitle(title string) string {
 	result := title
 	result = strings.ReplaceAll(result, ".", " ")

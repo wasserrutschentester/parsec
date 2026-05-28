@@ -41,7 +41,7 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 			res.Passed = false
 			res.Severity = "warning"
 			res.Warning = "WEB source should not be Interlaced."
-			res.Tracks = []TrackCheckResult{trackToResult(videoTrack, false, res.Warning)}
+			res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, res.Warning)}
 		}
 		results = append(results, res)
 	}
@@ -74,7 +74,7 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 	return results
 }
 
-func trackToResult(t *mediainfo.Track, passed bool, warning string) TrackCheckResult {
+func miTrackToResult(t *mediainfo.Track, passed bool, warning string) TrackCheckResult {
 	order := 0
 	if t.TypeOrder != nil {
 		order = *t.TypeOrder
@@ -118,7 +118,7 @@ func CheckRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 			res.Passed = false
 			res.Severity = "warning"
 			for _, t := range tracks {
-				res.Tracks = append(res.Tracks, trackToResult(t, false, "Redundant track"))
+				res.Tracks = append(res.Tracks, miTrackToResult(t, false, "Redundant track"))
 			}
 		}
 	}
@@ -167,7 +167,7 @@ func CheckResolution(videoTrack *mediainfo.Track) []CheckResult {
 	if len(trackWarnings) > 0 {
 		res.Passed = false
 		res.Severity = "warning"
-		res.Tracks = []TrackCheckResult{trackToResult(videoTrack, false, strings.Join(trackWarnings, "; "))}
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, strings.Join(trackWarnings, "; "))}
 	}
 
 	return []CheckResult{res}
@@ -194,7 +194,7 @@ func CheckFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 	if !isStandard {
 		res.Passed = false
 		res.Severity = "warning"
-		res.Tracks = []TrackCheckResult{trackToResult(videoTrack, false, fmt.Sprintf("non-standard framerate: %.3f fps", fps))}
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, fmt.Sprintf("non-standard framerate: %.3f fps", fps))}
 	}
 	return []CheckResult{res}
 }
@@ -222,7 +222,7 @@ func CheckBitRate(videoTrack *mediainfo.Track) []CheckResult {
 	if threshold > 0 && bitrate < threshold {
 		res.Passed = false
 		res.Severity = "warning"
-		res.Tracks = []TrackCheckResult{trackToResult(videoTrack, false, fmt.Sprintf("low bitrate for %dp: %d bps", height, bitrate))}
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, fmt.Sprintf("low bitrate for %dp: %d bps", height, bitrate))}
 	}
 	return []CheckResult{res}
 }
@@ -266,7 +266,7 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 			if trackWarning != "" {
 				res.Passed = false
 				res.Severity = "warning"
-				res.Tracks = append(res.Tracks, trackToResult(track, false, trackWarning))
+				res.Tracks = append(res.Tracks, miTrackToResult(track, false, trackWarning))
 			}
 		}
 	}
