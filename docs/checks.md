@@ -20,7 +20,8 @@ Most of these can be disabled in the [Config](config.md) if you don't want to us
 
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
-| Video Track Presence | `checkVideoPresence` | `mediainfo_no_video` | No | Verifies that the file contains at least one video track. |
+| Video Track Presence | `mediainfo.Get` | N/A | No | Verifies that the file contains at least one video track. Mandatory for processing. |
+| Audio Track Presence | `mediainfo.Get` | N/A | No | Verifies that the file contains at least one audio track. Mandatory for processing. |
 | Interlaced WEB | `checkInterlacedWeb` | `mediainfo_interlaced_web` | Yes | Issues a warning if a WEB source is detected as interlaced. |
 | Frame Rate | `checkFrameRate` | `mediainfo_framerate` | Yes | Validates against standard framerates (23.976, 24, 25, 29.97, 30, 50, 59.94, 60). |
 | Low Bitrate | `checkBitRate` | `mediainfo_bitrate` | Yes | Checks for minimum bitrate thresholds based on resolution (e.g., 2 Mbps for 1080p). |

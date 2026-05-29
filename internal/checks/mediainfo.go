@@ -20,7 +20,6 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		}
 	}
 
-	results = append(results, checkVideoPresence(videoTrack)...)
 	if videoTrack == nil {
 		return results
 	}
@@ -56,18 +55,6 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 	}
 
 	return results
-}
-
-func checkVideoPresence(videoTrack *mediainfo.Track) []CheckResult {
-	if videoTrack == nil {
-		return []CheckResult{{
-			Identifier: "mediainfo_no_video",
-			Passed:     false,
-			Severity:   "error",
-			Warning:    "No video track found",
-		}}
-	}
-	return nil
 }
 
 func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata, mi *mediainfo.MediaInfo) []CheckResult {
