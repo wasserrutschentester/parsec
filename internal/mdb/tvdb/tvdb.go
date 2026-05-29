@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"codeberg.org/n0ne/parsec/internal/cache"
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -157,6 +159,12 @@ type tvdbExternalIDsResponse struct {
 }
 
 func login() (string, error) {
+	// Try to get cached token
+	tokenKey := "tvdb_token"
+	if cached, err := cache.Get(tokenKey); err == nil {
+		return string(cached), nil
+	}
+
 	apiKey := config.GetTvdbApiKey()
 	if apiKey == "" {
 		return "", fmt.Errorf("TVDB API key not configured")
@@ -183,6 +191,9 @@ func login() (string, error) {
 		return "", err
 	}
 
+	// Cache token (cache.Get already handles 24h expiration, but token might be shorter or we want to be safe)
+	_ = cache.Set(tokenKey, []byte(data.Data.Token))
+
 	return data.Data.Token, nil
 }
 
@@ -193,6 +204,12 @@ func getISO3(lang string) string {
 }
 
 func get(endpoint string, target interface{}) error {
+	prefLang := config.GetPreferredLanguage()
+	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
+	if cached, err := cache.Get(cacheKey); err == nil {
+		return json.Unmarshal(cached, target)
+	}
+
 	token, err := login()
 	if err != nil {
 		return err
@@ -205,7 +222,6 @@ func get(endpoint string, target interface{}) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	prefLang := config.GetPreferredLanguage()
 	if prefLang != "" {
 		req.Header.Set("Accept-Language", getISO3(prefLang))
 	}
@@ -220,7 +236,14 @@ func get(endpoint string, target interface{}) error {
 		return fmt.Errorf("TVDB API returned status %d", resp.StatusCode)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(target)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	_ = cache.Set(cacheKey, body)
+
+	return json.Unmarshal(body, target)
 }
 
 func toTvdbType(mediaType string) string {

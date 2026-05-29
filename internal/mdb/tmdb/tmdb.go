@@ -3,11 +3,13 @@ package tmdb
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"codeberg.org/n0ne/parsec/internal/cache"
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	"golang.org/x/text/language"
@@ -86,11 +88,18 @@ func get(endpoint string, query url.Values, target interface{}) error {
 	if query == nil {
 		query = url.Values{}
 	}
-	query.Set("api_key", apiKey)
+
 	if query.Get("language") == "" {
 		query.Set("language", config.GetPreferredLanguage())
 	}
 
+	// Create cache key without api_key
+	cacheKey := fmt.Sprintf("tmdb:%s?%s", endpoint, query.Encode())
+	if cached, err := cache.Get(cacheKey); err == nil {
+		return json.Unmarshal(cached, target)
+	}
+
+	query.Set("api_key", apiKey)
 	u := fmt.Sprintf("%s/%s?%s", BaseURL, endpoint, query.Encode())
 	resp, err := HTTPClient.Get(u)
 	if err != nil {
@@ -102,7 +111,14 @@ func get(endpoint string, query url.Values, target interface{}) error {
 		return fmt.Errorf("TMDB API returned status %d", resp.StatusCode)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(target)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	_ = cache.Set(cacheKey, body)
+
+	return json.Unmarshal(body, target)
 }
 
 func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {

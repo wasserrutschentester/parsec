@@ -16,6 +16,7 @@ func InitDefaults() {
 }
 
 var activePreset string
+var NoCache bool
 
 func SetPreset(name string) {
 	activePreset = name

@@ -35,6 +35,7 @@ var (
 	debugFlag      bool
 	quietFlag      bool
 	presetFlag     string
+	noCacheFlag    bool
 )
 
 func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {

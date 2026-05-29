@@ -19,6 +19,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		ui.IsDebug = debugFlag
 		ui.PrintDebug("Debug output enabled")
+		config.NoCache = noCacheFlag
 	},
 }
 
@@ -35,6 +36,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/parsec/config.toml)")
 	rootCmd.PersistentFlags().StringVar(&presetFlag, "preset", "", "configuration preset to use")
 	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false, "enable debug output")
+	rootCmd.PersistentFlags().BoolVar(&noCacheFlag, "no-cache", false, "bypass the API cache and fetch fresh data")
 
 	config.InitDefaults()
 
