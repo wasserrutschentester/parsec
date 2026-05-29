@@ -81,7 +81,6 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	// Run Checks
 	var allIssues []issueGroup
 	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
-	appendFailed(&allIssues, "GENERIC", checks.RunGenericChecks(match))
 	appendFailed(&allIssues, "MDB", checks.RunMdbChecks(mi, match))
 	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
 	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath))

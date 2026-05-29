@@ -51,6 +51,69 @@ func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 		}
 	}
 
+	if config.IsCheckEnabled("filename_year_missing") {
+		if meta.Year == 0 && !meta.IsTV {
+			results = append(results, CheckResult{
+				Identifier: "filename_year_missing",
+				Passed:     false,
+				Severity:   "warning",
+				Warning:    "year is missing for this Movie",
+			})
+		}
+	}
+
+	if config.IsCheckEnabled("filename_year_redundant") {
+		if meta.Year > 0 && meta.Season > 1900 {
+			results = append(results, CheckResult{
+				Identifier: "filename_year_redundant",
+				Passed:     false,
+				Severity:   "info",
+				Warning:    fmt.Sprintf("redundant Year: The Season (%d) already indicates the year", meta.Season),
+			})
+		}
+	}
+
+	if config.IsCheckEnabled("filename_streaming") {
+		isWeb := strings.Contains(meta.Source, "WEB")
+		if isWeb && meta.Service == "" {
+			results = append(results, CheckResult{
+				Identifier: "filename_streaming",
+				Passed:     false,
+				Severity:   "warning",
+				Warning:    "Streaming Service Tag is missing for WEB source",
+			})
+		} else if !isWeb && meta.Service != "" {
+			results = append(results, CheckResult{
+				Identifier: "filename_streaming",
+				Passed:     false,
+				Severity:   "info",
+				Warning:    "Streaming Service Tag is not supported for non-WEB source",
+			})
+		}
+	}
+
+	if config.IsCheckEnabled("filename_tv_special") {
+		if meta.IsTV && meta.Season == 0 {
+			if meta.Date == "" || meta.EpisodeTitle == "" {
+				warning := ""
+				if meta.Date == "" {
+					warning = "Date"
+				} else if meta.EpisodeTitle != "" {
+					warning = "Episode Title"
+				} else {
+					warning = "Date and Episode Title"
+				}
+
+				results = append(results, CheckResult{
+					Identifier: "filename_tv_special",
+					Passed:     false,
+					Severity:   "warning",
+					Warning:    fmt.Sprintf("%s is missing for TV Special", warning),
+				})
+			}
+		}
+	}
+
 	return results
 }
 
