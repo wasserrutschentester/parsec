@@ -278,7 +278,7 @@ func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.Epi
 	}
 
 	for _, ep := range data.Data.Episodes {
-		if ep.Number == episode {
+		if ep.Number == episode && ep.SeasonNumber == season {
 			return mdb.EpisodeResult{
 				Name:     ep.Name,
 				Airdate:  ep.Aired,
