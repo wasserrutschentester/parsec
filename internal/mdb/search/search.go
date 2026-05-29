@@ -76,7 +76,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 		return &results[0], nil
 	}
 	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 1 || choice > len(results) {
+	if err != nil || choice < 0 || choice >= len(results) {
 		return nil, fmt.Errorf("invalid selection")
 	}
 	return &results[choice], nil
