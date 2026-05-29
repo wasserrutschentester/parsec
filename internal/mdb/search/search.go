@@ -167,36 +167,7 @@ func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResul
 
 		if matched {
 			// Merge TVDB data into TMDB result
-			if r.TvdbID == 0 {
-				r.TvdbID = tvdbRes.TvdbID
-			}
-			if r.TvdbType == "" {
-				r.TvdbType = tvdbRes.TvdbType
-			}
-			if r.TvdbSlug == "" {
-				r.TvdbSlug = tvdbRes.TvdbSlug
-			}
-			if r.ImdbID == "" {
-				r.ImdbID = tvdbRes.ImdbID
-			}
-			if tvdbRes.OriginalLanguage != "" {
-				r.OriginalLanguage = tvdbRes.OriginalLanguage
-			}
-			if r.Overview == "" {
-				r.Overview = tvdbRes.Overview
-			}
-			if r.Year == 0 {
-				r.Year = tvdbRes.Year
-			}
-
-			// Merge Titles
-			if tvdbRes.Title != "" && tvdbRes.Title != r.Title {
-				r.AltTitle = addUniqueAltTitle(r.AltTitle, tvdbRes.Title, r.Title, r.OriginalTitle)
-			}
-			for _, alt := range tvdbRes.AltTitle {
-				r.AltTitle = addUniqueAltTitle(r.AltTitle, alt, r.Title, r.OriginalTitle)
-			}
-
+			mergeMatchedResult(&r, &tvdbRes)
 			matchedTVDB[tvdbRes.TvdbID] = true
 		}
 		merged = append(merged, r)
@@ -210,6 +181,40 @@ func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResul
 	}
 
 	return merged
+}
+
+func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
+	// Merge TVDB data into TMDB result
+	if res.TvdbID == 0 {
+		res.TvdbID = tvdbRes.TvdbID
+	}
+	if res.TvdbType == "" {
+		res.TvdbType = tvdbRes.TvdbType
+	}
+	if res.TvdbSlug == "" {
+		res.TvdbSlug = tvdbRes.TvdbSlug
+	}
+	if res.ImdbID == "" {
+		res.ImdbID = tvdbRes.ImdbID
+	}
+	if tvdbRes.OriginalLanguage != "" {
+		res.OriginalLanguage = tvdbRes.OriginalLanguage
+	}
+	if res.Overview == "" {
+		res.Overview = tvdbRes.Overview
+	}
+	if res.Year == 0 {
+		res.Year = tvdbRes.Year
+	}
+
+	// Merge Titles
+	if tvdbRes.Title != "" && tvdbRes.Title != res.Title {
+		res.AltTitle = addUniqueAltTitle(res.AltTitle, tvdbRes.Title, res.Title, res.OriginalTitle)
+	}
+	for _, alt := range tvdbRes.AltTitle {
+		res.AltTitle = addUniqueAltTitle(res.AltTitle, alt, res.Title, res.OriginalTitle)
+	}
+
 }
 
 func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...string) []string {
@@ -278,14 +283,32 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 }
 
 func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
-	var result *mdb.SearchResult
-	var err error
-
 	mediaType := "movie"
 	if isTV {
 		mediaType = "tv"
 	}
 
+	result, err := initialSearchByID(imdbID, tmdbID, tvdbID, isTV, mediaType)
+	if err != nil {
+		return nil, err
+	}
+
+	// If we have a TMDB result but it's missing TVDB info, try to fetch it if we have a TVDB ID
+	if result.TvdbID > 0 && (result.TvdbSlug == "" || len(result.AltTitle) == 0) {
+		addMissingTvdbInfo(result, mediaType)
+	}
+
+	// Vice versa, if we have a TVDB result but it's missing TMDB info
+	if result.TmdbID > 0 && (result.TmdbType == "" || len(result.AltTitle) == 0) {
+		addMissingTmdbInfo(result, mediaType)
+	}
+
+	return result, nil
+}
+
+func initialSearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool, mediaType string) (*mdb.SearchResult, error) {
+	var result *mdb.SearchResult
+	var err error
 	if imdbID != "" {
 		result, err = tmdb.GetByImdbID(imdbID, isTV)
 		if err != nil {
@@ -302,56 +325,49 @@ func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchRe
 			return nil, err
 		}
 	}
-
-	if result == nil {
-		return nil, nil
-	}
-
-	// If we have a TMDB result but it's missing TVDB info, try to fetch it if we have a TVDB ID
-	if result.TvdbID > 0 && (result.TvdbSlug == "" || len(result.AltTitle) == 0) {
-		tvdbResult, err := tvdb.GetByID(result.TvdbID, mediaType)
-		if err == nil && tvdbResult != nil {
-			if result.TvdbSlug == "" {
-				result.TvdbSlug = tvdbResult.TvdbSlug
-			}
-			if result.TvdbType == "" {
-				result.TvdbType = tvdbResult.TvdbType
-			}
-			if result.OriginalLanguage == "" {
-				result.OriginalLanguage = tvdbResult.OriginalLanguage
-			}
-			if tvdbResult.Title != "" && tvdbResult.Title != result.Title {
-				result.AltTitle = addUniqueAltTitle(result.AltTitle, tvdbResult.Title, result.Title, result.OriginalTitle)
-			}
-			for _, alt := range tvdbResult.AltTitle {
-				result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
-			}
-		}
-	}
-
-	// Vice versa, if we have a TVDB result but it's missing TMDB info
-	if result.TmdbID > 0 && (result.TmdbType == "" || len(result.AltTitle) == 0) {
-		tmdbResult, err := tmdb.GetByID(result.TmdbID, mediaType)
-		if err == nil && tmdbResult != nil {
-			if result.TmdbType == "" {
-				result.TmdbType = tmdbResult.TmdbType
-			}
-			if result.ImdbID == "" {
-				result.ImdbID = tmdbResult.ImdbID
-			}
-			if result.OriginalLanguage == "" {
-				result.OriginalLanguage = tmdbResult.OriginalLanguage
-			}
-			if tmdbResult.Title != "" && tmdbResult.Title != result.Title {
-				result.AltTitle = addUniqueAltTitle(result.AltTitle, tmdbResult.Title, result.Title, result.OriginalTitle)
-			}
-			for _, alt := range tmdbResult.AltTitle {
-				result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
-			}
-		}
-	}
-
 	return result, nil
+}
+
+func addMissingTvdbInfo(result *mdb.SearchResult, mediaType string) {
+	tvdbResult, err := tvdb.GetByID(result.TvdbID, mediaType)
+	if err == nil && tvdbResult != nil {
+		if result.TvdbSlug == "" {
+			result.TvdbSlug = tvdbResult.TvdbSlug
+		}
+		if result.TvdbType == "" {
+			result.TvdbType = tvdbResult.TvdbType
+		}
+		if result.OriginalLanguage == "" {
+			result.OriginalLanguage = tvdbResult.OriginalLanguage
+		}
+		if tvdbResult.Title != "" && tvdbResult.Title != result.Title {
+			result.AltTitle = addUniqueAltTitle(result.AltTitle, tvdbResult.Title, result.Title, result.OriginalTitle)
+		}
+		for _, alt := range tvdbResult.AltTitle {
+			result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
+		}
+	}
+}
+
+func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
+	tmdbResult, err := tmdb.GetByID(result.TmdbID, mediaType)
+	if err == nil && tmdbResult != nil {
+		if result.TmdbType == "" {
+			result.TmdbType = tmdbResult.TmdbType
+		}
+		if result.ImdbID == "" {
+			result.ImdbID = tmdbResult.ImdbID
+		}
+		if result.OriginalLanguage == "" {
+			result.OriginalLanguage = tmdbResult.OriginalLanguage
+		}
+		if tmdbResult.Title != "" && tmdbResult.Title != result.Title {
+			result.AltTitle = addUniqueAltTitle(result.AltTitle, tmdbResult.Title, result.Title, result.OriginalTitle)
+		}
+		for _, alt := range tmdbResult.AltTitle {
+			result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
+		}
+	}
 }
 
 func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
