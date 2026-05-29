@@ -35,7 +35,14 @@ var jsonOutputFlag bool
 var checkCmd = &cobra.Command{
 	Use:   "check [file]",
 	Short: "Check if the file fits the specification",
-	Args:  cobra.MinimumNArgs(1),
+	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: VERIFY INTEGRITY :."),
+		`Performs comprehensive integrity and consistency checks on a media file.
+It validates:
+  1. Filename parsing and naming conventions
+  2. Technical metadata (via MediaInfo) for quality and standards
+  3. Matroska container integrity and track tagging
+  4. Consistency with online databases (TMDB/TVDB) for titles and episodes`),
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ui.IsSilent = jsonOutputFlag
 		filePath := args[0]

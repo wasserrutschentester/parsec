@@ -17,7 +17,9 @@ Presets are defined under the `[preset.NAME]` section. Almost all configuration 
 ```toml
 # Global defaults
 source = "WEB-DL"
-group = "4Rocket"
+group = "YourGroup"
+video_codec_avc = "H.264"
+video_codec_hevc = "H.265"
 
 [api_keys]
 tmdb = "your_tmdb_api_key"
@@ -28,9 +30,11 @@ title = "Loki"
 is_tv = true
 tmdb_id = 84958
 
-[preset.bluray]
+[preset.remux]
 source = "BluRay"
-template = "{title}.{year}.{resolution}.{source}.{audio_codec}{audio_channels}.{video_codec}-{group}"
+video_codec_avc = "AVC"
+video_codec_hevc = "HEVC"
+template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_codec}{audio_channels}-{group}"
 ```
 
 ### Using Presets
@@ -64,14 +68,12 @@ These options can be set globally OR within a `[preset.NAME]` block.
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `template` | string | The naming template used for renaming and checking. |
+| `template` | string | The naming template used for renaming and checking. See [Naming Templates](templates.md) for available tokens and formatting rules. |
 | `preferred_language` | string | Preferred language code (default: `de`). |
-| `subbed_tagging` | boolean | Enable the preferred language subbed override (default: `true`). |
-| `audio_description` | boolean | Force the audio description tag (default: `false`). |
-| `source` | string | Default source (e.g., `WEB-DL`, `BluRay`). |
-| `group` | string | Default release group name. |
+| `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
+| `allow_special_matches` | boolean | Allow matching episodes against Specials (Season 0) (default: `false`). |
 
 #### Metadata Overrides
 
@@ -85,7 +87,11 @@ These are especially useful within presets to provide missing information or ove
 | `episode` | integer | Episode number. |
 | `date` | string | Episode air date (YYYY-MM-DD). |
 | `episode_title`| string | Title of the episode. |
+| `cut_edition` | string | Override for the release edition (e.g., `Director's Cut`). |
+| `hdr` | string | Override for HDR information (e.g., `HDR10`, `DV`). |
 | `service` | string | Streaming service (e.g., `DSNP`, `NF`). |
+| `source` | string | Default source (e.g., `WEB-DL`, `BluRay`). |
+| `group` | string | Default release group name. |
 | `repack` | boolean | Set to `true` if the release is a repack. |
 | `is_tv` | boolean | Force identification as a TV show. |
 | `is_movie` | boolean | Force identification as a movie. |
@@ -103,6 +109,7 @@ Provide specific IDs to ensure the correct metadata is fetched from databases.
 #### Check Control
 
 You can enable or disable specific quality checks on a per-preset basis.
+See [Validation Checks](checks.md) for more details about what checks are availible
 
 | Key | Type | Description |
 |-----|------|-------------|
@@ -113,6 +120,7 @@ You can enable or disable specific quality checks on a per-preset basis.
 
 -   `filename_characters`: Check for disallowed characters in filename.
 -   `filename_sequences`: Check for disallowed character sequences (e.g., `..`).
+-   `filename_generation_mismatch`: Warn if the current filename does not match the generated name from template.
 -   `mediainfo_interlaced_web`: Warn if WEB source is interlaced.
 -   `mediainfo_framerate`: Check for non-standard framerates.
 -   `mediainfo_bitrate`: Check for low bitrates.
@@ -130,10 +138,10 @@ You can enable or disable specific quality checks on a per-preset basis.
 -   `matroska_duplicate_tracks`: Identify identical tracks.
 -   `matroska_default_flags`: Verify first-standard-track default rules.
 -   `matroska_subtitle_format`: Verify SRT-only requirement.
--   `generic_year_missing`: Ensure movies have a year tag.
--   `generic_year_redundant`: Check for redundant year tags in series.
--   `generic_streaming`: Check for service tags on WEB sources.
--   `generic_tv_special`: Check required tags for TV Specials.
+-   `filename_year_missing`: Ensure movies have a year tag.
+-   `filename_year_redundant`: Check for redundant year tags in series.
+-   `filename_streaming`: Check for service tags on WEB sources.
+-   `filename_tv_special`: Check required tags for TV Specials.
 -   `mdb_title`: Verify title against TMDB/TVDB.
 -   `mdb_movie_year`: Verify movie release year.
 -   `mdb_series_year`: Verify series start year.
@@ -169,4 +177,3 @@ disabled_checks = ["mediainfo_bitrate"]
 # Enable everything (including bitrate) for this preset
 disabled_checks = []
 ```
-

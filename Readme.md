@@ -29,34 +29,48 @@ Verify if a media file adheres to the specification.
 **Features:**
 - **Filename Validation**: Checks for allowed characters and correct sequence formatting.
 - **Metadata Comparison**: Cross-references filename tags with technical data from MediaInfo.
-- **Stream Analysis**: Performs quality checks on video and audio tracks.
+- **Stream Analysis**: Performs quality checks on video and audio tracks (framerate, bitrate, resolution).
 - **Matroska Verification**: Validates track order, default flags, and subtitle formats.
 - **MDB Integration**: Supports validation against TMDB, TVDB, and IMDb data.
+- **Interactive Output**: View the failing checks per group. not all at once
+- **JSON Output**: Export check results as JSON using the `--json` flag.
 
-A list of available checks can be found in the [checks documentation](docs/checks.md).
+For more information see the [Checks Documentation](docs/checks.md)
 
 ### `identify`
 Search and identify movies or TV shows in media databases.
 
 **Features:**
 - **Flexible Search**: Fuzzy search by title/year or direct lookup via IMDb, TMDB, or TVDB IDs.
-- **Automatic Parsing**: tries to extract Title, Year, Season, Episode from filenames to seed searches.
-- **Matroska Tags**: Can write Title, IMDb ID, TMDB ID, and TVDB ID as Matroska tags in the file.
+- **Automatic Parsing**: Tries to extract Title, Year, Season, Episode from filenames to seed searches.
+- **Matroska Tags**: Can write Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.
+- **Episode Search**: Can find Episode details via Episode + Season Number, Episode Title or Aired Date.
 
 ### `rename`
 Rename files based on metadata and naming conventions.
 
 **Features:**
+- **Batch Processing**: Rename multiple files at once.
 - **Filename Parsing**: Extracts various metadata from filenames, including Title, Year, Season, Episode and existing P2P tags.
 - **Technical Metadata**: Enriches metadata with technical data from MediaInfo.
 - **External Metadata**: Fetches additional metadata from external sources such as TMDB, TVDB, and IMDb.
-- **Filename Generation**: Generates new filenames based on the metadata and naming conventions.
+- **Interactive**: Preview changes and then confirm the modification. Or apply unattended
+- **Metadata Overrides**: Manually specify details like `--hdr`, `--cut-edition`, or `--repack`.
+
+### `mediainfo`
+Display a detailed, formatted dump of all technical metadata parsed by `parsec`.
 
 ## Configuration
 
 `parsec` uses a TOML-based configuration system. By default, it looks for a configuration file at `$HOME/.config/parsec/config.toml` or `config.toml` in the current directory.
 
 For a full list of available options and detailed information on the preset system, see the [Configuration Documentation](docs/config.md).
+
+### Global Flags
+- `--config`: Path to a specific configuration file.
+- `--preset`: Activate a configuration preset.
+- `--debug`: Enable verbose debug output.
+- `--no-cache`: Bypass the API cache and fetch fresh data from MDBs.
 
 ### Presets
 

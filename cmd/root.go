@@ -16,6 +16,7 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "parsec",
 	Short: "parsec allows you to parse, check and create releases",
+	Long:  ui.Banner(".: FIRST STEPS? :."),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		ui.IsDebug = debugFlag
 		ui.PrintDebug("Debug output enabled")

@@ -37,7 +37,6 @@ type Metadata struct {
 	AudioMeta     string
 	VideoCodec    string
 	Group         string
-	CRC           string
 	ImdbID        string
 	TmdbID        int
 	TvdbID        int
@@ -294,7 +293,6 @@ func (meta *Metadata) Render(template string) string {
 		"{audio_meta}":     meta.AudioMeta,
 		"{video_codec}":    meta.VideoCodec,
 		"{group}":          meta.Group,
-		"{crc}":            meta.CRC,
 	}
 
 	if meta.BitDepth > 8 {

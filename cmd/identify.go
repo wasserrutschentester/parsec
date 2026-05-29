@@ -23,10 +23,11 @@ var (
 var identifyCmd = &cobra.Command{
 	Use:   "identify [filename]",
 	Short: "search for a movie or TV show",
-	Long: `find a movie or TV show on the media databases
-	check if it exists and return its details.
-	If a filename is provided, it will be parsed for metadata.
-	Flags can be used to override or provide missing information.`,
+	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: CLASSIFY ENTITIES :."),
+		`find a movie or TV show on the media databases
+check if it exists and return its details.
+If a filename is provided, it will be parsed for metadata.
+Flags can be used to override or provide missing information.`),
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var meta *metadata.Metadata

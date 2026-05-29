@@ -236,29 +236,12 @@ func TestMetadata_String(t *testing.T) {
 			},
 			want: "Movie.[Netflix]-GRP",
 		},
-		{
-			name: "Anime Naming",
-			meta: Metadata{
-				Title:      "Sousou no Frieren",
-				Episode:    1,
-				Resolution: "1080p",
-				Group:      "SubsPlease",
-				CRC:        "F02B9CEE",
-			},
-			want: "[SubsPlease] Sousou no Frieren - 01 (1080p) [F02B9CEE]",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config.InitDefaults()
 			if tt.name == "Literal Brackets" || tt.name == "Empty Literal Brackets Removal" {
 				template := "{title}.[{service}]-{group}"
-				if got := tt.meta.Render(template); got != tt.want {
-					t.Errorf("Metadata.Render() = %v, want %v", got, tt.want)
-				}
-			} else if tt.name == "Anime Naming" {
-				// Anime template: [Group] Title - Episode (Resolution) [CRC]
-				template := "[{group}] {title} - {episode_02} ({resolution}) [{crc}]"
 				if got := tt.meta.Render(template); got != tt.want {
 					t.Errorf("Metadata.Render() = %v, want %v", got, tt.want)
 				}

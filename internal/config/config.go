@@ -10,7 +10,7 @@ func InitDefaults() {
 	viper.SetDefault("subbed_tagging", true)
 	viper.SetDefault("audio_description", false)
 	viper.SetDefault("source", "WEB-DL")
-	viper.SetDefault("group", "4Rocket")
+	viper.SetDefault("group", "PAARSEX")
 	viper.SetDefault("video_codec_avc", "H.264")
 	viper.SetDefault("video_codec_hevc", "H.265")
 }

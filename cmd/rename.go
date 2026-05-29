@@ -23,13 +23,14 @@ import (
 var renameCmd = &cobra.Command{
 	Use:   "rename [file...]",
 	Short: "rename files according to metadata and MDB data",
-	Long: `Rename files based on information from:
-1. MediaInfo (resolution, codecs, etc.)
-2. Movie Database (TMDB/TVDB for correct title and episode name)
-3. Information already in the filename
-4. CLI flags (to override or provide missing info)
+	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: ALIGNING THE SHIP :."),
+		`Rename files based on information from:
+  1. MediaInfo (resolution, codecs, etc.)
+  2. Media Databases (TMDB/TVDB for correct title and episode name)
+  3. Information already in the filename
+  4. CLI flags (to override or provide missing info)
 
-The resulting filename follows the project's naming convention.`,
+The resulting filename is generated according to the configured template.`),
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		for _, filePath := range args {
