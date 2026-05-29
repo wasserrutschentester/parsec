@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"codeberg.org/n0ne/parsec/internal/ui"
 )
 
@@ -51,13 +52,13 @@ func PrintResult(result SearchResult) {
 
 	var props [][2]string
 	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
-		props = append(props, [2]string{"Alias", result.OriginalTitle})
+		props = append(props, [2]string{"Origin Title", result.OriginalTitle})
 	}
 	if result.OriginalLanguage != "" {
 		props = append(props, [2]string{"Origin Lang", result.OriginalLanguage})
 	}
 	if len(result.AltTitle) > 0 {
-		props = append(props, [2]string{"Sensor Readings", strings.Join(result.AltTitle, ", ")})
+		props = append(props, [2]string{"Alt Titles", strings.Join(result.AltTitle, ", ")})
 	}
 
 	body := ui.PropertyLayout(props)
@@ -68,20 +69,60 @@ func PrintResult(result SearchResult) {
 		body += ui.LabelStyle.Render("OVERVIEW") + "\n" + result.Overview
 	}
 
-	var links []string
+	type footerLine struct {
+		label string
+		id    string
+		url   string
+	}
+	var items []footerLine
+
 	if result.TmdbID > 0 && result.TmdbType != "" {
-		links = append(links, ui.Link.Render(fmt.Sprintf("https://tmdb.org/%s/%d", result.TmdbType, result.TmdbID)))
+		items = append(items, footerLine{
+			label: "TMDB ID",
+			id:    fmt.Sprintf("%s/%d", result.TmdbType, result.TmdbID),
+			url:   fmt.Sprintf("https://tmdb.org/%s/%d", result.TmdbType, result.TmdbID),
+		})
 	}
 	if result.ImdbID != "" {
-		links = append(links, ui.Link.Render(fmt.Sprintf("https://imdb.com/title/%s", result.ImdbID)))
+		items = append(items, footerLine{
+			label: "IMDB ID",
+			id:    result.ImdbID,
+			url:   fmt.Sprintf("https://imdb.com/title/%s", result.ImdbID),
+		})
 	}
 	if result.TvdbSlug != "" && result.TvdbType != "" {
-		links = append(links, ui.Link.Render(fmt.Sprintf("https://thetvdb.com/%s/%s", result.TvdbType, result.TvdbSlug)))
+		items = append(items, footerLine{
+			label: "TVDB ID",
+			id:    fmt.Sprintf("%s/%d", result.TvdbType, result.TvdbID),
+			url:   fmt.Sprintf("https://thetvdb.com/%s/%s", result.TvdbType, result.TvdbSlug),
+		})
 	} else if result.TvdbID > 0 && result.TvdbType != "" {
-		links = append(links, ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=%s&id=%d", result.TvdbType, result.TvdbID)))
+		items = append(items, footerLine{
+			label: "TVDB ID",
+			id:    fmt.Sprintf("%s/%d", result.TvdbType, result.TvdbID),
+			url:   fmt.Sprintf("https://thetvdb.com/?tab=%s&id=%d", result.TvdbType, result.TvdbID),
+		})
 	}
 
-	footer := strings.Join(links, "  ")
+	maxLen := 0
+	for _, item := range items {
+		l := len(item.label) + len(item.id) + 2 // "Label: ID"
+		if l > maxLen {
+			maxLen = l
+		}
+	}
+
+	var lines []string
+	idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	for _, item := range items {
+		labelPart := ui.Muted.Render(item.label + ":")
+		idPart := idStyle.Render(item.id)
+		urlLabel := ui.Muted.Render("URL:")
+		padding := strings.Repeat(" ", maxLen-(len(item.label)+len(item.id)+2)+3)
+		line := fmt.Sprintf("%s %s%s%s %s", labelPart, idPart, padding, urlLabel, ui.Link.Render(item.url))
+		lines = append(lines, line)
+	}
+	footer := strings.Join(lines, "\n")
 
 	ui.Println(ui.Card(title, subtitle, body, footer))
 }
@@ -97,7 +138,12 @@ func PrintEpisodeResult(result EpisodeResult) {
 
 	footer := ""
 	if result.TvdbID > 0 {
-		footer = ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=episode&id=%d", result.TvdbID))
+		idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+		labelPart := ui.Muted.Render("TVDB ID:")
+		idPart := idStyle.Render(fmt.Sprintf("%d", result.TvdbID))
+		urlLabel := ui.Muted.Render("URL:")
+		link := ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=episode&id=%d", result.TvdbID))
+		footer = fmt.Sprintf("%s %s   %s %s", labelPart, idPart, urlLabel, link)
 	}
 
 	ui.Println(ui.Card(title, subtitle, body, footer))
