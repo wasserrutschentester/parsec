@@ -179,11 +179,14 @@ func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResul
 			if r.ImdbID == "" {
 				r.ImdbID = tvdbRes.ImdbID
 			}
-			if r.OriginalLanguage == "" {
+			if tvdbRes.OriginalLanguage != "" {
 				r.OriginalLanguage = tvdbRes.OriginalLanguage
 			}
 			if r.Overview == "" {
 				r.Overview = tvdbRes.Overview
+			}
+			if r.Year == 0 {
+				r.Year = tvdbRes.Year
 			}
 
 			// Merge Titles
