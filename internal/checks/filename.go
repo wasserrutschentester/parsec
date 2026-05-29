@@ -13,14 +13,14 @@ func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 
 	if config.IsCheckEnabled("filename_generation_mismatch") {
-		if name != meta.String() {
+		if name != meta.GetReleaseName() {
 			results = append(results, CheckResult{
 				Identifier: "filename_generation_mismatch",
 				Warning:    "Generated name does not match the original",
 				Passed:     false,
 				Severity:   "warning",
 				Expected:   name,
-				Actual:     meta.String(),
+				Actual:     meta.GetReleaseName(),
 			})
 		}
 	}

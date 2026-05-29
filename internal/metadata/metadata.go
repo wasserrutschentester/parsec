@@ -271,7 +271,7 @@ func (meta *Metadata) SetDefaults() {
 	}
 }
 
-func (meta *Metadata) String() string {
+func (meta *Metadata) GetReleaseName() string {
 	return meta.Render(config.GetTemplate())
 }
 

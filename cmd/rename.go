@@ -94,7 +94,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	meta.SetDefaults()
 
 	// 8. Generate new name
-	newName := meta.String() + ext
+	newName := meta.GetReleaseName() + ext
 	newPath := filepath.Join(filepath.Dir(filePath), newName)
 
 	if filepath.Base(filePath) == newName {

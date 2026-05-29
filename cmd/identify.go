@@ -173,6 +173,10 @@ func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.Epi
 	} else if meta.Season > 0 || meta.Episode > 0 || meta.EpisodeTitle != "" || meta.Date != "" {
 		ui.Println(ui.FormatWarning("Could not identify episode metadata"))
 	}
+
+	ui.PrintDebug(fmt.Sprintf("%+v\n", meta))
+	ui.PrintDebug(fmt.Sprintf("%+v\n", episodeResult))
+
 	return episodeResult
 
 }

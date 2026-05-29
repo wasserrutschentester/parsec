@@ -90,7 +90,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 		File:          filePath,
 		Passed:        len(allIssues) == 0,
 		ReleaseName:   filenameNoExt,
-		GeneratedName: match.String(),
+		GeneratedName: match.GetReleaseName(),
 		Issues:        allIssues,
 	}, nil
 }

@@ -263,8 +263,8 @@ func TestMetadata_String(t *testing.T) {
 					t.Errorf("Metadata.Render() = %v, want %v", got, tt.want)
 				}
 			} else {
-				if got := tt.meta.String(); got != tt.want {
-					t.Errorf("Metadata.String() = %v, want %v", got, tt.want)
+				if got := tt.meta.GetReleaseName(); got != tt.want {
+					t.Errorf("Metadata.GetReleaseName() = %v, want %v", got, tt.want)
 				}
 			}
 		})
