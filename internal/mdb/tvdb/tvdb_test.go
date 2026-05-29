@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/n0ne/parsec/internal/mdb"
+	"codeberg.org/n0ne/parsec/internal/metadata"
 	"github.com/spf13/viper"
 )
 
@@ -32,7 +34,7 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result := IdentifyEpisode(999, "", "2023-01-01", "en", false)
+	result, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, false)
 
 	if result.TvdbID != 456 {
 		t.Errorf("Expected TvdbID 456, got %d", result.TvdbID)
@@ -65,7 +67,7 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result := IdentifyEpisode(999, "Test Episode", "", "en", false)
+	result, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{EpisodeTitle: "Test Episode"}, false)
 
 	if result.TvdbID != 789 {
 		t.Errorf("Expected TvdbID 789, got %d", result.TvdbID)
@@ -96,13 +98,13 @@ func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 	defer func() { BaseURL = originalBaseURL }()
 
 	// Case 1: Specials NOT allowed, should skip special and find regular
-	result1 := IdentifyEpisode(999, "", "2023-01-01", "en", false)
+	result1, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, false)
 	if result1.TvdbID != 200 {
 		t.Errorf("Expected TvdbID 200 (Regular), got %d", result1.TvdbID)
 	}
 
 	// Case 2: Specials allowed
-	result2 := IdentifyEpisode(999, "", "2023-01-01", "en", true)
+	result2, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, true)
 	if result2.TvdbID != 100 {
 		t.Errorf("Expected TvdbID 100 (Special), got %d", result2.TvdbID)
 	}

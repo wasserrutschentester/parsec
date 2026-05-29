@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -157,11 +158,9 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 
 func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
 	var episodeResult mdb.EpisodeResult
-	if meta.Season > 0 && meta.Episode > 0 {
-		episodeResult = mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
-	} else if meta.EpisodeTitle != "" || meta.Date != "" {
+	if meta.Season > 0 && meta.Episode > 0 || meta.EpisodeTitle != "" || meta.Date != "" {
 		ui.Println(ui.Info.Render("Identifying episode..."))
-		episodeResult = mdbSearch.IdentifyEpisode(*result, meta)
+		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
 	}
 
 	if episodeResult.Name != "" {

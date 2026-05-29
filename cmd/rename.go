@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
@@ -148,10 +149,8 @@ func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainf
 
 func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
 	var episodeResult mdb.EpisodeResult
-	if meta.Season > 0 && meta.Episode > 0 {
-		episodeResult = mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
-	} else if meta.EpisodeTitle != "" || meta.Date != "" {
-		episodeResult = mdbSearch.IdentifyEpisode(*result, meta)
+	if (meta.Season > 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
+		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
 	}
 	if episodeResult.Name != "" {
 		meta.EpisodeTitle = episodeResult.Name

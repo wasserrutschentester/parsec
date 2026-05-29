@@ -138,7 +138,7 @@ func CheckSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 func CheckEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
 	if meta.Season > 0 || meta.Episode > 0 {
-		epResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
+		epResult := mdbSearch.FindEpisode(*result, meta, false)
 
 		existenceCheck := CheckResult{
 			Identifier: "mdb_episode_existence",

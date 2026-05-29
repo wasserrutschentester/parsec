@@ -13,6 +13,7 @@ import (
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
 	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/n0ne/parsec/internal/ui"
 	"golang.org/x/text/language"
 )
 
@@ -388,93 +389,122 @@ func GetEpisodes(seriesID int, page int, lang string) (tvdbEpisodeResponse, erro
 	return data, nil
 }
 
-func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string, allowSpecials bool) mdb.EpisodeResult {
-	preferred := config.GetPreferredLanguage()
-	langs := []string{preferred, origLang, "en"}
-	uniqueLangs := []string{}
-	seen := make(map[string]bool)
-	for _, l := range langs {
-		if l != "" && !seen[l] {
-			uniqueLangs = append(uniqueLangs, l)
-			seen[l] = true
+func GetAllEpisodes(seriesID int, lang string) ([]TvdbEpisode, error) {
+	var episodes []TvdbEpisode
+	for page := 0; page < 20; page++ {
+		data, err := GetEpisodes(seriesID, page, lang)
+		if err != nil {
+			break
+		}
+		episodes = append(episodes, data.Data.Episodes...)
+		if data.Links.Next == "" {
+			break
 		}
 	}
+	return episodes, nil
+}
 
-	normalizedQueryTitle := metadata.Normalize(episodeTitle)
+func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
+	preferred := config.GetPreferredLanguage()
+	langs := []string{preferred, result.OriginalLanguage, "en"}
+	uniqueLangs := metadata.RemoveDuplicates(langs)
+
+	normalizedQueryTitle := metadata.Normalize(meta.EpisodeTitle)
 
 	for _, lang := range uniqueLangs {
-		var episodes []TvdbEpisode
-
-		// Fetch up to 20 pages of episodes
-		for page := 0; page < 20; page++ {
-			data, err := GetEpisodes(tvdbID, page, lang)
-			if err != nil {
-				break
-			}
-			episodes = append(episodes, data.Data.Episodes...)
-			if data.Links.Next == "" {
-				break
-			}
+		episodes, err := GetAllEpisodes(result.TvdbID, lang)
+		if err != nil {
+			continue
 		}
+		ui.PrintDebug(fmt.Sprintf("found %d episodes combined", len(episodes)))
 
-		// 1. Air Date Match
-		if date != "" {
-			for _, ep := range episodes {
-				if ep.Aired == date {
-					// Ignore specials by default when matching via date (unless explicitly allowed)
-					if ep.SeasonNumber == 0 && !allowSpecials {
-						continue
-					}
-
-					res := ep.toEpisodeResult()
-					fillEpisodeTranslation(&res, ep.ID, lang)
-					return res
-				}
-			}
+		var ep *TvdbEpisode
+		// 1. Season/Episode Number Match
+		if (meta.Season > 0 && meta.Episode > 0) || allowSpecials {
+			ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episode)
 		}
-
-		// 2. Normalized Title Match
-		if normalizedQueryTitle != "" {
-			for _, ep := range episodes {
-				if metadata.Normalize(ep.Name) == normalizedQueryTitle {
-					res := ep.toEpisodeResult()
-					fillEpisodeTranslation(&res, ep.ID, lang)
-					return res
-				}
-			}
+		// 2. Air Date Match
+		if meta.Date != "" && ep == nil {
+			ep = matchByAirDate(episodes, meta.Date, allowSpecials)
 		}
+		// 3. Normalized Title Match
+		if normalizedQueryTitle != "" && ep == nil {
+			ep = matchByTitle(episodes, normalizedQueryTitle, allowSpecials)
+		}
+		// 4. Fuzzy Match (Fallback)
+		if normalizedQueryTitle != "" && ep == nil {
+			ep = matchByTitleFuzzy(episodes, normalizedQueryTitle)
+		}
+		if ep != nil {
+			res := ep.toEpisodeResult()
+			ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
+			fillEpisodeTranslation(&res, ep.ID, lang)
+			return res, nil
+		}
+	}
+	return mdb.EpisodeResult{}, fmt.Errorf("no episode found")
+}
 
-		// 3. Fuzzy Match (Fallback)
-		if normalizedQueryTitle != "" {
-			var bestMatch TvdbEpisode
-			maxSim := 0.0
-			found := false
-			for _, ep := range episodes {
-				sim := mdb.CalculateSimilarity(normalizedQueryTitle, metadata.Normalize(ep.Name))
-				if sim > maxSim {
-					maxSim = sim
-					bestMatch = ep
-					found = true
-				}
-			}
+func matchBySeasonEpisode(episodes []TvdbEpisode, season, episode int) *TvdbEpisode {
+	for _, ep := range episodes {
+		if ep.SeasonNumber == season && ep.Number == episode {
+			return &ep
+		}
+	}
+	return nil
+}
 
-			if found && maxSim > 0.8 {
-				res := bestMatch.toEpisodeResult()
-				fillEpisodeTranslation(&res, bestMatch.ID, lang)
-				return res
+func matchByAirDate(episodes []TvdbEpisode, date string, allowSpecials bool) *TvdbEpisode {
+	for _, ep := range episodes {
+		if ep.Aired == date {
+			if ep.SeasonNumber == 0 && !allowSpecials {
+				continue
 			}
+			return &ep
+		}
+	}
+	return nil
+}
+
+func matchByTitle(episodes []TvdbEpisode, normTitle string, allowSpecials bool) *TvdbEpisode {
+	for _, ep := range episodes {
+		if metadata.Normalize(ep.Name) == normTitle {
+			if ep.SeasonNumber == 0 && !allowSpecials {
+				continue
+			}
+			return &ep
+		}
+	}
+	return nil
+}
+
+func matchByTitleFuzzy(episodes []TvdbEpisode, normTitle string) *TvdbEpisode {
+	var bestMatch TvdbEpisode
+	maxSim := 0.0
+	found := false
+	for _, ep := range episodes {
+		sim := mdb.CalculateSimilarity(normTitle, metadata.Normalize(ep.Name))
+		if sim > maxSim {
+			maxSim = sim
+			bestMatch = ep
+			found = true
 		}
 	}
 
-	return mdb.EpisodeResult{}
+	if found && maxSim > 0.8 {
+		return &bestMatch
+	}
+	return nil
 }
 
 func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 	if lang == "" {
+		ui.PrintDebug("no language specified, skipping translation")
 		return
 	}
 
 	translation, err := GetTranslation(tvdbID, "episodes", lang)
+	ui.PrintDebug(fmt.Sprintf("translation: %+v, err: %v", translation, err))
 	if err == nil {
 		if translation.Data.Name != "" {
 			res.Name = translation.Data.Name
@@ -483,28 +513,6 @@ func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 			res.Overview = translation.Data.Overview
 		}
 	}
-}
-
-func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.EpisodeResult, error) {
-	var data tvdbEpisodeResponse
-	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
-	if lang != "" {
-		endpoint = fmt.Sprintf("%s/%s", endpoint, lang)
-	}
-
-	if err := get(fmt.Sprintf("%s?season=%d", endpoint, season), &data); err != nil {
-		return mdb.EpisodeResult{}, err
-	}
-
-	for _, ep := range data.Data.Episodes {
-		if ep.Number == episode && ep.SeasonNumber == season {
-			res := ep.toEpisodeResult()
-			fillEpisodeTranslation(&res, ep.ID, lang)
-			return res, nil
-		}
-	}
-
-	return mdb.EpisodeResult{}, fmt.Errorf("episode not found")
 }
 
 func isLanguageMatch(lang string, targets ...string) bool {

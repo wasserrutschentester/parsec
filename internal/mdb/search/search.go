@@ -354,46 +354,26 @@ func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchRe
 	return result, nil
 }
 
-func FindEpisode(result mdb.SearchResult, season, episode int) mdb.EpisodeResult {
-	preferred := config.GetPreferredLanguage()
-	langs := []string{preferred, result.OriginalLanguage, "en"}
-
-	// Remove duplicates and empty strings
-	uniqueLangs := []string{}
-	seen := make(map[string]bool)
-	for _, l := range langs {
-		if l != "" && !seen[l] {
-			uniqueLangs = append(uniqueLangs, l)
-			seen[l] = true
-		}
-	}
+func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
 
 	if result.TvdbID > 0 {
-		for _, lang := range uniqueLangs {
-			data, err := tvdb.GetEpisodeMetadata(result.TvdbID, season, episode, lang)
-			if err == nil && data.Name != "" {
-				return data
-			}
+		data, err := tvdb.IdentifyEpisode(result, meta, allowSpecials)
+		if err == nil && data.Name != "" {
+			return data
 		}
 	}
 
 	// Fallback to TMDB if TVDB id is missing or fails
+	preferred := config.GetPreferredLanguage()
+	langs := []string{preferred, result.OriginalLanguage, "en"}
+	uniqueLangs := metadata.RemoveDuplicates(langs)
 	if result.TmdbID > 0 {
 		for _, lang := range uniqueLangs {
-			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, season, episode, lang)
+			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, meta.Season, meta.Episode, lang)
 			if err == nil && data.Name != "" {
 				return data
 			}
 		}
 	}
 	return mdb.EpisodeResult{}
-}
-
-func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
-	if result.TvdbID == 0 {
-		return mdb.EpisodeResult{}
-	}
-
-	allowSpecials := (meta.Season == 0 && meta.Episode != 0) || config.GetAllowSpecials()
-	return tvdb.IdentifyEpisode(result.TvdbID, meta.EpisodeTitle, meta.Date, result.OriginalLanguage, allowSpecials)
 }
