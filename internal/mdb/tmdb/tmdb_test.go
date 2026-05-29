@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"github.com/spf13/viper"
 )
 
@@ -55,5 +56,42 @@ func TestSearch(t *testing.T) {
 
 	if results[0].ImdbID != "tt123" {
 		t.Errorf("Expected ImdbID 'tt123', got %q", results[0].ImdbID)
+	}
+}
+
+func TestGetByIDLocalization(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("api_keys.tmdb", "dummy_key")
+	viper.Set("preferred_language", "de")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lang := r.URL.Query().Get("language")
+		if lang != "de" {
+			t.Errorf("Expected language 'de', got %q", lang)
+		}
+
+		if r.URL.Path == "/tv/123" {
+			w.Write([]byte(`{"id": 123, "name": "German Title", "overview": "German Overview"}`))
+		} else if r.URL.Path == "/tv/123/external_ids" {
+			w.Write([]byte(`{"tvdb_id": 459258}`))
+		} else if r.URL.Path == "/tv/123/alternative_titles" {
+			w.Write([]byte(`{"results": []}`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	result, err := GetByID(123, "tv")
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+
+	if result.Title != "German Title" {
+		t.Errorf("Expected title 'German Title', got %q", result.Title)
 	}
 }

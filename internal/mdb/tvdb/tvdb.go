@@ -26,13 +26,18 @@ type loginResponse struct {
 }
 
 type tvdbMedia struct {
-	TvdbID   string      `json:"tvdb_id"` // Reliable in Search results (numeric string)
-	ID       interface{} `json:"id"`      // Integer in GetByID, String in Search (e.g. "series-123")
-	Slug     string      `json:"slug"`
-	Name     string      `json:"name"`
-	Year     string      `json:"year"`
-	Type     string      `json:"type"`
-	Overview string      `json:"overview"`
+	TvdbID             string      `json:"tvdb_id"` // Reliable in Search results (numeric string)
+	ID                 interface{} `json:"id"`      // Integer in GetByID, String in Search (e.g. "series-123")
+	Slug               string      `json:"slug"`
+	Name               string      `json:"name"`
+	NameTranslated     string      `json:"name_translated"`
+	Year               string      `json:"year"`
+	Type               string      `json:"type"`
+	Overview           string      `json:"overview"`
+	OverviewTranslated []string    `json:"overview_translated"`
+	Language           string      `json:"language"`         // language of this record
+	PrimaryLanguage    string      `json:"primary_language"` // search results
+	OriginalLanguage   string      `json:"originalLanguage"` // direct lookups
 }
 
 func parseTvdbID(m *tvdbMedia) int {
@@ -68,14 +73,30 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		resYear, _ = strconv.Atoi(m.Year[:4])
 	}
 
+	origLang := m.OriginalLanguage
+	if origLang == "" {
+		origLang = m.PrimaryLanguage
+	}
+
+	title := m.Name
+	if m.NameTranslated != "" {
+		title = m.NameTranslated
+	}
+
+	overview := m.Overview
+	if len(m.OverviewTranslated) > 0 {
+		overview = m.OverviewTranslated[0]
+	}
+
 	return mdb.SearchResult{
-		TvdbID:   tvdbID,
-		TvdbSlug: m.Slug,
-		TvdbType: m.Type,
-		Title:    m.Name,
-		Year:     resYear,
-		IsTV:     m.Type == "series",
-		Overview: m.Overview,
+		TvdbID:           tvdbID,
+		TvdbSlug:         m.Slug,
+		TvdbType:         m.Type,
+		Title:            title,
+		Year:             resYear,
+		IsTV:             m.Type == "series",
+		Overview:         overview,
+		OriginalLanguage: origLang,
 	}
 }
 
@@ -146,6 +167,12 @@ func login() (string, error) {
 	return data.Data.Token, nil
 }
 
+func getISO3(lang string) string {
+	tag := language.Make(lang)
+	base, _ := tag.Base()
+	return base.ISO3()
+}
+
 func get(endpoint string, target interface{}) error {
 	token, err := login()
 	if err != nil {
@@ -158,6 +185,11 @@ func get(endpoint string, target interface{}) error {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+
+	prefLang := config.GetPreferredLanguage()
+	if prefLang != "" {
+		req.Header.Set("Accept-Language", getISO3(prefLang))
+	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
@@ -222,9 +254,44 @@ func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	}
 	result.IsTV = endpoint == "series"
 
+	// Fetch explicit translation if preferred language is set
+	prefLang := config.GetPreferredLanguage()
+	if prefLang != "" {
+		translation, err := GetTranslation(tvdbID, mediaType, prefLang)
+		if err == nil {
+			if translation.Data.Name != "" {
+				result.Title = translation.Data.Name
+			}
+			if translation.Data.Overview != "" {
+				result.Overview = translation.Data.Overview
+			}
+		}
+	}
+
 	applyExternalIDs(&result, tvdbID, endpoint)
 
 	return &result, nil
+}
+
+type tvdbTranslationResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Name     string `json:"name"`
+		Overview string `json:"overview"`
+		Language string `json:"language"`
+	} `json:"data"`
+}
+
+func GetTranslation(tvdbID int, mediaType string, lang string) (tvdbTranslationResponse, error) {
+	tvdbType := toTvdbType(mediaType)
+	iso3 := getISO3(lang)
+	var data tvdbTranslationResponse
+	endpoint := fmt.Sprintf("%s/%d/translations/%s", tvdbType, tvdbID, iso3)
+
+	if err := get(endpoint, &data); err != nil {
+		return tvdbTranslationResponse{}, err
+	}
+	return data, nil
 }
 
 func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
@@ -279,14 +346,29 @@ func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.Epi
 
 	for _, ep := range data.Data.Episodes {
 		if ep.Number == episode && ep.SeasonNumber == season {
-			return mdb.EpisodeResult{
+			res := mdb.EpisodeResult{
 				Name:     ep.Name,
 				Airdate:  ep.Aired,
 				Overview: ep.Overview,
 				Season:   ep.SeasonNumber,
 				Episode:  ep.Number,
 				TvdbID:   ep.ID,
-			}, nil
+			}
+
+			// Explicitly fetch translation if language is requested
+			if lang != "" {
+				translation, err := GetTranslation(ep.ID, "episodes", lang)
+				if err == nil {
+					if translation.Data.Name != "" {
+						res.Name = translation.Data.Name
+					}
+					if translation.Data.Overview != "" {
+						res.Overview = translation.Data.Overview
+					}
+				}
+			}
+
+			return res, nil
 		}
 	}
 
