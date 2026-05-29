@@ -388,7 +388,7 @@ func GetEpisodes(seriesID int, page int, lang string) (tvdbEpisodeResponse, erro
 	return data, nil
 }
 
-func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string) mdb.EpisodeResult {
+func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string, allowSpecials bool) mdb.EpisodeResult {
 	preferred := config.GetPreferredLanguage()
 	langs := []string{preferred, origLang, "en"}
 	uniqueLangs := []string{}
@@ -405,8 +405,8 @@ func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string) mdb.Episod
 	for _, lang := range uniqueLangs {
 		var episodes []TvdbEpisode
 
-		// Fetch up to 10 pages of episodes
-		for page := 0; page < 10; page++ {
+		// Fetch up to 20 pages of episodes
+		for page := 0; page < 20; page++ {
 			data, err := GetEpisodes(tvdbID, page, lang)
 			if err != nil {
 				break
@@ -421,7 +421,14 @@ func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string) mdb.Episod
 		if date != "" {
 			for _, ep := range episodes {
 				if ep.Aired == date {
-					return ep.toEpisodeResult()
+					// Ignore specials by default when matching via date (unless explicitly allowed)
+					if ep.SeasonNumber == 0 && !allowSpecials {
+						continue
+					}
+
+					res := ep.toEpisodeResult()
+					fillEpisodeTranslation(&res, ep.ID, lang)
+					return res
 				}
 			}
 		}
@@ -430,7 +437,9 @@ func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string) mdb.Episod
 		if normalizedQueryTitle != "" {
 			for _, ep := range episodes {
 				if metadata.Normalize(ep.Name) == normalizedQueryTitle {
-					return ep.toEpisodeResult()
+					res := ep.toEpisodeResult()
+					fillEpisodeTranslation(&res, ep.ID, lang)
+					return res
 				}
 			}
 		}
@@ -448,13 +457,32 @@ func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string) mdb.Episod
 					found = true
 				}
 			}
+
 			if found && maxSim > 0.8 {
-				return bestMatch.toEpisodeResult()
+				res := bestMatch.toEpisodeResult()
+				fillEpisodeTranslation(&res, bestMatch.ID, lang)
+				return res
 			}
 		}
 	}
 
 	return mdb.EpisodeResult{}
+}
+
+func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
+	if lang == "" {
+		return
+	}
+
+	translation, err := GetTranslation(tvdbID, "episodes", lang)
+	if err == nil {
+		if translation.Data.Name != "" {
+			res.Name = translation.Data.Name
+		}
+		if translation.Data.Overview != "" {
+			res.Overview = translation.Data.Overview
+		}
+	}
 }
 
 func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.EpisodeResult, error) {
@@ -471,20 +499,7 @@ func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.Epi
 	for _, ep := range data.Data.Episodes {
 		if ep.Number == episode && ep.SeasonNumber == season {
 			res := ep.toEpisodeResult()
-
-			// Explicitly fetch translation if language is requested
-			if lang != "" {
-				translation, err := GetTranslation(ep.ID, "episodes", lang)
-				if err == nil {
-					if translation.Data.Name != "" {
-						res.Name = translation.Data.Name
-					}
-					if translation.Data.Overview != "" {
-						res.Overview = translation.Data.Overview
-					}
-				}
-			}
-
+			fillEpisodeTranslation(&res, ep.ID, lang)
 			return res, nil
 		}
 	}

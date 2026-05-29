@@ -13,10 +13,11 @@ import (
 )
 
 type Metadata struct {
-	Title         string
-	Year          int
-	Season        int
-	Episode       int
+	Title   string
+	Year    int
+	Season  int
+	Episode int
+
 	Date          string
 	EpisodeTitle  string
 	Language      string

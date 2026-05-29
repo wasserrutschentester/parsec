@@ -136,6 +136,10 @@ func GetTvdbID() int {
 	return getInt("tvdb_id")
 }
 
+func GetAllowSpecials() bool {
+	return getBool("allow_special_matches")
+}
+
 func GetVideoCodecAVC() string {
 	return getString("video_codec_avc")
 }

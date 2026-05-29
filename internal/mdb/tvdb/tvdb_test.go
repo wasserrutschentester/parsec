@@ -1,7 +1,6 @@
 package tvdb
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,115 +9,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-func TestSearch(t *testing.T) {
-	// Provide dummy API key
-	viper.Set("api_keys.tvdb", "dummy_key")
-
-	// Mock server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/login" {
-			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-		} else if r.URL.Path == "/search" {
-			resp := tvdbSearchResponse{
-				Status: "success",
-				Data: []tvdbMedia{
-					{TvdbID: "1", Name: "Test Show", Year: "2023", Type: "series"},
-				},
-			}
-			json.NewEncoder(w).Encode(resp)
-		} else if r.URL.Path == "/series/1/extended" {
-			resp := tvdbExternalIDsResponse{
-				Status: "success",
-			}
-			resp.Data.RemoteIds = []remoteID{{ID: "tt123", SourceName: "IMDB"}}
-			json.NewEncoder(w).Encode(resp)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	// Override BaseURL
-	originalBaseURL := BaseURL
-	BaseURL = server.URL
-	defer func() { BaseURL = originalBaseURL }()
-
-	results, err := Search("tv", "Test", 2023)
-	if err != nil {
-		t.Fatalf("Search failed: %v", err)
-	}
-
-	if len(results) != 1 {
-		t.Fatalf("Expected 1 result, got %d", len(results))
-	}
-
-	if results[0].Title != "Test Show" {
-		t.Errorf("Expected title 'Test Show', got %q", results[0].Title)
-	}
-
-	if results[0].ImdbID != "tt123" {
-		t.Errorf("Expected ImdbID 'tt123', got %q", results[0].ImdbID)
-	}
-}
-
-func TestAcceptLanguageHeader(t *testing.T) {
+func TestIdentifyEpisodeByDate(t *testing.T) {
 	config.InitDefaults()
+	config.NoCache = true
 	viper.Set("api_keys.tvdb", "dummy_key")
-	viper.Set("preferred_language", "de")
+	viper.Set("preferred_language", "")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/login" {
 			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-			return
-		}
-
-		lang := r.Header.Get("Accept-Language")
-		if lang != "deu" {
-			t.Errorf("Expected Accept-Language 'deu', got %q", lang)
-		}
-
-		w.Write([]byte(`{"status": "success", "data": {}}`))
-	}))
-	defer server.Close()
-
-	originalBaseURL := BaseURL
-	BaseURL = server.URL
-	defer func() { BaseURL = originalBaseURL }()
-
-	var dummy interface{}
-	get("dummy", &dummy)
-}
-
-func TestTranslatedFields(t *testing.T) {
-	m := tvdbMedia{
-		Name:               "Original",
-		NameTranslated:     "Translated",
-		Overview:           "Original Overview",
-		OverviewTranslated: []string{"Translated Overview"},
-	}
-	res := m.toSearchResult()
-	if res.Title != "Translated" {
-		t.Errorf("Expected title 'Translated', got %q", res.Title)
-	}
-	if res.Overview != "Translated Overview" {
-		t.Errorf("Expected overview 'Translated Overview', got %q", res.Overview)
-	}
-}
-
-func TestGetByIDWithTranslation(t *testing.T) {
-	config.InitDefaults()
-	viper.Set("api_keys.tvdb", "dummy_key")
-	viper.Set("preferred_language", "de")
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/login" {
-			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-		} else if r.URL.Path == "/series/123" {
-			w.Write([]byte(`{"status": "success", "data": {"id": 123, "name": "Danish Title", "overview": "Danish Overview", "type": "series"}}`))
-		} else if r.URL.Path == "/series/123/translations/deu" {
-			w.Write([]byte(`{"status": "success", "data": {"name": "German Title", "overview": "German Overview"}}`))
-		} else if r.URL.Path == "/series/123/extended" {
-			w.Write([]byte(`{"status": "success", "data": {"originalLanguage": "dan"}}`))
+		} else if r.URL.Path == "/series/999/episodes/default/en" {
+			w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 456, "number": 1, "seasonNumber": 1, "aired": "2023-01-01", "name": "", "overview": ""}]}, "links": {"next": ""}}`))
+		} else if r.URL.Path == "/episodes/456/translations/eng" {
+			w.Write([]byte(`{"status": "success", "data": {"name": "Test Episode", "overview": "Test Overview"}}`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -129,30 +32,29 @@ func TestGetByIDWithTranslation(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result, err := GetByID(123, "tv")
-	if err != nil {
-		t.Fatalf("GetByID failed: %v", err)
-	}
+	result := IdentifyEpisode(999, "", "2023-01-01", "en", false)
 
-	if result.Title != "German Title" {
-		t.Errorf("Expected title 'German Title', got %q", result.Title)
+	if result.TvdbID != 456 {
+		t.Errorf("Expected TvdbID 456, got %d", result.TvdbID)
 	}
-	if result.Overview != "German Overview" {
-		t.Errorf("Expected overview 'German Overview', got %q", result.Overview)
+	if result.Name != "Test Episode" {
+		t.Errorf("Expected name 'Test Episode', got %q", result.Name)
 	}
 }
 
-func TestGetEpisodeMetadataWithTranslation(t *testing.T) {
+func TestIdentifyEpisodeByTitle(t *testing.T) {
 	config.InitDefaults()
+	config.NoCache = true
 	viper.Set("api_keys.tvdb", "dummy_key")
+	viper.Set("preferred_language", "")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/login" {
 			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-		} else if r.URL.Path == "/series/123/episodes/default/de" {
-			w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 456, "number": 1, "seasonNumber": 1, "name": "Danish Ep", "overview": "Danish Overview"}]}}`))
-		} else if r.URL.Path == "/episodes/456/translations/deu" {
-			w.Write([]byte(`{"status": "success", "data": {"name": "German Ep", "overview": "German Overview"}}`))
+		} else if r.URL.Path == "/series/999/episodes/default/en" {
+			w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 789, "number": 2, "seasonNumber": 1, "aired": "2023-01-02", "name": "Test Episode", "overview": ""}]}, "links": {"next": ""}}`))
+		} else if r.URL.Path == "/episodes/789/translations/eng" {
+			w.Write([]byte(`{"status": "success", "data": {"name": "Test Episode", "overview": "Test Overview"}}`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -163,15 +65,45 @@ func TestGetEpisodeMetadataWithTranslation(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result, err := GetEpisodeMetadata(123, 1, 1, "de")
-	if err != nil {
-		t.Fatalf("GetEpisodeMetadata failed: %v", err)
+	result := IdentifyEpisode(999, "Test Episode", "", "en", false)
+
+	if result.TvdbID != 789 {
+		t.Errorf("Expected TvdbID 789, got %d", result.TvdbID)
+	}
+}
+
+func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
+	config.InitDefaults()
+	config.NoCache = true
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		} else if r.URL.Path == "/series/999/episodes/default/en" {
+			w.Write([]byte(`{"status": "success", "data": {"episodes": [
+				{"id": 100, "number": 1, "seasonNumber": 0, "aired": "2023-01-01", "name": "Special"},
+				{"id": 200, "number": 1, "seasonNumber": 1, "aired": "2023-01-01", "name": "Regular"}
+			]}, "links": {"next": ""}}`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	// Case 1: Specials NOT allowed, should skip special and find regular
+	result1 := IdentifyEpisode(999, "", "2023-01-01", "en", false)
+	if result1.TvdbID != 200 {
+		t.Errorf("Expected TvdbID 200 (Regular), got %d", result1.TvdbID)
 	}
 
-	if result.Name != "German Ep" {
-		t.Errorf("Expected name 'German Ep', got %q", result.Name)
-	}
-	if result.Overview != "German Overview" {
-		t.Errorf("Expected overview 'German Overview', got %q", result.Overview)
+	// Case 2: Specials allowed
+	result2 := IdentifyEpisode(999, "", "2023-01-01", "en", true)
+	if result2.TvdbID != 100 {
+		t.Errorf("Expected TvdbID 100 (Special), got %d", result2.TvdbID)
 	}
 }

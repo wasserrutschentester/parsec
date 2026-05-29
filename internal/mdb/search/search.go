@@ -394,5 +394,6 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata) mdb.Episo
 		return mdb.EpisodeResult{}
 	}
 
-	return tvdb.IdentifyEpisode(result.TvdbID, meta.EpisodeTitle, meta.Date, result.OriginalLanguage)
+	allowSpecials := (meta.Season == 0 && meta.Episode != 0) || config.GetAllowSpecials()
+	return tvdb.IdentifyEpisode(result.TvdbID, meta.EpisodeTitle, meta.Date, result.OriginalLanguage, allowSpecials)
 }
