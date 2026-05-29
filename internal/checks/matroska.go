@@ -89,18 +89,22 @@ func newFailedTrackResult(id, desc, severity string, track *matroska.EbmlTrack, 
 func RunMatroskaChecks(filePath string) []CheckResult {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {
-		return []CheckResult{{
-			Identifier: "matroska_ebml_error",
-			Passed:     false,
-			Severity:   "error",
-			Warning:    fmt.Sprintf("%v", err),
-		}}
+		return checkMatroskaFormat(err)
 	}
 
-	return RunTrackChecks(ebml.Tracks)
+	return runTrackChecks(ebml.Tracks)
 }
 
-func RunTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
+func checkMatroskaFormat(err error) []CheckResult {
+	return []CheckResult{{
+		Identifier: "matroska_ebml_error",
+		Passed:     false,
+		Severity:   "error",
+		Warning:    fmt.Sprintf("%v", err),
+	}}
+}
+
+func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 	var results []CheckResult
 	var lastAudioPriority, lastSubPriority int
 	var lastAudioTrack, lastSubTrack *matroska.EbmlTrack

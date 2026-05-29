@@ -20,39 +20,24 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		}
 	}
 
+	results = append(results, checkVideoPresence(videoTrack)...)
 	if videoTrack == nil {
-		return []CheckResult{{
-			Identifier: "mediainfo_no_video",
-			Passed:     false,
-			Severity:   "error",
-			Warning:    "No video track found",
-		}}
+		return results
 	}
 
 	// 1. Interlaced WEB
 	if config.IsCheckEnabled("mediainfo_interlaced_web") {
-		res := CheckResult{
-			Identifier: "mediainfo_interlaced_web",
-			Passed:     true,
-		}
-		isWeb := strings.Contains(strings.ToUpper(meta.Source), "WEB")
-		if isWeb && strings.Contains(strings.ToUpper(videoTrack.ScanType), "INTERLACED") {
-			res.Passed = false
-			res.Severity = "warning"
-			res.Warning = "WEB source should not be Interlaced"
-			res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, res.Warning)}
-		}
-		results = append(results, res)
+		results = append(results, checkInterlacedWeb(videoTrack, meta, mi)...)
 	}
 
 	// 2. Non-standard Framerate
 	if config.IsCheckEnabled("mediainfo_framerate") {
-		results = append(results, CheckFrameRate(videoTrack)...)
+		results = append(results, checkFrameRate(videoTrack)...)
 	}
 
 	// 3. Low Bitrate
 	if config.IsCheckEnabled("mediainfo_bitrate") {
-		results = append(results, CheckBitRate(videoTrack)...)
+		results = append(results, checkBitRate(videoTrack)...)
 	}
 
 	// 4. Inconsistent Track Durations
@@ -62,15 +47,42 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 
 	// 5. Redundant Audio Tracks
 	if config.IsCheckEnabled("mediainfo_redundant_audio") {
-		results = append(results, CheckRedundantAudio(mi)...)
+		results = append(results, checkRedundantAudio(mi)...)
 	}
 
 	// 6. Non-standard Resolution
 	if config.IsCheckEnabled("mediainfo_resolution") {
-		results = append(results, CheckResolution(videoTrack)...)
+		results = append(results, checkResolution(videoTrack)...)
 	}
 
 	return results
+}
+
+func checkVideoPresence(videoTrack *mediainfo.Track) []CheckResult {
+	if videoTrack == nil {
+		return []CheckResult{{
+			Identifier: "mediainfo_no_video",
+			Passed:     false,
+			Severity:   "error",
+			Warning:    "No video track found",
+		}}
+	}
+	return nil
+}
+
+func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata, mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_interlaced_web",
+		Passed:     true,
+	}
+	isWeb := strings.Contains(strings.ToUpper(meta.Source), "WEB")
+	if isWeb && strings.Contains(strings.ToUpper(videoTrack.ScanType), "INTERLACED") {
+		res.Passed = false
+		res.Severity = "warning"
+		res.Warning = "WEB source should not be Interlaced"
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, res.Warning)}
+	}
+	return []CheckResult{res}
 }
 
 func miTrackToResult(t *mediainfo.Track, passed bool, warning string) TrackCheckResult {
@@ -90,7 +102,7 @@ func miTrackToResult(t *mediainfo.Track, passed bool, warning string) TrackCheck
 	}
 }
 
-func CheckRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
+func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
 		Identifier: "mediainfo_redundant_audio",
 		Passed:     true,
@@ -124,7 +136,7 @@ func CheckRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 	return []CheckResult{res}
 }
 
-func CheckResolution(videoTrack *mediainfo.Track) []CheckResult {
+func checkResolution(videoTrack *mediainfo.Track) []CheckResult {
 	res := CheckResult{
 		Identifier: "mediainfo_resolution",
 		Passed:     true,
@@ -174,7 +186,7 @@ func CheckResolution(videoTrack *mediainfo.Track) []CheckResult {
 	return []CheckResult{res}
 }
 
-func CheckFrameRate(videoTrack *mediainfo.Track) []CheckResult {
+func checkFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 	res := CheckResult{
 		Identifier: "mediainfo_framerate",
 		Passed:     true,
@@ -200,7 +212,7 @@ func CheckFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 	return []CheckResult{res}
 }
 
-func CheckBitRate(videoTrack *mediainfo.Track) []CheckResult {
+func checkBitRate(videoTrack *mediainfo.Track) []CheckResult {
 	res := CheckResult{
 		Identifier: "mediainfo_bitrate",
 		Passed:     true,

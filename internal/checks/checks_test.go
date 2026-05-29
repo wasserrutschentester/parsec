@@ -16,9 +16,9 @@ func TestNormalizeForComparison(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := NormalizeForComparison(tt.input)
+		got := normalizeForComparison(tt.input)
 		if got != tt.want {
-			t.Errorf("NormalizeForComparison(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("normalizeForComparison(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

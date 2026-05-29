@@ -10,7 +10,7 @@ import (
 type TrackCheckResult = types.TrackCheckResult
 type CheckResult = types.CheckResult
 
-func NormalizeForComparison(s string) string {
+func normalizeForComparison(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, ".", " ")
 	s = strings.ReplaceAll(s, "-", " ")

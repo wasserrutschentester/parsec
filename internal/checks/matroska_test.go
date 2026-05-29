@@ -235,10 +235,10 @@ func TestRunTrackChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := RunTrackChecks(tt.tracks)
+			res := runTrackChecks(tt.tracks)
 			hasFailure := len(res) > 0
 			if hasFailure != tt.wantErr {
-				t.Errorf("RunTrackChecks() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
+				t.Errorf("runTrackChecks() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
 			}
 		})
 	}
@@ -308,7 +308,7 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 		}
 
-		res := RunTrackChecks(tracks)
+		res := runTrackChecks(tracks)
 		found := false
 		for _, r := range res {
 			if r.Identifier == "matroska_duplicate_tracks" {
@@ -336,7 +336,7 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
 		}
 
-		res := RunTrackChecks(tracks)
+		res := runTrackChecks(tracks)
 		found := false
 		for _, r := range res {
 			if r.Identifier == "matroska_track_order" {

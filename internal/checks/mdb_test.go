@@ -23,7 +23,7 @@ func TestCheckTitle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{Title: tt.metaTitle}
 			res := &mdb.SearchResult{Title: tt.resTitle}
-			results := CheckTitle(meta, res)
+			results := checkTitle(meta, res)
 			hasFailure := false
 			for _, r := range results {
 				if !r.Passed {
@@ -32,10 +32,10 @@ func TestCheckTitle(t *testing.T) {
 				}
 			}
 			if tt.wantWarn && !hasFailure {
-				t.Errorf("CheckTitle() expected warnings, got none")
+				t.Errorf("checkTitle() expected warnings, got none")
 			}
 			if !tt.wantWarn && hasFailure {
-				t.Errorf("CheckTitle() expected no warnings, got failure")
+				t.Errorf("checkTitle() expected no warnings, got failure")
 			}
 		})
 	}
@@ -57,7 +57,7 @@ func TestCheckMovieYear(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &metadata.Metadata{Year: tt.metaYear, IsTV: false}
 			res := &mdb.SearchResult{Year: tt.resYear}
-			results := CheckMovieYear(meta, res)
+			results := checkMovieYear(meta, res)
 			hasFailure := false
 			for _, r := range results {
 				if !r.Passed {
@@ -66,10 +66,10 @@ func TestCheckMovieYear(t *testing.T) {
 				}
 			}
 			if tt.wantWarn && !hasFailure {
-				t.Errorf("CheckMovieYear() expected warnings, got none")
+				t.Errorf("checkMovieYear() expected warnings, got none")
 			}
 			if !tt.wantWarn && hasFailure {
-				t.Errorf("CheckMovieYear() expected no warnings, got failure")
+				t.Errorf("checkMovieYear() expected no warnings, got failure")
 			}
 		})
 	}

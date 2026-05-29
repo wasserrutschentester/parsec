@@ -44,7 +44,7 @@ func TestCheckRedundantAudio(t *testing.T) {
 					Tracks: tt.tracks,
 				},
 			}
-			results := CheckRedundantAudio(mi)
+			results := checkRedundantAudio(mi)
 			hasFailure := false
 			for _, r := range results {
 				if !r.Passed {
@@ -53,10 +53,10 @@ func TestCheckRedundantAudio(t *testing.T) {
 				}
 			}
 			if tt.wantWarn && !hasFailure {
-				t.Errorf("CheckRedundantAudio() expected warnings, got none")
+				t.Errorf("checkRedundantAudio() expected warnings, got none")
 			}
 			if !tt.wantWarn && hasFailure {
-				t.Errorf("CheckRedundantAudio() expected no warnings, got failure")
+				t.Errorf("checkRedundantAudio() expected no warnings, got failure")
 			}
 		})
 	}
@@ -96,7 +96,7 @@ func TestCheckResolution(t *testing.T) {
 				Width:  tt.width,
 				Height: tt.height,
 			}
-			results := CheckResolution(track)
+			results := checkResolution(track)
 			hasFailure := false
 			for _, r := range results {
 				if !r.Passed {
@@ -105,10 +105,10 @@ func TestCheckResolution(t *testing.T) {
 				}
 			}
 			if tt.wantWarn && !hasFailure {
-				t.Errorf("CheckResolution() expected warnings, got none")
+				t.Errorf("checkResolution() expected warnings, got none")
 			}
 			if !tt.wantWarn && hasFailure {
-				t.Errorf("CheckResolution() expected no warnings, got failure")
+				t.Errorf("checkResolution() expected no warnings, got failure")
 			}
 		})
 	}
@@ -135,7 +135,7 @@ func TestCheckFrameRate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			track := &mediainfo.Track{FrameRate: tt.fps}
-			results := CheckFrameRate(track)
+			results := checkFrameRate(track)
 			hasFailure := false
 			for _, r := range results {
 				if !r.Passed {
@@ -144,10 +144,10 @@ func TestCheckFrameRate(t *testing.T) {
 				}
 			}
 			if tt.wantWarn && !hasFailure {
-				t.Errorf("CheckFrameRate(%f) expected warning, got none", tt.fps)
+				t.Errorf("checkFrameRate(%f) expected warning, got none", tt.fps)
 			}
 			if !tt.wantWarn && hasFailure {
-				t.Errorf("CheckFrameRate(%f) expected no warning, got failure", tt.fps)
+				t.Errorf("checkFrameRate(%f) expected no warning, got failure", tt.fps)
 			}
 		})
 	}
@@ -171,7 +171,7 @@ func TestCheckBitRate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			track := &mediainfo.Track{Height: tt.height, BitRate: tt.bitrate}
-			results := CheckBitRate(track)
+			results := checkBitRate(track)
 			hasFailure := false
 			for _, r := range results {
 				if !r.Passed {
@@ -180,10 +180,10 @@ func TestCheckBitRate(t *testing.T) {
 				}
 			}
 			if tt.wantWarn && !hasFailure {
-				t.Errorf("CheckBitRate(%d, %d) expected warning, got none", tt.height, tt.bitrate)
+				t.Errorf("checkBitRate(%d, %d) expected warning, got none", tt.height, tt.bitrate)
 			}
 			if !tt.wantWarn && hasFailure {
-				t.Errorf("CheckBitRate(%d, %d) expected no warning, got failure", tt.height, tt.bitrate)
+				t.Errorf("checkBitRate(%d, %d) expected no warning, got failure", tt.height, tt.bitrate)
 			}
 		})
 	}
