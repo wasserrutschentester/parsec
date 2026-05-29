@@ -251,8 +251,8 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 	queryLower := strings.ToLower(query)
 
 	for i := range results {
-		titleSim := calculateSimilarity(queryLower, strings.ToLower(results[i].Title))
-		origSim := calculateSimilarity(queryLower, strings.ToLower(results[i].OriginalTitle))
+		titleSim := mdb.CalculateSimilarity(queryLower, strings.ToLower(results[i].Title))
+		origSim := mdb.CalculateSimilarity(queryLower, strings.ToLower(results[i].OriginalTitle))
 		results[i].Similarity = math.Max(titleSim, origSim)
 
 		// Bonus for year match
@@ -275,60 +275,6 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 	}
 
 	return results, nil
-}
-
-func calculateSimilarity(s1, s2 string) float64 {
-	if s1 == s2 {
-		return 1.0
-	}
-	if len(s1) == 0 || len(s2) == 0 {
-		return 0.0
-	}
-
-	dist := levenshteinDistance(s1, s2)
-	maxLen := math.Max(float64(len(s1)), float64(len(s2)))
-	return 1.0 - (float64(dist) / maxLen)
-}
-
-func levenshteinDistance(s1, s2 string) int {
-	r1, r2 := []rune(s1), []rune(s2)
-	n, m := len(r1), len(r2)
-
-	if n > m {
-		r1, r2 = r2, r1
-		n, m = m, n
-	}
-
-	row := make([]int, n+1)
-	for i := 0; i <= n; i++ {
-		row[i] = i
-	}
-
-	for j := 1; j <= m; j++ {
-		prev := j
-		for i := 1; i <= n; i++ {
-			var cost int
-			if r1[i-1] != r2[j-1] {
-				cost = 1
-			}
-			newVal := min(row[i]+1, prev+1, row[i-1]+cost)
-			row[i-1] = prev
-			prev = newVal
-		}
-		row[n] = prev
-	}
-
-	return row[n]
-}
-
-func min(a, b, c int) int {
-	if a <= b && a <= c {
-		return a
-	}
-	if b <= a && b <= c {
-		return b
-	}
-	return c
 }
 
 func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
@@ -441,4 +387,12 @@ func FindEpisode(result mdb.SearchResult, season, episode int) mdb.EpisodeResult
 		}
 	}
 	return mdb.EpisodeResult{}
+}
+
+func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
+	if result.TvdbID == 0 {
+		return mdb.EpisodeResult{}
+	}
+
+	return tvdb.IdentifyEpisode(result.TvdbID, meta.EpisodeTitle, meta.Date, result.OriginalLanguage)
 }

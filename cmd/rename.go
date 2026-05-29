@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"codeberg.org/n0ne/parsec/internal/mdb"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
@@ -75,11 +76,8 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		if result.Year > 0 {
 			meta.Year = result.Year
 		}
-		if meta.IsTV && (meta.Season > 0 || meta.Episode > 0) {
-			episodeResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
-			if episodeResult.Name != "" {
-				meta.EpisodeTitle = episodeResult.Name
-			}
+		if meta.IsTV {
+			renameGetEpisodeInfo(result, meta)
 		}
 	}
 
@@ -105,7 +103,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	}
 
 	ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
-	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath),"Proposed Vector", newName))
+	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath), "Proposed Vector", newName))
 	ui.Println()
 
 	if dryRunFlag {
@@ -146,6 +144,21 @@ func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainf
 	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
 		meta.IsTV = true
 	}
+}
+
+func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
+	var episodeResult mdb.EpisodeResult
+	if meta.Season > 0 && meta.Episode > 0 {
+		episodeResult = mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
+	} else if meta.EpisodeTitle != "" || meta.Date != "" {
+		episodeResult = mdbSearch.IdentifyEpisode(*result, meta)
+	}
+	if episodeResult.Name != "" {
+		meta.EpisodeTitle = episodeResult.Name
+		meta.Season = episodeResult.Season
+		meta.Episode = episodeResult.Episode
+	}
+	return episodeResult
 }
 
 func init() {

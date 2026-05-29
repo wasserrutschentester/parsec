@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
+	"codeberg.org/n0ne/parsec/internal/metadata"
 	"golang.org/x/text/language"
 )
 
@@ -105,18 +106,36 @@ type tvdbSearchResponse struct {
 	Data   []tvdbMedia `json:"data"`
 }
 
+type TvdbEpisode struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	Aired        string `json:"aired"`
+	SeasonNumber int    `json:"seasonNumber"`
+	Number       int    `json:"number"`
+	Overview     string `json:"overview"`
+}
+
+func (e *TvdbEpisode) toEpisodeResult() mdb.EpisodeResult {
+	return mdb.EpisodeResult{
+		Name:     e.Name,
+		Airdate:  e.Aired,
+		Overview: e.Overview,
+		Season:   e.SeasonNumber,
+		Episode:  e.Number,
+		TvdbID:   e.ID,
+	}
+}
+
 type tvdbEpisodeResponse struct {
 	Status string `json:"status"`
 	Data   struct {
-		Episodes []struct {
-			ID           int    `json:"id"`
-			Name         string `json:"name"`
-			Aired        string `json:"aired"`
-			SeasonNumber int    `json:"seasonNumber"`
-			Number       int    `json:"number"`
-			Overview     string `json:"overview"`
-		} `json:"episodes"`
+		Episodes []TvdbEpisode `json:"episodes"`
 	} `json:"data"`
+	Links struct {
+		Prev string `json:"prev"`
+		Self string `json:"self"`
+		Next string `json:"next"`
+	} `json:"links"`
 }
 
 type remoteID struct {
@@ -333,6 +352,88 @@ func GetExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, erro
 	return data, nil
 }
 
+func GetEpisodes(seriesID int, page int, lang string) (tvdbEpisodeResponse, error) {
+	var data tvdbEpisodeResponse
+	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
+	if lang != "" {
+		endpoint = fmt.Sprintf("%s/%s", endpoint, lang)
+	}
+
+	if err := get(fmt.Sprintf("%s?page=%d", endpoint, page), &data); err != nil {
+		return tvdbEpisodeResponse{}, err
+	}
+	return data, nil
+}
+
+func IdentifyEpisode(tvdbID int, episodeTitle, date, origLang string) mdb.EpisodeResult {
+	preferred := config.GetPreferredLanguage()
+	langs := []string{preferred, origLang, "en"}
+	uniqueLangs := []string{}
+	seen := make(map[string]bool)
+	for _, l := range langs {
+		if l != "" && !seen[l] {
+			uniqueLangs = append(uniqueLangs, l)
+			seen[l] = true
+		}
+	}
+
+	normalizedQueryTitle := metadata.Normalize(episodeTitle)
+
+	for _, lang := range uniqueLangs {
+		var episodes []TvdbEpisode
+
+		// Fetch up to 10 pages of episodes
+		for page := 0; page < 10; page++ {
+			data, err := GetEpisodes(tvdbID, page, lang)
+			if err != nil {
+				break
+			}
+			episodes = append(episodes, data.Data.Episodes...)
+			if data.Links.Next == "" {
+				break
+			}
+		}
+
+		// 1. Air Date Match
+		if date != "" {
+			for _, ep := range episodes {
+				if ep.Aired == date {
+					return ep.toEpisodeResult()
+				}
+			}
+		}
+
+		// 2. Normalized Title Match
+		if normalizedQueryTitle != "" {
+			for _, ep := range episodes {
+				if metadata.Normalize(ep.Name) == normalizedQueryTitle {
+					return ep.toEpisodeResult()
+				}
+			}
+		}
+
+		// 3. Fuzzy Match (Fallback)
+		if normalizedQueryTitle != "" {
+			var bestMatch TvdbEpisode
+			maxSim := 0.0
+			found := false
+			for _, ep := range episodes {
+				sim := mdb.CalculateSimilarity(normalizedQueryTitle, metadata.Normalize(ep.Name))
+				if sim > maxSim {
+					maxSim = sim
+					bestMatch = ep
+					found = true
+				}
+			}
+			if found && maxSim > 0.8 {
+				return bestMatch.toEpisodeResult()
+			}
+		}
+	}
+
+	return mdb.EpisodeResult{}
+}
+
 func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tvdbEpisodeResponse
 	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
@@ -346,14 +447,7 @@ func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.Epi
 
 	for _, ep := range data.Data.Episodes {
 		if ep.Number == episode && ep.SeasonNumber == season {
-			res := mdb.EpisodeResult{
-				Name:     ep.Name,
-				Airdate:  ep.Aired,
-				Overview: ep.Overview,
-				Season:   ep.SeasonNumber,
-				Episode:  ep.Number,
-				TvdbID:   ep.ID,
-			}
+			res := ep.toEpisodeResult()
 
 			// Explicitly fetch translation if language is requested
 			if lang != "" {

@@ -6,6 +6,27 @@ import (
 	"codeberg.org/n0ne/parsec/internal/config"
 )
 
+func TestNormalize(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"Winter is coming", "winter is coming"},
+		{"Winter.is.Coming", "winter is coming"},
+		{"Winter - is - coming", "winter is coming"},
+		{"Winter: is coming!", "winter is coming"},
+		{"  Winter   is coming  ", "winter is coming"},
+		{"S01E01 - Pilot", "s01e01 pilot"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := Normalize(tt.input); got != tt.want {
+				t.Errorf("Normalize(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLanguageName(t *testing.T) {
 	tests := []struct {
 		lang string

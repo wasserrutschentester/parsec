@@ -364,6 +364,21 @@ func CleanName(name string) string {
 	return name
 }
 
+func Normalize(s string) string {
+	s = strings.ToLower(s)
+
+	s = strings.ReplaceAll(s, ".", " ")
+	s = strings.ReplaceAll(s, "-", " ")
+
+	re := regexp.MustCompile(`[^a-z0-9 ]`)
+	s = re.ReplaceAllString(s, "")
+
+	re = regexp.MustCompile(`\s+`)
+	s = re.ReplaceAllString(s, " ")
+
+	return strings.TrimSpace(s)
+}
+
 func (meta *Metadata) Override(newMeta *Metadata) bool {
 	updated := false
 	mVal := reflect.ValueOf(meta).Elem()

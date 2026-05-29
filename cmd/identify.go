@@ -55,12 +55,12 @@ var identifyCmd = &cobra.Command{
 		mdb.PrintResult(*result)
 		tags := mdb.GetMatroskaTags(*result)
 
-		if meta.IsTV && (meta.Season > 0 || meta.Episode > 0) {
-			episodeResult := mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
-			mdb.PrintEpisodeResult(episodeResult)
-			tags.SetEpisodeTags(episodeResult)
+		if meta.IsTV {
+			episodeResult := getEpisodeResult(result, meta)
+			if episodeResult.Name != "" {
+				tags.SetEpisodeTags(episodeResult)
+			}
 		}
-
 		if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
 			fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
 			var response string
@@ -153,4 +153,26 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 			ui.Println("  " + ui.LabelValue("TVDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTvdb, result.TvdbID)))
 		}
 	}
+}
+
+func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
+	var episodeResult mdb.EpisodeResult
+	if meta.Season > 0 && meta.Episode > 0 {
+		episodeResult = mdbSearch.FindEpisode(*result, meta.Season, meta.Episode)
+	} else if meta.EpisodeTitle != "" || meta.Date != "" {
+		ui.Println(ui.Info.Render("Identifying episode..."))
+		episodeResult = mdbSearch.IdentifyEpisode(*result, meta)
+	}
+
+	if episodeResult.Name != "" {
+		mdb.PrintEpisodeResult(episodeResult)
+		// Back-fill metadata
+		meta.Season = episodeResult.Season
+		meta.Episode = episodeResult.Episode
+		meta.EpisodeTitle = episodeResult.Name
+	} else if meta.Season > 0 || meta.Episode > 0 || meta.EpisodeTitle != "" || meta.Date != "" {
+		ui.Println(ui.FormatWarning("Could not identify episode metadata"))
+	}
+	return episodeResult
+
 }

@@ -2,6 +2,7 @@ package mdb
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -179,4 +180,58 @@ func (tags *MatroskaTags) SetEpisodeTags(result EpisodeResult) {
 	if result.TvdbID > 0 {
 		tags.Tvdb2 = fmt.Sprintf("episodes/%d", result.TvdbID)
 	}
+}
+
+func CalculateSimilarity(s1, s2 string) float64 {
+	if s1 == s2 {
+		return 1.0
+	}
+	if len(s1) == 0 || len(s2) == 0 {
+		return 0.0
+	}
+
+	dist := levenshteinDistance(s1, s2)
+	maxLen := math.Max(float64(len(s1)), float64(len(s2)))
+	return 1.0 - (float64(dist) / maxLen)
+}
+
+func levenshteinDistance(s1, s2 string) int {
+	r1, r2 := []rune(s1), []rune(s2)
+	n, m := len(r1), len(r2)
+
+	if n > m {
+		r1, r2 = r2, r1
+		n, m = m, n
+	}
+
+	row := make([]int, n+1)
+	for i := 0; i <= n; i++ {
+		row[i] = i
+	}
+
+	for j := 1; j <= m; j++ {
+		prev := j
+		for i := 1; i <= n; i++ {
+			var cost int
+			if r1[i-1] != r2[j-1] {
+				cost = 1
+			}
+			newVal := min(row[i]+1, prev+1, row[i-1]+cost)
+			row[i-1] = prev
+			prev = newVal
+		}
+		row[n] = prev
+	}
+
+	return row[n]
+}
+
+func min(a, b, c int) int {
+	if a <= b && a <= c {
+		return a
+	}
+	if b <= a && b <= c {
+		return b
+	}
+	return c
 }

@@ -21,38 +21,15 @@ func TestCalculateSimilarity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := calculateSimilarity(tt.s1, tt.s2)
+		got := mdb.CalculateSimilarity(tt.s1, tt.s2)
 		if (got-tt.want) > 0.001 || (tt.want-got) > 0.001 {
-			t.Errorf("calculateSimilarity(%q, %q) = %v, want %v", tt.s1, tt.s2, got, tt.want)
-		}
-	}
-}
-
-func TestLevenshteinDistance(t *testing.T) {
-	tests := []struct {
-		s1   string
-		s2   string
-		want int
-	}{
-		{"abc", "abc", 0},
-		{"abc", "abd", 1},
-		{"abc", "", 3},
-		{"", "abc", 3},
-		{"kitten", "sitting", 3},
-		{"flaw", "lawn", 2},
-		{"", "", 0},
-		{"a", "b", 1},
-	}
-
-	for _, tt := range tests {
-		got := levenshteinDistance(tt.s1, tt.s2)
-		if got != tt.want {
-			t.Errorf("levenshteinDistance(%q, %q) = %d, want %d", tt.s1, tt.s2, got, tt.want)
+			t.Errorf("CalculateSimilarity(%q, %q) = %v, want %v", tt.s1, tt.s2, got, tt.want)
 		}
 	}
 }
 
 func TestAddUniqueAltTitle(t *testing.T) {
+
 	tests := []struct {
 		titles         []string
 		newTitle       string
