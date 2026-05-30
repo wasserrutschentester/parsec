@@ -116,7 +116,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	if !unattendedFlag {
 		fmt.Print(ui.Info.Render("Proceed with rename? [y/N] "))
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			ui.Println(ui.Muted.Render("Skipping..."))
 			return
@@ -192,17 +192,17 @@ func init() {
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
-		renameCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
 	p2pFlags := []string{"service", "source", "repack", "group"}
 	for _, f := range p2pFlags {
-		renameCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
 	// Group ID flags
 	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
-		renameCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
 	renameCmd.Flags().SortFlags = false

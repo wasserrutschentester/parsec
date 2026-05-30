@@ -12,7 +12,7 @@ func TestCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	SetDir(tempDir)
 	defer ResetDir()
@@ -51,7 +51,7 @@ func TestCache(t *testing.T) {
 	}
 
 	// Test Clear
-	Set(key, data)
+	_ = Set(key, data)
 	Clear()
 	if _, err := Get(key); err == nil {
 		t.Error("Expected error after Clear")

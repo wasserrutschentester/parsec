@@ -70,7 +70,7 @@ func isMatroska(filePath string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	header := make([]byte, 4)
 	n, err := f.Read(header)
@@ -158,7 +158,7 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tagsXML)
+	defer func() { _ = os.Remove(tagsXML) }()
 
 	cmd := exec.Command("mkvpropedit", filePath, "--tags", "global:"+tagsXML)
 	if err := cmd.Run(); err != nil {
@@ -208,7 +208,7 @@ func createTagsXML(filePath string, tags mdb.MatroskaTags) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file for tags: %w", err)
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	if _, err := tmpFile.Write(xmlContent); err != nil {
 		return "", fmt.Errorf("failed to write tags to temp file: %w", err)

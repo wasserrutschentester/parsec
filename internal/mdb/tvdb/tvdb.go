@@ -181,7 +181,7 @@ func login() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("TVDB login failed with status %d", resp.StatusCode)
@@ -231,7 +231,7 @@ func get(endpoint string, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("TVDB API returned status %d", resp.StatusCode)

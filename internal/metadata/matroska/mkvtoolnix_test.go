@@ -21,7 +21,7 @@ func TestCreateTagsXML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createTagsXML failed: %v", err)
 	}
-	defer os.Remove(xmlPath)
+	defer func() { _ = os.Remove(xmlPath) }()
 
 	content, err := os.ReadFile(xmlPath)
 	if err != nil {

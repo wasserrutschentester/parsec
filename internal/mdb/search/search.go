@@ -71,7 +71,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 
 	fmt.Print(ui.Info.Render("\nSelect a result [default 0]: "))
 	var input string
-	fmt.Scanln(&input)
+	_, _ = fmt.Scanln(&input)
 	if input == "" {
 		return &results[0], nil
 	}

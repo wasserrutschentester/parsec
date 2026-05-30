@@ -230,6 +230,6 @@ func init() {
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
-		checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 }

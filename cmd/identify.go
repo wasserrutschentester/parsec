@@ -66,7 +66,7 @@ Flags can be used to override or provide missing information.`),
 		if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
 			fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			if response != "y" && response != "Y" {
 				ui.Println(ui.Muted.Render("Skipping..."))
 				return
@@ -111,19 +111,19 @@ func init() {
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
-		identifyCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
+		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
 
 	// Group P2P flags
 	p2pFlags := []string{"service", "source", "group"}
 	for _, f := range p2pFlags {
-		identifyCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
+		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
 	// Group ID flags
 	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
-		identifyCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
 	// Disable sorting to keep the defined order

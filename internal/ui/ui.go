@@ -447,7 +447,7 @@ func FormatDebug(msg string) string {
 
 func PrintWarning(msg string) {
 	if !IsSilent {
-		lipgloss.Println(FormatWarning(msg))
+		_, _ = lipgloss.Println(FormatWarning(msg))
 	}
 }
 
@@ -457,25 +457,25 @@ func PrintError(msg string) {
 
 func PrintDebug(msg string) {
 	if IsDebug && !IsSilent {
-		lipgloss.Println(FormatDebug(msg))
+		_, _ = lipgloss.Println(FormatDebug(msg))
 	}
 }
 
 func PrintSuccess(msg string) {
 	if !IsSilent {
-		lipgloss.Println(Success.Render("✓ ") + msg)
+		_, _ = lipgloss.Println(Success.Render("✓ ") + msg)
 	}
 }
 
 func PrintInfo(msg string) {
 	if !IsSilent {
-		lipgloss.Println(Info.Render("i ") + msg)
+		_, _ = lipgloss.Println(Info.Render("i ") + msg)
 	}
 }
 
 func Println(a ...any) {
 	if !IsSilent {
-		lipgloss.Println(a...)
+		_, _ = lipgloss.Println(a...)
 	}
 }
 
