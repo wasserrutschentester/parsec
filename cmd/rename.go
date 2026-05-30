@@ -52,7 +52,8 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		mediaMeta := mi.GetMetadata()
 		meta.Override(mediaMeta)
 	} else {
-		fmt.Printf("Warning: Could not get MediaInfo for %s: %v\n", filePath, err)
+		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", filePath, err))
+		return
 	}
 
 	// 2.2 Get EBML Metadata for Visual Impaired flag
@@ -63,7 +64,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		}
 	}
 
-	// 3.1 Apply MDB IDs from file tags
+	// 2.3 Apply MDB IDs from file tags
 	renameApplyMdbIDs(cmd, meta, mi)
 
 	// 3. Override with CLI flags
