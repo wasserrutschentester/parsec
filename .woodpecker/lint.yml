@@ -1,5 +1,5 @@
 when:
-    - event: [push, tag, cron]
+    - event: [push, pull_request]
 
 variables:
     - &golang "golang:1.25-alpine"
