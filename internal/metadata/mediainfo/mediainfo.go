@@ -185,10 +185,10 @@ func Get(filePath string) (*MediaInfo, error) {
 	return &mi, nil
 }
 
-func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb int, tvdb int, isTV bool) {
+func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb, tvdb int, isTV bool) {
 	extra := mi.getGeneralExtra()
 	if extra == nil {
-		return
+		return imdb, tmdb, tvdb, isTV
 	}
 
 	imdb = extra.GetString("IMDB")
@@ -374,7 +374,6 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	default:
 		meta.LanguageExt = "ML"
 	}
-
 }
 
 func (mi *MediaInfo) Print() {

@@ -7,8 +7,10 @@ import (
 	"codeberg.org/n0ne/parsec/internal/types"
 )
 
-type TrackCheckResult = types.TrackCheckResult
-type CheckResult = types.CheckResult
+type (
+	TrackCheckResult = types.TrackCheckResult
+	CheckResult      = types.CheckResult
+)
 
 func normalizeForComparison(s string) string {
 	s = strings.ToLower(s)

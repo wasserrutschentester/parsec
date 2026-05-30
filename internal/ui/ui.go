@@ -138,7 +138,8 @@ func Card(title, subtitle, body, footer string) string {
 	bodyStyle := lipgloss.NewStyle().Width(innerWidth)
 	footerStyle := Muted.Width(innerWidth)
 
-	content := lipgloss.JoinVertical(lipgloss.Left,
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
 		header,
 		divider,
 		"",
@@ -228,7 +229,8 @@ func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualVa
 	expectedPrefix := LabelStyle.Width(maxLabelLen + 4).Render(expectedLabel + ":")
 	actualPrefix := LabelStyle.Width(maxLabelLen + 4).Render(actualLabel + ":")
 
-	return lipgloss.JoinVertical(lipgloss.Left,
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
 		lipgloss.JoinHorizontal(lipgloss.Top, expectedPrefix, lines[0]),
 		lipgloss.JoinHorizontal(lipgloss.Top, actualPrefix, lines[1]),
 	)

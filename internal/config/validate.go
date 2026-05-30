@@ -34,7 +34,7 @@ func isValidAPIKey(key string) bool {
 	return len(key) > 25 && apiKeyRegex.MatchString(key)
 }
 
-func checkKey(key string, name string) {
+func checkKey(key, name string) {
 	if key != "" {
 		if isValidAPIKey(key) {
 			ui.PrintSuccess(fmt.Sprintf("%s API key found and appears valid.", name))

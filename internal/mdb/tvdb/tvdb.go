@@ -325,7 +325,7 @@ type tvdbTranslationResponse struct {
 	} `json:"data"`
 }
 
-func GetTranslation(tvdbID int, mediaType string, lang string) (tvdbTranslationResponse, error) {
+func GetTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse, error) {
 	tvdbType := toTvdbType(mediaType)
 	iso3 := getISO3(lang)
 	var data tvdbTranslationResponse
@@ -377,7 +377,7 @@ func GetExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, erro
 	return data, nil
 }
 
-func GetEpisodes(seriesID int, page int, lang string) (tvdbEpisodeResponse, error) {
+func GetEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	var data tvdbEpisodeResponse
 	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
 	if lang != "" {

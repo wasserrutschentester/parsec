@@ -72,7 +72,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 	prefTag := language.Make(prefLang)
 	origTag := language.Make(origLang)
 
-	check := func(trackType string, langs []string, targetTag language.Tag, targetStr string, label string) {
+	check := func(trackType string, langs []string, targetTag language.Tag, targetStr, label string) {
 		if targetStr == "" {
 			return
 		}

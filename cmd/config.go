@@ -45,12 +45,12 @@ var configInitCmd = &cobra.Command{
 			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", backupFile))
 		}
 
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not create config directory: %v", err))
 			return
 		}
 
-		if err := os.WriteFile(targetFile, []byte(config.GetDefaultConfig()), 0644); err != nil {
+		if err := os.WriteFile(targetFile, []byte(config.GetDefaultConfig()), 0o644); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not write config file: %v", err))
 			return
 		}

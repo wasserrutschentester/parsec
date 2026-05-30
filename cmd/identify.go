@@ -15,9 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	writeTagsFlag bool
-)
+var writeTagsFlag bool
 
 // identifyCmd represents the identify command
 var identifyCmd = &cobra.Command{
@@ -178,5 +176,4 @@ func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.Epi
 	ui.PrintDebug(fmt.Sprintf("%+v\n", episodeResult))
 
 	return episodeResult
-
 }

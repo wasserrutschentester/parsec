@@ -17,7 +17,7 @@ func TestValidate(t *testing.T) {
 	t.Run("DefaultConfig", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		confPath := filepath.Join(tmpDir, "config.toml")
-		err := os.WriteFile(confPath, []byte(GetDefaultConfig()), 0644)
+		err := os.WriteFile(confPath, []byte(GetDefaultConfig()), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write default config: %v", err)
 		}

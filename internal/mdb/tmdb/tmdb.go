@@ -232,7 +232,7 @@ func GetExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, erro
 	return data, nil
 }
 
-func GetAlternativeTitles(tmdbID int, mediaType string, originalLanguage string) ([]string, error) {
+func GetAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]string, error) {
 	var data struct {
 		Titles []struct {
 			Title string `json:"title"`
@@ -277,7 +277,7 @@ func GetAlternativeTitles(tmdbID int, mediaType string, originalLanguage string)
 	return titles, nil
 }
 
-func GetEpisodeMetadata(seriesID int, season, episode int, lang string) (mdb.EpisodeResult, error) {
+func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tmdbEpisodeResponse
 	params := url.Values{}
 	if lang != "" {

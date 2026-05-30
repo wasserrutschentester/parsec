@@ -214,7 +214,6 @@ func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 	for _, alt := range tvdbRes.AltTitle {
 		res.AltTitle = addUniqueAltTitle(res.AltTitle, alt, res.Title, res.OriginalTitle)
 	}
-
 }
 
 func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...string) []string {
@@ -282,7 +281,7 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 	return results, nil
 }
 
-func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
+func SearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
 	mediaType := "movie"
 	if isTV {
 		mediaType = "tv"
@@ -306,7 +305,7 @@ func SearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool) (*mdb.SearchRe
 	return result, nil
 }
 
-func initialSearchByID(imdbID string, tmdbID int, tvdbID int, isTV bool, mediaType string) (*mdb.SearchResult, error) {
+func initialSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool, mediaType string) (*mdb.SearchResult, error) {
 	var result *mdb.SearchResult
 	var err error
 	if imdbID != "" {
@@ -371,7 +370,6 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 }
 
 func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
-
 	if result.TvdbID > 0 {
 		data, err := tvdb.IdentifyEpisode(result, meta, allowSpecials)
 		if err == nil && data.Name != "" {

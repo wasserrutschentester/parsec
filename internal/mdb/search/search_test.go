@@ -29,7 +29,6 @@ func TestCalculateSimilarity(t *testing.T) {
 }
 
 func TestAddUniqueAltTitle(t *testing.T) {
-
 	tests := []struct {
 		titles         []string
 		newTitle       string

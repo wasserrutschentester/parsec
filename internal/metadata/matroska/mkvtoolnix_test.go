@@ -60,7 +60,6 @@ func TestCreateTagsXML(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestCountTypes(t *testing.T) {

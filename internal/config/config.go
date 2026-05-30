@@ -21,8 +21,10 @@ func InitDefaults() {
 	viper.SetDefault("video_codec_hevc", "H.265")
 }
 
-var activePreset string
-var NoCache bool
+var (
+	activePreset string
+	NoCache      bool
+)
 
 func SetPreset(name string) {
 	activePreset = name

@@ -129,7 +129,6 @@ func renameFile(cmd *cobra.Command, filePath string) {
 	} else {
 		ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
 	}
-
 }
 
 func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainfo.MediaInfo) {

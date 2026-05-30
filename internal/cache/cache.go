@@ -53,10 +53,10 @@ func Get(key string) ([]byte, error) {
 }
 
 func Set(key string, data []byte) error {
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(getPath(key), data, 0644)
+	return os.WriteFile(getPath(key), data, 0o644)
 }
 
 func getPath(key string) string {
