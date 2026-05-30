@@ -33,7 +33,6 @@ var (
 	unattendedFlag bool
 	verboseFlag    bool
 	debugFlag      bool
-	quietFlag      bool
 	presetFlag     string
 	noCacheFlag    bool
 )

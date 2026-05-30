@@ -163,10 +163,11 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 
 		if config.IsCheckEnabled("matroska_track_order") {
 			priority := getTrackPriority(*track)
-			if track.Type == "audio" {
+			switch track.Type {
+			case "audio":
 				agg.Add(checkTrackOrder(track, lastAudioTrack, priority, &lastAudioPriority, "some Audio tracks are out of order", reportedOrderTracks))
 				lastAudioTrack = track
-			} else if track.Type == "subtitles" {
+			case "subtitles":
 				agg.Add(checkTrackOrder(track, lastSubTrack, priority, &lastSubPriority, "some Subtitle tracks are out of order", reportedOrderTracks))
 				lastSubTrack = track
 			}
@@ -368,7 +369,8 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 	isSpecialized := props.Forced || props.Commentary || props.VisualImpaired || props.HearingImpaired || props.TextDescriptions
 
 	if !isSpecialized {
-		if track.Type == "audio" {
+		switch track.Type {
+		case "audio":
 			if !seenAudioLangs[props.Language] {
 				shouldBeDefault = true
 				seenAudioLangs[props.Language] = true
@@ -377,7 +379,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 			if audioCounts[props.Language] == 1 && !props.Default {
 				shouldBeDefault = false
 			}
-		} else if track.Type == "subtitles" {
+		case "subtitles":
 			if !seenSubLangs[props.Language] {
 				shouldBeDefault = true
 				seenSubLangs[props.Language] = true
@@ -422,9 +424,10 @@ func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 		if !isRelevantTrack(track) {
 			continue
 		}
-		if track.Type == "audio" {
+		switch track.Type {
+		case "audio":
 			audio[track.Properties.Language]++
-		} else if track.Type == "subtitles" {
+		case "subtitles":
 			sub[track.Properties.Language]++
 		}
 	}
@@ -549,7 +552,8 @@ func getTrackPriority(track matroska.EbmlTrack) int {
 	}
 
 	propertyScore := 0
-	if track.Type == "audio" {
+	switch track.Type {
+	case "audio":
 		if track.Properties.Commentary {
 			propertyScore = propScoreCommentary
 		} else if track.Properties.VisualImpaired {
@@ -557,7 +561,7 @@ func getTrackPriority(track matroska.EbmlTrack) int {
 		} else if track.Properties.TextDescriptions {
 			propertyScore = propScoreDescription
 		}
-	} else if track.Type == "subtitles" {
+	case "subtitles":
 		if track.Properties.Forced {
 			propertyScore = propScoreForced
 		} else if track.Properties.HearingImpaired {

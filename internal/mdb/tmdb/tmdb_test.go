@@ -17,20 +17,21 @@ func TestSearch(t *testing.T) {
 	// Mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Mock search response
-		if r.URL.Path == "/search/movie" {
+		switch r.URL.Path {
+		case "/search/movie":
 			resp := tmdbSearchResponse{
 				Results: []tmdbMedia{
 					{ID: 1, Title: "Test Movie", ReleaseDate: "2023-01-01"},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
-		} else if r.URL.Path == "/movie/1/external_ids" {
+			_ = json.NewEncoder(w).Encode(resp)
+		case "/movie/1/external_ids":
 			resp := tmdbExternalIDsResponse{Imdb: "tt123"}
-			json.NewEncoder(w).Encode(resp)
-		} else if r.URL.Path == "/movie/1/alternative_titles" {
+			_ = json.NewEncoder(w).Encode(resp)
+		case "/movie/1/alternative_titles":
 			// Return empty for simplicity
-			w.Write([]byte(`{"titles": []}`))
-		} else {
+			_, _ = w.Write([]byte(`{"titles": []}`))
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -70,13 +71,14 @@ func TestGetByIDLocalization(t *testing.T) {
 			t.Errorf("Expected language 'de', got %q", lang)
 		}
 
-		if r.URL.Path == "/tv/123" {
-			w.Write([]byte(`{"id": 123, "name": "German Title", "overview": "German Overview"}`))
-		} else if r.URL.Path == "/tv/123/external_ids" {
-			w.Write([]byte(`{"tvdb_id": 459258}`))
-		} else if r.URL.Path == "/tv/123/alternative_titles" {
-			w.Write([]byte(`{"results": []}`))
-		} else {
+		switch r.URL.Path {
+		case "/tv/123":
+			_, _ = w.Write([]byte(`{"id": 123, "name": "German Title", "overview": "German Overview"}`))
+		case "/tv/123/external_ids":
+			_, _ = w.Write([]byte(`{"tvdb_id": 459258}`))
+		case "/tv/123/alternative_titles":
+			_, _ = w.Write([]byte(`{"results": []}`))
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))

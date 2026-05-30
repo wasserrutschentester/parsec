@@ -189,11 +189,7 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 		return ""
 	}
 
-	result := sub[:end]
-	if strings.HasPrefix(result, ".") {
-		result = result[1:]
-	}
-	return result
+	return strings.TrimPrefix(sub[:end], ".")
 }
 
 func matchTitleYear(filename string) (string, int) {

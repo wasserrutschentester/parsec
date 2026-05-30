@@ -352,9 +352,10 @@ func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 		}
 
 		for _, ext := range externalIDs.Data.RemoteIds {
-			if ext.SourceName == "IMDB" {
+			switch ext.SourceName {
+			case "IMDB":
 				result.ImdbID = ext.ID
-			} else if ext.SourceName == "TheMovieDB.com" || ext.SourceName == "TMDB" {
+			case "TheMovieDB.com", "TMDB":
 				tmdbID, _ := strconv.Atoi(ext.ID)
 				result.TmdbID = tmdbID
 				if result.IsTV {

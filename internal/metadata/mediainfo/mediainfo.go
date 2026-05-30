@@ -210,12 +210,13 @@ func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb int, tvdb int, isTV bool) {
 	// TVDB2
 	tvdb2 := extra.GetString("TVDB2")
 	tvdb2ID, tvdb2Type := parseID(tvdb2)
-	if tvdb2Type == "series" {
+	switch tvdb2Type {
+	case "series":
 		if tvdb == 0 {
 			tvdb = tvdb2ID
 		}
 		isTV = true
-	} else if tvdb2Type == "episodes" {
+	case "episodes":
 		isTV = true
 	}
 

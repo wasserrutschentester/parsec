@@ -18,13 +18,14 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 	viper.Set("preferred_language", "")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/login" {
-			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-		} else if r.URL.Path == "/series/999/episodes/default/en" {
-			w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 456, "number": 1, "seasonNumber": 1, "aired": "2023-01-01", "name": "", "overview": ""}]}, "links": {"next": ""}}`))
-		} else if r.URL.Path == "/episodes/456/translations/eng" {
-			w.Write([]byte(`{"status": "success", "data": {"name": "Test Episode", "overview": "Test Overview"}}`))
-		} else {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 456, "number": 1, "seasonNumber": 1, "aired": "2023-01-01", "name": "", "overview": ""}]}, "links": {"next": ""}}`))
+		case "/episodes/456/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Test Episode", "overview": "Test Overview"}}`))
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -51,13 +52,14 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 	viper.Set("preferred_language", "")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/login" {
-			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-		} else if r.URL.Path == "/series/999/episodes/default/en" {
-			w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 789, "number": 2, "seasonNumber": 1, "aired": "2023-01-02", "name": "Test Episode", "overview": ""}]}, "links": {"next": ""}}`))
-		} else if r.URL.Path == "/episodes/789/translations/eng" {
-			w.Write([]byte(`{"status": "success", "data": {"name": "Test Episode", "overview": "Test Overview"}}`))
-		} else {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [{"id": 789, "number": 2, "seasonNumber": 1, "aired": "2023-01-02", "name": "Test Episode", "overview": ""}]}, "links": {"next": ""}}`))
+		case "/episodes/789/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Test Episode", "overview": "Test Overview"}}`))
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
@@ -80,14 +82,15 @@ func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 	viper.Set("api_keys.tvdb", "dummy_key")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/login" {
-			w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
-		} else if r.URL.Path == "/series/999/episodes/default/en" {
-			w.Write([]byte(`{"status": "success", "data": {"episodes": [
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [
 				{"id": 100, "number": 1, "seasonNumber": 0, "aired": "2023-01-01", "name": "Special"},
 				{"id": 200, "number": 1, "seasonNumber": 1, "aired": "2023-01-01", "name": "Regular"}
 			]}, "links": {"next": ""}}`))
-		} else {
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
