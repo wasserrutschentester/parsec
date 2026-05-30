@@ -3,6 +3,7 @@ when:
 
 variables:
     - &golang "golang:1.25-alpine"
+    - &golangci_lint "golangci/golangci-lint:v2.12-alpine"
 
 steps:
     vendor:
@@ -10,10 +11,12 @@ steps:
         commands: go mod vendor
 
     lint:
-        image: *golang
-        commands: |
-            go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-            golangci-lint run
+        image: *golangci_lint
+        commands: golangci-lint run
+        when:
+            - event: pull_request
+            - event: push
+              branch: "renovate/*"
 
     test:
         image: *golang
