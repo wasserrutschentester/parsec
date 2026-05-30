@@ -44,7 +44,6 @@ It validates:
   4. Consistency with online databases (TMDB/TVDB) for titles and episodes`),
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		ui.IsSilent = jsonOutputFlag
 		filePath := args[0]
 
 		report, err := collectCheckData(cmd, filePath)

@@ -39,11 +39,15 @@ steps:
                   if [ "$$GOOS" = "windows" ]; then EXT=".exe"; fi
 
                   echo "Building for $$GOOS/$$GOARCH..."
+                  VERSION=$${CI_COMMIT_TAG:-$$(git describe --tags --always --match 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/-[0-9]*-g/-/') }
                   GOOS=$$GOOS GOARCH=$$GOARCH go build \
-                    -ldflags="-s -w" \
+                    -ldflags="-s -w -X codeberg.org/n0ne/parsec/cmd.Version=$$VERSION" \
                     -o "dist/parsec-$${GOOS}-$${GOARCH}$${EXT}"
-                  
                 done
+            - |
+                cd dist
+                sha256sum * > checksums.txt
+                cd ..
 
     release:
         image: *release_plugin

@@ -7,25 +7,34 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/n0ne/parsec/internal/update"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile string
+	Version = "v0.0.0"
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "parsec",
 	Short: "parsec allows you to parse, check and create releases",
 	Long:  ui.Banner(".: FIRST STEPS? :."),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		ui.IsSilent = jsonOutputFlag // make sure only json is printed
 		ui.IsDebug = debugFlag
 		ui.PrintDebug("Debug output enabled")
 		config.NoCache = noCacheFlag
+		update.CheckForUpdateBackground(Version)
 	},
 }
 
 func Execute() {
+	// Version is now injected via ldflags during build
+	rootCmd.Version = Version
+
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
@@ -135,6 +144,9 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
+		if err := viper.ReadInConfig(); err != nil {
+			ui.PrintError(fmt.Sprintf("Error reading config file: %v", err))
+		}
 	} else {
 		// Set search paths
 		confDir, err := os.UserConfigDir()

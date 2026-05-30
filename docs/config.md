@@ -91,6 +91,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `template` | string | The naming template used for renaming and checking. See [Naming Templates](templates.md) for available tokens and formatting rules. |
 | `preferred_language` | string | Preferred language code (default: `de`). |
 | `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |
+| `disable_update_check` | boolean | Disable automatic update checks in the background and the warning notice if the version is outdated |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
 | `allow_special_matches` | boolean | Allow matching episodes against Specials (Season 0) (default: `false`). |

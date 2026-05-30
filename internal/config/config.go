@@ -19,6 +19,7 @@ func InitDefaults() {
 	viper.SetDefault("group", "PAARSEX")
 	viper.SetDefault("video_codec_avc", "H.264")
 	viper.SetDefault("video_codec_hevc", "H.265")
+	viper.SetDefault("disable_update_check", false)
 }
 
 var (
@@ -154,6 +155,10 @@ func GetVideoCodecAVC() string {
 
 func GetVideoCodecHEVC() string {
 	return getString("video_codec_hevc")
+}
+
+func GetDisableUpdateCheck() bool {
+	return getBool("disable_update_check")
 }
 
 func IsCheckEnabled(checkName string) bool {
