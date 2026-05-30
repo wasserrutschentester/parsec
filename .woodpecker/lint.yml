@@ -1,0 +1,14 @@
+when:
+    - event: [push, tag, cron]
+
+variables:
+    - &golang "golang:1.25-alpine"
+
+steps:
+    vendor:
+        image: *golang
+        commands: go mod vendor
+
+    test:
+        image: *golang
+        commands: go test ./...
