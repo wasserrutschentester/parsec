@@ -1,0 +1,77 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/n0ne/parsec/internal/ui"
+	"github.com/spf13/cobra"
+)
+
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Manage parsec configuration",
+	Long:  ui.Banner(".: CONFIGURATION :."),
+}
+
+var configInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Create a default configuration file",
+	Long:  ui.Banner(".: WARP CORE LOADING PROTO :."),
+	Run: func(cmd *cobra.Command, args []string) {
+		ui.Println(ui.Banner(".: LOADING WARP CORE :."))
+		confDir, err := os.UserConfigDir()
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Could not determine user config directory: %v", err))
+			return
+		}
+
+		targetDir := filepath.Join(confDir, "parsec")
+		targetFile := filepath.Join(targetDir, "config.toml")
+
+		if _, err := os.Stat(targetFile); err == nil {
+			if !ui.ConfirmContinue(fmt.Sprintf("Configuration file already exists at %s. Overwrite and backup old one?", targetFile)) {
+				return
+			}
+
+			backupFile := targetFile + "." + time.Now().Format("2006-01-02_15-04-05") + ".bak"
+			if err := os.Rename(targetFile, backupFile); err != nil {
+				ui.PrintError(fmt.Sprintf("Could not backup existing config file: %v", err))
+				return
+			}
+			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", backupFile))
+		}
+
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			ui.PrintError(fmt.Sprintf("Could not create config directory: %v", err))
+			return
+		}
+
+		if err := os.WriteFile(targetFile, []byte(config.GetDefaultConfig()), 0644); err != nil {
+			ui.PrintError(fmt.Sprintf("Could not write config file: %v", err))
+			return
+		}
+
+		ui.PrintSuccess(fmt.Sprintf("Created default configuration at %s", targetFile))
+	},
+}
+
+var configValidateCmd = &cobra.Command{
+	Use:   "validate",
+	Short: "Verify the current configuration",
+	Long:  ui.Banner(".: STABILITY ASSESSMENT :."),
+	Run: func(cmd *cobra.Command, args []string) {
+		ui.Println(ui.Banner(".: ASSESSING STABILITY :."))
+		config.Validate()
+		ui.PrintSuccess("Configuration validation complete.")
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(configCmd)
+	configCmd.AddCommand(configInitCmd)
+	configCmd.AddCommand(configValidateCmd)
+}

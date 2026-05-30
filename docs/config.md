@@ -6,6 +6,26 @@ Parsec uses a TOML-based configuration system. By default, it looks for a config
 2.  `config.toml` in the current working directory
 3.  `.parsec.toml` in the current working directory
 
+## Managing Configuration
+
+You can use the `config` command to manage your configuration.
+
+### Initialize Configuration
+
+To create a default configuration file in the default location (`$HOME/.config/parsec/config.toml`), run:
+
+```bash
+parsec config init
+```
+
+### Validate Configuration
+
+To verify your current configuration and check if API keys are set, run:
+
+```bash
+parsec config validate
+```
+
 ## Presets
 
 Presets allow you to define groups of settings that can be activated via the `--preset` flag. This is useful for recurring release types or specific shows.

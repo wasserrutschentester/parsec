@@ -1,0 +1,105 @@
+# ╔═════════════════════════════════════════╗
+# ║      ____                               ║
+# ║     / __ \____ __________ ___  _____    ║
+# ║    / /_/ / __ `/ ___/ ___/ _ \/ ___/    ║
+# ║   / ____/ /_/ / /  (__  )  __/ /__      ║
+# ║  /_/    \__,_|_|  |___/\___|\___/       ║
+# ║       .: SYSTEM ADMINISTRATION :.       ║
+# ╚═════════════════════════════════════════╝
+
+# Configuration documentation is available at
+# https://codeberg.org/n0ne/parsec/src/branch/main/docs/config.md
+
+# Your release group Name (should only contain alphanumeric characters and be unique)
+group = "NoRealGrpPlsChange"
+
+# Default source for releases (Value in Filename or from flag is prioritized over this setting)
+source = "WEB-DL"
+
+# Preferred language for identification, tagging, and track ordering
+preferred_language = "de"
+
+# If true, sets {language} to preferred_language and {language_ext} to "SUBBED"
+# if no audio is present but subs are available in the preferred language
+subbed_tagging = true
+
+# Naming template for releases
+# for what is available see https://codeberg.org/n0ne/parsec/src/branch/main/docs/templates.md
+template = "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}"
+
+# Display names for video codecs
+video_codec_avc = "H.264"
+video_codec_hevc = "H.265"
+
+# Api keys for Media Databases (required for most features)
+[api_keys]
+tmdb = "your_tmdb_api_key" # https://developer.themoviedb.org/docs/getting-started
+tvdb = "your_tvdb_api_key" # https://thetvdb.com/api-information
+
+
+# ---------------------------------- #
+#        SOME EXAMPLE PRESETS        #
+# ---------------------------------- #
+
+# ------------------------------------------------------------------------------
+# PRESET: mandalorian
+# Use case: Automatically identify a specific show without needing to parse it.
+# Useful for automation or when the file name is ambiguous.
+# ------------------------------------------------------------------------------
+[preset.mandalorian]
+title = "The Mandalorian"
+tmdb_id = 82856
+is_tv = true
+service = "DSNP"
+# source = "WEB-DL" # Doesn't need to be set since it's already set in default preset
+
+# ------------------------------------------------------------------------------
+# PRESET: remux
+# Use case: High-quality BluRay Remuxes.
+# use REMUX keyword and change order of video and audio codec info
+# ------------------------------------------------------------------------------
+[preset.movie-remux]
+source = "BluRay"
+video_codec_hevc = "HEVC"
+video_codec_avc = "AVC"
+template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_codec}.{audio_channels}-{group}"
+
+# ------------------------------------------------------------------------------
+# PRESET: encode
+# Use case: Name of the encoding library is used as the video codec.
+# ------------------------------------------------------------------------------
+[preset.encode]
+source = "BluRay"
+video_codec_hevc = "x265"
+video_codec_avc = "x264"
+
+# ------------------------------------------------------------------------------
+# PRESET: quick-check
+# Use case: Fast validation during ingest.
+# Disables some verbose and opinionated checks.
+# ------------------------------------------------------------------------------
+[preset.quick-check]
+disabled_checks = [
+    "filename_sequences",
+    "mediainfo_bitrate",
+    "matroska_track_order",
+    "matroska_name_quality"
+]
+
+# ------------------------------------------------------------------------------
+# PRESET: tvnation
+# Use case: disable all checks except for disallowed filename characters
+# ------------------------------------------------------------------------------
+[preset.tvnation]
+enabled_checks = ["filename_characters"]
+
+# ------------------------------------------------------------------------------
+# PRESET: special
+# Use case: For handling TV specials and extras.
+# Enables matching title/Aired date against Season 0 for TVDB
+# ------------------------------------------------------------------------------
+[preset.special]
+allow_special_matches = true
+season = 0
+is_tv = true
+template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resolution}.{service}.{source}.{video_codec}-{group}"

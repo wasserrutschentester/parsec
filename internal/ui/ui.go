@@ -461,6 +461,18 @@ func PrintDebug(msg string) {
 	}
 }
 
+func PrintSuccess(msg string) {
+	if !IsSilent {
+		lipgloss.Println(Success.Render("✓ ") + msg)
+	}
+}
+
+func PrintInfo(msg string) {
+	if !IsSilent {
+		lipgloss.Println(Info.Render("i ") + msg)
+	}
+}
+
 func Println(a ...any) {
 	if !IsSilent {
 		lipgloss.Println(a...)

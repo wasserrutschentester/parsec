@@ -1,8 +1,13 @@
 package config
 
 import (
+	_ "embed"
+
 	"github.com/spf13/viper"
 )
+
+//go:embed default_config.toml
+var defaultConfig string
 
 func InitDefaults() {
 	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
@@ -185,4 +190,12 @@ func GetTmdbApiKey() string {
 
 func GetTvdbApiKey() string {
 	return viper.GetString("api_keys.tvdb")
+}
+
+func GetConfigFileUsed() string {
+	return viper.ConfigFileUsed()
+}
+
+func GetDefaultConfig() string {
+	return defaultConfig
 }
