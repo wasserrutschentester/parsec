@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -157,5 +158,8 @@ func initConfig() {
 
 	if presetFlag != "" {
 		config.SetPreset(presetFlag)
+		if !config.PresetExists(presetFlag) {
+			ui.PrintWarning(fmt.Sprintf("Preset '%s' does not exist in your configuration", presetFlag))
+		}
 	}
 }

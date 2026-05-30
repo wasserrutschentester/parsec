@@ -2,6 +2,7 @@ package config
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/spf13/viper"
 )
@@ -27,34 +28,34 @@ func SetPreset(name string) {
 	activePreset = name
 }
 
-func getString(key string) string {
+func getPresetKey(key string) string {
 	if activePreset != "" {
-		presetKey := "preset." + activePreset + "." + key
-		if viper.IsSet(presetKey) {
-			return viper.GetString(presetKey)
+		getPresetKey := fmt.Sprintf("preset.%s.%s", activePreset, key)
+		if viper.IsSet(getPresetKey) {
+			return getPresetKey
 		}
 	}
-	return viper.GetString(key)
+	return key
+}
+
+func PresetExists(name string) bool {
+	return viper.IsSet("preset." + name)
+}
+
+func getString(key string) string {
+	return viper.GetString(getPresetKey(key))
 }
 
 func getInt(key string) int {
-	if activePreset != "" {
-		presetKey := "preset." + activePreset + "." + key
-		if viper.IsSet(presetKey) {
-			return viper.GetInt(presetKey)
-		}
-	}
-	return viper.GetInt(key)
+	return viper.GetInt(getPresetKey(key))
 }
 
 func getBool(key string) bool {
-	if activePreset != "" {
-		presetKey := "preset." + activePreset + "." + key
-		if viper.IsSet(presetKey) {
-			return viper.GetBool(presetKey)
-		}
-	}
-	return viper.GetBool(key)
+	return viper.GetBool(getPresetKey(key))
+}
+
+func getStringSlice(key string) []string {
+	return viper.GetStringSlice(getPresetKey(key))
 }
 
 func GetTemplate() string {
@@ -172,16 +173,6 @@ func IsCheckEnabled(checkName string) bool {
 	}
 
 	return true
-}
-
-func getStringSlice(key string) []string {
-	if activePreset != "" {
-		presetKey := "preset." + activePreset + "." + key
-		if viper.IsSet(presetKey) {
-			return viper.GetStringSlice(presetKey)
-		}
-	}
-	return viper.GetStringSlice(key)
 }
 
 func GetTmdbApiKey() string {
