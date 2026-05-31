@@ -14,10 +14,10 @@ import (
 )
 
 type EbmlMetadata struct {
-	Attachments []string    `json:"attachments,omitempty"`
-	Errors      []string    `json:"errors,omitempty"`
-	FileName    string      `json:"file_name,omitempty"`
-	Tracks      []EbmlTrack `json:"tracks,omitempty"`
+	Attachments []EbmlAttachment `json:"attachments,omitempty"`
+	Errors      []string         `json:"errors,omitempty"`
+	FileName    string           `json:"file_name,omitempty"`
+	Tracks      []EbmlTrack      `json:"tracks,omitempty"`
 }
 
 type EbmlTrack struct {
@@ -44,6 +44,13 @@ type EbmlTrackProperties struct {
 	OriginalLanguage bool   `json:"flag_original,omitempty"`
 	TextDescriptions bool   `json:"flag_text_descriptions,omitempty"`
 	TextSubtitles    bool   `json:"text_subtitles,omitempty"`
+}
+
+type EbmlAttachment struct {
+	ID          int    `json:"id,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
+	FileName    string `json:"file_name,omitempty"`
+	Size        int    `json:"size,omitempty"`
 }
 
 type mkvTags struct {
