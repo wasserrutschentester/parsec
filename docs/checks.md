@@ -55,6 +55,8 @@ Most of these can be disabled in the [Config](config.md) if you don't want to us
 | Title Match | `checkTitle` | `mdb_title` | Yes | Compares filename title with the official title from TMDB/TVDB. |
 | Movie Year Match | `checkMovieYear` | `mdb_movie_year` | Yes | Verifies release year against database records for movies. |
 | Series Year Match | `checkSeriesYear` | `mdb_series_year` | Yes | Verifies series start year against database records. |
+| Unknown Original Language | `checkUnknownOriginalLang` | `mdb_unknown_original_lang` | Yes | Warns if the original language from TMDB/TVDB is not recognized or missing (could cause issues with other language checks). |
+| Unwanted Audio Language | `checkUnwantedAudioLang` | `mdb_unwanted_audio_lang` | Yes | Flags audio tracks in languages that are neither the preferred nor the original language (often considered bloated) |
 | Episode Existence | `checkEpisode` | `mdb_episode_existence` | Yes | Verifies that the Season/Episode exists in the database. |
 | Episode Title Match | `checkEpisodeTitle` | `mdb_episode_title` | Yes | Compares filename episode title with the official database title. |
 | Special Date Match | `checkSpecialDate` | `mdb_episode_date` | Yes | Verifies air date for TV specials against database records. |

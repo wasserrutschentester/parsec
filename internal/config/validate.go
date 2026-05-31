@@ -134,6 +134,8 @@ var validCheckIdentifiers = map[string]bool{
 	"mdb_movie_year":               true,
 	"mdb_series_year":              true,
 	"mdb_track_languages":          true,
+	"mdb_unknown_original_lang":    true,
+	"mdb_unwanted_audio_lang":      true,
 	"mdb_episode_existence":        true,
 	"mdb_episode_title":            true,
 	"mdb_episode_date":             true,

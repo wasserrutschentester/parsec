@@ -166,6 +166,8 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `mdb_title`: Verify title against TMDB/TVDB.
 -   `mdb_movie_year`: Verify movie release year.
 -   `mdb_series_year`: Verify series start year.
+-   `mdb_unknown_original_lang`: Warn if the original language is missing or unrecognized by MDB.
+-   `mdb_unwanted_audio_lang`: Flag audio tracks in languages other than preferred/original.
 -   `mdb_episode_existence`: Check if episode exists in database.
 -   `mdb_episode_title`: Verify episode title.
 -   `mdb_episode_date`: Verify episode air date.

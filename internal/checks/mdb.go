@@ -24,6 +24,10 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		return checkNoMatch()
 	}
 
+	if config.IsCheckEnabled("mdb_unknown_original_lang") {
+		results = append(results, checkUnknownOriginalLang(mi, searchResult)...)
+	}
+
 	if config.IsCheckEnabled("mdb_title") {
 		results = append(results, checkTitle(meta, searchResult)...)
 	}
@@ -39,6 +43,9 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 
 	if mi != nil && config.IsCheckEnabled("mdb_track_languages") {
 		results = append(results, checkTrackLanguages(mi, searchResult)...)
+	}
+	if mi != nil && config.IsCheckEnabled("mdb_unwanted_audio_lang") {
+		results = append(results, checkUnwantedAudioLang(mi, searchResult)...)
 	}
 	return results
 }
@@ -104,6 +111,55 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 	if origLang != "" && origTag != prefTag {
 		check("Audio", audioLangs, origTag, origLang, "original")
 		check("Subtitle", subLangs, origTag, origLang, "original")
+	}
+	return results
+}
+
+func checkUnknownOriginalLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
+	var results []CheckResult
+	origLang := result.OriginalLanguage
+	origTag := language.Make(origLang)
+	if origLang == "" || origTag == language.Und {
+		res := CheckResult{
+			Identifier: "mdb_unknown_original_lang",
+			Passed:     false,
+			Severity:   "warning",
+			Warning:    fmt.Sprintf("original language '%s' is not recognized or missing from TMDB/TVDB", origLang),
+			Actual:     origLang,
+		}
+		results = append(results, res)
+	}
+	return results
+}
+
+func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
+	var results []CheckResult
+	prefLang := config.GetPreferredLanguage()
+	origLang := result.OriginalLanguage
+	audioLangs := mi.GetAudioLanguages()
+
+	wantedLangs := map[language.Tag]bool{
+		language.Make(prefLang): true,
+		language.Make(origLang): true,
+		language.Und:            true,
+		language.Make("mul"):    true,
+	}
+
+	unwantedLangs := []language.Tag{}
+	for _, lang := range audioLangs {
+		langTag := language.Make(lang)
+		if !wantedLangs[langTag] {
+			unwantedLangs = append(unwantedLangs, langTag)
+		}
+	}
+	unwantedLangs = metadata.RemoveDuplicates(unwantedLangs)
+	if len(unwantedLangs) > 0 {
+		results = append(results, CheckResult{
+			Identifier: "mdb_unwanted_audio_lang",
+			Passed:     false,
+			Severity:   "warning",
+			Warning:    fmt.Sprintf("Has unwanted audio language track(s): %s", unwantedLangs),
+		})
 	}
 	return results
 }
