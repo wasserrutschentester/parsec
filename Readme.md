@@ -6,20 +6,39 @@ parse - check - create - release
 
 ## Installation
 
-**Parsec is currently in early development and may not be stable.**
+**Parsec is currently in beta. The initial rapid development phase is over, but it isn't well tested yet. If you encounter any issues, please report them on the [issue tracker](https://codeberg.org/n0ne/parsec/issues).**
 
-To install `parsec`, ensure you have [Go](https://go.dev/) installed and run:
+To install `parsec`, ensure you can just download the latest release from the [releases page](https://codeberg.org/n0ne/parsec/releases) and extract the binary to your `PATH` (and make sure it's set as executable)
+
+for new versions you can use the `update` command to go to the latest version:
 
 ```bash
-go install codeberg.org/n0ne/parsec@main
+parsec update
 ```
 
-### Prerequisites
+### Dependencies
 
 `parsec` depends on the following external tools which must be available in your `PATH`:
 
 - **[MediaInfo](https://mediaarea.net/en/MediaInfo)**: Used for extracting technical metadata.
 - **[MKVToolNix](https://mkvtoolnix.download/)**: Specifically `mkvmerge` and `mkvpropedit` for handling Matroska files.
+
+### Manual Installation
+
+Clone the repository and build with make:
+
+```bash
+git clone https://codeberg.org/n0ne/parsec.git
+cd parsec
+make build
+```
+
+this should create a `parsec` binary in the current directory.
+
+Build Dependencies:
+- **[Go](https://golang.org/)**: Go compiler and standard library.
+- **[Git](https://git-scm.com/)**: Version control system.
+- **[make](https://www.gnu.org/software/make/)**: Build automation tool.
 
 ## Commands
 
@@ -46,6 +65,8 @@ Search and identify movies or TV shows in media databases.
 - **Matroska Tags**: Can write Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.
 - **Episode Search**: Can find Episode details via Episode + Season Number, Episode Title or Aired Date.
 
+For more information see the [Identify Documentation](docs/identify.md)
+
 ### `rename`
 Rename files based on metadata and naming conventions.
 
@@ -57,8 +78,12 @@ Rename files based on metadata and naming conventions.
 - **Interactive**: Preview changes and then confirm the modification. Or apply unattended
 - **Metadata Overrides**: Manually specify details like `--hdr`, `--cut-edition`, or `--repack`.
 
-### `mediainfo`
-Display a detailed, formatted dump of all technical metadata parsed by `parsec`.
+For more information see the [Rename Documentation](docs/rename.md)
+
+### `update`
+Update `parsec` to the latest version.
+
+For more information see the [Update Documentation](docs/update.md)
 
 ## Configuration
 

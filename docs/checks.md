@@ -1,10 +1,37 @@
 # Parsec Validation Checks
 
-This document lists all individual checks performed by the `parsec check` command to ensure media files adhere to the project specification.
+The `check` command performs comprehensive integrity and consistency checks on a media file to ensure it adheres to the project specification.
 
-Most of these can be disabled in the [Config](config.md) if you don't want to use them
+## Usage
 
-## Filename Checks
+```bash
+parsec check [file] [flags]
+```
+
+## Flags
+
+### ID Flags
+Force identification using specific database IDs.
+
+| Flag | Shorthand | Type | Description |
+|------|-----------|------|-------------|
+| `--imdb` | | string | IMDb ID (e.g., `tt1234567`). |
+| `--tmdb` | | integer | TMDB ID. |
+| `--tvdb` | | integer | TVDB ID. |
+
+### Other Flags
+
+| Flag | Shorthand | Type | Description |
+|------|-----------|------|-------------|
+| `--json` | `-j` | boolean | Output check results in JSON format. |
+| `--unattended`| `-u` | boolean | Do not prompt for confirmation before displaying issue details. |
+| `--verbose` | | boolean | Enable verbose output. |
+
+## Available Checks
+
+This document lists all individual checks performed by the `parsec check` command. Most of these can be disabled in the [Config](config.md) if you don't want to use them.
+
+### Filename Checks
 
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
@@ -16,7 +43,7 @@ Most of these can be disabled in the [Config](config.md) if you don't want to us
 | TV Specials | `checkTvSpecial` | `filename_tv_special` | Yes | Requires air date and episode title for TV specials (Season 00). |
 | Name Mismatch | `checkNameMismatch` | `filename_generation_mismatch` | Yes | Verifies that the filename matches the name generated from its metadata. |
 
-## Technical Quality Checks (MediaInfo)
+### Technical Quality Checks (MediaInfo)
 
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
@@ -29,7 +56,7 @@ Most of these can be disabled in the [Config](config.md) if you don't want to us
 | Redundant Audio | `checkRedundantAudio` | `mediainfo_redundant_audio` | Yes | Identifies multiple standard audio tracks for the same language. |
 | Resolution | `checkResolution` | `mediainfo_resolution` | Yes | Checks for odd resolution, standard widths, and sane aspect ratios. |
 
-## Matroska / EBML Checks
+### Matroska / EBML Checks
 
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
@@ -46,7 +73,7 @@ Most of these can be disabled in the [Config](config.md) if you don't want to us
 | Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures only the first standard track per language is marked as Default. |
 | Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all subtitle tracks are in SRT format. |
 
-## Media Database (MDB) Consistency Checks
+### Media Database (MDB) Consistency Checks
 
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
@@ -61,3 +88,178 @@ Most of these can be disabled in the [Config](config.md) if you don't want to us
 | Episode Title Match | `checkEpisodeTitle` | `mdb_episode_title` | Yes | Compares filename episode title with the official database title. |
 | Special Date Match | `checkSpecialDate` | `mdb_episode_date` | Yes | Verifies air date for TV specials against database records. |
 | Track Languages | `checkTrackLanguages` | `mdb_track_languages` | Yes | Verifies presence of audio and subtitle tracks in both preferred and original languages. |
+
+## JSON Output
+
+When the `--json` flag is used, `parsec check` outputs a detailed report in JSON format. Passed checks and empty fields are generally omitted to reduce noise.
+
+The interactive Output contains the same information as the JSON output, but in an easy-to-read human-readable format.
+
+### Top-Level Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file` | string | Full path or filename of the checked file. |
+| `passed` | boolean | `true` if all checks passed, `false` otherwise. |
+| `filename` | string | The original filename without extension. |
+| `generated_name` | string | The expected filename generated based on metadata and naming conventions. |
+| `issues` | array | A list of issue groups, categorized by source. |
+
+**Example:**
+```json
+{
+  "file": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv",
+  "passed": false,
+  "filename": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
+  "generated_name": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.H.265-FuN",
+  "issues": []
+}
+```
+
+### Issue Group
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `category` | string | The category of issues. Possible values: `FILENAME`, `MDB`, `MEDIAINFO`, `MATROSKA`. |
+| `results` | array | A list of individual check results for this category. |
+
+**Example:**
+```json
+{
+  "category": "FILENAME",
+  "results": []
+}
+```
+
+### Result Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `identifier` | string | Unique identifier for the check (see [Available Checks](#available-checks)). |
+| `passed` | boolean | Whether this specific check passed. |
+| `severity` | string | The importance of the issue. Possible values: `info`, `warning`, `error`. |
+| `warning` | string | Human-readable description of the problem. |
+| `expected` | string | The expected value (optional, depends on the check). |
+| `actual` | string | The actual value found (optional, depends on the check). |
+| `tracks` | array | List of track-specific results (optional, for checks that evaluate individual tracks). |
+
+**Example:**
+```json
+{
+  "identifier": "filename_generation_mismatch",
+  "passed": false,
+  "severity": "warning",
+  "warning": "Generated name does not match the original",
+  "expected": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
+  "actual": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN",
+  "tracks": []
+}
+```
+
+### Track Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | The MediaInfo track ID (Number, starting from 1). |
+| `type` | string | The track type (e.g., `video`, `audio`, `subtitle`). |
+| `passed` | boolean | Whether the check passed for this specific track. |
+| `type_order` | integer | The sequential order of this track among tracks of the same type. |
+| `codec` | string | Technical codec name (e.g., `V_MPEG4/ISO/AVC`, `A_AC3`). |
+| `name` | string | The track's `Name` field in Matroska. |
+| `language` | string | The track's ISO 639-2/T language tag (e.g., `ger`, `eng`). |
+| `flags` | array | List of applied track flags. See [Track Flags](#track-flags). |
+| `warning` | string | Human-readable description of the track-specific issue. |
+
+**Example:**
+```json
+{
+  "id": "2",
+  "type": "audio",
+  "passed": false,
+  "type_order": 1,
+  "codec": "AC-3",
+  "name": "Surround",
+  "language": "ger",
+  "flags": [
+    "Default"
+  ],
+  "warning": "junk keyword 'SURROUND' in Name"
+}
+```
+
+### Track Flags
+
+Possible values in the `flags` array:
+
+* `Default`: Track is marked as the default for its type.
+* `Forced`: Track is marked as forced.
+* `Hearing Impaired`: Track is marked for hearing impaired (SDH).
+* `Visual Impaired`: Track is marked for visual impaired (Descriptive Audio).
+* `Commentary`: Track is marked as commentary.
+* `Original`: Track is marked as being in the original language.
+
+### Full Example
+```bash
+parsec check Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv --json
+```
+```json
+{
+  "file": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv",
+  "passed": false,
+  "filename": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
+  "generated_name": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN",
+  "issues": [
+    {
+      "category": "FILENAME",
+      "results": [
+        {
+          "identifier": "filename_generation_mismatch",
+          "passed": false,
+          "severity": "warning",
+          "warning": "Generated name does not match the original",
+          "expected": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
+          "actual": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN"
+        }
+      ]
+    },
+    {
+      "category": "MDB",
+      "results": [
+        {
+          "identifier": "mdb_subtitle_language_preferred",
+          "passed": false,
+          "severity": "warning",
+          "warning": "Subtitle track in preferred language 'de' is missing",
+          "expected": "de"
+        }
+      ]
+    },
+    {
+      "category": "MATROSKA",
+      "results": [
+        {
+          "identifier": "matroska_name_quality",
+          "passed": false,
+          "severity": "info",
+          "warning": "Track Name contains junk keywords",
+          "tracks": [
+            {
+              "id": "2",
+              "type": "audio",
+              "passed": false,
+              "type_order": 1,
+              "codec": "AC-3",
+              "name": "Surround",
+              "language": "ger",
+              "flags": [
+                "Default"
+              ],
+              "warning": "junk keyword 'SURROUND' in Name"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
