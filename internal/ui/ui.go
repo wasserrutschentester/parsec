@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2/table"
 	"codeberg.org/n0ne/parsec/internal/types"
 	"github.com/aymanbagabas/go-udiff"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/term"
 )
 
@@ -28,6 +29,7 @@ var (
 	gray   = lipgloss.Color("244")
 	purple = lipgloss.Color("141")
 	white  = lipgloss.Color("255")
+	black  = lipgloss.Color("0")
 
 	// Functional Styles
 	Info    = lipgloss.NewStyle().Foreground(blue)
@@ -80,7 +82,7 @@ var (
 
 	WarningTag = BadgeStyle.
 			Background(yellow).
-			Foreground(lipgloss.Color("0")).
+			Foreground(black).
 			Render("ANOMALY")
 
 	ErrorTag = BadgeStyle.
@@ -94,9 +96,51 @@ var (
 			Render("DEBUG")
 )
 
+// DisableColors globally disables color output for all styles and components.
+func DisableColors() {
+	// In v2, global color downsampling is handled by the Writer.
+	// Note: Style.Render() still produces ANSI codes, so we must also reset styles.
+	lipgloss.Writer.Profile = colorprofile.ASCII
+
+	// Reset base colors
+	blue = lipgloss.NoColor{}
+	green = lipgloss.NoColor{}
+	yellow = lipgloss.NoColor{}
+	red = lipgloss.NoColor{}
+	gray = lipgloss.NoColor{}
+	purple = lipgloss.NoColor{}
+	white = lipgloss.NoColor{}
+	black = lipgloss.NoColor{}
+
+	// Reset functional styles
+	Info = lipgloss.NewStyle()
+	Success = lipgloss.NewStyle()
+	Warning = lipgloss.NewStyle()
+	Error = lipgloss.NewStyle()
+	Muted = lipgloss.NewStyle()
+	Debug = lipgloss.NewStyle()
+	Link = lipgloss.NewStyle()
+
+	// Reset structural styles
+	Header = lipgloss.NewStyle().Bold(true)
+	LabelStyle = lipgloss.NewStyle().Bold(true)
+	ValueStyle = lipgloss.NewStyle()
+	Label = lipgloss.NewStyle().Bold(true)
+	Value = lipgloss.NewStyle()
+	BadgeStyle = lipgloss.NewStyle().Bold(true)
+	CardStyle = lipgloss.NewStyle()
+
+	// Re-render global icons/tags
+	IconCheck = Success.Render("✓")
+	IconCross = Error.Render("✗")
+	WarningTag = BadgeStyle.Render("ANOMALY")
+	ErrorTag = BadgeStyle.Render("CRITICAL")
+	DebugTag = BadgeStyle.Render("DEBUG")
+}
+
 // Status Badges
 func SuccessBadge(msg string) string {
-	return BadgeStyle.Background(green).Foreground(lipgloss.Color("0")).Render("NOMINAL") + " " + Success.Render(msg)
+	return BadgeStyle.Background(green).Foreground(black).Render("NOMINAL") + " " + Success.Render(msg)
 }
 
 func WarningBadge(msg string) string {
@@ -454,7 +498,7 @@ func PrintWarning(msg string) {
 }
 
 func PrintError(msg string) {
-	fmt.Fprintln(os.Stderr, FormatError(msg))
+	_, _ = lipgloss.Fprintln(os.Stderr, FormatError(msg))
 }
 
 func PrintDebug(msg string) {

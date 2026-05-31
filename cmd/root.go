@@ -24,6 +24,9 @@ var rootCmd = &cobra.Command{
 	Long:  ui.Banner(".: FIRST STEPS? :."),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		ui.IsSilent = jsonOutputFlag // make sure only json is printed
+		if jsonOutputFlag {
+			ui.DisableColors()
+		}
 		ui.IsDebug = debugFlag
 		ui.PrintDebug("Debug output enabled")
 		config.NoCache = noCacheFlag
