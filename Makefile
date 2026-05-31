@@ -11,6 +11,11 @@ VERSION ?= $(shell echo $(GIT_VER) | sed -e '/^v/! s/^/v0.0.0-/' -e 's/-dirty/+d
 
 LDFLAGS = -X codeberg.org/n0ne/parsec/cmd.Version=$(VERSION)
 
+.PHONY: init
+init: ## Initialize local development environment
+	git config core.hooksPath scripts
+	chmod +x scripts/commit-msg
+
 .PHONY: all
 all: lint
 
