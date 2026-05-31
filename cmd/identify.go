@@ -27,7 +27,7 @@ check if it exists and return its details.
 If a filename is provided, it will be parsed for metadata.
 Flags can be used to override or provide missing information.`),
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var meta *metadata.Metadata
 		filePath := ""
 		if len(args) > 0 {
@@ -47,7 +47,7 @@ Flags can be used to override or provide missing information.`),
 		result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 		if err != nil {
 			ui.PrintError(err.Error())
-			return
+			return fmt.Errorf("search failed")
 		}
 
 		warnOnIDMismatch(filePath, result)
@@ -67,7 +67,7 @@ Flags can be used to override or provide missing information.`),
 			_, _ = fmt.Scanln(&response)
 			if response != "y" && response != "Y" {
 				ui.Println(ui.Muted.Render("Skipping..."))
-				return
+				return nil
 			} else {
 				writeTagsFlag = true
 			}
@@ -81,6 +81,7 @@ Flags can be used to override or provide missing information.`),
 				ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
 			}
 		}
+		return nil
 	},
 }
 

@@ -21,12 +21,12 @@ func init() {
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update parsec to the latest version",
-	Run: func(cmd *cobra.Command, args []string) {
-		runUpdate()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runUpdate()
 	},
 }
 
-func runUpdate() {
+func runUpdate() error {
 	ui.PrintInfo("Checking for updates...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -35,14 +35,14 @@ func runUpdate() {
 	rel, err := update.FetchLatestRelease(ctx)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to check for updates: %v", err))
-		return
+		return fmt.Errorf("fetching release info failed")
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Latest version: %s (Current: %s)", rel.TagName, Version))
 
 	if !forceUpdate && !update.IsNewer(rel.TagName, Version) {
 		ui.PrintSuccess(fmt.Sprintf("You are already on the latest version (%s)", Version))
-		return
+		return nil
 	}
 
 	ui.PrintInfo(fmt.Sprintf("Updating to %s...", rel.TagName))
@@ -54,7 +54,7 @@ func runUpdate() {
 		for _, a := range rel.Assets {
 			ui.PrintInfo("- " + a.Name)
 		}
-		return
+		return fmt.Errorf("no matching asset found")
 	}
 
 	// 1. Download
@@ -62,7 +62,7 @@ func runUpdate() {
 	tempFile, err := update.DownloadAsset(ctx, asset.BrowserDownloadURL)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to download update: %v", err))
-		return
+		return fmt.Errorf("download failed")
 	}
 	defer func() { _ = os.Remove(tempFile) }() // Cleanup if we return early (e.g. checksum fail)
 
@@ -72,7 +72,7 @@ func runUpdate() {
 		ui.PrintInfo("Verifying checksum...")
 		if err := update.VerifyChecksum(ctx, asset.Name, tempFile, checksumAsset.BrowserDownloadURL); err != nil {
 			ui.PrintError(fmt.Sprintf("Security check failed: %v", err))
-			return
+			return fmt.Errorf("checksum verification failed")
 		}
 		ui.PrintSuccess("Checksum verified")
 	} else {
@@ -83,8 +83,9 @@ func runUpdate() {
 	ui.PrintInfo("Finalizing update...")
 	if err := update.ReplaceExecutable(tempFile); err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to replace binary: %v", err))
-		return
+		return fmt.Errorf("update failed")
 	}
 
 	ui.PrintSuccess(fmt.Sprintf("Successfully updated to %s", rel.TagName))
+	return nil
 }

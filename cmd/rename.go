@@ -32,14 +32,18 @@ var renameCmd = &cobra.Command{
 
 The resulting filename is generated according to the configured template.`),
 	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, filePath := range args {
-			renameFile(cmd, filePath)
+			err := renameFile(cmd, filePath)
+			if err != nil {
+				return err
+			}
 		}
+		return nil
 	},
 }
 
-func renameFile(cmd *cobra.Command, filePath string) {
+func renameFile(cmd *cobra.Command, filePath string) error {
 	ext := filepath.Ext(filePath)
 	filenameNoExt := filename.GetBaseName(filePath)
 
@@ -53,7 +57,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		meta.Override(mediaMeta)
 	} else {
 		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", filePath, err))
-		return
+		return fmt.Errorf("mediainfo parsing failed")
 	}
 
 	// 2.2 Get EBML Metadata for Visual Impaired flag
@@ -102,7 +106,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 
 	if filepath.Base(filePath) == newName {
 		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' already has the correct name.", filepath.Base(filePath))))
-		return
+		return nil
 	}
 
 	ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
@@ -111,7 +115,7 @@ func renameFile(cmd *cobra.Command, filePath string) {
 
 	if dryRunFlag {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-		return
+		return nil
 	}
 
 	if !unattendedFlag {
@@ -120,15 +124,17 @@ func renameFile(cmd *cobra.Command, filePath string) {
 		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			ui.Println(ui.Muted.Render("Skipping..."))
-			return
+			return nil
 		}
 	}
 
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", filePath, renameErr))
+		return fmt.Errorf("rename failed")
 	} else {
 		ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
+		return nil
 	}
 }
 

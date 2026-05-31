@@ -21,12 +21,12 @@ var configInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Create a default configuration file",
 	Long:  ui.Banner(".: WARP CORE LOADING PROTO :."),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: LOADING WARP CORE :."))
 		confDir, err := os.UserConfigDir()
 		if err != nil {
 			ui.PrintError(fmt.Sprintf("Could not determine user config directory: %v", err))
-			return
+			return fmt.Errorf("config dir determination failed")
 		}
 
 		targetDir := filepath.Join(confDir, "parsec")
@@ -34,28 +34,29 @@ var configInitCmd = &cobra.Command{
 
 		if _, err := os.Stat(targetFile); err == nil {
 			if !ui.ConfirmContinue(fmt.Sprintf("Configuration file already exists at %s. Overwrite and backup old one?", targetFile)) {
-				return
+				return nil
 			}
 
 			backupFile := targetFile + "." + time.Now().Format("2006-01-02_15-04-05") + ".bak"
 			if err := os.Rename(targetFile, backupFile); err != nil {
 				ui.PrintError(fmt.Sprintf("Could not backup existing config file: %v", err))
-				return
+				return fmt.Errorf("config backup failed")
 			}
 			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", backupFile))
 		}
 
 		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not create config directory: %v", err))
-			return
+			return fmt.Errorf("config dir creation failed")
 		}
 
 		if err := os.WriteFile(targetFile, []byte(config.GetDefaultConfig()), 0o644); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not write config file: %v", err))
-			return
+			return fmt.Errorf("config write failed")
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Created default configuration at %s", targetFile))
+		return nil
 	},
 }
 

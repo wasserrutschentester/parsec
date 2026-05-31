@@ -43,13 +43,13 @@ It validates:
   3. Matroska container integrity and track tagging
   4. Consistency with online databases (TMDB/TVDB) for titles and episodes`),
 	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		report, err := collectCheckData(cmd, filePath)
 		if err != nil {
 			ui.PrintError(err.Error())
-			return
+			return fmt.Errorf("collecting check data failed")
 		}
 
 		if jsonOutputFlag {
@@ -57,6 +57,7 @@ It validates:
 		} else {
 			printInteractiveReport(report)
 		}
+		return nil
 	},
 }
 
