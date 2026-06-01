@@ -205,6 +205,10 @@ func getISO3(lang string) string {
 }
 
 func get(endpoint string, target interface{}) error {
+	return getWithRetry(endpoint, target, true)
+}
+
+func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
 	prefLang := config.GetPreferredLanguage()
 	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
 	if cached, err := cache.Get(cacheKey); err == nil {
@@ -234,6 +238,12 @@ func get(endpoint string, target interface{}) error {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusUnauthorized {
+			_ = cache.Remove("tvdb_token")
+			if allowRetry {
+				return getWithRetry(endpoint, target, false)
+			}
+		}
 		return fmt.Errorf("TVDB API returned status %d", resp.StatusCode)
 	}
 

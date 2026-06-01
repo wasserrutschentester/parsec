@@ -44,6 +44,8 @@ Flags can be used to override or provide missing information.`),
 		applyMetadataFlags(cmd, meta)
 		meta.SetDefaults()
 
+		ui.PrintDebug(fmt.Sprintf("%+v", meta))
+
 		result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 		if err != nil {
 			ui.PrintError(err.Error())

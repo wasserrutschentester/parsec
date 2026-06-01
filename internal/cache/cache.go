@@ -59,6 +59,10 @@ func Set(key string, data []byte) error {
 	return os.WriteFile(getPath(key), data, 0o644)
 }
 
+func Remove(key string) error {
+	return os.Remove(getPath(key))
+}
+
 func getPath(key string) string {
 	hash := sha256.Sum256([]byte(key))
 	return filepath.Join(cacheDir, fmt.Sprintf("%x", hash))
