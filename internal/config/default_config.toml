@@ -31,6 +31,11 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode
 video_codec_avc = "H.264"
 video_codec_hevc = "H.265"
 
+# Custom regular expression to clean titles before normalization.
+# It will remove any matches of this regex from the Title and Episode Title.
+# e.g. '(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))' to remove anything after | and Part indicators.
+title_cleaning_regex = ""
+
 # Api keys for Media Databases (required for most features)
 [api_keys]
 tmdb = "your_tmdb_api_key" # https://developer.themoviedb.org/docs/getting-started

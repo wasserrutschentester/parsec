@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 )
 
@@ -16,6 +17,18 @@ func GetBaseName(filePath string) string {
 		name = name[:len(name)-len(ext)]
 	}
 	return name
+}
+
+func ApplyTitleCleanRegex(title string) string {
+	regexStr := config.GetTitleCleaningRegex()
+	if regexStr == "" {
+		return title
+	}
+	re, err := regexp.Compile(regexStr)
+	if err != nil {
+		return title
+	}
+	return strings.TrimSpace(re.ReplaceAllString(title, ""))
 }
 
 func Parse(filename string) *metadata.Metadata {
@@ -292,6 +305,9 @@ func DeobfuscateTitle(title string) string {
 }
 
 func NormalizeTitle(title string) string {
+	// 0. Apply custom cleaning regex from config
+	title = ApplyTitleCleanRegex(title)
+
 	// replace umlauts and similar characters
 	title = removeDiacritics(title)
 

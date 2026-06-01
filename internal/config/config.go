@@ -20,6 +20,7 @@ func InitDefaults() {
 	viper.SetDefault("video_codec_avc", "H.264")
 	viper.SetDefault("video_codec_hevc", "H.265")
 	viper.SetDefault("disable_update_check", false)
+	viper.SetDefault("title_cleaning_regex", "")
 }
 
 var (
@@ -147,6 +148,10 @@ func GetTvdbID() int {
 
 func GetAllowSpecials() bool {
 	return getBool("allow_special_matches")
+}
+
+func GetTitleCleaningRegex() string {
+	return getString("title_cleaning_regex")
 }
 
 func GetVideoCodecAVC() string {

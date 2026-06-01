@@ -83,6 +83,7 @@ var expectedTypes = map[string]string{
 	"tmdb_id":               "int64",
 	"tvdb_id":               "int64",
 	"allow_special_matches": "bool",
+	"title_cleaning_regex":  "string",
 	"enabled_checks":        "[]interface {}",
 	"disabled_checks":       "[]interface {}",
 }

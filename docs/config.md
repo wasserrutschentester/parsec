@@ -95,6 +95,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
 | `allow_special_matches` | boolean | Allow matching episodes against Specials (Season 0) (default: `false`). |
+| `title_cleaning_regex` | string | Optional custom regex to strip unwanted parts from titles (e.g. `(?i)(\s*\|.*)` to remove everything after a pipe) |
 
 #### Metadata Overrides
 
