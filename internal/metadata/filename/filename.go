@@ -165,16 +165,19 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 		return ""
 	}
 
-	// Find the end of the season/episode or date tag
+	// Find the end of the season/episode and date tags
 	start := 0
 	if meta.Season != 0 || meta.Episode != 0 {
 		tag := fmt.Sprintf("S%02dE%02d", meta.Season, meta.Episode)
 		if loc := strings.Index(filename, tag); loc != -1 {
 			start = loc + len(tag)
 		}
-	} else if meta.Date != "" {
+	}
+	if meta.Date != "" {
 		if loc := strings.Index(filename, meta.Date); loc != -1 {
-			start = loc + len(meta.Date)
+			if end := loc + len(meta.Date); end > start {
+				start = end
+			}
 		}
 	}
 
@@ -206,7 +209,7 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 }
 
 func matchTitleYear(filename string) (string, int) {
-	re := regexp.MustCompile(`^(.*?)(?:[ .](\d{4})|[ .]S\d{2,4}(?:E\d{2})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
+	re := regexp.MustCompile(`^(.*?)(?:[ .](\d{4})|[ .]S\d{2,4}(?:E\d{2,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
 	match := re.FindStringSubmatchIndex(filename)
 	if match != nil {
 		title := filename[match[2]:match[3]]

@@ -216,6 +216,40 @@ func TestParse(t *testing.T) {
 				IsTV:          false,
 			},
 		},
+		{
+			filename: "ZDF.Magazin.Royale.S00E166.2026-05-29.Die.Colonius-Sprengung.ZMR.vor.Ort.GERMAN.1080p.ZDF.WEB-DL.h264-SLiDE",
+			expected: metadata.Metadata{
+				Title:        "ZDF.Magazin.Royale",
+				Season:       0,
+				Episode:      166,
+				Date:         "2026-05-29",
+				EpisodeTitle: "Die.Colonius-Sprengung.ZMR.vor.Ort",
+				Language:     "GERMAN",
+				Resolution:   "1080p",
+				Service:      "ZDF",
+				Source:       "WEB-DL",
+				VideoCodec:   "h264",
+				Group:        "SLiDE",
+				IsTV:         true,
+			},
+		},
+		{
+			filename: "ZDF.Magazin.Royale.S2026E166.2026-05-29.Die.Colonius-Sprengung.ZMR.vor.Ort.GERMAN.1080p.ZDF.WEB-DL.h264-SLiDE",
+			expected: metadata.Metadata{
+				Title:        "ZDF.Magazin.Royale",
+				Season:       2026,
+				Episode:      166,
+				Date:         "2026-05-29",
+				EpisodeTitle: "Die.Colonius-Sprengung.ZMR.vor.Ort",
+				Language:     "GERMAN",
+				Resolution:   "1080p",
+				Service:      "ZDF",
+				Source:       "WEB-DL",
+				VideoCodec:   "h264",
+				Group:        "SLiDE",
+				IsTV:         true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
