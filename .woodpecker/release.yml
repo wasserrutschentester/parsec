@@ -1,13 +1,21 @@
 when:
     - event: tag
       branch: main
-      ref: refs/tags/v*
+      ref:
+          include: ["refs/tags/v0.[1-9]*", "refs/tags/v[1-9]*"]
 
 variables:
     - &build_platforms "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
     - &golang "golang:1.25-alpine"
     - &golangci_lint "golangci/golangci-lint:v2.12-alpine"
     - &release_plugin "codeberg.org/woodpecker-plugins/release"
+
+clone:
+    git:
+        image: woodpeckerci/plugin-git
+        settings:
+            partial: false
+            depth: 0
 
 steps:
     vendor:
@@ -24,6 +32,16 @@ steps:
         image: *golang
         commands:
             - go test ./...
+
+    changelog:
+        image: orhunp/git-cliff:latest
+        environment:
+            GITEA_REPO: n0ne/parsec
+            GITEA_API_URL: https://codeberg.org
+            GITEA_TOKEN:
+                from_secret: forge_token
+        commands:
+            - git-cliff --current --remote --strip all --output RELEASE_NOTES.md
 
     build:
         image: *golang
@@ -44,10 +62,6 @@ steps:
                     -ldflags="-s -w -X codeberg.org/n0ne/parsec/cmd.Version=$$VERSION" \
                     -o "dist/parsec-$${GOOS}-$${GOARCH}$${EXT}"
                 done
-            - |
-                cd dist
-                sha256sum * > checksums.txt
-                cd ..
 
     release:
         image: *release_plugin
@@ -56,5 +70,11 @@ steps:
                 from_secret: forge_token
             files:
                 - dist/*
+            checksum:
+                - sha256
+            checksum_file: checksums.txt
+            checksum_flatten: true
             title: ${CI_COMMIT_TAG}
-            generate_release_notes: true
+            note: RELEASE_NOTES.md
+            overwrite: true
+            draft: true
