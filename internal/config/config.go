@@ -21,6 +21,8 @@ func InitDefaults() {
 	viper.SetDefault("video_codec_hevc", "H.265")
 	viper.SetDefault("disable_update_check", false)
 	viper.SetDefault("title_cleaning_regex", "")
+	viper.SetDefault("prowlarr.movie_categories", []int{2000})
+	viper.SetDefault("prowlarr.tv_categories", []int{5000})
 }
 
 var (
@@ -193,6 +195,26 @@ func GetTmdbApiKey() string {
 
 func GetTvdbApiKey() string {
 	return viper.GetString("api_keys.tvdb")
+}
+
+func GetProwlarrUrl() string {
+	return viper.GetString("prowlarr.url")
+}
+
+func GetProwlarrApiKey() string {
+	return viper.GetString("prowlarr.api_key")
+}
+
+func GetProwlarrIndexers() []int {
+	return viper.GetIntSlice("prowlarr.indexers")
+}
+
+func GetProwlarrMovieCategories() []int {
+	return viper.GetIntSlice("prowlarr.movie_categories")
+}
+
+func GetProwlarrTvCategories() []int {
+	return viper.GetIntSlice("prowlarr.tv_categories")
 }
 
 func GetConfigFileUsed() string {

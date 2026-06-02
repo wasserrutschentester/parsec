@@ -5,6 +5,7 @@ import (
 
 	"codeberg.org/n0ne/parsec/internal/config"
 	"codeberg.org/n0ne/parsec/internal/mdb"
+	"codeberg.org/n0ne/parsec/internal/mdb/prowlarr"
 	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
 	"codeberg.org/n0ne/parsec/internal/metadata"
 	"codeberg.org/n0ne/parsec/internal/metadata/filename"
@@ -63,6 +64,11 @@ Flags can be used to override or provide missing information.`),
 				tags.SetEpisodeTags(episodeResult)
 			}
 		}
+
+		if releasesFlag {
+			prowlarr.PrintReleases(result, meta, bestFlag)
+		}
+
 		if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
 			fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
 			var response string
@@ -109,6 +115,8 @@ func init() {
 	// Other
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
+	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
+	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {

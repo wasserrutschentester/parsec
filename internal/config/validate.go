@@ -49,12 +49,18 @@ func checkKey(key, name string) {
 func checkAPIKeys() {
 	tmdbKey := GetTmdbApiKey()
 	tvdbKey := GetTvdbApiKey()
+	prowlarrKey := GetProwlarrApiKey()
+	prowlarrUrl := GetProwlarrUrl()
 
 	if tmdbKey == "" && tvdbKey == "" {
 		ui.PrintWarning("No API keys found. Metadata fetching might be limited.")
 	} else {
 		checkKey(tmdbKey, "TMDB")
 		checkKey(tvdbKey, "TVDB")
+	}
+
+	if prowlarrUrl != "" {
+		checkKey(prowlarrKey, "Prowlarr")
 	}
 }
 
@@ -92,6 +98,14 @@ var expectedTypes = map[string]string{
 var apiKeysExpectedTypes = map[string]string{
 	"tmdb": "string",
 	"tvdb": "string",
+}
+
+var prowlarrExpectedTypes = map[string]string{
+	"url":              "string",
+	"api_key":          "string",
+	"indexers":         "[]interface {}",
+	"movie_categories": "[]interface {}",
+	"tv_categories":    "[]interface {}",
 }
 
 var validTemplateKeys = map[string]bool{
@@ -200,6 +214,12 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 		if k == "api_keys" && prefix == "" {
 			if subMap, ok := v.(map[string]interface{}); ok {
 				errors = append(errors, validateMapTypes(subMap, fullKey, apiKeysExpectedTypes)...)
+				continue
+			}
+		}
+		if k == "prowlarr" && prefix == "" {
+			if subMap, ok := v.(map[string]interface{}); ok {
+				errors = append(errors, validateMapTypes(subMap, fullKey, prowlarrExpectedTypes)...)
 				continue
 			}
 		}

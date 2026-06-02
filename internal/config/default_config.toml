@@ -41,6 +41,12 @@ title_cleaning_regex = ""
 tmdb = "your_tmdb_api_key" # https://developer.themoviedb.org/docs/getting-started
 tvdb = "your_tvdb_api_key" # https://thetvdb.com/api-information
 
+# Prowlarr configuration for release searching
+[prowlarr]
+url = "http://localhost:9696" # e.g. http://localhost:9696
+api_key = "your_prowlarr_api_key"
+indexers = [] # Array of indexer IDs to limit the search (empty for all)
+
 
 # ---------------------------------- #
 #        SOME EXAMPLE PRESETS        #

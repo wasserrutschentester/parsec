@@ -80,6 +80,18 @@ These options can only be set at the top level of the configuration file and are
 | `api_keys.tmdb` | string | API key for TMDB. |
 | `api_keys.tvdb` | string | API key for TVDB. |
 
+#### Prowlarr Settings
+
+These settings are used for release searching via Prowlarr.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `prowlarr.url` | string | URL of your Prowlarr instance (e.g., `http://localhost:9696`). |
+| `prowlarr.api_key` | string | API key for Prowlarr. |
+| `prowlarr.indexers` | array of integers | Array of indexer IDs to limit the search (empty for all). |
+| `prowlarr.movie_categories` | array of integers | Prowlarr categories to search for movies (default: `[2000]`). |
+| `prowlarr.tv_categories` | array of integers | Prowlarr categories to search for TV shows (default: `[5000]`). |
+
 ### Preset-aware Options
 
 These options can be set globally OR within a `[preset.NAME]` block.
