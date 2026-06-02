@@ -25,14 +25,28 @@ func compareMetadata(got, want metadata.Metadata) string {
 	return strings.Join(diffs, "\n")
 }
 
+func runTableTest[T any](t *testing.T, tests []struct {
+	input    string
+	expected T
+}, fn func(string) T, compare func(T, T) string) {
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := fn(tt.input)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("Differences found:\n%s", compare(got, tt.expected))
+			}
+		})
+	}
+}
+
 // Test cases for filename parsing
 func TestParse(t *testing.T) {
 	tests := []struct {
-		filename string
+		input    string
 		expected metadata.Metadata
 	}{
 		{
-			filename: "Film.Titel.2000.GERMAN.1080p.ARD.WEB-DL.AAC2.0.H.264-GRP.mkv",
+			input: "Film.Titel.2000.GERMAN.1080p.ARD.WEB-DL.AAC2.0.H.264-GRP.mkv",
 			expected: metadata.Metadata{
 				Title:         "Film.Titel",
 				Year:          2000,
@@ -48,7 +62,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Das.Traumschiff.S2026E03.Honululu.GERMAN.1080p.ZDF.WEB-DL.AAC2.0.H.264-GRP",
+			input: "Das.Traumschiff.S2026E03.Honululu.GERMAN.1080p.ZDF.WEB-DL.AAC2.0.H.264-GRP",
 			expected: metadata.Metadata{
 				Title:         "Das.Traumschiff",
 				Season:        2026,
@@ -66,7 +80,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Anderer.Film.1969.German.720p.WEB-DL.DDP5.1.H.264-GRP.mkv",
+			input: "Anderer.Film.1969.German.720p.WEB-DL.DDP5.1.H.264-GRP.mkv",
 			expected: metadata.Metadata{
 				Title:         "Anderer.Film",
 				Year:          1969,
@@ -81,7 +95,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Film.2024.1080p.WEB-DL.AAC2.0.H.265-GRP.mkv",
+			input: "Film.2024.1080p.WEB-DL.AAC2.0.H.265-GRP.mkv",
 			expected: metadata.Metadata{
 				Title:         "Film",
 				Year:          2024,
@@ -95,7 +109,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Daily.Show.2024-05-24.720p.WEB-DL.AAC2.0.H.264-GRP",
+			input: "Daily.Show.2024-05-24.720p.WEB-DL.AAC2.0.H.264-GRP",
 			expected: metadata.Metadata{
 				Title:         "Daily.Show",
 				Date:          "2024-05-24",
@@ -109,7 +123,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Movie.Name.2023.2160p.DIRECTORS.CUT.mkv",
+			input: "Movie.Name.2023.2160p.DIRECTORS.CUT.mkv",
 			expected: metadata.Metadata{
 				Title:      "Movie.Name",
 				Year:       2023,
@@ -119,18 +133,28 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Show.S01E01.1080p.Open.Matte.mkv",
+			input: "Movie.Name.2023.2160p.Director's.Cut.mkv",
+			expected: metadata.Metadata{
+				Title:      "Movie.Name",
+				Year:       2023,
+				Resolution: "2160p",
+				CutEdition: "Director's.Cut",
+				IsTV:       false,
+			},
+		},
+		{
+			input: "Show.S01E01.1080p.Open.Matte.mkv",
 			expected: metadata.Metadata{
 				Title:      "Show",
 				Season:     1,
 				Episode:    1,
 				Resolution: "1080p",
-				CutEdition: "OPEN.MATTE",
+				CutEdition: "Open.Matte",
 				IsTV:       true,
 			},
 		},
 		{
-			filename: "Movie.3D.HSBS.1080p.mkv",
+			input: "Movie.3D.HSBS.1080p.mkv",
 			expected: metadata.Metadata{
 				Title:      "Movie",
 				Resolution: "1080p",
@@ -139,7 +163,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Avatar.The.Way.of.Water.2022.3D.SBS.DIRECTORS.CUT.2160p.mkv",
+			input: "Avatar.The.Way.of.Water.2022.3D.SBS.DIRECTORS.CUT.2160p.mkv",
 			expected: metadata.Metadata{
 				Title:      "Avatar.The.Way.of.Water",
 				Year:       2022,
@@ -149,7 +173,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Movie.2024.1080p.BluRay.DDP5.1.x264-GRP",
+			input: "Movie.2024.1080p.BluRay.DDP5.1.x264-GRP",
 			expected: metadata.Metadata{
 				Title:         "Movie",
 				Year:          2024,
@@ -163,7 +187,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Series.S01E02.Multi.1080p.Netflix.WEBRip.DDP5.1.x265-GRP",
+			input: "Series.S01E02.Multi.1080p.Netflix.WEBRip.DDP5.1.x265-GRP",
 			expected: metadata.Metadata{
 				Title:         "Series",
 				Season:        1,
@@ -180,7 +204,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Film.2024.GERMAN.DL.WITH.AD.1080p.BluRay.DDP5.1.x264-GRP",
+			input: "Film.2024.GERMAN.DL.WITH.AD.1080p.BluRay.DDP5.1.x264-GRP",
 			expected: metadata.Metadata{
 				Title:         "Film",
 				Year:          2024,
@@ -198,7 +222,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "Moneyland.Die.dunklen.Geschaefte.der.Finanzindustrie.2025.GERMAN.DL.with.Audio.Description.1080p.ARTE.WEB-DL.AAC2.0.H.265-NoGroup",
+			input: "Moneyland.Die.dunklen.Geschaefte.der.Finanzindustrie.2025.GERMAN.DL.with.Audio.Description.1080p.ARTE.WEB-DL.AAC2.0.H.265-NoGroup",
 			expected: metadata.Metadata{
 				Title:         "Moneyland.Die.dunklen.Geschaefte.der.Finanzindustrie",
 				Year:          2025,
@@ -217,7 +241,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "ZDF.Magazin.Royale.S00E166.2026-05-29.Die.Colonius-Sprengung.ZMR.vor.Ort.GERMAN.1080p.ZDF.WEB-DL.h264-SLiDE",
+			input: "ZDF.Magazin.Royale.S00E166.2026-05-29.Die.Colonius-Sprengung.ZMR.vor.Ort.GERMAN.1080p.ZDF.WEB-DL.h264-SLiDE",
 			expected: metadata.Metadata{
 				Title:        "ZDF.Magazin.Royale",
 				Season:       0,
@@ -234,7 +258,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			filename: "ZDF.Magazin.Royale.S2026E166.2026-05-29.Die.Colonius-Sprengung.ZMR.vor.Ort.GERMAN.1080p.ZDF.WEB-DL.h264-SLiDE",
+			input: "ZDF.Magazin.Royale.S2026E166.2026-05-29.Die.Colonius-Sprengung.ZMR.vor.Ort.GERMAN.1080p.ZDF.WEB-DL.h264-SLiDE",
 			expected: metadata.Metadata{
 				Title:        "ZDF.Magazin.Royale",
 				Season:       2026,
@@ -250,25 +274,154 @@ func TestParse(t *testing.T) {
 				IsTV:         true,
 			},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.filename, func(t *testing.T) {
-			got := Parse(tt.filename)
-			if !reflect.DeepEqual(*got, tt.expected) {
-				t.Errorf("Differences found:\n%s", compareMetadata(*got, tt.expected))
-			}
-		})
-	}
-}
-
-func TestMissingYear(t *testing.T) {
-	tests := []struct {
-		filename string
-		expected metadata.Metadata
-	}{
 		{
-			filename: "Film.Titel.GERMAN.1080p.ARD.WEB-DL.AAC2.0.H.264-GRP.mkv",
+			// Issue 1: Spaces instead of just . as separators
+			input: "Film Titel 2000 GERMAN 1080p ARD WEB-DL AAC2.0 H.264-GRP",
+			expected: metadata.Metadata{
+				Title:         "Film Titel",
+				Year:          2000,
+				Language:      "GERMAN",
+				Resolution:    "1080p",
+				Service:       "ARD",
+				Source:        "WEB-DL",
+				AudioCodec:    "AAC",
+				AudioChannels: "2.0",
+				VideoCodec:    "H.264",
+				Group:         "GRP",
+				IsTV:          false,
+			},
+		},
+		{
+			// Issue 2: don't match WEB-DL.anything.after.that as group DL.anything.after.that
+			input: "Movie.2023.1080p.WEB-DL.Extra.stuff",
+			expected: metadata.Metadata{
+				Title:      "Movie",
+				Year:       2023,
+				Resolution: "1080p",
+				Source:     "WEB-DL",
+				Group:      "",
+				IsTV:       false,
+			},
+		},
+		{
+			// Issue 3: match WEB without -DL or Rip as a source
+			input: "Film.2024.1080p.WEB.AAC2.0.H.264-GRP",
+			expected: metadata.Metadata{
+				Title:         "Film",
+				Year:          2024,
+				Resolution:    "1080p",
+				Source:        "WEB",
+				AudioCodec:    "AAC",
+				AudioChannels: "2.0",
+				VideoCodec:    "H.264",
+				Group:         "GRP",
+				IsTV:          false,
+			},
+		},
+		{
+			// Issue 4: more other reasonable match options (DTS, TrueHD, etc.)
+			input: "Movie.2023.2160p.WEB.TrueHD.7.1.Atmos.H.265-GRP",
+			expected: metadata.Metadata{
+				Title:         "Movie",
+				Year:          2023,
+				Resolution:    "2160p",
+				Source:        "WEB",
+				AudioCodec:    "TrueHD",
+				AudioChannels: "7.1",
+				AudioMeta:     "Atmos",
+				VideoCodec:    "H.265",
+				Group:         "GRP",
+				IsTV:          false,
+			},
+		},
+		{
+			input: "Another.Movie.2024.4K.Remux.DTS-HD.MA.5.1.AVC-GRP",
+			expected: metadata.Metadata{
+				Title:         "Another.Movie",
+				Year:          2024,
+				Resolution:    "4K",
+				AudioCodec:    "DTS-HD.MA",
+				AudioChannels: "5.1",
+				VideoCodec:    "AVC",
+				Group:         "GRP",
+				IsTV:          false,
+			},
+		},
+		{
+			input: "Show.S01E01.720p.HEVC.Opus.mkv",
+			expected: metadata.Metadata{
+				Title:      "Show",
+				Season:     1,
+				Episode:    1,
+				Resolution: "720p",
+				VideoCodec: "HEVC",
+				AudioCodec: "Opus",
+				IsTV:       true,
+			},
+		},
+		{
+			input: "Movie.2024.UHD.BluRay.REMUX.HEVC.DTS-HD.MA.5.1-GRP",
+			expected: metadata.Metadata{
+				Title:         "Movie",
+				Year:          2024,
+				Source:        "UHD.BluRay",
+				VideoCodec:    "HEVC",
+				AudioCodec:    "DTS-HD.MA",
+				AudioChannels: "5.1",
+				Group:         "GRP",
+			},
+		},
+		{
+			input: "Movie.2024.Blu-Ray.REMUX.1080p.AVC.DTS-HD.MA.5.1-GRP",
+			expected: metadata.Metadata{
+				Title:         "Movie",
+				Year:          2024,
+				Source:        "Blu-Ray",
+				Resolution:    "1080p",
+				VideoCodec:    "AVC",
+				AudioCodec:    "DTS-HD.MA",
+				AudioChannels: "5.1",
+				Group:         "GRP",
+			},
+		},
+		{
+			input: "Classic.Movie.PAL.DVD.mkv",
+			expected: metadata.Metadata{
+				Title:  "Classic.Movie",
+				Source: "PAL.DVD",
+			},
+		},
+		{
+			input: "Another.Classic.NTSC.DVD.mkv",
+			expected: metadata.Metadata{
+				Title:  "Another.Classic",
+				Source: "NTSC.DVD",
+			},
+		},
+		{
+			input: "Movie.DVD5.mkv",
+			expected: metadata.Metadata{
+				Title:  "Movie",
+				Source: "DVD5",
+			},
+		},
+		{
+			input: "Movie.DVD9.mkv",
+			expected: metadata.Metadata{
+				Title:  "Movie",
+				Source: "DVD9",
+			},
+		},
+		{
+			input: "Movie.PAL.DVD9.mkv",
+			expected: metadata.Metadata{
+				Title:  "Movie",
+				Source: "PAL.DVD9",
+			},
+		},
+		// From TestMissingYear
+		{
+			input: "Film.Titel.GERMAN.1080p.ARD.WEB-DL.AAC2.0.H.264-GRP.mkv",
 			expected: metadata.Metadata{
 				Title:         "Film.Titel",
 				Language:      "GERMAN",
@@ -282,7 +435,7 @@ func TestMissingYear(t *testing.T) {
 			},
 		},
 		{
-			filename: "Simple.Movie.1080p.x264-GRP",
+			input: "Simple.Movie.1080p.x264-GRP",
 			expected: metadata.Metadata{
 				Title:      "Simple.Movie",
 				Resolution: "1080p",
@@ -291,7 +444,7 @@ func TestMissingYear(t *testing.T) {
 			},
 		},
 		{
-			filename: "Repack.Movie.REPACK.720p.WEB-DL.AAC2.0.x264-GRP",
+			input: "Repack.Movie.REPACK.720p.WEB-DL.AAC2.0.x264-GRP",
 			expected: metadata.Metadata{
 				Title:         "Repack.Movie",
 				Repack:        true,
@@ -304,7 +457,7 @@ func TestMissingYear(t *testing.T) {
 			},
 		},
 		{
-			filename: "Repack-end.Movie.1080p.BluRay.x264.REPACK-GRP",
+			input: "Repack-end.Movie.1080p.BluRay.x264.REPACK-GRP",
 			expected: metadata.Metadata{
 				Title:      "Repack-end.Movie",
 				Repack:     true,
@@ -316,14 +469,9 @@ func TestMissingYear(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.filename, func(t *testing.T) {
-			got := Parse(tt.filename)
-			if !reflect.DeepEqual(*got, tt.expected) {
-				t.Errorf("Differences found:\n%s", compareMetadata(*got, tt.expected))
-			}
-		})
-	}
+	runTableTest(t, tests, func(s string) metadata.Metadata {
+		return *Parse(s)
+	}, compareMetadata)
 }
 
 func TestDeobfuscateTitle(t *testing.T) {
@@ -342,14 +490,12 @@ func TestDeobfuscateTitle(t *testing.T) {
 		{"Bloede Buehnenduesen", "Blöde Bühnendüsen"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := DeobfuscateTitle(tt.input)
-			if got != tt.expected {
-				t.Errorf("DeobfuscateTitle(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
-		})
-	}
+	runTableTest(t, tests, DeobfuscateTitle, func(got, want string) string {
+		if got != want {
+			return fmt.Sprintf("got %q, want %q", got, want)
+		}
+		return ""
+	})
 }
 
 func TestNormalizeTitle(t *testing.T) {
@@ -368,14 +514,12 @@ func TestNormalizeTitle(t *testing.T) {
 		{"Title with (parentheses) and \"quotes\"", "Title.with.parentheses.and.quotes"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := NormalizeTitle(tt.input)
-			if got != tt.expected {
-				t.Errorf("NormalizeTitle(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
-		})
-	}
+	runTableTest(t, tests, NormalizeTitle, func(got, want string) string {
+		if got != want {
+			return fmt.Sprintf("got %q, want %q", got, want)
+		}
+		return ""
+	})
 }
 
 func TestNormalizeService(t *testing.T) {
@@ -399,12 +543,10 @@ func TestNormalizeService(t *testing.T) {
 		{"ARD", "ARD"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := NormalizeService(tt.input)
-			if got != tt.expected {
-				t.Errorf("NormalizeService(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
-		})
-	}
+	runTableTest(t, tests, NormalizeService, func(got, want string) string {
+		if got != want {
+			return fmt.Sprintf("got %q, want %q", got, want)
+		}
+		return ""
+	})
 }
