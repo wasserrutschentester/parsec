@@ -52,15 +52,26 @@ filter_unconventional = false
 split_commits = false
 # regex for preprocessing the commit messages
 commit_preprocessors = [
-  { pattern = "#([0-9]+)", replace = "[#${1}](https://codeberg.org/n0ne/parsec/issues/${1})" },
-  { pattern = "^(Feat|Fix|Docs|Chore|Refactor|Style|Test|Ci):", replace = "${1}:", case_sensitive = false },
-  { pattern = "^set (.*)", replace = "chore: Set ${1}" },
-  { pattern = "^add unit tests (.*)", replace = "test: Add unit tests ${1}" },
-  { pattern = "^testing: (.*)", replace = "test: ${1}" },
-  { pattern = "\\(make linter happy\\)", replace = "" },
-  { pattern = "\\(gh/main\\)", replace = "" },
-  { pattern = "respomses", replace = "responses" },
-  { pattern = "\\.$", replace = "" },
+  { pattern = '#([0-9]+)', replace = '[#${1}](https://codeberg.org/n0ne/parsec/issues/${1})' },
+  # Join lines that were split without an empty line (fixes "Incorrect body syntax")
+  { pattern = '^(\w+(\([^)]+\))?: [^\n]+)\n([^\n])', replace = "$1\n\n$3" },
+  # Normalize types to lowercase and preserve scopes
+  { pattern = '^(?i)feat(\([^)]+\))?:', replace = 'feat$1:' },
+  { pattern = '^(?i)fix(\([^)]+\))?:', replace = 'fix$1:' },
+  { pattern = '^(?i)doc(s)?(\([^)]+\))?:', replace = 'docs$2:' },
+  { pattern = '^(?i)perf(\([^)]+\))?:', replace = 'perf$1:' },
+  { pattern = '^(?i)refactor(\([^)]+\))?:', replace = 'refactor$1:' },
+  { pattern = '^(?i)style(\([^)]+\))?:', replace = 'style$1:' },
+  { pattern = '^(?i)test(\([^)]+\))?:', replace = 'test$1:' },
+  { pattern = '^(?i)chore(\([^)]+\))?:', replace = 'chore$1:' },
+  { pattern = '^(?i)ci(\([^)]+\))?:', replace = 'chore(ci)$1:' },
+  # Fix common typos and formatting
+  { pattern = '^set (.*)', replace = 'chore: set ${1}' },
+  { pattern = '^add unit tests (.*)', replace = 'test: add unit tests ${1}' },
+  { pattern = '^testing: (.*)', replace = 'test: ${1}' },
+  { pattern = '\(make linter happy\)', replace = '' },
+  { pattern = 'respomses', replace = 'responses' },
+  { pattern = '\.$', replace = '' },
 ]
 # regex for parsing and grouping commits
 commit_parsers = [
