@@ -41,7 +41,7 @@ func TestCache(t *testing.T) {
 
 	// Test Expiration (manual mod time change)
 	path := getPath(key)
-	oldTime := time.Now().Add(-25 * time.Hour)
+	oldTime := time.Now().Add(-7 * time.Hour)
 	if err := os.Chtimes(path, oldTime, oldTime); err != nil {
 		t.Fatal(err)
 	}

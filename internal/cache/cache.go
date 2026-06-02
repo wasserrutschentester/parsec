@@ -43,8 +43,8 @@ func Get(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	// Cache for 24 hours
-	if time.Since(info.ModTime()) > 24*time.Hour {
+	// Cache for 6 hours
+	if time.Since(info.ModTime()) > 6*time.Hour {
 		_ = os.Remove(path)
 		return nil, fmt.Errorf("cache expired")
 	}

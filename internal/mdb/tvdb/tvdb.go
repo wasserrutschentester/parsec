@@ -192,7 +192,7 @@ func login() (string, error) {
 		return "", err
 	}
 
-	// Cache token (cache.Get already handles 24h expiration, but token might be shorter or we want to be safe)
+	// Cache token (cache.Get already handles 6h expiration, but token might be shorter or we want to be safe)
 	_ = cache.Set(tokenKey, []byte(data.Data.Token))
 
 	return data.Data.Token, nil
