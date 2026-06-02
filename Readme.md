@@ -64,6 +64,7 @@ Search and identify movies or TV shows in media databases.
 - **Automatic Parsing**: Tries to extract Title, Year, Season, Episode from filenames to seed searches.
 - **Matroska Tags**: Can write Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.
 - **Episode Search**: Can find Episode details via Episode + Season Number, Episode Title or Aired Date.
+- **Release Search**: Search for existing releases on your indexers via Prowlarr.
 
 For more information see the [Identify Documentation](docs/identify.md)
 

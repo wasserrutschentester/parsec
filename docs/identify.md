@@ -12,11 +12,12 @@ If a `filename` is provided, `parsec` will automatically parse it to extract ini
 
 ## Features
 
--   **Flexible Search**: Fuzzy search by title/year or direct lookup via IMDb, TMDB, or TVDB IDs.
--   **Automatic Parsing**: Tries to extract Title, Year, Season, Episode from filenames to seed searches.
--   **Matroska Tags**: Writes Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.
--   **Episode Search**: Finds episode details via Season/Episode numbers, Episode Title, or Air Date.
--   **ID Verification**: If a file already contains metadata tags, `parsec` will warn you if the selected search result differs from the existing tags.
+- **Flexible Search**: Fuzzy search by title/year or direct lookup via IMDb, TMDB, or TVDB IDs.
+- **Automatic Parsing**: Tries to extract Title, Year, Season, Episode from filenames to seed searches.
+- **Matroska Tags**: Writes Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.
+- **Episode Search**: Finds episode details via Season/Episode numbers, Episode Title, or Air Date.
+- **Release Search**: Search for existing releases on your indexers via Prowlarr.
+- **ID Verification**: If a file already contains metadata tags, `parsec` will warn you if the selected search result differs from the existing tags.
 
 ## Flags
 
@@ -58,6 +59,8 @@ Additional metadata that can be written to tags.
 |------|-----------|------|-------------|
 | `--write-tags`| | boolean | Automatically write metadata tags to the file without prompting. |
 | `--unattended`| `-u` | boolean | Run in unattended mode (selects the first search result if it's a high-confidence match). |
+| `--releases` | `-r` | boolean | Search for releases via Prowlarr for the identified entity. |
+| `--best-release`| `-b` | boolean | Only show the best release (same resolution and most seeders) when searching for releases. |
 
 ## Examples
 
@@ -66,9 +69,9 @@ Additional metadata that can be written to tags.
 parsec identify "Loki.S01E01.mkv"
 ```
 
-**Search for a movie by ID:**
+**Search for releases for a specific movie:**
 ```bash
-parsec identify --imdb tt0111161
+parsec identify --imdb tt0111161 --releases
 ```
 
 **Identify a specific episode by date:**
