@@ -7,6 +7,7 @@ when:
 variables:
     - &build_platforms "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
     - &golang "golang:1.25-alpine"
+    - &golang_cgo "golang:1.25"
     - &golangci_lint "golangci/golangci-lint:v2.12-alpine"
     - &release_plugin "codeberg.org/woodpecker-plugins/release"
 
@@ -20,18 +21,15 @@ clone:
 steps:
     vendor:
         image: *golang
-        commands:
-            - go mod vendor
+        commands: go mod vendor
 
     lint:
         image: *golangci_lint
-        commands:
-            - golangci-lint run
+        commands: golangci-lint run
 
     test:
-        image: *golang
-        commands:
-            - go test ./...
+        image: *golang_cgo
+        commands: go test -race -cover ./...
 
     changelog:
         image: orhunp/git-cliff:latest
@@ -41,7 +39,7 @@ steps:
             GITEA_TOKEN:
                 from_secret: forge_token
         commands:
-            - git-cliff --current --remote --strip all --output RELEASE_NOTES.md
+            - git-cliff --current --strip all --output RELEASE_NOTES.md
 
     build:
         image: *golang

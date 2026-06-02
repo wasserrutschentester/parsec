@@ -3,6 +3,7 @@ when:
 
 variables:
     - &golang "golang:1.25-alpine"
+    - &golang_cgo "golang:1.25"
     - &golangci_lint "golangci/golangci-lint:v2.12-alpine"
 
 steps:
@@ -13,11 +14,7 @@ steps:
     lint:
         image: *golangci_lint
         commands: golangci-lint run
-        when:
-            - event: pull_request
-            - event: push
-              branch: "renovate/*"
 
     test:
-        image: *golang
-        commands: go test ./...
+        image: *golang_cgo
+        commands: go test -race -cover ./...
