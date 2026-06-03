@@ -33,6 +33,7 @@ var renameCmd = &cobra.Command{
 The resulting filename is generated according to the configured template.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
 		for _, filePath := range args {
 			err := renameFile(cmd, filePath)
 			if err != nil {
@@ -86,7 +87,11 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 		if meta.IsTV {
 			renameGetEpisodeInfo(result, meta)
 		}
+	} else {
+		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
 	}
+
+	ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
 
 	// 6. Apply normalization to Title, EpisodeTitle and Service
 	meta.Title = filename.NormalizeTitle(meta.Title)
@@ -109,7 +114,6 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 		return nil
 	}
 
-	ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
 	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath), "Proposed Vector", newName))
 	ui.Println()
 
