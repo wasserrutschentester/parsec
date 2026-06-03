@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"github.com/pelletier/go-toml/v2"
 )
 

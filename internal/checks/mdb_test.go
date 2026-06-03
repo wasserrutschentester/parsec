@@ -3,8 +3,8 @@ package checks
 import (
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/mdb"
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
 func TestCheckTitle(t *testing.T) {

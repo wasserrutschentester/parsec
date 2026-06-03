@@ -3,8 +3,8 @@ package checks
 import (
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
 func TestCheckAllowedCharacters(t *testing.T) {

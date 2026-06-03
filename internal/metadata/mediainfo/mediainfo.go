@@ -11,8 +11,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/language"
 )

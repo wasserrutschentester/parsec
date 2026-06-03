@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/mdb"
 )
 
 func TestCreateTagsXML(t *testing.T) {

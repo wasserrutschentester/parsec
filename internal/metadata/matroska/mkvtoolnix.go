@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 
-	"codeberg.org/n0ne/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/mdb"
 )
 
 type EbmlMetadata struct {

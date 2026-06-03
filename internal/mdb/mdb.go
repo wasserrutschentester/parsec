@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 type SearchResult struct {

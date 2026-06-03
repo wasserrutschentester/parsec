@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
 func TestRunTrackChecks(t *testing.T) {

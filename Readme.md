@@ -6,9 +6,9 @@ parse - check - create - release
 
 ## Installation
 
-**Parsec is currently in beta. The initial rapid development phase is over, but it isn't well tested yet. If you encounter any issues, please report them on the [issue tracker](https://codeberg.org/n0ne/parsec/issues).**
+**Parsec is currently in beta. The initial rapid development phase is over, but it isn't well tested yet. If you encounter any issues, please report them on the [issue tracker](https://codeberg.org/upPollo/parsec/issues).**
 
-To install `parsec`, ensure you can just download the latest release from the [releases page](https://codeberg.org/n0ne/parsec/releases) and extract the binary to your `PATH` (and make sure it's set as executable)
+To install `parsec`, ensure you can just download the latest release from the [releases page](https://codeberg.org/upPollo/parsec/releases) and extract the binary to your `PATH` (and make sure it's set as executable)
 
 for new versions you can use the `update` command to go to the latest version:
 
@@ -28,7 +28,7 @@ parsec update
 Clone the repository and build with make:
 
 ```bash
-git clone https://codeberg.org/n0ne/parsec.git
+git clone https://codeberg.org/upPollo/parsec.git
 cd parsec
 make build
 ```

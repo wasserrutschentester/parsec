@@ -8,13 +8,13 @@ import (
 	"strings"
 	"sync"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/mdb"
-	"codeberg.org/n0ne/parsec/internal/mdb/tmdb"
-	"codeberg.org/n0ne/parsec/internal/mdb/tvdb"
-	"codeberg.org/n0ne/parsec/internal/metadata"
-	"codeberg.org/n0ne/parsec/internal/metadata/filename"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/mdb/tmdb"
+	"codeberg.org/upPollo/parsec/internal/mdb/tvdb"
+	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata/filename"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {

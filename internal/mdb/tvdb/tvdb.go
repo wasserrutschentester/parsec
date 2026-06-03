@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/cache"
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/mdb"
-	"codeberg.org/n0ne/parsec/internal/metadata"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/cache"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"golang.org/x/text/language"
 )
 

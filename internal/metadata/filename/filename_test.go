@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
 func compareMetadata(got, want metadata.Metadata) string {

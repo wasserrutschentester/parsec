@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/text/language"
 )

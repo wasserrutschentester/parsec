@@ -3,7 +3,7 @@ package metadata
 import (
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/config"
 )
 
 func TestNormalize(t *testing.T) {

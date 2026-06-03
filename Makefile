@@ -9,7 +9,7 @@ GIT_VER := $(shell git describe --tags --always --match "v[0-9]*.[0-9]*.[0-9]*" 
 # 2. Replace '-dirty' with '+dirty' for semver compliance
 VERSION ?= $(shell echo $(GIT_VER) | sed -e '/^v/! s/^/v0.0.0-/' -e 's/-dirty/+dirty/')
 
-LDFLAGS = -X codeberg.org/n0ne/parsec/cmd.Version=$(VERSION)
+LDFLAGS = -X codeberg.org/upPollo/parsec/cmd.Version=$(VERSION)
 
 .PHONY: init
 init: ## Initialize local development environment

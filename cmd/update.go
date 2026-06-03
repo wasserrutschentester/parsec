@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"codeberg.org/n0ne/parsec/internal/ui"
-	"codeberg.org/n0ne/parsec/internal/update"
+	"codeberg.org/upPollo/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/update"
 	"github.com/spf13/cobra"
 )
 

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"github.com/spf13/cobra"
 )
 

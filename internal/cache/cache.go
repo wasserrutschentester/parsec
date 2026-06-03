@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/config"
 )
 
 var cacheDir string

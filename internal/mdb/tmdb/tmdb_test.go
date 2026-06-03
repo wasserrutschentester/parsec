@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/config"
 	"github.com/spf13/viper"
 )
 

@@ -15,15 +15,15 @@ import (
 	"strings"
 	"time"
 
-	"codeberg.org/n0ne/parsec/internal/cache"
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/cache"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"golang.org/x/mod/semver"
 )
 
 var (
 	// owner is the Codeberg user/org
-	owner = "n0ne"
+	owner = "upPollo"
 	// repo is the repository name
 	repo = "parsec"
 	// baseURL is the Codeberg API base URL

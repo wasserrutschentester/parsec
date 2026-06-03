@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
 )

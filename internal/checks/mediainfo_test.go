@@ -3,7 +3,7 @@ package checks
 import (
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
 func TestCheckRedundantAudio(t *testing.T) {

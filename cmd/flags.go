@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"github.com/spf13/cobra"
 )
 

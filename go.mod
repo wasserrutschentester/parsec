@@ -1,4 +1,4 @@
-module codeberg.org/n0ne/parsec
+module codeberg.org/upPollo/parsec
 
 go 1.25.0
 

@@ -8,7 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
-	"codeberg.org/n0ne/parsec/internal/types"
+	"codeberg.org/upPollo/parsec/internal/types"
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/term"

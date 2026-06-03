@@ -1,6 +1,6 @@
 package main
 
-import "codeberg.org/n0ne/parsec/cmd"
+import "codeberg.org/upPollo/parsec/cmd"
 
 func main() {
 	cmd.Execute()

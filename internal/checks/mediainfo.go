@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/metadata"
-	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {

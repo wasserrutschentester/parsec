@@ -8,7 +8,7 @@
 # ╚═════════════════════════════════════════╝
 
 # Configuration documentation is available at
-# https://codeberg.org/n0ne/parsec/src/branch/main/docs/config.md
+# https://codeberg.org/upPollo/parsec/src/branch/main/docs/config.md
 
 # Your release group Name (should only contain alphanumeric characters and be unique)
 group = "NoRealGrpPlsChange"
@@ -24,7 +24,7 @@ preferred_language = "de"
 subbed_tagging = true
 
 # Naming template for releases
-# for what is available see https://codeberg.org/n0ne/parsec/src/branch/main/docs/templates.md
+# for what is available see https://codeberg.org/upPollo/parsec/src/branch/main/docs/templates.md
 template = "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}"
 
 # Display names for video codecs

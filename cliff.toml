@@ -29,7 +29,7 @@ body = """
   {% endfor %}
 {% endif %}
 {% if previous.version %}\
-    **Full Changelog**: https://codeberg.org/n0ne/parsec/compare/{{ previous.version }}...{{ version }}
+    **Full Changelog**: https://codeberg.org/upPollo/parsec/compare/{{ previous.version }}...{{ version }}
 {% endif %}\n
 """
 
@@ -52,7 +52,7 @@ filter_unconventional = false
 split_commits = false
 # regex for preprocessing the commit messages
 commit_preprocessors = [
-  { pattern = '#([0-9]+)', replace = '[#${1}](https://codeberg.org/n0ne/parsec/issues/${1})' },
+  { pattern = '#([0-9]+)', replace = '[#${1}](https://codeberg.org/upPollo/parsec/issues/${1})' },
   # Join lines that were split without an empty line (fixes "Incorrect body syntax")
   { pattern = '^(\w+(\([^)]+\))?: [^\n]+)\n([^\n])', replace = "$1\n\n$3" },
   # Normalize types to lowercase and preserve scopes

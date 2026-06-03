@@ -6,13 +6,13 @@ import (
 	"os"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/checks"
-	"codeberg.org/n0ne/parsec/internal/metadata"
-	"codeberg.org/n0ne/parsec/internal/metadata/filename"
-	"codeberg.org/n0ne/parsec/internal/metadata/matroska"
-	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
-	"codeberg.org/n0ne/parsec/internal/types"
-	"codeberg.org/n0ne/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/checks"
+	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata/filename"
+	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/types"
+	"codeberg.org/upPollo/parsec/internal/ui"
 
 	"github.com/spf13/cobra"
 )

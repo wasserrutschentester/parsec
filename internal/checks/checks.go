@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/types"
+	"codeberg.org/upPollo/parsec/internal/types"
 )
 
 type (

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
 func GetBaseName(filePath string) string {

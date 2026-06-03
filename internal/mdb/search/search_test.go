@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"codeberg.org/n0ne/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/mdb"
 )
 
 func TestCalculateSimilarity(t *testing.T) {

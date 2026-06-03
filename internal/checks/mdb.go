@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"codeberg.org/n0ne/parsec/internal/config"
-	"codeberg.org/n0ne/parsec/internal/mdb"
-	mdbSearch "codeberg.org/n0ne/parsec/internal/mdb/search"
-	"codeberg.org/n0ne/parsec/internal/metadata"
-	"codeberg.org/n0ne/parsec/internal/metadata/filename"
-	"codeberg.org/n0ne/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/mdb"
+	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
+	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata/filename"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 	"golang.org/x/text/language"
 )
 

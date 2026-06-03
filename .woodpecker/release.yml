@@ -37,7 +37,7 @@ steps:
             GITEA_REPO: n0ne/parsec
             GITEA_API_URL: https://codeberg.org
             GITEA_TOKEN:
-                from_secret: forge_token
+                from_secret: PARSEC_FORGE_TOKEN
         commands:
             - git-cliff --current --strip all --output RELEASE_NOTES.md
 
@@ -57,7 +57,7 @@ steps:
                   echo "Building for $$GOOS/$$GOARCH..."
                   VERSION=$${CI_COMMIT_TAG:-$$(git describe --tags --always --match 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/-[0-9]*-g/-/') }
                   GOOS=$$GOOS GOARCH=$$GOARCH go build \
-                    -ldflags="-s -w -X codeberg.org/n0ne/parsec/cmd.Version=$$VERSION" \
+                    -ldflags="-s -w -X codeberg.org/upPollo/parsec/cmd.Version=$$VERSION" \
                     -o "dist/parsec-$${GOOS}-$${GOARCH}$${EXT}"
                 done
 
@@ -65,7 +65,7 @@ steps:
         image: *release_plugin
         settings:
             api_key:
-                from_secret: forge_token
+                from_secret: PARSEC_FORGE_TOKEN
             files:
                 - dist/*
             checksum:
