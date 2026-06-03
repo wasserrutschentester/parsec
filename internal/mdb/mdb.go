@@ -150,6 +150,29 @@ func PrintEpisodeResult(result EpisodeResult) {
 	ui.Println(ui.Card(title, subtitle, body, footer))
 }
 
+func PrintCompactResult(result SearchResult) {
+	title := fmt.Sprintf("%s (%d) [OV: %s]", result.Title, result.Year, result.OriginalLanguage)
+	ids := ""
+	if result.TmdbID > 0 && result.TmdbType != "" {
+		ids = fmt.Sprintf("TMDB: %s/%d,", result.TmdbType, result.TmdbID)
+	}
+	if result.ImdbID != "" {
+		ids += fmt.Sprintf(" IMDb: %s,", result.ImdbID)
+	}
+	if result.TvdbID > 0 {
+		ids += fmt.Sprintf(" TVDB: %d", result.TvdbID)
+	}
+	ids = strings.TrimSuffix(ids, ",")
+	ids = strings.TrimSpace(ids)
+	ui.Println("Match:", title, ids)
+}
+
+func PrintCompactEpisodeResult(result EpisodeResult) {
+	// indented to align to Match:
+	ui.Println(fmt.Sprintf("       %s (S%02dE%02d) %s", result.Name, result.Season, result.Episode, result.Airdate))
+
+}
+
 func GetMatroskaTags(result SearchResult) MatroskaTags {
 	tags := MatroskaTags{}
 	if result.Title != "" {

@@ -80,12 +80,14 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	result, _ := mdbSearch.InteractiveSearch(meta, true)
 
 	if result != nil {
+		mdb.PrintCompactResult(*result)
 		meta.Title = result.Title
 		if result.Year > 0 {
 			meta.Year = result.Year
 		}
 		if meta.IsTV {
-			renameGetEpisodeInfo(result, meta)
+			episodeResult := renameGetEpisodeInfo(result, meta)
+			mdb.PrintCompactEpisodeResult(episodeResult)
 		}
 	} else {
 		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
@@ -114,6 +116,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 		return nil
 	}
 
+	ui.Println()
 	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath), "Proposed Vector", newName))
 	ui.Println()
 
