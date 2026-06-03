@@ -335,11 +335,12 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			input: "Another.Movie.2024.4K.Remux.DTS-HD.MA.5.1.AVC-GRP",
+			input: "Another.Movie.2024.4K.REMASTERED.1080p.DTS-HD.MA.5.1.AVC-GRP",
 			expected: metadata.Metadata{
 				Title:         "Another.Movie",
 				Year:          2024,
-				Resolution:    "4K",
+				Resolution:    "1080p",
+				CutEdition:    "4K.REMASTERED",
 				AudioCodec:    "DTS-HD.MA",
 				AudioChannels: "5.1",
 				VideoCodec:    "AVC",

@@ -63,7 +63,7 @@ func Parse(filename string) *metadata.Metadata {
 	}
 
 	// Basic regex for resolution
-	resRegex := regexp.MustCompile(`[ .](\d{3,4}p|4K|8K)([ .-]|$| )`)
+	resRegex := regexp.MustCompile(`[ .](\d{3,4}[p|i])([ .-]|$| )`)
 	if match := resRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Resolution = match[1]
 	}
@@ -276,7 +276,7 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 
 func matchEdition(filename string, meta *metadata.Metadata) {
 	// Regex for Editions
-	editionRegex := regexp.MustCompile(`(?i)[ .](Open[ .]Matte|REMASTERED|IMAX(?:[ .]Enhanced)?|DIRECTOR'?S[ .]CUT|DC|EXTENDED|THEATRICAL|CRITERION|UNCENSORED|SPECIAL[ .]EDITION)([ .]|$)`)
+	editionRegex := regexp.MustCompile(`(?i)[ .](Open[ .]Matte|((4K|8K)[ .]?)?REMASTERED|IMAX(?:[ .]Enhanced)?|DIRECTOR'?S[ .]CUT|DC|EXTENDED|THEATRICAL|CRITERION|UNCENSORED|SPECIAL[ .]EDITION)([ .]|$)`)
 	if match := editionRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.CutEdition = match[1]
 	}
