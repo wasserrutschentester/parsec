@@ -17,19 +17,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type issueGroup struct {
-	Category string               `json:"category"`
-	Results  []checks.CheckResult `json:"results"`
-}
-
-type checkReport struct {
-	File          string       `json:"file"`
-	Passed        bool         `json:"passed"`
-	ReleaseName   string       `json:"filename"`
-	GeneratedName string       `json:"generated_name"`
-	Issues        []issueGroup `json:"issues"`
-}
-
 var jsonOutputFlag bool
 
 var checkCmd = &cobra.Command{
@@ -41,32 +28,92 @@ It validates:
   1. Filename parsing and naming conventions
   2. Technical metadata (via MediaInfo) for quality and standards
   3. Matroska container integrity and track tagging
-  4. Consistency with online databases (TMDB/TVDB) for titles and episodes`),
+  4. Consistency with online databases (TMDB/TVDB) for titles and episodes
+
+You can also pass a JSON check report file to render it.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
-		var reports []checkReport
+		var allReports []types.CheckReport
+
 		for _, filePath := range args {
-			report, err := collectCheckData(cmd, filePath)
-			if err != nil {
-				ui.PrintError(err.Error())
-				return fmt.Errorf("collecting check data failed for %s", filePath)
+			var currentReports []types.CheckReport
+			isJSON, jsonReports := loadJSONReport(filePath)
+
+			if isJSON {
+				currentReports = jsonReports
+			} else {
+				report, err := collectCheckData(cmd, filePath)
+				if err != nil {
+					ui.PrintError(err.Error())
+					return fmt.Errorf("collecting check data failed for %s", filePath)
+				}
+				currentReports = []types.CheckReport{report}
 			}
-			reports = append(reports, report)
+
+			allReports = append(allReports, currentReports...)
 
 			if !jsonOutputFlag {
-				printInteractiveReport(report)
+				for _, r := range currentReports {
+					ui.PrintInteractiveReport(r, unattendedFlag)
+				}
 			}
 		}
 
 		if jsonOutputFlag {
-			printJSONReports(reports)
+			printJSONReports(allReports)
 		}
 		return nil
 	},
 }
 
-func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) {
+func loadJSONReport(filePath string) (bool, []types.CheckReport) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, nil
+	}
+	defer func() { _ = f.Close() }()
+
+	// Read a small header to see if it even looks like JSON
+	header := make([]byte, 512)
+	n, err := f.Read(header)
+	if err != nil || n == 0 {
+		return false, nil
+	}
+
+	trimmedHeader := strings.TrimLeft(string(header[:n]), " \t\r\n")
+	if len(trimmedHeader) == 0 || (trimmedHeader[0] != '{' && trimmedHeader[0] != '[') {
+		return false, nil
+	}
+
+	// It's likely JSON, read the whole thing for parsing
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, nil
+	}
+
+	reports, err := parseReports(data)
+	if err != nil {
+		return false, nil
+	}
+
+	return true, reports
+}
+
+func parseReports(data []byte) ([]types.CheckReport, error) {
+	var reports []types.CheckReport
+	if err := json.Unmarshal(data, &reports); err != nil {
+		// Try unmarshaling a single report
+		var singleReport types.CheckReport
+		if err := json.Unmarshal(data, &singleReport); err != nil {
+			return nil, err
+		}
+		reports = append(reports, singleReport)
+	}
+	return reports, nil
+}
+
+func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, error) {
 	filenameNoExt := filename.GetBaseName(filePath)
 
 	ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
@@ -75,7 +122,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	match := filename.Parse(filenameNoExt)
 	mi, err := mediainfo.Get(filePath)
 	if err != nil {
-		return checkReport{}, fmt.Errorf("error getting mediainfo: %v", err)
+		return types.CheckReport{}, fmt.Errorf("error getting mediainfo: %v", err)
 	}
 
 	mediaMeta := mi.GetMetadata()
@@ -91,13 +138,13 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	setupMdbIDs(cmd, mi, match)
 
 	// Run Checks
-	var allIssues []issueGroup
+	var allIssues []types.IssueGroup
 	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
 	appendFailed(&allIssues, "MDB", checks.RunMdbChecks(mi, match))
 	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
 	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath))
 
-	return checkReport{
+	return types.CheckReport{
 		File:          filePath,
 		Passed:        len(allIssues) == 0,
 		ReleaseName:   filenameNoExt,
@@ -106,7 +153,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (checkReport, error) 
 	}, nil
 }
 
-func appendFailed(allIssues *[]issueGroup, category string, results []checks.CheckResult) {
+func appendFailed(allIssues *[]types.IssueGroup, category string, results []checks.CheckResult) {
 	var failed []checks.CheckResult
 	for _, r := range results {
 		if !r.Passed {
@@ -114,7 +161,7 @@ func appendFailed(allIssues *[]issueGroup, category string, results []checks.Che
 		}
 	}
 	if len(failed) > 0 {
-		*allIssues = append(*allIssues, issueGroup{category, failed})
+		*allIssues = append(*allIssues, types.IssueGroup{Category: category, Results: failed})
 	}
 }
 
@@ -144,84 +191,13 @@ func setupMdbIDs(cmd *cobra.Command, mi *mediainfo.MediaInfo, match *metadata.Me
 	}
 }
 
-func printJSONReports(reports []checkReport) {
+func printJSONReports(reports []types.CheckReport) {
 	data, err := json.MarshalIndent(reports, "", "  ")
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Error generating output: %v", err))
 		os.Exit(1)
 	}
 	fmt.Println(string(data))
-}
-
-func printInteractiveReport(report checkReport) {
-	if report.Passed {
-		ui.Println("\n" + ui.IconCheck + ui.Success.Render(" All systems nominal! The file fits the specification."))
-		ui.Println()
-		return
-	}
-
-	// Calculate shared column widths across all tracks to ensure table alignment
-	var allTracks []types.TrackCheckResult
-	for _, group := range report.Issues {
-		for _, res := range group.Results {
-			allTracks = append(allTracks, res.Tracks...)
-		}
-	}
-	sharedWidths := ui.CalculateTrackTableWidths(allTracks)
-
-	totalIssues := countIssues(report.Issues)
-	ui.Println("\n" + ui.IconCross + ui.Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
-	for _, group := range report.Issues {
-		count := len(group.Results)
-		if !unattendedFlag {
-			if !ui.ConfirmContinue(fmt.Sprintf("\nDisplay %d %s issues?", count, group.Category)) {
-				return
-			}
-		}
-
-		ui.Println(ui.ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
-		for _, res := range group.Results {
-			switch res.Severity {
-			case "error":
-				ui.PrintError(res.Warning)
-			default:
-				ui.PrintWarning(res.Warning)
-			}
-			if len(res.Tracks) == 0 {
-				printUnexpectedDiff(res)
-				continue
-			}
-
-			ui.Println(ui.FormatTrackTable(res.Tracks, sharedWidths))
-		}
-	}
-	ui.Println()
-}
-
-func printUnexpectedDiff(res checks.CheckResult) {
-	if res.Expected != "" && res.Actual != "" {
-		labelE := "Expected"
-		labelA := "Actual"
-
-		// Use Official/Parsed for all MDB related checks
-		if strings.HasPrefix(res.Identifier, "mdb_") {
-			labelE, labelA = "Official", "Parsed"
-		} else if res.Identifier == "filename_generation_mismatch" {
-			labelE, labelA = "Original", "Generated"
-		}
-		indent := "   "
-		diff := ui.FormatStringDiffAligned(labelE, res.Expected, labelA, res.Actual)
-		indentedDiff := indent + strings.ReplaceAll(diff, "\n", "\n"+indent)
-		ui.Println(indentedDiff)
-	}
-}
-
-func countIssues(groups []issueGroup) int {
-	count := 0
-	for _, group := range groups {
-		count += len(group.Results)
-	}
-	return count
 }
 
 func init() {

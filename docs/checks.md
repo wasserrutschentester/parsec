@@ -10,6 +10,18 @@ parsec check [file...] [flags]
 
 You can provide one or more files to be checked.
 
+### Rendering Saved Reports
+
+The `check` command can also be used to view previously saved JSON reports in the interactive human-readable format. `parsec` automatically detects if a file is a JSON report by sniffing its content.
+
+```bash
+# Save a report to a file
+parsec check movie.mkv --json > report.json
+
+# View the saved report later in interactive mode
+parsec check report.json
+```
+
 ## Features
 
 - **Batch Processing**: Validate multiple files in one command.

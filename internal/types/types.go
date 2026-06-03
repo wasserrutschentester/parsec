@@ -21,3 +21,16 @@ type TrackCheckResult struct {
 	Flags     []string `json:"flags,omitempty"`
 	Warning   string   `json:"warning,omitempty"`
 }
+
+type IssueGroup struct {
+	Category string        `json:"category"`
+	Results  []CheckResult `json:"results"`
+}
+
+type CheckReport struct {
+	File          string       `json:"file"`
+	Passed        bool         `json:"passed"`
+	ReleaseName   string       `json:"filename"`
+	GeneratedName string       `json:"generated_name"`
+	Issues        []IssueGroup `json:"issues"`
+}
