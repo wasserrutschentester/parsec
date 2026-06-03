@@ -240,8 +240,7 @@ func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...strin
 	return append(titles, newTitle)
 }
 
-// FuzzySearch combines search and filtering/sorting to find the best match
-func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
+func queryWithRetry(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
 	var results []mdb.SearchResult
 	var err error
 
@@ -250,24 +249,43 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 	} else {
 		results, err = SearchMovie(query, year)
 	}
-
 	if err != nil {
 		return nil, err
 	}
 
-	// retry without year if search fails
-	if len(results) == 0 {
-		if isTV {
-			results, err = SearchTV(query, 0)
-		} else {
-			results, err = SearchMovie(query, 0)
-		}
+	// retry without year
+	if len(results) == 0 && year > 0 {
+		results, err = queryWithRetry(query, 0, isTV)
 	}
 
-	if len(results) == 0 {
-		return nil, nil
+	return results, err
+}
+
+// FuzzySearch combines search and filtering/sorting to find the best match
+func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
+	var results []mdb.SearchResult
+	var err error
+
+	results, err = queryWithRetry(query, year, isTV)
+	if err != nil {
+		return nil, err
 	}
 
+	results = sortBySimilarity(results, query, year)
+
+	if len(results) > 0 {
+		results = filterResults(results)
+	}
+
+	// Return top 5 results
+	if len(results) > 5 {
+		results = results[:5]
+	}
+
+	return results, nil
+}
+
+func sortBySimilarity(results []mdb.SearchResult, query string, year int) []mdb.SearchResult {
 	queryLower := strings.ToLower(query)
 
 	for i := range results {
@@ -290,13 +308,23 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 		}
 		return results[i].Popularity > results[j].Popularity
 	})
+	return results
+}
 
-	// Return top 5 results
-	if len(results) > 5 {
-		results = results[:5]
+// Filter results that are more than 30% worse than the top scoring result
+func filterResults(results []mdb.SearchResult) []mdb.SearchResult {
+	topScore := results[0].Similarity
+	threshold := topScore - 0.3
+	filteredResults := make([]mdb.SearchResult, 0, len(results))
+	for _, r := range results {
+		if r.Similarity >= threshold {
+			filteredResults = append(filteredResults, r)
+		} else {
+			ui.PrintDebug(fmt.Sprintf("Result '%s' (%d) filtered out: Similarity %.2f < dynamic threshold %.2f ",
+				r.Title, r.Year, r.Similarity, threshold))
+		}
 	}
-
-	return results, nil
+	return filteredResults
 }
 
 func SearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
