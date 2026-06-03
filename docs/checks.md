@@ -5,8 +5,19 @@ The `check` command performs comprehensive integrity and consistency checks on a
 ## Usage
 
 ```bash
-parsec check [file] [flags]
+parsec check [file...] [flags]
 ```
+
+You can provide one or more files to be checked.
+
+## Features
+
+- **Batch Processing**: Validate multiple files in one command.
+- **Filename Integrity**: Verifies that the filename matches the internal metadata.
+- **Technical Analysis**: Checks for technical anomalies using MediaInfo.
+- **Matroska Verification**: Ensures the container and track tagging meet standards.
+- **MDB Consistency**: Validates that file metadata matches information in online databases.
+- **JSON Reports**: Machine-readable output for integration with other tools.
 
 ## Flags
 
@@ -91,9 +102,12 @@ This document lists all individual checks performed by the `parsec check` comman
 
 ## JSON Output
 
-When the `--json` flag is used, `parsec check` outputs a detailed report in JSON format. Passed checks and empty fields are generally omitted to reduce noise.
+When the `--json` flag is used, `parsec check` always outputs detailed reports as a JSON **array** of objects, even when processing a single file.
+This ensures consistent machine-readable output.
 
-The interactive Output contains the same information as the JSON output, but in an easy-to-read human-readable format.
+Passed checks and empty fields are generally omitted to reduce noise.
+
+The interactive output contains the same information as the JSON output, but in an easy-to-read human-readable format.
 
 ### Top-Level Structure
 
@@ -203,63 +217,65 @@ Possible values in the `flags` array:
 parsec check Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv --json
 ```
 ```json
-{
-  "file": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv",
-  "passed": false,
-  "filename": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
-  "generated_name": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN",
-  "issues": [
-    {
-      "category": "FILENAME",
-      "results": [
-        {
-          "identifier": "filename_generation_mismatch",
-          "passed": false,
-          "severity": "warning",
-          "warning": "Generated name does not match the original",
-          "expected": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
-          "actual": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN"
-        }
-      ]
-    },
-    {
-      "category": "MDB",
-      "results": [
-        {
-          "identifier": "mdb_subtitle_language_preferred",
-          "passed": false,
-          "severity": "warning",
-          "warning": "Subtitle track in preferred language 'de' is missing",
-          "expected": "de"
-        }
-      ]
-    },
-    {
-      "category": "MATROSKA",
-      "results": [
-        {
-          "identifier": "matroska_name_quality",
-          "passed": false,
-          "severity": "info",
-          "warning": "Track Name contains junk keywords",
-          "tracks": [
-            {
-              "id": "2",
-              "type": "audio",
-              "passed": false,
-              "type_order": 1,
-              "codec": "AC-3",
-              "name": "Surround",
-              "language": "ger",
-              "flags": [
-                "Default"
-              ],
-              "warning": "junk keyword 'SURROUND' in Name"
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
+[
+  {
+    "file": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv",
+    "passed": false,
+    "filename": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
+    "generated_name": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN",
+    "issues": [
+      {
+        "category": "FILENAME",
+        "results": [
+          {
+            "identifier": "filename_generation_mismatch",
+            "passed": false,
+            "severity": "warning",
+            "warning": "Generated name does not match the original",
+            "expected": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
+            "actual": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN"
+          }
+        ]
+      },
+      {
+        "category": "MDB",
+        "results": [
+          {
+            "identifier": "mdb_subtitle_language_preferred",
+            "passed": false,
+            "severity": "warning",
+            "warning": "Subtitle track in preferred language 'de' is missing",
+            "expected": "de"
+          }
+        ]
+      },
+      {
+        "category": "MATROSKA",
+        "results": [
+          {
+            "identifier": "matroska_name_quality",
+            "passed": false,
+            "severity": "info",
+            "warning": "Track Name contains junk keywords",
+            "tracks": [
+              {
+                "id": "2",
+                "type": "audio",
+                "passed": false,
+                "type_order": 1,
+                "codec": "AC-3",
+                "name": "Surround",
+                "language": "ger",
+                "flags": [
+                  "Default"
+                ],
+                "warning": "junk keyword 'SURROUND' in Name"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
 ```

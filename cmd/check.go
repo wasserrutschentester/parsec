@@ -44,18 +44,23 @@ It validates:
   4. Consistency with online databases (TMDB/TVDB) for titles and episodes`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		filePath := args[0]
+		ui.IsSilent = jsonOutputFlag
+		var reports []checkReport
+		for _, filePath := range args {
+			report, err := collectCheckData(cmd, filePath)
+			if err != nil {
+				ui.PrintError(err.Error())
+				return fmt.Errorf("collecting check data failed for %s", filePath)
+			}
+			reports = append(reports, report)
 
-		report, err := collectCheckData(cmd, filePath)
-		if err != nil {
-			ui.PrintError(err.Error())
-			return fmt.Errorf("collecting check data failed")
+			if !jsonOutputFlag {
+				printInteractiveReport(report)
+			}
 		}
 
 		if jsonOutputFlag {
-			printJSONReport(report)
-		} else {
-			printInteractiveReport(report)
+			printJSONReports(reports)
 		}
 		return nil
 	},
@@ -139,8 +144,8 @@ func setupMdbIDs(cmd *cobra.Command, mi *mediainfo.MediaInfo, match *metadata.Me
 	}
 }
 
-func printJSONReport(report checkReport) {
-	data, err := json.MarshalIndent(report, "", "  ")
+func printJSONReports(reports []checkReport) {
+	data, err := json.MarshalIndent(reports, "", "  ")
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Error generating output: %v", err))
 		os.Exit(1)

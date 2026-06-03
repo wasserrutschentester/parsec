@@ -27,70 +27,81 @@ var identifyCmd = &cobra.Command{
 check if it exists and return its details.
 If a filename is provided, it will be parsed for metadata.
 Flags can be used to override or provide missing information.`),
-	Args: cobra.MaximumNArgs(1),
+	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var meta *metadata.Metadata
-		filePath := ""
-		if len(args) > 0 {
-			filePath = args[0]
-			filenameNoExt := filename.GetBaseName(filePath)
-			meta = filename.Parse(filenameNoExt)
-			ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
-			ui.Println(ui.LabelValue("Target Name:", filenameNoExt))
-		} else {
-			meta = &metadata.Metadata{}
-			ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
+		ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
+		if len(args) == 0 {
+			return identifyFile(cmd, "")
 		}
 
-		applyMetadataFlags(cmd, meta)
-		meta.SetDefaults()
-
-		ui.PrintDebug(fmt.Sprintf("%+v", meta))
-
-		result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
-		if err != nil {
-			ui.PrintError(err.Error())
-			return fmt.Errorf("search failed")
-		}
-
-		warnOnIDMismatch(filePath, result)
-
-		mdb.PrintResult(*result)
-		tags := mdb.GetMatroskaTags(*result)
-
-		if meta.IsTV {
-			episodeResult := getEpisodeResult(result, meta)
-			if episodeResult.Name != "" {
-				tags.SetEpisodeTags(episodeResult)
-			}
-		}
-
-		if releasesFlag {
-			prowlarr.PrintReleases(result, meta, bestFlag)
-		}
-
-		if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
-			fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
-			var response string
-			_, _ = fmt.Scanln(&response)
-			if response != "y" && response != "Y" {
-				ui.Println(ui.Muted.Render("Skipping..."))
-				return nil
-			} else {
-				writeTagsFlag = true
-			}
-		}
-
-		if writeTagsFlag {
-			err := matroska.SetGlobalTags(filePath, tags)
+		for _, filePath := range args {
+			err := identifyFile(cmd, filePath)
 			if err != nil {
-				ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
-			} else {
-				ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
+				return err
 			}
 		}
 		return nil
 	},
+}
+
+func identifyFile(cmd *cobra.Command, filePath string) error {
+	var meta *metadata.Metadata
+	if filePath != "" {
+		filenameNoExt := filename.GetBaseName(filePath)
+		meta = filename.Parse(filenameNoExt)
+		ui.Println(ui.LabelValue("Target Name:", filenameNoExt))
+	} else {
+		meta = &metadata.Metadata{}
+	}
+
+	applyMetadataFlags(cmd, meta)
+	meta.SetDefaults()
+
+	ui.PrintDebug(fmt.Sprintf("%+v", meta))
+
+	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
+	if err != nil {
+		ui.PrintError(err.Error())
+		return fmt.Errorf("search failed")
+	}
+
+	warnOnIDMismatch(filePath, result)
+
+	mdb.PrintResult(*result)
+	tags := mdb.GetMatroskaTags(*result)
+
+	if meta.IsTV {
+		episodeResult := getEpisodeResult(result, meta)
+		if episodeResult.Name != "" {
+			tags.SetEpisodeTags(episodeResult)
+		}
+	}
+
+	if releasesFlag {
+		prowlarr.PrintReleases(result, meta, bestFlag)
+	}
+
+	shouldWriteTags := writeTagsFlag
+	if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
+		fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
+		var response string
+		_, _ = fmt.Scanln(&response)
+		if response == "y" || response == "Y" {
+			shouldWriteTags = true
+		} else {
+			ui.Println(ui.Muted.Render("Skipping..."))
+		}
+	}
+
+	if shouldWriteTags && filePath != "" {
+		err := matroska.SetGlobalTags(filePath, tags)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
+		} else {
+			ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
+		}
+	}
+	return nil
 }
 
 func init() {
