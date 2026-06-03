@@ -172,10 +172,18 @@ func initConfig() {
 
 	viper.AutomaticEnv()
 
+	if viper.ConfigFileUsed() != "" {
+		ui.PrintDebug(fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed()))
+	} else {
+		ui.PrintDebug("No config file found, using defaults")
+	}
+
 	if presetFlag != "" {
 		config.SetPreset(presetFlag)
 		if !config.PresetExists(presetFlag) {
 			ui.PrintWarning(fmt.Sprintf("Preset '%s' does not exist in your configuration", presetFlag))
+		} else {
+			ui.PrintDebug(fmt.Sprintf("Using configuration preset: %s", presetFlag))
 		}
 	}
 }

@@ -36,6 +36,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 		if result == nil {
 			return nil, fmt.Errorf("no results found")
 		}
+		ui.PrintDebug(fmt.Sprintf("InteractiveSearch ID result: %+v", result))
 		return result, nil
 	}
 
@@ -52,6 +53,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 	}
 
 	if len(results) == 1 || unattended {
+		ui.PrintDebug(fmt.Sprintf("InteractiveSearch auto-selected: %+v", results[0]))
 		return &results[0], nil
 	}
 
@@ -79,7 +81,9 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 	if err != nil || choice < 0 || choice >= len(results) {
 		return nil, fmt.Errorf("invalid selection")
 	}
-	return &results[choice], nil
+	result := &results[choice]
+	ui.PrintDebug(fmt.Sprintf("InteractiveSearch selected: %+v", result))
+	return result, nil
 }
 
 func SearchMovie(query string, year int) ([]mdb.SearchResult, error) {
@@ -91,6 +95,7 @@ func SearchTV(query string, year int) ([]mdb.SearchResult, error) {
 }
 
 func search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
+	ui.PrintDebug(fmt.Sprintf("Starting parallel MDB search: type=%s, query=%s, year=%d", mediaType, query, year))
 	var resultsTMDB []mdb.SearchResult
 	var resultsTVDB []mdb.SearchResult
 	var errTMDB, errTVDB error
@@ -106,6 +111,8 @@ func search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 		resultsTVDB, errTVDB = tvdb.Search(mediaType, query, year)
 	}()
 	wg.Wait()
+
+	ui.PrintDebug(fmt.Sprintf("MDB search results: TMDB=%d, TVDB=%d", len(resultsTMDB), len(resultsTVDB)))
 
 	if errTMDB != nil {
 		return nil, fmt.Errorf("TMDB search failed: %v", errTMDB)
@@ -272,6 +279,8 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 		if year > 0 && results[i].Year == year {
 			results[i].Similarity += 0.05 // Slight boost for exact year match
 		}
+		ui.PrintDebug(fmt.Sprintf("Result: %s (%d) - Similarity: %.2f (Title: %.2f, Orig: %.2f)",
+			results[i].Title, results[i].Year, results[i].Similarity, titleSim, origSim))
 	}
 
 	// Sort results by similarity, then popularity
@@ -380,6 +389,7 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 
 func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
 	if result.TvdbID > 0 {
+		ui.PrintDebug(fmt.Sprintf("Searching for episode on TVDB: ID=%d, S%02dE%02d", result.TvdbID, meta.Season, meta.Episode))
 		data, err := tvdb.IdentifyEpisode(result, meta, allowSpecials)
 		if err == nil && data.Name != "" {
 			return data
@@ -391,6 +401,7 @@ func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials
 	langs := []string{preferred, result.OriginalLanguage, "en"}
 	uniqueLangs := metadata.RemoveDuplicates(langs)
 	if result.TmdbID > 0 {
+		ui.PrintDebug(fmt.Sprintf("Searching for episode on TMDB: ID=%d, S%02dE%02d", result.TmdbID, meta.Season, meta.Episode))
 		for _, lang := range uniqueLangs {
 			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, meta.Season, meta.Episode, lang)
 			if err == nil && data.Name != "" {

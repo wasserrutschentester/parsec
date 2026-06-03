@@ -122,13 +122,20 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 
 	var allResults []ReleaseResource
 	seenGuids := make(map[string]bool)
+	duplicates := 0
 	for results := range resultsChan {
 		for _, r := range results {
 			if !seenGuids[r.Guid] {
 				allResults = append(allResults, r)
 				seenGuids[r.Guid] = true
+			} else {
+				duplicates++
 			}
 		}
+	}
+
+	if duplicates > 0 {
+		ui.PrintDebug(fmt.Sprintf("Removed %d duplicate Prowlarr results across multiple queries", duplicates))
 	}
 
 	return allResults, nil
@@ -169,6 +176,7 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 
 	ui.PrintDebug(fmt.Sprintf("Prowlarr search URL: %s", searchURL.String()))
 
+	start := time.Now()
 	req, err := http.NewRequest("GET", searchURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
@@ -182,6 +190,8 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 		return nil, fmt.Errorf("prowlarr request failed: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	duration := time.Since(start)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -198,6 +208,7 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 		return nil, fmt.Errorf("failed to decode prowlarr response: %v", err)
 	}
 
+	ui.PrintDebug(fmt.Sprintf("Prowlarr request took %v, returned %d results", duration, len(results)))
 	_ = cache.Set(cacheKey, body)
 
 	return results, nil
@@ -211,6 +222,12 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 		cleanImdb := strings.TrimPrefix(imdbID, "tt")
 		imdbInt, _ = strconv.ParseInt(cleanImdb, 10, 64)
 	}
+
+	type indexerStat struct {
+		total   int
+		matched int
+	}
+	stats := make(map[string]indexerStat)
 
 	for _, r := range results {
 		match := false
@@ -227,12 +244,21 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 			match = true
 		}
 
+		s := stats[r.Indexer]
+		s.total++
+
 		if match {
-			ui.PrintDebug(fmt.Sprintf("%+v match: %v", r, match))
+			s.matched++
 			filtered = append(filtered, r)
 		} else {
-			ui.PrintDebug(fmt.Sprintf("Prowlarr result '%s' filtered out (IMDB: %d, TMDB: %d, TVDB: %d)", r.Title, r.ImdbID, r.TmdbID, r.TvdbID))
+			ui.PrintDebug(fmt.Sprintf("Prowlarr result '%s' from %s filtered out (IMDB: %d, TMDB: %d, TVDB: %d)", r.Title, r.Indexer, r.ImdbID, r.TmdbID, r.TvdbID))
 		}
+		stats[r.Indexer] = s
+	}
+
+	for indexer, s := range stats {
+		ui.PrintDebug(fmt.Sprintf("Indexer '%s' stats: total=%d, matched=%d, false_positives=%d",
+			indexer, s.total, s.matched, s.total-s.matched))
 	}
 
 	return filtered

@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 type EbmlMetadata struct {
@@ -113,6 +114,7 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 		return nil, err
 	}
 
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvmerge -J %s", filePath))
 	cmd := exec.Command("mkvmerge", "-J", filePath)
 	output, err := cmd.Output()
 	if err != nil {
@@ -149,6 +151,7 @@ func (metadata *EbmlMetadata) countTypes() {
 func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 	for _, track := range metadata.Tracks {
 		if track.Type == "audio" && track.Properties.VisualImpaired {
+			ui.PrintDebug("found Visual Impaired audio Track")
 			return true
 		}
 	}
@@ -167,6 +170,7 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	}
 	defer func() { _ = os.Remove(tagsXML) }()
 
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --tags global:%s", filePath, tagsXML))
 	cmd := exec.Command("mkvpropedit", filePath, "--tags", "global:"+tagsXML)
 	if err := cmd.Run(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {

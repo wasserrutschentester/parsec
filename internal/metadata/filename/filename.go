@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 func GetBaseName(filePath string) string {
@@ -123,6 +124,8 @@ func Parse(filename string) *metadata.Metadata {
 
 	// Episode title
 	meta.EpisodeTitle = matchEpisodeTitle(filename, meta)
+
+	ui.PrintDebug(fmt.Sprintf("Filename meta: %+v", meta))
 
 	return meta
 }

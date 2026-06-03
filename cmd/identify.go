@@ -57,8 +57,6 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 	applyMetadataFlags(cmd, meta)
 	meta.SetDefaults()
 
-	ui.PrintDebug(fmt.Sprintf("%+v", meta))
-
 	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 	if err != nil {
 		ui.PrintError(err.Error())

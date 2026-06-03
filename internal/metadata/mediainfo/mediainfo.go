@@ -13,6 +13,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/language"
 )
@@ -158,6 +159,7 @@ func Get(filePath string) (*MediaInfo, error) {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
+	ui.PrintDebug(fmt.Sprintf("Executing: mediainfo --Output=JSON --ParseSpeed=0 %s", filePath))
 	cmd := exec.Command("mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
 	out, err := cmd.Output()
 	if err != nil {
@@ -282,6 +284,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 		}
 	}
 	mi.SetLanguageTag(meta)
+	ui.PrintDebug(fmt.Sprintf("Mediainfo meta: %+v", meta))
 	return meta
 }
 

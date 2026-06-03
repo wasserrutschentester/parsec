@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+
 	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -98,4 +101,5 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	if tvdbIDFlag != 0 {
 		meta.TvdbID = tvdbIDFlag
 	}
+	ui.PrintDebug(fmt.Sprintf("Set Flag overrides: %+v", meta))
 }

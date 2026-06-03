@@ -269,6 +269,7 @@ func (meta *Metadata) SetDefaults() {
 	} else if meta.IsTV && config.GetIsMovie() {
 		meta.IsTV = false
 	}
+	ui.PrintDebug(fmt.Sprintf("set config overrides: %+v", meta))
 }
 
 func (meta *Metadata) GetReleaseName() string {
