@@ -248,6 +248,15 @@ func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) 
 		return nil, err
 	}
 
+	// retry without year if search fails
+	if len(results) == 0 {
+		if isTV {
+			results, err = SearchTV(query, 0)
+		} else {
+			results, err = SearchMovie(query, 0)
+		}
+	}
+
 	if len(results) == 0 {
 		return nil, nil
 	}
