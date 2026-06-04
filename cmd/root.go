@@ -24,12 +24,15 @@ var rootCmd = &cobra.Command{
 	Long:  ui.Banner(".: FIRST STEPS? :."),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		ui.IsSilent = jsonOutputFlag // make sure only json is printed
-		if jsonOutputFlag {
+		if ui.IsSilent {
 			ui.DisableColors()
 		}
 		ui.IsDebug = debugFlag
 		ui.PrintDebug("Debug output enabled")
 		config.NoCache = noCacheFlag
+
+		initConfig()
+		config.InitDefaults()
 
 		// Suppress update check for completion commands to avoid polluting shell output
 		if !isCompletionCommand(cmd) {
@@ -59,14 +62,10 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/parsec/config.toml)")
 	rootCmd.PersistentFlags().StringVarP(&presetFlag, "preset", "p", "", "configuration preset to use")
 	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&noCacheFlag, "no-cache", false, "bypass the API cache and fetch fresh data")
-
-	config.InitDefaults()
 
 	// Add template functions for flag grouping
 	cobra.AddTemplateFunc("filterFlags", func(fs *pflag.FlagSet, key, value string) *pflag.FlagSet {
