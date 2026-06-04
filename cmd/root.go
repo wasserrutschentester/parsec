@@ -30,8 +30,22 @@ var rootCmd = &cobra.Command{
 		ui.IsDebug = debugFlag
 		ui.PrintDebug("Debug output enabled")
 		config.NoCache = noCacheFlag
-		update.CheckForUpdateBackground(Version)
+
+		// Suppress update check for completion commands to avoid polluting shell output
+		if !isCompletionCommand(cmd) {
+			update.CheckForUpdateBackground(Version)
+		}
 	},
+}
+
+func isCompletionCommand(cmd *cobra.Command) bool {
+	switch cmd.Name() {
+	case "__complete", "__completeNoDesc", "completion":
+		return true
+	default:
+		// checks for "parsec completion bash" and similar commands
+		return cmd.HasParent() && cmd.Parent().Name() == "completion"
+	}
 }
 
 func Execute() {
