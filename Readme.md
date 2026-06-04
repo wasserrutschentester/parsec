@@ -87,6 +87,11 @@ Update `parsec` to the latest version.
 
 For more information see the [Update Documentation](docs/update.md)
 
+### `completion`
+Generate autocompletion scripts for various shells (bash, zsh, fish, powershell).
+
+For more information see the [Shell Completion Documentation](docs/completion.md)
+
 ## Configuration
 
 `parsec` uses a TOML-based configuration system. By default, it looks for a configuration file at `$HOME/.config/parsec/config.toml` or `config.toml` in the current directory.
