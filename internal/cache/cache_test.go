@@ -57,3 +57,44 @@ func TestCache(t *testing.T) {
 		t.Error("Expected error after Clear")
 	}
 }
+
+func TestCleanup(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "parsec-test-cleanup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	SetDir(tempDir)
+	defer ResetDir()
+
+	// Create a fresh file
+	keyFresh := "fresh"
+	if err := Set(keyFresh, []byte("fresh-data")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an old file
+	keyOld := "old"
+	if err := Set(keyOld, []byte("old-data")); err != nil {
+		t.Fatal(err)
+	}
+	pathOld := getPath(keyOld)
+	oldTime := time.Now().Add(-cacheDuration - time.Hour)
+	if err := os.Chtimes(pathOld, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	// Run Cleanup
+	Cleanup()
+
+	// Fresh file should still exist
+	if _, err := os.Stat(getPath(keyFresh)); err != nil {
+		t.Errorf("Fresh file should exist: %v", err)
+	}
+
+	// Old file should be gone
+	if _, err := os.Stat(pathOld); !os.IsNotExist(err) {
+		t.Errorf("Old file should be removed, err: %v", err)
+	}
+}

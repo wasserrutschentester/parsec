@@ -12,8 +12,11 @@ import (
 
 var cacheDir string
 
+const cacheDuration = 6 * time.Hour
+
 func init() {
 	ResetDir()
+	Cleanup()
 }
 
 func ResetDir() {
@@ -26,6 +29,47 @@ func ResetDir() {
 
 func SetDir(dir string) {
 	cacheDir = dir
+}
+
+func Cleanup() {
+	// check if cache directory exists`
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return
+	}
+
+	markerPath := filepath.Join(cacheDir, ".last_cleanup")
+	if info, err := os.Stat(markerPath); err == nil {
+		if time.Since(info.ModTime()) < cacheDuration {
+			return
+		}
+	}
+
+	removeExpiredFiles()
+
+	// Update marker
+	_ = os.WriteFile(markerPath, []byte{}, 0o644)
+}
+
+func removeExpiredFiles() {
+	files, err := os.ReadDir(cacheDir)
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() || file.Name() == ".last_cleanup" {
+			continue
+		}
+
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
+		if time.Since(info.ModTime()) > cacheDuration {
+			_ = os.Remove(filepath.Join(cacheDir, file.Name()))
+		}
+	}
 }
 
 func Clear() {
@@ -43,8 +87,7 @@ func Get(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	// Cache for 6 hours
-	if time.Since(info.ModTime()) > 6*time.Hour {
+	if time.Since(info.ModTime()) > cacheDuration {
 		_ = os.Remove(path)
 		return nil, fmt.Errorf("cache expired")
 	}
