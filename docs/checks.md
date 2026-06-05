@@ -84,7 +84,7 @@ This document lists all individual checks performed by the `parsec check` comman
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
 | Matroska Format | `checkMatroskaFormat` | `matroska_ebml_error` | No | Verifies that the file is a valid Matroska (MKV) container. |
-| Track Order | `checkTrackOrder` | `matroska_track_order` | Yes | Ensures audio and subtitle tracks are sorted by language priority (preferred_language, Original, English, and then alphabetical by ISO tag) and type (Forced, Standard/Default, SDH/Descriptive, Commentary). |
+| Track Order | `checkTrackOrder` | `matroska_track_order` | Yes | Ensures audio and subtitle tracks are sorted by language priority (preferred_language, Original, and then alphabetical by English language and dialect name ) and type (Forced, Standard/Default, SDH/Descriptive, Commentary). |
 | Language Tags | `validateTrackBasics` | `matroska_language_tag` | Yes | Verifies that all tracks have a valid ISO language tag. |
 | 'mul' Track Name | `validateTrackBasics` | `matroska_multi_lang` | Yes | Ensures that tracks with language 'mul' (Multiple) have a Name field listing at least two full language names. |
 | Original Language Consistency | `checkOriginalLanguageConsistency` | `matroska_original_language` | Yes | Verifies that the `OriginalLanguage` flag is applied consistently. |

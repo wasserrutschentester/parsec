@@ -248,44 +248,44 @@ func TestGetTrackPriority(t *testing.T) {
 	tests := []struct {
 		name    string
 		track   matroska.EbmlTrack
-		wantMin int
-		wantMax int
+		wantMin int64
+		wantMax int64
 	}{
 		{
 			name:    "German Audio Default",
 			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger"}},
-			wantMin: 1000,
-			wantMax: 1000,
+			wantMin: priorityPreferred,
+			wantMax: priorityPreferred + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "German Audio AD",
 			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", VisualImpaired: true}},
-			wantMin: 1010,
-			wantMax: 1010,
+			wantMin: priorityPreferred,
+			wantMax: priorityPreferred + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "German Sub Forced",
 			track:   matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Forced: true}},
-			wantMin: 1000,
-			wantMax: 1001,
+			wantMin: priorityPreferred,
+			wantMax: priorityPreferred + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "German Sub SDH",
 			track:   matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", HearingImpaired: true}},
-			wantMin: 1020,
-			wantMax: 1021,
+			wantMin: priorityPreferred,
+			wantMax: priorityPreferred + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "Original Language",
 			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fre", OriginalLanguage: true}},
-			wantMin: 2000,
-			wantMax: 2000,
+			wantMin: priorityOriginal,
+			wantMax: priorityOriginal + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "English Audio",
 			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng"}},
-			wantMin: 5000,
-			wantMax: 1_000_000_000,
+			wantMin: priorityOther,
+			wantMax: priorityOther + (int64(1) << 60) - 1,
 		},
 	}
 

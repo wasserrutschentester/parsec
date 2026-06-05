@@ -35,17 +35,17 @@ var (
 )
 
 const (
-	priorityPreferred = 1000
-	priorityOriginal  = 2000
-	priorityMul       = 3000
-	priorityOther     = 5000
+	priorityPreferred = int64(1) << 60
+	priorityOriginal  = int64(2) << 60
+	priorityMul       = int64(3) << 60
+	priorityOther     = int64(4) << 60
 
-	propScoreCommentary  = 30
-	propScoreAD          = 10
-	propScoreDescription = 20
-	propScoreForced      = 0
-	propScoreSDH         = 20
-	propScoreStandard    = 10
+	propScoreCommentary  = int64(30)
+	propScoreAD          = int64(10)
+	propScoreDescription = int64(20)
+	propScoreForced      = int64(0)
+	propScoreSDH         = int64(20)
+	propScoreStandard    = int64(10)
 )
 
 type trackResultAggregator struct {
@@ -106,7 +106,7 @@ func checkMatroskaFormat(err error) []CheckResult {
 
 func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 	var results []CheckResult
-	var lastAudioPriority, lastSubPriority int
+	var lastAudioPriority, lastSubPriority int64
 	var lastAudioTrack, lastSubTrack *matroska.EbmlTrack
 	seenTracks := make(map[string]*matroska.EbmlTrack)
 	reportedDuplicates := make(map[string]bool)
@@ -197,7 +197,7 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 	return results
 }
 
-func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int, lastPriority *int, description string, reportedTracks map[int]bool) *CheckResult {
+func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int64, lastPriority *int64, description string, reportedTracks map[int]bool) *CheckResult {
 	if priority < *lastPriority {
 		res := &CheckResult{
 			Identifier: "matroska_track_order",
@@ -206,12 +206,12 @@ func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int, lastPri
 			Severity:   "warning",
 		}
 		if prevTrack != nil && !reportedTracks[prevTrack.Properties.Number] {
-			warning := fmt.Sprintf("score: %d", *lastPriority)
+			warning := fmt.Sprintf("score: %s", formatPriority(*lastPriority))
 			res.Tracks = append(res.Tracks, ebmlTrackToResult(prevTrack, true, warning))
 			reportedTracks[prevTrack.Properties.Number] = true
 		}
 		if !reportedTracks[track.Properties.Number] {
-			warning := ui.Warning.Render(fmt.Sprintf("score: %d (out of order)", priority))
+			warning := ui.Warning.Render(fmt.Sprintf("score: %s (out of order)", formatPriority(priority)))
 			res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, warning))
 			reportedTracks[track.Properties.Number] = true
 		}
@@ -220,6 +220,14 @@ func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int, lastPri
 	}
 	*lastPriority = priority
 	return nil
+}
+
+func formatPriority(p int64) string {
+	cat := (p >> 60) & 0xF
+	base := (p >> 35) & 0x1FFFFFF
+	full := (p >> 10) & 0x1FFFFFF
+	typ := p & 0x3FF
+	return fmt.Sprintf("0x%X:%07X:%07X:%03X", cat, base, full, typ)
 }
 
 func getOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
@@ -526,12 +534,12 @@ func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywo
 	return nil
 }
 
-func getTrackPriority(track matroska.EbmlTrack) int {
+func getTrackPriority(track matroska.EbmlTrack) int64 {
 	lang := track.Properties.Language
 	tag := language.Make(lang)
 	prefTag := language.Make(config.GetPreferredLanguage())
 
-	langScore := priorityOther
+	var langScore int64
 	if tag == prefTag {
 		langScore = priorityPreferred
 	} else if track.Properties.OriginalLanguage {
@@ -539,22 +547,18 @@ func getTrackPriority(track matroska.EbmlTrack) int {
 	} else if tag == language.Make("mul") {
 		langScore = priorityMul
 	} else {
-		langName := metadata.LanguageName(lang)
-		score := 0
-		for i := 0; i < 6; i++ {
-			val := 0
-			if i < len(langName) {
-				c := langName[i]
-				if c >= 'A' && c <= 'Z' {
-					val = int(c - 'A' + 1)
-				}
-			}
-			score = (score << 5) | val
-		}
-		langScore += score
+		langScore = priorityOther
 	}
 
-	propertyScore := 0
+	langName := metadata.LanguageName(lang)
+	baseTag, _ := tag.Base()
+	baseName := metadata.LanguageName(baseTag.String())
+
+	langScore += calcScore(baseName) << 35
+	if baseName != langName {
+		langScore += calcScore(langName) << 10
+	}
+	var propertyScore int64
 	switch track.Type {
 	case "audio":
 		if track.Properties.Commentary {
@@ -579,4 +583,19 @@ func getTrackPriority(track matroska.EbmlTrack) int {
 	}
 
 	return langScore + propertyScore
+}
+
+func calcScore(name string) int64 {
+	s := int64(0)
+	for i := 0; i < 5; i++ {
+		val := int64(0)
+		if i < len(name) {
+			c := name[i]
+			if c >= 'A' && c <= 'Z' {
+				val = int64(c - 'A' + 1)
+			}
+		}
+		s = (s << 5) | val
+	}
+	return s
 }
