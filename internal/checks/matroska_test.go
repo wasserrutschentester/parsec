@@ -259,6 +259,27 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Zlib compression disabled",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1, ContentEncodingAlgorithms: ""}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Zlib compression enabled",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1, ContentEncodingAlgorithms: "0"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Zlib compression enabled (multiple)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1, ContentEncodingAlgorithms: "1,0"}},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Audio tracks are ignored",
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},

@@ -95,6 +95,7 @@ This document lists all individual checks performed by the `parsec check` comman
 | Duplicate Tracks | `checkDuplicateTracks` | `matroska_duplicate_tracks` | Yes | Identifies identical tracks (same language, flags, and name). |
 | Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures only the first standard track per language is marked as Default. |
 | Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all subtitle tracks are in SRT format. |
+| Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
 
 ### Media Database (MDB) Consistency Checks
 

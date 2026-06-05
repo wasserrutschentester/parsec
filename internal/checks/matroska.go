@@ -161,6 +161,10 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 			agg.Add(checkSubtitleFormat(*track))
 		}
 
+		if config.IsCheckEnabled("matroska_zlib_compression") {
+			agg.Add(checkZlibCompression(*track))
+		}
+
 		if config.IsCheckEnabled("matroska_track_order") {
 			priority := getTrackPriority(*track)
 			switch track.Type {
@@ -186,6 +190,7 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 		"matroska_name_keywords",
 		"matroska_default_flags",
 		"matroska_subtitle_format",
+		"matroska_zlib_compression",
 		"matroska_track_order",
 	}
 	for _, id := range ids {
@@ -421,6 +426,16 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 		warning := fmt.Sprintf("text-based but codec is %s", codec)
 		track.Codec = ui.Warning.Render(track.Codec)
 		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track isn't in SRT format", "warning", &track, warning)
+	}
+	return nil
+}
+
+func checkZlibCompression(track matroska.EbmlTrack) *CheckResult {
+	algos := strings.Split(track.Properties.ContentEncodingAlgorithms, ",")
+	for _, algo := range algos {
+		if algo == "0" { // 0 = zlib
+			return newFailedTrackResult("matroska_zlib_compression", "Track uses zlib compression", "warning", &track, ui.Warning.Render("zlib compression enabled"))
+		}
 	}
 	return nil
 }

@@ -170,6 +170,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_name_keywords":       true,
 	"matroska_default_flags":       true,
 	"matroska_subtitle_format":     true,
+	"matroska_zlib_compression":    true,
 	"matroska_track_order":         true,
 }
 

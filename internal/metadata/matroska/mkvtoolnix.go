@@ -30,21 +30,22 @@ type EbmlTrack struct {
 }
 
 type EbmlTrackProperties struct {
-	Language         string `json:"language,omitempty"`
-	LanguageIetf     string `json:"language_ietf,omitempty"`
-	Name             string `json:"track_name,omitempty"`
-	Source           string `json:"tag_source,omitempty"`
-	Number           int    `json:"number,omitempty"`
-	IndexEntries     int    `json:"num_index_entries,omitempty"`
-	Enabled          bool   `json:"enabled_track,omitempty"`
-	Default          bool   `json:"default_track,omitempty"`
-	Forced           bool   `json:"forced_track,omitempty"`
-	HearingImpaired  bool   `json:"flag_hearing_impaired,omitempty"`
-	VisualImpaired   bool   `json:"flag_visual_impaired,omitempty"`
-	Commentary       bool   `json:"flag_commentary,omitempty"`
-	OriginalLanguage bool   `json:"flag_original,omitempty"`
-	TextDescriptions bool   `json:"flag_text_descriptions,omitempty"`
-	TextSubtitles    bool   `json:"text_subtitles,omitempty"`
+	Language                  string `json:"language,omitempty"`
+	LanguageIetf              string `json:"language_ietf,omitempty"`
+	Name                      string `json:"track_name,omitempty"`
+	Source                    string `json:"tag_source,omitempty"`
+	Number                    int    `json:"number,omitempty"`
+	IndexEntries              int    `json:"num_index_entries,omitempty"`
+	Enabled                   bool   `json:"enabled_track,omitempty"`
+	Default                   bool   `json:"default_track,omitempty"`
+	Forced                    bool   `json:"forced_track,omitempty"`
+	HearingImpaired           bool   `json:"flag_hearing_impaired,omitempty"`
+	VisualImpaired            bool   `json:"flag_visual_impaired,omitempty"`
+	Commentary                bool   `json:"flag_commentary,omitempty"`
+	OriginalLanguage          bool   `json:"flag_original,omitempty"`
+	TextDescriptions          bool   `json:"flag_text_descriptions,omitempty"`
+	TextSubtitles             bool   `json:"text_subtitles,omitempty"`
+	ContentEncodingAlgorithms string `json:"content_encoding_algorithms,omitempty"`
 }
 
 type EbmlAttachment struct {
