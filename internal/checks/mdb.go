@@ -16,7 +16,6 @@ import (
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true)
-	mdb.PrintCompactResult(*searchResult)
 
 	if searchErr != nil {
 		return checkMdbError(searchErr)
@@ -24,6 +23,8 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 	if searchResult == nil {
 		return checkNoMatch()
 	}
+
+	mdb.PrintCompactResult(*searchResult)
 
 	if config.IsCheckEnabled("mdb_unknown_original_lang") {
 		results = append(results, checkUnknownOriginalLang(mi, searchResult)...)
