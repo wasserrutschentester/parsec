@@ -337,6 +337,9 @@ func SearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult
 	if err != nil {
 		return nil, err
 	}
+	if result == nil {
+		return nil, fmt.Errorf("no results found")
+	}
 
 	// If we have a TMDB result but it's missing TVDB info, try to fetch it if we have a TVDB ID
 	if result.TvdbID > 0 && (result.TvdbSlug == "" || len(result.AltTitle) == 0) {
