@@ -224,6 +224,41 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Redundant language name 'German'",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "German", Default: true, Number: 1}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Dialect 'Castilian' on Spanish track is allowed",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Name: "Castilian", Default: true, Number: 1}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Dialect 'Latino' on single Spanish track is allowed",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Name: "Latino", Default: true, Number: 1}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Chinese dialects always allowed (Traditional)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "chi", Name: "Traditional", Default: true, Number: 1}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Chinese dialects: 'Chinese' is still redundant",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "chi", Name: "Chinese Traditional", Default: true, Number: 1}},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Audio tracks are ignored",
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},
