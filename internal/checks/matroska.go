@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
 	"golang.org/x/text/language"
@@ -37,7 +38,6 @@ const (
 	priorityPreferred = 1000
 	priorityOriginal  = 2000
 	priorityMul       = 3000
-	priorityEnglish   = 4000
 	priorityOther     = 5000
 
 	propScoreCommentary  = 30
@@ -239,7 +239,7 @@ func ebmlTrackToResult(t *matroska.EbmlTrack, passed bool, warning string) Track
 		TypeOrder: t.TypeOrder,
 		Codec:     t.Codec,
 		Name:      t.Properties.Name,
-		Language:  t.Properties.Language,
+		Language:  metadata.LanguageName(t.Properties.Language),
 		Flags:     ebmlGetFlagsSlice(t),
 		Passed:    passed,
 		Warning:   warning,
@@ -538,17 +538,20 @@ func getTrackPriority(track matroska.EbmlTrack) int {
 		langScore = priorityOriginal
 	} else if tag == language.Make("mul") {
 		langScore = priorityMul
-	} else if tag == language.English {
-		langScore = priorityEnglish
 	} else {
-		base, _ := tag.Base()
-		s := base.String()
-		if len(s) >= 2 {
-			langScore += int(s[0]-'a')*100 + int(s[1]-'a')*10
-			if len(s) >= 3 {
-				langScore += int(s[2] - 'a')
+		langName := metadata.LanguageName(lang)
+		score := 0
+		for i := 0; i < 6; i++ {
+			val := 0
+			if i < len(langName) {
+				c := langName[i]
+				if c >= 'A' && c <= 'Z' {
+					val = int(c - 'A' + 1)
+				}
 			}
+			score = (score << 5) | val
 		}
+		langScore += score
 	}
 
 	propertyScore := 0
@@ -568,6 +571,10 @@ func getTrackPriority(track matroska.EbmlTrack) int {
 			propertyScore = propScoreSDH
 		} else {
 			propertyScore = propScoreStandard
+		}
+		// text subs should be before image based subs
+		if !track.Properties.TextSubtitles {
+			propertyScore += 1
 		}
 	}
 

@@ -143,16 +143,16 @@ func TestRunTrackChecks(t *testing.T) {
 		{
 			name: "Alphabetical language order",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ita", Default: true, Number: 2}},
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ita", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Default: true, Number: 2}},
 			},
 			wantErr: false,
 		},
 		{
 			name: "Alphabetical language order (wrong)",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ita", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Default: true, Number: 2}},
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ita", Default: true, Number: 2}},
 			},
 			wantErr: true,
 		},
@@ -267,13 +267,13 @@ func TestGetTrackPriority(t *testing.T) {
 			name:    "German Sub Forced",
 			track:   matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Forced: true}},
 			wantMin: 1000,
-			wantMax: 1000,
+			wantMax: 1001,
 		},
 		{
 			name:    "German Sub SDH",
 			track:   matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", HearingImpaired: true}},
 			wantMin: 1020,
-			wantMax: 1020,
+			wantMax: 1021,
 		},
 		{
 			name:    "Original Language",
@@ -284,8 +284,8 @@ func TestGetTrackPriority(t *testing.T) {
 		{
 			name:    "English Audio",
 			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng"}},
-			wantMin: 4000,
-			wantMax: 4000,
+			wantMin: 5000,
+			wantMax: 1_000_000_000,
 		},
 	}
 
