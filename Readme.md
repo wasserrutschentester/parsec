@@ -1,6 +1,11 @@
 # parsec
 
-parse - check - create - release
+<div align="center">
+  <img src="docs/assets/header.webp" alt="Parsec header" width="600px"/>
+  </br>
+  <h2 id="tagline">parse - check - create - release</h2>
+  </br>
+</div>
 
 `parsec` is a tool for managing media files, providing capabilities to identify, check, and rename files according to specific standards and metadata from online databases.
 
