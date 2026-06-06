@@ -49,12 +49,17 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		resYear, _ = strconv.Atoi(date[:4])
 	}
 
+	origLang := m.OriginalLanguage
+	if origLang == "xx" {
+		origLang = "zxx"
+	}
+
 	return mdb.SearchResult{
 		TmdbID:           m.ID,
 		TmdbType:         mediaType,
 		Title:            title,
 		OriginalTitle:    originalTitle,
-		OriginalLanguage: m.OriginalLanguage,
+		OriginalLanguage: origLang,
 		Year:             resYear,
 		IsTV:             mediaType == "tv",
 		Popularity:       m.Popularity,

@@ -66,7 +66,7 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 			r.Title,
 			strconv.Itoa(r.Year),
 			fmt.Sprintf("%.0f%%", r.Similarity*100),
-			r.OriginalLanguage,
+			mdb.FormatLanguage(r.OriginalLanguage),
 		})
 	}
 	ui.Println(ui.TrackTable(headers, rows))

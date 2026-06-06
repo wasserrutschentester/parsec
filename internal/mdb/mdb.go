@@ -44,6 +44,13 @@ type MatroskaTags struct {
 	Tvdb2 string
 }
 
+func FormatLanguage(lang string) string {
+	if lang == "zxx" {
+		return "zxx (No Dialogue)"
+	}
+	return lang
+}
+
 func PrintResult(result SearchResult) {
 	title := fmt.Sprintf("%s (%d)", result.Title, result.Year)
 	subtitle := ""
@@ -56,7 +63,7 @@ func PrintResult(result SearchResult) {
 		props = append(props, [2]string{"Origin Title", result.OriginalTitle})
 	}
 	if result.OriginalLanguage != "" {
-		props = append(props, [2]string{"Origin Lang", result.OriginalLanguage})
+		props = append(props, [2]string{"Origin Lang", FormatLanguage(result.OriginalLanguage)})
 	}
 	if len(result.AltTitle) > 0 {
 		props = append(props, [2]string{"Alt Titles", strings.Join(result.AltTitle, ", ")})
@@ -151,7 +158,7 @@ func PrintEpisodeResult(result EpisodeResult) {
 }
 
 func PrintCompactResult(result SearchResult) {
-	title := fmt.Sprintf("%s (%d) [OV: %s]", result.Title, result.Year, result.OriginalLanguage)
+	title := fmt.Sprintf("%s (%d) [OV: %s]", result.Title, result.Year, FormatLanguage(result.OriginalLanguage))
 	ids := ""
 	if result.TmdbID > 0 && result.TmdbType != "" {
 		ids = fmt.Sprintf("TMDB: %s/%d,", result.TmdbType, result.TmdbID)
