@@ -161,6 +161,7 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `mediainfo_durations`: Check for inconsistent track durations.
 -   `mediainfo_redundant_audio`: Check for redundant audio tracks.
 -   `mediainfo_resolution`: Check for non-standard resolutions.
+-   `mediainfo_dialogue_normalization`: Check for dialogue normalization in lossless audio tracks.
 -   `matroska_track_order`: Verify track ordering rules.
 -   `matroska_language_tag`: Verify valid ISO language tags on tracks.
 -   `matroska_multi_lang`: Ensure 'mul' tracks have at least two full language names.

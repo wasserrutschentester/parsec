@@ -78,6 +78,7 @@ This document lists all individual checks performed by the `parsec check` comman
 | Track Durations | `checkDurations` | `mediainfo_durations` | Yes | Detects significant timing discrepancies between video, audio, and subtitle tracks. |
 | Redundant Audio | `checkRedundantAudio` | `mediainfo_redundant_audio` | Yes | Identifies multiple standard audio tracks for the same language. |
 | Resolution | `checkResolution` | `mediainfo_resolution` | Yes | Checks for odd resolution, standard widths, and sane aspect ratios. |
+| Dialogue Normalization | `checkDialogueNormalization` | `mediainfo_dialogue_normalization` | Yes | Verifies that dialogue normalization is removed for lossless (TrueHD, DTS-HD MA) and DTS-HD HRA tracks. |
 
 ### Matroska / EBML Checks
 

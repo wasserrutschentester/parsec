@@ -262,3 +262,81 @@ func TestCheckDurations(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckDialogueNormalization(t *testing.T) {
+	tests := []struct {
+		name     string
+		track    mediainfo.Track
+		wantWarn bool
+	}{
+		{
+			name: "TrueHD with Dialog_Normalization",
+			track: mediainfo.Track{
+				Type:                 "Audio",
+				Format:               "MLP FBA",
+				Dialog_Normalization: "-27 dB",
+			},
+			wantWarn: true,
+		},
+		{
+			name: "TrueHD with dialnorm in Extra",
+			track: mediainfo.Track{
+				Type:   "Audio",
+				Format: "MLP FBA",
+				Extra:  mediainfo.Extra{"dialnorm": "-27"},
+			},
+			wantWarn: true,
+		},
+		{
+			name: "TrueHD without DialNorm",
+			track: mediainfo.Track{
+				Type:   "Audio",
+				Format: "MLP FBA",
+			},
+			wantWarn: false,
+		},
+		{
+			name: "DTS-HD MA with DialNorm",
+			track: mediainfo.Track{
+				Type:                 "Audio",
+				Format:               "DTS",
+				Format_Profile:       "MA / Core",
+				Dialog_Normalization: "-27 dB",
+			},
+			wantWarn: true,
+		},
+		{
+			name: "AC-3 with DialNorm (Allowed)",
+			track: mediainfo.Track{
+				Type:                 "Audio",
+				Format:               "AC-3",
+				Dialog_Normalization: "-27 dB",
+			},
+			wantWarn: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mi := &mediainfo.MediaInfo{
+				Media: mediainfo.Media{
+					Tracks: []mediainfo.Track{tt.track},
+				},
+			}
+			results := checkDialogueNormalization(mi)
+			hasFailure := false
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+			if tt.wantWarn && !hasFailure {
+				t.Errorf("checkDialogueNormalization() expected warning, got none")
+			}
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("checkDialogueNormalization() expected no warning, got failure")
+			}
+		})
+	}
+}

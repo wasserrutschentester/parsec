@@ -54,7 +54,41 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		results = append(results, checkResolution(videoTrack)...)
 	}
 
+	// 7. Dialogue Normalization
+	if config.IsCheckEnabled("mediainfo_dialogue_normalization") {
+		results = append(results, checkDialogueNormalization(mi)...)
+	}
+
 	return results
+}
+
+func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_dialogue_normalization",
+		Passed:     true,
+	}
+
+	for i := range mi.Media.Tracks {
+		track := &mi.Media.Tracks[i]
+		dialnorm := track.GetDialNorm()
+		if track.Type == "Audio" && dialnorm != "" {
+			codec := metadata.AudioCodecName(track.Format, track.Format_Profile, track.Format_AdditionalFeatures)
+			isLosslessOrHRA := false
+			switch codec {
+			case "TrueHD", "DTS-HD.MA", "DTS-HD.HRA":
+				isLosslessOrHRA = true
+			}
+
+			if isLosslessOrHRA {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Warning = "Dialogue Normalization should be removed for lossless/HRA tracks"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, false, fmt.Sprintf("contains dialnorm: %s", dialnorm)))
+			}
+		}
+	}
+
+	return []CheckResult{res}
 }
 
 func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata, mi *mediainfo.MediaInfo) []CheckResult {

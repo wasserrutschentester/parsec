@@ -135,6 +135,7 @@ type Track struct {
 	BitDepth                  int       `json:"BitDepth,string,omitempty"`
 	ChromaSubsampling         string    `json:"ChromaSubsampling,omitempty"`
 	SamplingRate              int       `json:"SamplingRate,string,omitempty"`
+	Dialog_Normalization      string    `json:"Dialog_Normalization,omitempty"`
 	CodecID                   string    `json:"CodecID,omitempty"`
 	CodecID_Hint              string    `json:"CodecID_Hint,omitempty"`
 	Encoded_Library           string    `json:"Encoded_Library,omitempty"`
@@ -152,6 +153,22 @@ type Track struct {
 
 	// Add more fields as needed, matching the JSON keys
 	Extra Extra `json:"extra,omitempty"`
+}
+
+func (t *Track) GetDialNorm() string {
+	val := t.Dialog_Normalization
+	if val == "" {
+		val = t.Extra.GetString("Dialog_Normalization")
+	}
+	if val == "" {
+		val = t.Extra.GetString("dialnorm")
+	}
+	if val == "" {
+		val = t.Extra.GetString("dialnorm_Average")
+	}
+
+	// Strip " dB" suffix if present
+	return strings.TrimSuffix(val, " dB")
 }
 
 func Get(filePath string) (*MediaInfo, error) {
