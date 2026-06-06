@@ -32,5 +32,6 @@ type CheckReport struct {
 	Passed        bool         `json:"passed"`
 	ReleaseName   string       `json:"filename"`
 	GeneratedName string       `json:"generated_name"`
+	Version       string       `json:"version"`
 	Issues        []IssueGroup `json:"issues"`
 }

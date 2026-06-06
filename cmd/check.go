@@ -149,6 +149,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, e
 		Passed:        len(allIssues) == 0,
 		ReleaseName:   filenameNoExt,
 		GeneratedName: match.GetReleaseName(),
+		Version:       Version,
 		Issues:        allIssues,
 	}, nil
 }

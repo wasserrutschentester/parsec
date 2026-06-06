@@ -131,6 +131,7 @@ The interactive output contains the same information as the JSON output, but in 
 | `passed` | boolean | `true` if all checks passed, `false` otherwise. |
 | `filename` | string | The original filename without extension. |
 | `generated_name` | string | The expected filename generated based on metadata and naming conventions. |
+| `version` | string | The version of parsec used to generate the report. |
 | `issues` | array | A list of issue groups, categorized by source. |
 
 **Example:**
@@ -140,6 +141,7 @@ The interactive output contains the same information as the JSON output, but in 
   "passed": false,
   "filename": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
   "generated_name": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.H.265-FuN",
+  "version": "v0.3.0",
   "issues": []
 }
 ```
@@ -237,6 +239,7 @@ parsec check Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN.mkv --
     "passed": false,
     "filename": "Die.Kaenguru.Chroniken.2020.German.AC3.1080p.BluRay.x265-FuN",
     "generated_name": "Die.Kaenguru.Chroniken.2020.GERMAN.1080p.BluRay.DD5.1.x265-FuN",
+    "version": "v0.3.0",
     "issues": [
       {
         "category": "FILENAME",
