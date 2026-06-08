@@ -33,7 +33,7 @@ var configInitCmd = &cobra.Command{
 		targetFile := filepath.Join(targetDir, "config.toml")
 
 		if _, err := os.Stat(targetFile); err == nil {
-			if !ui.ConfirmContinue(fmt.Sprintf("Configuration file already exists at %s. Overwrite and backup old one?", targetFile)) {
+			if !ui.ConfirmContinue(fmt.Sprintf("Configuration file already exists at %s. Overwrite and backup old one?", ui.AnonymizePath(targetFile))) {
 				return nil
 			}
 
@@ -42,7 +42,7 @@ var configInitCmd = &cobra.Command{
 				ui.PrintError(fmt.Sprintf("Could not backup existing config file: %v", err))
 				return fmt.Errorf("config backup failed")
 			}
-			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", backupFile))
+			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", ui.AnonymizePath(backupFile)))
 		}
 
 		if err := os.MkdirAll(targetDir, 0o755); err != nil {
@@ -55,7 +55,7 @@ var configInitCmd = &cobra.Command{
 			return fmt.Errorf("config write failed")
 		}
 
-		ui.PrintSuccess(fmt.Sprintf("Created default configuration at %s", targetFile))
+		ui.PrintSuccess(fmt.Sprintf("Created default configuration at %s", ui.AnonymizePath(targetFile)))
 		return nil
 	},
 }

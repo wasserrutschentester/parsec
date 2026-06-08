@@ -519,6 +519,18 @@ func PrintInfo(msg string) {
 	}
 }
 
+// AnonymizePath replaces the user's home directory with a tilde (~).
+func AnonymizePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if strings.HasPrefix(path, home) {
+		return "~" + strings.TrimPrefix(path, home)
+	}
+	return path
+}
+
 func Println(a ...any) {
 	if !IsSilent {
 		_, _ = lipgloss.Println(a...)

@@ -176,7 +176,7 @@ func Get(filePath string) (*MediaInfo, error) {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mediainfo --Output=JSON --ParseSpeed=0 %s", filePath))
+	ui.PrintDebug(fmt.Sprintf("Executing: mediainfo --Output=JSON --ParseSpeed=0 %s", ui.AnonymizePath(filePath)))
 	cmd := exec.Command("mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
 	out, err := cmd.Output()
 	if err != nil {

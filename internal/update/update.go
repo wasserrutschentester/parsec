@@ -43,7 +43,7 @@ func CheckForUpdateBackground(currentVersion string) {
 	cachedData, err := cache.Get(cacheKey)
 	if err == nil {
 		latestTag := string(cachedData)
-		ui.PrintDebug(fmt.Sprintf("cached latest tag: %s", latestTag))
+		ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
 		if IsNewer(latestTag, currentVersion) {
 			ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
 		}

@@ -57,7 +57,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 		mediaMeta := mi.GetMetadata()
 		meta.Override(mediaMeta)
 	} else {
-		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", filePath, err))
+		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", ui.AnonymizePath(filePath), err))
 		return fmt.Errorf("mediainfo parsing failed")
 	}
 
@@ -137,7 +137,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
-		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", filePath, renameErr))
+		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
 		return fmt.Errorf("rename failed")
 	} else {
 		ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))

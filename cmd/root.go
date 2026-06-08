@@ -186,7 +186,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if viper.ConfigFileUsed() != "" {
-		ui.PrintDebug(fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed()))
+		ui.PrintDebug(fmt.Sprintf("Using config file: %s", ui.AnonymizePath(viper.ConfigFileUsed())))
 	} else {
 		ui.PrintDebug("No config file found, using defaults")
 	}

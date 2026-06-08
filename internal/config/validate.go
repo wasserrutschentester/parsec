@@ -24,7 +24,7 @@ func checkConfigFile() {
 	if configFile == "" {
 		ui.PrintWarning("No configuration file found. Using internal defaults.")
 	} else {
-		ui.PrintInfo(fmt.Sprintf("Using configuration file: %s", configFile))
+		ui.PrintInfo(fmt.Sprintf("Using configuration file: %s", ui.AnonymizePath(configFile)))
 	}
 }
 

@@ -273,7 +273,9 @@ func (meta *Metadata) SetDefaults() {
 }
 
 func (meta *Metadata) GetReleaseName() string {
-	return meta.Render(config.GetTemplate())
+	template := config.GetTemplate()
+	ui.PrintDebug(fmt.Sprintf("using template: %s", template))
+	return meta.Render(template)
 }
 
 func (meta *Metadata) Render(template string) string {

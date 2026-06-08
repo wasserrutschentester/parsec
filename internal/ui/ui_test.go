@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -79,5 +80,33 @@ func TestCard(t *testing.T) {
 		if w != firstWidth {
 			t.Errorf("Line %d has width %d, expected %d", i, w, firstWidth)
 		}
+	}
+}
+
+func TestAnonymizePath(t *testing.T) {
+	// We can't easily mock os.UserHomeDir() without more complex setup,
+	// but we can test it with the actual home dir.
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		t.Skip("Home directory not found")
+	}
+
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{"Home path", home, "~"},
+		{"Subdir path", home + "/some/path", "~/some/path"},
+		{"Other path", "/tmp/path", "/tmp/path"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := AnonymizePath(tt.path)
+			if got != tt.expected {
+				t.Errorf("AnonymizePath(%q) = %q, expected %q", tt.path, got, tt.expected)
+			}
+		})
 	}
 }
