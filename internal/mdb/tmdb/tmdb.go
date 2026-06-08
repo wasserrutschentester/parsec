@@ -162,7 +162,11 @@ func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
 		}
 		if externalIDs.Tvdb != 0 {
 			result.TvdbID = externalIDs.Tvdb
-			result.TvdbType = "series"
+			if result.IsTV {
+				result.TvdbType = "series"
+			} else {
+				result.TvdbType = "movies"
+			}
 		}
 	}
 }
@@ -200,19 +204,17 @@ func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
 		return nil, err
 	}
 
-	if isTV && len(data.TVResults) > 0 {
-		return finalizeImdbResult(data.TVResults[0], "tv", imdbID), nil
-	}
-	if !isTV && len(data.MovieResults) > 0 {
-		return finalizeImdbResult(data.MovieResults[0], "movie", imdbID), nil
-	}
-	if len(data.MovieResults) > 0 {
-		return finalizeImdbResult(data.MovieResults[0], "movie", imdbID), nil
-	}
-	if len(data.TVResults) > 0 {
-		return finalizeImdbResult(data.TVResults[0], "tv", imdbID), nil
+	if isTV {
+		if len(data.TVResults) > 0 {
+			return finalizeImdbResult(data.TVResults[0], "tv", imdbID), nil
+		}
+	} else {
+		if len(data.MovieResults) > 0 {
+			return finalizeImdbResult(data.MovieResults[0], "movie", imdbID), nil
+		}
 	}
 
+	// No strict match found.
 	return nil, nil
 }
 
