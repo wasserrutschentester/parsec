@@ -290,6 +290,99 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	return results, nil
 }
 
+type tvdbRemoteIdResponse struct {
+	Status string `json:"status"`
+	Data   []struct {
+		Series *tvdbMedia `json:"series"`
+		Movie  *tvdbMedia `json:"movie"`
+	} `json:"data"`
+}
+
+func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
+	endpoint := fmt.Sprintf("search/remoteid/%s", remoteID)
+
+	var data tvdbRemoteIdResponse
+	if err := get(endpoint, &data); err != nil {
+		return nil, err
+	}
+
+	if len(data.Data) == 0 {
+		return nil, nil
+	}
+
+	var r *tvdbMedia
+	actualType := ""
+
+	if mediaType == "tv" {
+		for _, item := range data.Data {
+			if item.Series != nil {
+				r = item.Series
+				actualType = "series"
+				break
+			}
+		}
+	} else {
+		for _, item := range data.Data {
+			if item.Movie != nil {
+				r = item.Movie
+				actualType = "movies"
+				break
+			}
+		}
+	}
+
+	// Fallback to whatever is available if requested type not found
+	if r == nil {
+		for _, item := range data.Data {
+			if item.Series != nil {
+				r = item.Series
+				actualType = "series"
+				break
+			} else if item.Movie != nil {
+				r = item.Movie
+				actualType = "movies"
+				break
+			}
+		}
+	}
+
+	if r == nil {
+		return nil, nil
+	}
+
+	// Manually set type for toSearchResult
+	r.Type = actualType
+
+	result := r.toSearchResult()
+
+	// TVDB ID is sometimes nested under 'id' in these responses rather than 'tvdb_id'
+	tvdbID := parseTvdbID(r)
+	applyExternalIDs(&result, tvdbID, actualType)
+
+	applyTranslation(&result, tvdbID, actualType)
+
+	return &result, nil
+}
+
+func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
+	prefLang := config.GetPreferredLanguage()
+	if prefLang == "" {
+		return
+	}
+
+	translation, err := GetTranslation(tvdbID, mediaType, prefLang)
+	if err != nil {
+		return
+	}
+
+	if translation.Data.Name != "" {
+		result.Title = translation.Data.Name
+	}
+	if translation.Data.Overview != "" {
+		result.Overview = translation.Data.Overview
+	}
+}
+
 func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	endpoint := toTvdbType(mediaType)
 	var data struct {
@@ -307,19 +400,7 @@ func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	}
 	result.IsTV = endpoint == "series"
 
-	// Fetch explicit translation if preferred language is set
-	prefLang := config.GetPreferredLanguage()
-	if prefLang != "" {
-		translation, err := GetTranslation(tvdbID, mediaType, prefLang)
-		if err == nil {
-			if translation.Data.Name != "" {
-				result.Title = translation.Data.Name
-			}
-			if translation.Data.Overview != "" {
-				result.Overview = translation.Data.Overview
-			}
-		}
-	}
+	applyTranslation(&result, tvdbID, endpoint)
 
 	applyExternalIDs(&result, tvdbID, endpoint)
 

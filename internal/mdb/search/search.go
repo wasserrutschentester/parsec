@@ -362,6 +362,15 @@ func initialSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool, mediaType s
 		if err != nil {
 			return nil, err
 		}
+		// If TMDB didn't find it, try TVDB
+		if result == nil {
+			ui.PrintDebug(fmt.Sprintf("IMDB ID %s not found on TMDB as %s, trying TVDB...", imdbID, mediaType))
+			result, err = tvdb.GetByRemoteID(imdbID, mediaType)
+
+			if err != nil {
+				return nil, err
+			}
+		}
 	} else if tmdbID > 0 {
 		result, err = tmdb.GetByID(tmdbID, mediaType)
 		if err != nil {
