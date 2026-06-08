@@ -228,12 +228,12 @@ func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...strin
 		return titles
 	}
 	for _, et := range existingTitles {
-		if newTitle == et {
+		if strings.EqualFold(newTitle, et) {
 			return titles
 		}
 	}
 	for _, t := range titles {
-		if t == newTitle {
+		if strings.EqualFold(t, newTitle) {
 			return titles
 		}
 	}
@@ -293,6 +293,8 @@ func sortBySimilarity(results []mdb.SearchResult, query string, year int) []mdb.
 		origSim := mdb.CalculateSimilarity(queryLower, strings.ToLower(results[i].OriginalTitle))
 		results[i].Similarity = math.Max(titleSim, origSim)
 
+		titleSim = calculateAltSimilarity(&results[i], queryLower, titleSim)
+
 		// Bonus for year match
 		if year > 0 && results[i].Year == year {
 			results[i].Similarity += 0.05 // Slight boost for exact year match
@@ -309,6 +311,23 @@ func sortBySimilarity(results []mdb.SearchResult, query string, year int) []mdb.
 		return results[i].Popularity > results[j].Popularity
 	})
 	return results
+}
+
+func calculateAltSimilarity(result *mdb.SearchResult, queryLower string, titleSim float64) float64 {
+	for _, alt := range result.AltTitle {
+		altSim := mdb.CalculateSimilarity(queryLower, strings.ToLower(alt))
+		if altSim > result.Similarity {
+			result.Similarity = altSim
+			// If an alt title is a better match, we might want to swap it with the primary title
+			// especially if it's a 100% match (e.g. translated title matched exactly)
+			if altSim > titleSim {
+				result.AltTitle = addUniqueAltTitle(result.AltTitle, result.Title)
+				result.Title = alt
+				titleSim = altSim
+			}
+		}
+	}
+	return titleSim
 }
 
 // Filter results that are more than 30% worse than the top scoring result
