@@ -300,32 +300,55 @@ func DeobfuscateTitle(title string) string {
 	result := title
 	result = strings.ReplaceAll(result, ".", " ")
 
-	// replace umlaut replacements (ae, oe, ue) with their corresponding characters,
-	// unless preceded by a vowel
-	re := regexp.MustCompile(`(?i)(^|[^aeou])(ae|oe|ue)`)
+	// replace umlaut replacements (ae, oe, ue) with their corresponding characters
+	// We want to avoid replacing if preceded by a vowel.
+	// We also want to avoid replacing "oe" at the end of a word (like Monroe, Poe, Toe, Aloe)
+	re := regexp.MustCompile(`(?i)(^|[^aeiou])(ae|oe|ue)($|[^a-z]|.)`)
 	result = re.ReplaceAllStringFunc(result, func(m string) string {
-		lower := strings.ToLower(m)
-		var r string
-		switch {
-		case strings.HasSuffix(lower, "ae"):
-			r = "ä"
-		case strings.HasSuffix(lower, "oe"):
-			r = "ö"
-		case strings.HasSuffix(lower, "ue"):
-			r = "ü"
+		match := re.FindStringSubmatch(m)
+		if len(match) < 4 {
+			return m
 		}
-		if len(m) > 2 {
-			return m[:1] + r
-		}
-		return r
+		prefix := match[1]
+		umlautMatch := match[2]
+		suffix := match[3]
+
+		r := getUmlautReplacement(umlautMatch, suffix)
+		return prefix + r + suffix
 	})
 
-	// umlaut at the start of the word (capitalized)
-	result = strings.ReplaceAll(result, "Ae", "ä")
-	result = strings.ReplaceAll(result, "Oe", "ö")
-	result = strings.ReplaceAll(result, "Ue", "ü")
-
 	return result
+}
+
+func getUmlautReplacement(umlautMatch, suffix string) string {
+	lowerUmlaut := strings.ToLower(umlautMatch)
+
+	// Exception: English words ending in "oe" (e.g. Monroe, Poe, Toe, Aloe)
+	isEndOfWord := suffix == "" || !regexp.MustCompile(`(?i)[a-z]`).MatchString(suffix)
+	if lowerUmlaut == "oe" && isEndOfWord {
+		return umlautMatch
+	}
+
+	isUpper := umlautMatch[0] >= 'A' && umlautMatch[0] <= 'Z'
+
+	switch lowerUmlaut {
+	case "ae":
+		if isUpper {
+			return "Ä"
+		}
+		return "ä"
+	case "oe":
+		if isUpper {
+			return "Ö"
+		}
+		return "ö"
+	case "ue":
+		if isUpper {
+			return "Ü"
+		}
+		return "ü"
+	}
+	return umlautMatch
 }
 
 func NormalizeTitle(title string) string {

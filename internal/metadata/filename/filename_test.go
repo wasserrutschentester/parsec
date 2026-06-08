@@ -28,7 +28,8 @@ func compareMetadata(got, want metadata.Metadata) string {
 func runTableTest[T any](t *testing.T, tests []struct {
 	input    string
 	expected T
-}, fn func(string) T, compare func(T, T) string) {
+}, fn func(string) T, compare func(T, T) string,
+) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			got := fn(tt.input)
@@ -481,9 +482,9 @@ func TestDeobfuscateTitle(t *testing.T) {
 		expected string
 	}{
 		{"Gloeckner", "Glöckner"},
-		{"Ueber", "über"},
+		{"Ueber", "Über"},
 		{"neue", "neue"},
-		{"Aerzte", "ärzte"},
+		{"Aerzte", "Ärzte"},
 		{"Koeln", "Köln"},
 		{"Muenchen", "München"},
 		{"Baeume", "Bäume"},
