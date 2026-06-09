@@ -161,7 +161,7 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 		if err := viper.ReadInConfig(); err != nil {
-			ui.PrintError(fmt.Sprintf("Error reading config file: %v", err))
+			ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(cfgFile), err))
 		}
 	} else {
 		// Set search paths
@@ -174,12 +174,22 @@ func initConfig() {
 		// Set preferred type to TOML
 		viper.SetConfigType("toml")
 
-		// Try 'config' first
-		viper.SetConfigName("config")
-		if err := viper.ReadInConfig(); err != nil {
-			// Fallback to '.parsec' (can still be TOML if extension matches or forced)
-			viper.SetConfigName(".parsec")
-			_ = viper.ReadInConfig()
+		// Try preferred names in order
+		for _, name := range []string{"config", ".parsec"} {
+			viper.SetConfigName(name)
+			if err := viper.ReadInConfig(); err != nil {
+				if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+					configPath := viper.ConfigFileUsed()
+					if configPath == "" {
+						configPath = name
+					}
+					ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(configPath), err))
+					break // Stop trying if we found a file but it's broken
+				}
+				// If it's just not found, continue to the next name
+			} else {
+				break // Successfully read a config, stop trying
+			}
 		}
 	}
 
@@ -187,8 +197,8 @@ func initConfig() {
 
 	if viper.ConfigFileUsed() != "" {
 		ui.PrintDebug(fmt.Sprintf("Using config file: %s", ui.AnonymizePath(viper.ConfigFileUsed())))
-	} else {
-		ui.PrintDebug("No config file found, using defaults")
+	} else if cfgFile == "" {
+		ui.PrintWarning("No config file found, using defaults")
 	}
 
 	if presetFlag != "" {
