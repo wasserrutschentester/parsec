@@ -5,10 +5,10 @@ The `check` command performs comprehensive integrity and consistency checks on a
 ## Usage
 
 ```bash
-parsec check [file...] [flags]
+parsec check [path...] [flags]
 ```
 
-You can provide one or more files to be checked.
+You can provide one or more files or directories to be checked. Directories will be scanned recursively for Matroska (.mkv) files.
 
 ### Rendering Saved Reports
 
@@ -24,7 +24,8 @@ parsec check report.json
 
 ## Features
 
-- **Batch Processing**: Validate multiple files in one command.
+- **Batch Processing**: Validate multiple files or entire directories in one command.
+- **Recursive Scanning**: Automatically finds all Matroska files within provided directories.
 - **Filename Integrity**: Verifies that the filename matches the internal metadata.
 - **Technical Analysis**: Checks for technical anomalies using MediaInfo.
 - **Matroska Verification**: Ensures the container and track tagging meet standards.

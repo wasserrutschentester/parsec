@@ -20,23 +20,26 @@ import (
 var jsonOutputFlag bool
 
 var checkCmd = &cobra.Command{
-	Use:   "check [file]",
-	Short: "Check if the file fits the specification",
+	Use:   "check [path...]",
+	Short: "Check if files fit the specification",
 	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: VERIFY INTEGRITY :."),
-		`Performs comprehensive integrity and consistency checks on a media file.
+		`Performs comprehensive integrity and consistency checks on media files.
 It validates:
   1. Filename parsing and naming conventions
   2. Technical metadata (via MediaInfo) for quality and standards
   3. Matroska container integrity and track tagging
   4. Consistency with online databases (TMDB/TVDB) for titles and episodes
 
+You can pass files or directories. Directories are scanned recursively for Matroska files.
 You can also pass a JSON check report file to render it.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
 		var allReports []types.CheckReport
 
-		for _, filePath := range args {
+		expandedArgs := expandArgs(args)
+
+		for _, filePath := range expandedArgs {
 			var currentReports []types.CheckReport
 			isJSON, jsonReports := loadJSONReport(filePath)
 

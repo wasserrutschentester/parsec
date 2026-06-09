@@ -5,14 +5,15 @@ The `rename` command renames files according to metadata extracted from the file
 ## Usage
 
 ```bash
-parsec rename [file...] [flags]
+parsec rename [path...] [flags]
 ```
 
-You can provide one or more files to be processed.
+You can provide one or more files or directories to be processed. Directories will be scanned recursively for Matroska (.mkv) files.
 
 ## Features
 
--   **Batch Processing**: Rename multiple files in one command.
+-   **Batch Processing**: Rename multiple files or entire directories in one command.
+-   **Recursive Scanning**: Automatically finds all Matroska files within provided directories.
 -   **Filename Parsing**: Extracts metadata like Title, Year, Season, Episode, and existing P2P tags from the current filename.
 -   **Technical Metadata**: Enriches metadata with technical data (resolution, codecs) from MediaInfo.
 -   **External Metadata**: Fetches "official" titles and episode names from TMDB, TVDB, and IMDb.

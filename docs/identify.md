@@ -5,14 +5,15 @@ The `identify` command allows you to search for and identify movies or TV shows 
 ## Usage
 
 ```bash
-parsec identify [filename...] [flags]
+parsec identify [path...] [flags]
 ```
 
-If filenames are provided, `parsec` will process each one, automatically parsing them to extract initial metadata like title, year, season, and episode to seed the search.
+If filenames or directories are provided, `parsec` will process each one. Directories will be scanned recursively for Matroska (.mkv) files. Each file will be automatically parsed to extract initial metadata like title, year, season, and episode to seed the search.
 
 ## Features
 
-- **Batch Processing**: Identify multiple files in one command.
+- **Batch Processing**: Identify multiple files or entire directories in one command.
+- **Recursive Scanning**: Automatically finds all Matroska files within provided directories.
 - **Flexible Search**: Fuzzy search by title/year or direct lookup via IMDb, TMDB, or TVDB IDs.
 - **Automatic Parsing**: Tries to extract Title, Year, Season, Episode from filenames to seed searches.
 - **Matroska Tags**: Writes Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.

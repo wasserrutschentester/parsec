@@ -21,7 +21,7 @@ import (
 
 // renameCmd represents the rename command
 var renameCmd = &cobra.Command{
-	Use:   "rename [file...]",
+	Use:   "rename [path...]",
 	Short: "rename files according to metadata and MDB data",
 	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: ALIGNING THE SHIP :."),
 		`Rename files based on information from:
@@ -30,11 +30,13 @@ var renameCmd = &cobra.Command{
   3. Information already in the filename
   4. CLI flags (to override or provide missing info)
 
+You can pass files or directories. Directories are scanned recursively for Matroska files.
 The resulting filename is generated according to the configured template.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
-		for _, filePath := range args {
+		expandedArgs := expandArgs(args)
+		for _, filePath := range expandedArgs {
 			err := renameFile(cmd, filePath)
 			if err != nil {
 				return err

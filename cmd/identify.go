@@ -20,12 +20,13 @@ var writeTagsFlag bool
 
 // identifyCmd represents the identify command
 var identifyCmd = &cobra.Command{
-	Use:   "identify [filename]",
+	Use:   "identify [path...]",
 	Short: "search for a movie or TV show",
 	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: CLASSIFY ENTITIES :."),
 		`find a movie or TV show on the media databases
 check if it exists and return its details.
-If a filename is provided, it will be parsed for metadata.
+If filenames or directories are provided, they will be parsed for metadata.
+Directories are scanned recursively for Matroska files.
 Flags can be used to override or provide missing information.`),
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -34,7 +35,8 @@ Flags can be used to override or provide missing information.`),
 			return identifyFile(cmd, "")
 		}
 
-		for _, filePath := range args {
+		expandedArgs := expandArgs(args)
+		for _, filePath := range expandedArgs {
 			err := identifyFile(cmd, filePath)
 			if err != nil {
 				return err
