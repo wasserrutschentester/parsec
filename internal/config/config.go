@@ -41,6 +41,7 @@ func getPresetKey(key string) string {
 			return getPresetKey
 		}
 	}
+
 	return key
 }
 
@@ -176,6 +177,7 @@ func IsCheckEnabled(checkName string) bool {
 				return true
 			}
 		}
+
 		return false
 	}
 

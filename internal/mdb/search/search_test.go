@@ -48,6 +48,7 @@ func TestAddUniqueAltTitle(t *testing.T) {
 			t.Errorf("addUniqueAltTitle(%v, %q) len = %d, want %d", tt.titles, tt.newTitle, len(got), len(tt.want))
 			continue
 		}
+
 		for i := range got {
 			if got[i] != tt.want[i] {
 				t.Errorf("addUniqueAltTitle(%v, %q) = %v, want %v", tt.titles, tt.newTitle, got, tt.want)
@@ -91,35 +92,43 @@ func TestMergeResults(t *testing.T) {
 
 	// Check if Movie 1 was merged correctly
 	foundMovie1 := false
+
 	for _, r := range merged {
 		if r.TmdbID == 1 {
 			foundMovie1 = true
+
 			if r.TvdbID != 101 {
 				t.Errorf("Movie 1: expected TvdbID 101, got %d", r.TvdbID)
 			}
+
 			foundAlt := false
+
 			for _, alt := range r.AltTitle {
 				if alt == "Movie One" {
 					foundAlt = true
 					break
 				}
 			}
+
 			if !foundAlt {
 				t.Errorf("Movie 1: expected 'Movie One' in AltTitles")
 			}
 		}
 	}
+
 	if !foundMovie1 {
 		t.Errorf("Movie 1 not found in merged results")
 	}
 
 	// Check if Movie 3 was added
 	foundMovie3 := false
+
 	for _, r := range merged {
 		if r.TvdbID == 102 {
 			foundMovie3 = true
 		}
 	}
+
 	if !foundMovie3 {
 		t.Errorf("Movie 3 not found in merged results")
 	}

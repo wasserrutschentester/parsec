@@ -158,12 +158,14 @@ func Card(title, subtitle, body, footer string) string {
 	if width <= 0 {
 		width = 80
 	}
+
 	if width > 100 {
 		width = 100
 	}
 
 	// Overhead: 2 for borders, 2 for padding
 	const overhead = 4
+
 	innerWidth := width - overhead
 	if innerWidth < 40 {
 		innerWidth = 40
@@ -199,6 +201,7 @@ func Card(title, subtitle, body, footer string) string {
 func FormatDiff(expectedLabel, expectedValue, actualLabel, actualValue string) string {
 	expectedLine := lipgloss.NewStyle().Foreground(green).Render(fmt.Sprintf("+ %s: %s", expectedLabel, expectedValue))
 	actualLine := lipgloss.NewStyle().Foreground(red).Render(fmt.Sprintf("- %s: %s", actualLabel, actualValue))
+
 	return lipgloss.JoinVertical(lipgloss.Left, actualLine, expectedLine)
 }
 
@@ -207,6 +210,7 @@ func FormatStringDiff(oldStr, newStr string) string {
 	edits := udiff.Strings(oldStr, newStr)
 
 	var line1, line2 strings.Builder
+
 	pos := 0
 
 	for _, edit := range edits {
@@ -223,6 +227,7 @@ func FormatStringDiff(oldStr, newStr string) string {
 		// Calculate visual widths for alignment
 		oldW := lipgloss.Width(oldText)
 		newW := lipgloss.Width(newText)
+
 		maxW := oldW
 		if newW > maxW {
 			maxW = newW
@@ -231,6 +236,7 @@ func FormatStringDiff(oldStr, newStr string) string {
 		// Add deleted part (red) to line 1
 		if oldW > 0 {
 			line1.WriteString(lipgloss.NewStyle().Foreground(red).Render(oldText))
+
 			if maxW > oldW {
 				line1.WriteString(strings.Repeat(" ", maxW-oldW))
 			}
@@ -241,6 +247,7 @@ func FormatStringDiff(oldStr, newStr string) string {
 		// Add inserted part (green) to line 2
 		if newW > 0 {
 			line2.WriteString(lipgloss.NewStyle().Foreground(green).Render(newText))
+
 			if maxW > newW {
 				line2.WriteString(strings.Repeat(" ", maxW-newW))
 			}
@@ -264,6 +271,7 @@ func FormatStringDiff(oldStr, newStr string) string {
 // FormatStringDiffAligned visualizes a mismatch between two strings with labels and character-level alignment.
 func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualValue string) string {
 	diff := FormatStringDiff(expectedValue, actualValue)
+
 	lines := strings.Split(diff, "\n")
 	if len(lines) != 2 {
 		return diff
@@ -289,6 +297,7 @@ func TrackTable(headers []string, rows [][]string) string {
 			if row < 0 { // Header row
 				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
+
 			return lipgloss.NewStyle().Padding(0, 1)
 		}).
 		Headers(headers...).
@@ -325,6 +334,7 @@ func CalculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {
 			}
 		}
 	}
+
 	return widths
 }
 
@@ -335,6 +345,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 	}
 
 	headers := []string{"ID", "Type", "#", "Codec", "Lang", "Name", "Flags", "Warning"}
+
 	var rows [][]string
 	for _, t := range tracks {
 		rows = append(rows, []string{
@@ -365,10 +376,12 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 	overhead := 6 + len(headers) + 1 + (len(headers) * 2)
 
 	otherColsWidth := 0
+
 	for i := range headers {
 		if i == 5 { // Name column
 			continue
 		}
+
 		otherColsWidth += contentWidths[i]
 	}
 
@@ -378,6 +391,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 	if nameWidth < 20 {
 		nameWidth = 20
 	}
+
 	if nameWidth > maxNameContentWidth {
 		nameWidth = maxNameContentWidth
 	}
@@ -390,6 +404,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 			if row < 0 { // Header row
 				style = style.Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
+
 			w := contentWidths[col]
 			if col == 5 { // Name column
 				w = nameWidth
@@ -446,9 +461,11 @@ func PropertyLayout(pairs [][2]string) string {
 	if width <= 0 {
 		width = 80
 	}
+
 	if width > 100 {
 		width = 100
 	}
+
 	innerWidth := width - 4 // Match Card inner width
 
 	maxLabelLen := 0
@@ -459,12 +476,14 @@ func PropertyLayout(pairs [][2]string) string {
 	}
 
 	labelWidth := maxLabelLen + 2
+
 	valueWidth := innerWidth - labelWidth
 	if valueWidth < 20 {
 		valueWidth = 20
 	}
 
 	var lines []string
+
 	for _, p := range pairs {
 		label := LabelStyle.Width(labelWidth).Render(p[0] + ":")
 		value := ValueStyle.Width(valueWidth).Render(p[1])
@@ -525,9 +544,11 @@ func AnonymizePath(path string) string {
 	if err != nil {
 		return path
 	}
+
 	if strings.HasPrefix(path, home) {
 		return "~" + strings.TrimPrefix(path, home)
 	}
+
 	return path
 }
 
@@ -545,6 +566,7 @@ func ConfirmContinue(msg string) bool {
 	}
 
 	fmt.Printf("%s [Y/n]: ", msg)
+
 	scanner := bufio.NewScanner(os.Stdin)
 	if scanner.Scan() {
 		input := strings.ToLower(strings.TrimSpace(scanner.Text()))
@@ -552,6 +574,7 @@ func ConfirmContinue(msg string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -561,6 +584,7 @@ func IsTerminal() bool {
 	if err != nil {
 		return false
 	}
+
 	if (fi.Mode() & os.ModeCharDevice) == 0 {
 		return false
 	}
@@ -569,6 +593,7 @@ func IsTerminal() bool {
 	if err != nil {
 		return false
 	}
+
 	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
@@ -576,5 +601,6 @@ func max(a, b int) int {
 	if a > b {
 		return a
 	}
+
 	return b
 }

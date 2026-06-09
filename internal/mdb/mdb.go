@@ -48,11 +48,13 @@ func FormatLanguage(lang string) string {
 	if lang == "zxx" {
 		return "zxx (No Dialogue)"
 	}
+
 	return lang
 }
 
 func PrintResult(result SearchResult) {
 	title := fmt.Sprintf("%s (%d)", result.Title, result.Year)
+
 	subtitle := ""
 	if result.Similarity > 0 {
 		subtitle = fmt.Sprintf("[ %.0f%% MATCH ]", result.Similarity*100)
@@ -62,9 +64,11 @@ func PrintResult(result SearchResult) {
 	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
 		props = append(props, [2]string{"Origin Title", result.OriginalTitle})
 	}
+
 	if result.OriginalLanguage != "" {
 		props = append(props, [2]string{"Origin Lang", FormatLanguage(result.OriginalLanguage)})
 	}
+
 	if len(result.AltTitle) > 0 {
 		props = append(props, [2]string{"Alt Titles", strings.Join(result.AltTitle, ", ")})
 	}
@@ -74,6 +78,7 @@ func PrintResult(result SearchResult) {
 		if body != "" {
 			body += "\n\n"
 		}
+
 		body += ui.LabelStyle.Render("OVERVIEW") + "\n" + result.Overview
 	}
 
@@ -82,6 +87,7 @@ func PrintResult(result SearchResult) {
 		id    string
 		url   string
 	}
+
 	var items []footerLine
 
 	if result.TmdbID > 0 && result.TmdbType != "" {
@@ -91,6 +97,7 @@ func PrintResult(result SearchResult) {
 			url:   fmt.Sprintf("https://tmdb.org/%s/%d", result.TmdbType, result.TmdbID),
 		})
 	}
+
 	if result.ImdbID != "" {
 		items = append(items, footerLine{
 			label: "IMDB ID",
@@ -98,6 +105,7 @@ func PrintResult(result SearchResult) {
 			url:   fmt.Sprintf("https://imdb.com/title/%s", result.ImdbID),
 		})
 	}
+
 	if result.TvdbSlug != "" && result.TvdbType != "" {
 		items = append(items, footerLine{
 			label: "TVDB ID",
@@ -113,6 +121,7 @@ func PrintResult(result SearchResult) {
 	}
 
 	maxLen := 0
+
 	for _, item := range items {
 		l := len(item.label) + len(item.id) + 2 // "Label: ID"
 		if l > maxLen {
@@ -121,7 +130,9 @@ func PrintResult(result SearchResult) {
 	}
 
 	var lines []string
+
 	idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+
 	for _, item := range items {
 		labelPart := ui.Muted.Render(item.label + ":")
 		idPart := idStyle.Render(item.id)
@@ -130,6 +141,7 @@ func PrintResult(result SearchResult) {
 		line := fmt.Sprintf("%s %s%s%s %s", labelPart, idPart, padding, urlLabel, ui.Link.Render(item.url))
 		lines = append(lines, line)
 	}
+
 	footer := strings.Join(lines, "\n")
 
 	ui.Println(ui.Card(title, subtitle, body, footer))
@@ -145,6 +157,7 @@ func PrintEpisodeResult(result EpisodeResult) {
 	}
 
 	footer := ""
+
 	if result.TvdbID > 0 {
 		idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 		labelPart := ui.Muted.Render("TVDB ID:")
@@ -159,16 +172,20 @@ func PrintEpisodeResult(result EpisodeResult) {
 
 func PrintCompactResult(result SearchResult) {
 	title := fmt.Sprintf("%s (%d) [OV: %s]", result.Title, result.Year, FormatLanguage(result.OriginalLanguage))
+
 	ids := ""
 	if result.TmdbID > 0 && result.TmdbType != "" {
 		ids = fmt.Sprintf("TMDB: %s/%d,", result.TmdbType, result.TmdbID)
 	}
+
 	if result.ImdbID != "" {
 		ids += fmt.Sprintf(" IMDb: %s,", result.ImdbID)
 	}
+
 	if result.TvdbID > 0 {
 		ids += fmt.Sprintf(" TVDB: %d", result.TvdbID)
 	}
+
 	ids = strings.TrimSuffix(ids, ",")
 	ids = strings.TrimSpace(ids)
 	ui.Println("Match:", title, ids)
@@ -177,7 +194,6 @@ func PrintCompactResult(result SearchResult) {
 func PrintCompactEpisodeResult(result EpisodeResult) {
 	// indented to align to Match:
 	ui.Println(fmt.Sprintf("       %s (S%02dE%02d) %s", result.Name, result.Season, result.Episode, result.Airdate))
-
 }
 
 func GetMatroskaTags(result SearchResult) MatroskaTags {
@@ -185,12 +201,15 @@ func GetMatroskaTags(result SearchResult) MatroskaTags {
 	if result.Title != "" {
 		tags.Title = result.Title
 	}
+
 	if result.ImdbID != "" {
 		tags.Imdb = result.ImdbID
 	}
+
 	if result.TmdbID > 0 && result.TmdbType != "" {
 		tags.Tmdb = fmt.Sprintf("%s/%d", result.TmdbType, result.TmdbID)
 	}
+
 	if result.TvdbID > 0 {
 		if result.IsTV {
 			tags.Tvdb = result.TvdbID
@@ -200,6 +219,7 @@ func GetMatroskaTags(result SearchResult) MatroskaTags {
 			tags.Tvdb2 = fmt.Sprintf("%s/%d", result.TvdbType, result.TvdbID)
 		}
 	}
+
 	return tags
 }
 
@@ -207,6 +227,7 @@ func (tags *MatroskaTags) SetEpisodeTags(result EpisodeResult) {
 	if result.Name != "" {
 		tags.Title = result.Name
 	}
+
 	if result.TvdbID > 0 {
 		tags.Tvdb2 = fmt.Sprintf("episodes/%d", result.TvdbID)
 	}
@@ -216,12 +237,14 @@ func CalculateSimilarity(s1, s2 string) float64 {
 	if s1 == s2 {
 		return 1.0
 	}
+
 	if len(s1) == 0 || len(s2) == 0 {
 		return 0.0
 	}
 
 	dist := levenshteinDistance(s1, s2)
 	maxLen := math.Max(float64(len(s1)), float64(len(s2)))
+
 	return 1.0 - (float64(dist) / maxLen)
 }
 
@@ -241,15 +264,18 @@ func levenshteinDistance(s1, s2 string) int {
 
 	for j := 1; j <= m; j++ {
 		prev := j
+
 		for i := 1; i <= n; i++ {
 			var cost int
 			if r1[i-1] != r2[j-1] {
 				cost = 1
 			}
+
 			newVal := min(row[i]+1, prev+1, row[i-1]+cost)
 			row[i-1] = prev
 			prev = newVal
 		}
+
 		row[n] = prev
 	}
 
@@ -260,8 +286,10 @@ func min(a, b, c int) int {
 	if a <= b && a <= c {
 		return a
 	}
+
 	if b <= a && b <= c {
 		return b
 	}
+
 	return c
 }

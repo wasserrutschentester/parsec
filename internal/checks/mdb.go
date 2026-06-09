@@ -15,11 +15,12 @@ import (
 
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
-	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true)
 
+	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true)
 	if searchErr != nil {
 		return checkMdbError(searchErr)
 	}
+
 	if searchResult == nil {
 		return checkNoMatch()
 	}
@@ -33,12 +34,15 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 	if config.IsCheckEnabled("mdb_title") {
 		results = append(results, checkTitle(meta, searchResult)...)
 	}
+
 	if config.IsCheckEnabled("mdb_movie_year") {
 		results = append(results, checkMovieYear(meta, searchResult)...)
 	}
+
 	if meta.IsTV && config.IsCheckEnabled("mdb_series_year") {
 		results = append(results, checkSeriesYear(meta, searchResult)...)
 	}
+
 	if meta.IsTV {
 		results = append(results, checkEpisode(meta, searchResult)...)
 	}
@@ -46,9 +50,11 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 	if mi != nil && config.IsCheckEnabled("mdb_track_languages") {
 		results = append(results, checkTrackLanguages(mi, searchResult)...)
 	}
+
 	if mi != nil && config.IsCheckEnabled("mdb_unwanted_audio_lang") {
 		results = append(results, checkUnwantedAudioLang(mi, searchResult)...)
 	}
+
 	return results
 }
 
@@ -72,6 +78,7 @@ func checkNoMatch() []CheckResult {
 
 func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
+
 	prefLang := config.GetPreferredLanguage()
 	origLang := result.OriginalLanguage
 
@@ -85,7 +92,9 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		if targetStr == "" {
 			return
 		}
+
 		found := false
+
 		for _, l := range langs {
 			if language.Make(l) == targetTag {
 				found = true
@@ -104,6 +113,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 			res.Severity = "warning"
 			res.Warning = fmt.Sprintf("%s track in %s language '%s' is missing", trackType, label, targetStr)
 		}
+
 		results = append(results, res)
 	}
 
@@ -114,12 +124,15 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		check("Audio", audioLangs, origTag, origLang, "original")
 		check("Subtitle", subLangs, origTag, origLang, "original")
 	}
+
 	return results
 }
 
 func checkUnknownOriginalLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
+
 	origLang := result.OriginalLanguage
+
 	origTag := language.Make(origLang)
 	if origLang == "" || origTag == language.Und {
 		res := CheckResult{
@@ -131,11 +144,13 @@ func checkUnknownOriginalLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult)
 		}
 		results = append(results, res)
 	}
+
 	return results
 }
 
 func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
+
 	prefLang := config.GetPreferredLanguage()
 	origLang := result.OriginalLanguage
 	audioLangs := mi.GetAudioLanguages()
@@ -148,12 +163,14 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 	}
 
 	unwantedLangs := []language.Tag{}
+
 	for _, lang := range audioLangs {
 		langTag := language.Make(lang)
 		if !wantedLangs[langTag] {
 			unwantedLangs = append(unwantedLangs, langTag)
 		}
 	}
+
 	unwantedLangs = metadata.RemoveDuplicates(unwantedLangs)
 	if len(unwantedLangs) > 0 {
 		results = append(results, CheckResult{
@@ -163,6 +180,7 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 			Warning:    fmt.Sprintf("Has unwanted audio language track(s): %s", unwantedLangs),
 		})
 	}
+
 	return results
 }
 
@@ -173,6 +191,7 @@ func checkMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckRe
 	}
 	if !meta.IsTV && meta.Year > 0 && result.Year > 0 {
 		res.Expected = fmt.Sprintf("%d", result.Year)
+
 		res.Actual = fmt.Sprintf("%d", meta.Year)
 		if meta.Year != result.Year {
 			res.Passed = false
@@ -180,6 +199,7 @@ func checkMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckRe
 			res.Warning = "Year Mismatch"
 		}
 	}
+
 	return []CheckResult{res}
 }
 
@@ -190,6 +210,7 @@ func checkSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 	}
 	if meta.Year > 0 && result.Year > 0 && meta.Season < 1900 {
 		res.Expected = fmt.Sprintf("%d", result.Year)
+
 		res.Actual = fmt.Sprintf("%d", meta.Year)
 		if meta.Year != result.Year {
 			res.Passed = false
@@ -197,11 +218,13 @@ func checkSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 			res.Warning = "Year Mismatch"
 		}
 	}
+
 	return []CheckResult{res}
 }
 
 func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
+
 	if meta.Season > 0 || meta.Episode > 0 {
 		epResult := mdbSearch.FindEpisode(*result, meta, false)
 
@@ -222,11 +245,13 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 			if config.IsCheckEnabled("mdb_episode_title") {
 				results = append(results, checkEpisodeTitle(meta, epResult)...)
 			}
+
 			if config.IsCheckEnabled("mdb_episode_date") {
 				results = append(results, checkSpecialDate(meta, epResult)...)
 			}
 		}
 	}
+
 	return results
 }
 
@@ -239,6 +264,7 @@ func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 		res.Expected = epResult.Name
 		res.Actual = meta.EpisodeTitle
 		normParsed := normalizeForComparison(filename.DeobfuscateTitle(meta.EpisodeTitle))
+
 		normOfficial := normalizeForComparison(filename.ApplyTitleCleanRegex(epResult.Name))
 		if normParsed != normOfficial {
 			res.Passed = false
@@ -246,6 +272,7 @@ func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 			res.Warning = "Title Mismatch"
 		}
 	}
+
 	return []CheckResult{res}
 }
 
@@ -258,6 +285,7 @@ func checkTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 		res.Expected = result.Title
 		res.Actual = meta.Title
 		normParsed := normalizeForComparison(filename.DeobfuscateTitle(meta.Title))
+
 		normOfficial := normalizeForComparison(filename.ApplyTitleCleanRegex(result.Title))
 		if normParsed != normOfficial {
 			res.Passed = false
@@ -265,6 +293,7 @@ func checkTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 			res.Warning = "Title Mismatch"
 		}
 	}
+
 	return []CheckResult{res}
 }
 
@@ -275,6 +304,7 @@ func checkSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Che
 	}
 	if meta.Season == 0 && meta.Date != "" {
 		res.Expected = epResult.Airdate
+
 		res.Actual = meta.Date
 		if epResult.Airdate != meta.Date {
 			res.Passed = false
@@ -282,5 +312,6 @@ func checkSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Che
 			res.Warning = "Date Mismatch"
 		}
 	}
+
 	return []CheckResult{res}
 }

@@ -106,6 +106,7 @@ func TestAudioCodecName(t *testing.T) {
 
 func TestVideoCodecName(t *testing.T) {
 	config.InitDefaults()
+
 	tests := []struct {
 		format  string
 		version string
@@ -161,12 +162,14 @@ func TestHeightToResolution(t *testing.T) {
 
 func TestMetadata_SetDefaults(t *testing.T) {
 	config.InitDefaults()
+
 	meta := &Metadata{}
 	meta.SetDefaults()
 
 	if meta.Source != config.GetSource() {
 		t.Errorf("SetDefaults() Source = %v, want %v", meta.Source, config.GetSource())
 	}
+
 	if meta.Group != config.GetGroup() {
 		t.Errorf("SetDefaults() Group = %v, want %v", meta.Group, config.GetGroup())
 	}
@@ -240,6 +243,7 @@ func TestMetadata_String(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config.InitDefaults()
+
 			if tt.name == "Literal Brackets" || tt.name == "Empty Literal Brackets Removal" {
 				template := "{title}.[{service}]-{group}"
 				if got := tt.meta.Render(template); got != tt.want {
@@ -269,9 +273,11 @@ func TestMetadata_Override(t *testing.T) {
 	if !updated {
 		t.Errorf("Override() should return true when updated")
 	}
+
 	if meta.Title != "New" {
 		t.Errorf("Override() Title = %v, want New", meta.Title)
 	}
+
 	if meta.Year != 2000 {
 		t.Errorf("Override() Year should remain 2000, got %v", meta.Year)
 	}

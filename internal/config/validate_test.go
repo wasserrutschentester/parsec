@@ -17,13 +17,16 @@ func TestValidate(t *testing.T) {
 	t.Run("DefaultConfig", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		confPath := filepath.Join(tmpDir, "config.toml")
+
 		err := os.WriteFile(confPath, []byte(GetDefaultConfig()), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write default config: %v", err)
 		}
 
 		data, _ := os.ReadFile(confPath)
+
 		var configMap map[string]interface{}
+
 		_ = toml.Unmarshal(data, &configMap)
 
 		errors := validateMapTypes(configMap, "", expectedTypes)
@@ -51,7 +54,9 @@ tmdb_id = "abc"
 template = "{year}{bad_token}"
 enabled_checks = ["mediainfo_bitrate", "unknown_identifier"]
 `
+
 		var configMap map[string]interface{}
+
 		_ = toml.Unmarshal([]byte(badConfig), &configMap)
 
 		errors := validateMapTypes(configMap, "", expectedTypes)
@@ -76,6 +81,7 @@ enabled_checks = ["mediainfo_bitrate", "unknown_identifier"]
 			if !expectedErrors[err] {
 				t.Errorf("Unexpected error found: %s", err)
 			}
+
 			delete(expectedErrors, err)
 		}
 

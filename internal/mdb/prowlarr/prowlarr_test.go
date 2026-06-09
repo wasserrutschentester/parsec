@@ -20,6 +20,7 @@ func TestBuildSearchURL(t *testing.T) {
 	if q.Get("type") != mediaType {
 		t.Errorf("expected type %s, got %s", mediaType, q.Get("type"))
 	}
+
 	if q.Get("query") != searchQuery {
 		t.Errorf("expected query %s, got %s", searchQuery, q.Get("query"))
 	}
@@ -33,15 +34,19 @@ func TestBuildSearchURL(t *testing.T) {
 	if len(ids) != 2 {
 		t.Errorf("expected 2 indexerIds, got %d", len(ids))
 	}
+
 	found1, found2 := false, false
+
 	for _, id := range ids {
 		if id == "1" {
 			found1 = true
 		}
+
 		if id == "2" {
 			found2 = true
 		}
 	}
+
 	if !found1 || !found2 {
 		t.Errorf("missing indexerIds: found1=%v, found2=%v", found1, found2)
 	}

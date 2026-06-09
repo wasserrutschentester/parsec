@@ -10,6 +10,7 @@ import (
 
 func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
+
 	tests := []struct {
 		name    string
 		tracks  []matroska.EbmlTrack
@@ -292,6 +293,7 @@ func TestRunTrackChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			res := runTrackChecks(tt.tracks)
+
 			hasFailure := len(res) > 0
 			if hasFailure != tt.wantErr {
 				t.Errorf("runTrackChecks() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
@@ -366,20 +368,25 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 
 		res := runTrackChecks(tracks)
 		found := false
+
 		for _, r := range res {
 			if r.Identifier == "matroska_duplicate_tracks" {
 				found = true
+
 				if len(r.Tracks) != 2 {
 					t.Errorf("Expected 2 tracks for duplicate check, got %d", len(r.Tracks))
 				}
+
 				if r.Tracks[0].Warning != "original track" {
 					t.Errorf("Expected first track warning to be 'original track', got '%s'", r.Tracks[0].Warning)
 				}
+
 				if !strings.Contains(r.Tracks[1].Warning, "duplicate track") {
 					t.Errorf("Expected second track warning to contain 'duplicate track', got '%s'", r.Tracks[1].Warning)
 				}
 			}
 		}
+
 		if !found {
 			t.Error("Expected matroska_duplicate_tracks result")
 		}
@@ -387,6 +394,7 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 
 	t.Run("Track order returns both previous and current track", func(t *testing.T) {
 		config.InitDefaults()
+
 		tracks := []matroska.EbmlTrack{
 			{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
 			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
@@ -394,17 +402,21 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 
 		res := runTrackChecks(tracks)
 		found := false
+
 		for _, r := range res {
 			if r.Identifier == "matroska_track_order" {
 				found = true
+
 				if len(r.Tracks) != 2 {
 					t.Errorf("Expected 2 tracks for track order check, got %d", len(r.Tracks))
 				}
+
 				if !strings.Contains(r.Tracks[0].Warning, "score:") {
 					t.Errorf("Expected first track warning to contain 'score:', got '%s'", r.Tracks[0].Warning)
 				}
 			}
 		}
+
 		if !found {
 			t.Error("Expected matroska_track_order result")
 		}

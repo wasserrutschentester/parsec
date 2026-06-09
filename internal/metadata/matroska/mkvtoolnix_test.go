@@ -29,6 +29,7 @@ func TestCreateTagsXML(t *testing.T) {
 	}
 
 	var parsedTags mkvTags
+
 	err = xml.Unmarshal(content, &parsedTags)
 	if err != nil {
 		t.Fatalf("failed to unmarshal generated XML: %v", err)

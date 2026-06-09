@@ -47,6 +47,7 @@ func LanguageName(lang string) string {
 	if lang == "" {
 		return ""
 	}
+
 	tag := language.Make(lang)
 	if tag != language.Und {
 		if tag == language.Make("mul") {
@@ -92,9 +93,11 @@ func AudioMetaName(title, additionalFeatures string) string {
 	if strings.Contains(uFeatures, "ATMOS") || strings.Contains(uFeatures, "JOC") || strings.Contains(uTitle, "ATMOS") {
 		return "Atmos"
 	}
+
 	if strings.Contains(uFeatures, "AURO3D") || strings.Contains(uTitle, "AURO3D") {
 		return "Auro3D"
 	}
+
 	return ""
 }
 
@@ -110,6 +113,7 @@ func AudioCodecName(format, profile, additionalFeatures string) string {
 		if strings.Contains(uFeatures, "DEP") || strings.Contains(uFeatures, "DEPENDENT") {
 			return "DDP"
 		}
+
 		return "DD"
 	case "E-AC-3":
 		return "DDP"
@@ -133,18 +137,23 @@ func detectDTS(uProfile, uFeatures string) string {
 	if isXLL && isX {
 		return "DTS-X"
 	}
+
 	if isXLL || strings.Contains(combined, "MA") {
 		return "DTS-HD.MA"
 	}
+
 	if strings.Contains(combined, "XBR") || strings.Contains(combined, "XXCH") || strings.Contains(combined, "HRA") {
 		return "DTS-HD.HRA"
 	}
+
 	if strings.Contains(combined, "ES") {
 		return "DTS-ES"
 	}
+
 	if strings.Contains(combined, "96/24") {
 		return "DTS"
 	}
+
 	return "DTS"
 }
 
@@ -158,14 +167,17 @@ func VideoCodecName(format, formatVersion, codecIDHint string) string {
 		if strings.Contains(formatVersion, "2") {
 			return "MPEG2"
 		}
+
 		return "MPEG"
 	case "MPEG-4 Visual":
 		if strings.Contains(strings.ToUpper(codecIDHint), "XVID") {
 			return "XviD"
 		}
+
 		if strings.Contains(strings.ToUpper(codecIDHint), "DIVX") {
 			return "DivX"
 		}
+
 		return "MPEG4"
 	default:
 		return format
@@ -207,10 +219,12 @@ func HeightToResolution(height int, scanType string, frameRate float64) string {
 			if frameRate >= 24.9 && frameRate <= 25.1 || frameRate >= 49.9 && frameRate <= 50.1 {
 				return "576" + suffix
 			}
+
 			if frameRate >= 23.9 && frameRate <= 24.1 || frameRate >= 29.9 && frameRate <= 30.1 || frameRate >= 59.9 && frameRate <= 60.1 {
 				return "480" + suffix
 			}
 		}
+
 		return fmt.Sprintf("%d%s", height, suffix)
 	}
 }
@@ -219,62 +233,80 @@ func (meta *Metadata) SetDefaults() {
 	if meta.Title == "" {
 		meta.Title = config.GetTitle()
 	}
+
 	if meta.Year == 0 {
 		meta.Year = config.GetYear()
 	}
+
 	if meta.Season == 0 {
 		meta.Season = config.GetSeason()
 	}
+
 	if meta.Episode == 0 {
 		meta.Episode = config.GetEpisode()
 	}
+
 	if meta.Date == "" {
 		meta.Date = config.GetDate()
 	}
+
 	if meta.EpisodeTitle == "" {
 		meta.EpisodeTitle = config.GetEpisodeTitle()
 	}
+
 	if meta.CutEdition == "" {
 		meta.CutEdition = config.GetCutEdition()
 	}
+
 	if meta.HDR == "" {
 		meta.HDR = config.GetHDR()
 	}
+
 	if meta.Service == "" {
 		meta.Service = config.GetService()
 	}
+
 	if meta.Source == "" {
 		meta.Source = config.GetSource()
 	}
+
 	if !meta.Repack {
 		meta.Repack = config.GetRepack()
 	}
+
 	if !meta.HasAudioDesc {
 		meta.HasAudioDesc = config.GetAudioDescription()
 	}
+
 	if meta.Group == "" {
 		meta.Group = config.GetGroup()
 	}
+
 	if meta.ImdbID == "" {
 		meta.ImdbID = config.GetImdbID()
 	}
+
 	if meta.TmdbID == 0 {
 		meta.TmdbID = config.GetTmdbID()
 	}
+
 	if meta.TvdbID == 0 {
 		meta.TvdbID = config.GetTvdbID()
 	}
+
 	if !meta.IsTV && config.GetIsTV() {
 		meta.IsTV = true
 	} else if meta.IsTV && config.GetIsMovie() {
 		meta.IsTV = false
 	}
+
 	ui.PrintDebug(fmt.Sprintf("set config overrides: %+v", meta))
 }
 
 func (meta *Metadata) GetReleaseName() string {
 	template := config.GetTemplate()
 	ui.PrintDebug(fmt.Sprintf("using template: %s", template))
+
 	return meta.Render(template)
 }
 
@@ -305,23 +337,28 @@ func (meta *Metadata) Render(template string) string {
 	if meta.Year > 0 {
 		replacements["{year}"] = fmt.Sprintf("%d", meta.Year)
 	}
+
 	if meta.Season > 0 || meta.IsTV {
 		replacements["{season_raw}"] = fmt.Sprintf("%d", meta.Season)
 		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
 		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
 	}
+
 	if meta.Episode > 0 {
 		replacements["{episode_raw}"] = fmt.Sprintf("%d", meta.Episode)
 		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
 		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
 		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)
 	}
+
 	if meta.Repack {
 		replacements["{repack}"] = "REPACK"
 	}
+
 	if meta.HasAudioDesc && meta.Accessibility == "" {
 		replacements["{accessibility}"] = "with.Audio.Description"
 	}
+
 	result := template
 	for tag, val := range replacements {
 		result = strings.ReplaceAll(result, tag, val)
@@ -396,21 +433,25 @@ func (meta *Metadata) Override(newMeta *Metadata) bool {
 			if mField.Bool() != nField.Bool() && nField.Bool() {
 				ui.PrintDebug(fmt.Sprintf("%s: %t %s %t", f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
 				mField.SetBool(nField.Bool())
+
 				updated = true
 			}
 		} else {
 			if !nField.IsZero() && mField.Interface() != nField.Interface() {
 				ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
 				mField.Set(nField)
+
 				updated = true
 			}
 		}
 	}
+
 	return updated
 }
 
 func RemoveDuplicates[T comparable](slice []T) []T {
 	seen := make(map[T]struct{})
+
 	result := make([]T, 0, len(slice))
 	for _, v := range slice {
 		if _, exists := seen[v]; !exists {
@@ -418,5 +459,6 @@ func RemoveDuplicates[T comparable](slice []T) []T {
 			result = append(result, v)
 		}
 	}
+
 	return result
 }

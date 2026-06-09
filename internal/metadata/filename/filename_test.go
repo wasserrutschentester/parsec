@@ -11,17 +11,20 @@ import (
 
 func compareMetadata(got, want metadata.Metadata) string {
 	var diffs []string
+
 	vGot := reflect.ValueOf(got)
 	vWant := reflect.ValueOf(want)
 	typeOfS := vGot.Type()
 
 	for i := 0; i < vGot.NumField(); i++ {
 		fieldGot := vGot.Field(i).Interface()
+
 		fieldWant := vWant.Field(i).Interface()
 		if !reflect.DeepEqual(fieldGot, fieldWant) {
 			diffs = append(diffs, fmt.Sprintf("%s: got %v, want %v", typeOfS.Field(i).Name, fieldGot, fieldWant))
 		}
 	}
+
 	return strings.Join(diffs, "\n")
 }
 
@@ -496,6 +499,7 @@ func TestDeobfuscateTitle(t *testing.T) {
 		if got != want {
 			return fmt.Sprintf("got %q, want %q", got, want)
 		}
+
 		return ""
 	})
 }
@@ -520,6 +524,7 @@ func TestNormalizeTitle(t *testing.T) {
 		if got != want {
 			return fmt.Sprintf("got %q, want %q", got, want)
 		}
+
 		return ""
 	})
 }
@@ -549,6 +554,7 @@ func TestNormalizeService(t *testing.T) {
 		if got != want {
 			return fmt.Sprintf("got %q, want %q", got, want)
 		}
+
 		return ""
 	})
 }

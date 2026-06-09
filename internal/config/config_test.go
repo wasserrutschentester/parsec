@@ -19,15 +19,18 @@ func TestPresets(t *testing.T) {
 
 	// Test default (no preset)
 	SetPreset("")
+
 	if GetGroup() != "GlobalGroup" {
 		t.Errorf("GetGroup() = %v, want GlobalGroup", GetGroup())
 	}
+
 	if GetSource() != "GlobalSource" {
 		t.Errorf("GetSource() = %v, want GlobalSource", GetSource())
 	}
 
 	// Test preset override
 	SetPreset("my_preset")
+
 	if GetGroup() != "PresetGroup" {
 		t.Errorf("GetGroup() = %v, want PresetGroup", GetGroup())
 	}
@@ -38,6 +41,7 @@ func TestPresets(t *testing.T) {
 
 	// Test another preset
 	SetPreset("other")
+
 	if GetGroup() != "GlobalGroup" {
 		t.Errorf("GetGroup() = %v, want GlobalGroup", GetGroup())
 	}
@@ -47,6 +51,7 @@ func TestPresets(t *testing.T) {
 	viper.Set("preset.my_preset.api_keys.tmdb", "PresetKey")
 
 	SetPreset("my_preset")
+
 	if GetTmdbApiKey() != "GlobalKey" {
 		t.Errorf("GetTmdbApiKey() = %v, want GlobalKey", GetTmdbApiKey())
 	}
@@ -63,9 +68,11 @@ func TestIsCheckEnabled(t *testing.T) {
 
 	// Test blacklist (disabled_checks)
 	viper.Set("disabled_checks", []string{"bad_check"})
+
 	if IsCheckEnabled("bad_check") {
 		t.Errorf("IsCheckEnabled(bad_check) = true, want false (blacklisted)")
 	}
+
 	if !IsCheckEnabled("good_check") {
 		t.Errorf("IsCheckEnabled(good_check) = false, want true")
 	}
@@ -74,9 +81,11 @@ func TestIsCheckEnabled(t *testing.T) {
 	viper.Reset()
 	InitDefaults()
 	viper.Set("enabled_checks", []string{"only_this"})
+
 	if !IsCheckEnabled("only_this") {
 		t.Errorf("IsCheckEnabled(only_this) = false, want true (whitelisted)")
 	}
+
 	if IsCheckEnabled("other_check") {
 		t.Errorf("IsCheckEnabled(other_check) = true, want false (not in whitelist)")
 	}
@@ -88,17 +97,21 @@ func TestIsCheckEnabled(t *testing.T) {
 	viper.Set("preset.my_preset.disabled_checks", []string{"preset_disabled"})
 
 	SetPreset("")
+
 	if IsCheckEnabled("global_disabled") {
 		t.Errorf("IsCheckEnabled(global_disabled) = true, want false")
 	}
+
 	if !IsCheckEnabled("preset_disabled") {
 		t.Errorf("IsCheckEnabled(preset_disabled) = false, want true")
 	}
 
 	SetPreset("my_preset")
+
 	if !IsCheckEnabled("global_disabled") {
 		t.Errorf("IsCheckEnabled(global_disabled) = false, want true (overridden by preset)")
 	}
+
 	if IsCheckEnabled("preset_disabled") {
 		t.Errorf("IsCheckEnabled(preset_disabled) = true, want false")
 	}

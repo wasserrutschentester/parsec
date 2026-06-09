@@ -82,15 +82,18 @@ func isMatroska(filePath string) (bool, error) {
 	defer func() { _ = f.Close() }()
 
 	header := make([]byte, 4)
+
 	n, err := f.Read(header)
 	if err != nil {
 		return false, err
 	}
+
 	if n < 4 {
 		return false, nil
 	}
 
 	ebmlHeader := []byte{0x1A, 0x45, 0xDF, 0xA3}
+
 	return bytes.Equal(header, ebmlHeader), nil
 }
 
@@ -103,9 +106,11 @@ func CheckForMatroska(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to check if file is Matroska: %w", err)
 	}
+
 	if !isMKV {
 		return fmt.Errorf("file is not a Matroska file: %s", filePath)
 	}
+
 	return nil
 }
 
@@ -117,23 +122,29 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 
 	ui.PrintDebug(fmt.Sprintf("Executing: mkvmerge -J %s", ui.AnonymizePath(filePath)))
 	cmd := exec.Command("mkvmerge", "-J", filePath)
+
 	output, err := cmd.Output()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return nil, fmt.Errorf("mkvmerge is not installed or not available in PATH: %w", err)
 		}
+
 		return nil, fmt.Errorf("failed to get ebml metadata: %w", err)
 	}
+
 	var metadata EbmlMetadata
 	if err := json.Unmarshal(output, &metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal ebml metadata: %w", err)
 	}
+
 	metadata.countTypes()
+
 	return &metadata, nil
 }
 
 func (metadata *EbmlMetadata) countTypes() {
 	numVideo, numAudio, numSubtitles := 0, 0, 0
+
 	for i := range metadata.Tracks {
 		switch metadata.Tracks[i].Type {
 		case "video":
@@ -156,6 +167,7 @@ func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -172,11 +184,13 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	defer func() { _ = os.Remove(tagsXML) }()
 
 	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --tags global:%s", ui.AnonymizePath(filePath), tagsXML))
+
 	cmd := exec.Command("mkvpropedit", filePath, "--tags", "global:"+tagsXML)
 	if err := cmd.Run(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
 		}
+
 		return fmt.Errorf("failed to set global tags: %w", err)
 	}
 
@@ -196,15 +210,19 @@ func createTagsXML(filePath string, tags mdb.MatroskaTags) (string, error) {
 	if tags.Title != "" {
 		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TITLE", String: tags.Title})
 	}
+
 	if tags.Imdb != "" {
 		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "IMDB", String: tags.Imdb})
 	}
+
 	if tags.Tmdb != "" {
 		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TMDB", String: tags.Tmdb})
 	}
+
 	if tags.Tvdb != 0 {
 		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TVDB", String: strconv.Itoa(tags.Tvdb)})
 	}
+
 	if tags.Tvdb2 != "" {
 		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TVDB2", String: tags.Tvdb2})
 	}

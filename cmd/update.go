@@ -51,29 +51,35 @@ func runUpdate() error {
 	if asset == nil {
 		ui.PrintError("No prebuilt binary found for your platform")
 		ui.PrintInfo("Available assets:")
+
 		for _, a := range rel.Assets {
 			ui.PrintInfo("- " + a.Name)
 		}
+
 		return fmt.Errorf("no matching asset found")
 	}
 
 	// 1. Download
 	ui.PrintInfo("Downloading update...")
+
 	tempFile, err := update.DownloadAsset(ctx, asset.BrowserDownloadURL)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to download update: %v", err))
 		return fmt.Errorf("download failed")
 	}
+
 	defer func() { _ = os.Remove(tempFile) }() // Cleanup if we return early (e.g. checksum fail)
 
 	// 2. Verify Checksum
 	checksumAsset := rel.GetChecksumsAsset()
 	if checksumAsset != nil {
 		ui.PrintInfo("Verifying checksum...")
+
 		if err := update.VerifyChecksum(ctx, asset.Name, tempFile, checksumAsset.BrowserDownloadURL); err != nil {
 			ui.PrintError(fmt.Sprintf("Security check failed: %v", err))
 			return fmt.Errorf("checksum verification failed")
 		}
+
 		ui.PrintSuccess("Checksum verified")
 	} else {
 		ui.PrintWarning("No checksums.txt found in release, skipping verification")
@@ -81,11 +87,13 @@ func runUpdate() error {
 
 	// 3. Finalize Replacement
 	ui.PrintInfo("Finalizing update...")
+
 	if err := update.ReplaceExecutable(tempFile); err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to replace binary: %v", err))
 		return fmt.Errorf("update failed")
 	}
 
 	ui.PrintSuccess(fmt.Sprintf("Successfully updated to %s", rel.TagName))
+
 	return nil
 }

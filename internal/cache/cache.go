@@ -24,6 +24,7 @@ func ResetDir() {
 	if err != nil {
 		dir = os.TempDir()
 	}
+
 	cacheDir = filepath.Join(dir, "parsec", "api")
 }
 
@@ -82,6 +83,7 @@ func Get(key string) ([]byte, error) {
 	}
 
 	path := getPath(key)
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -99,6 +101,7 @@ func Set(key string, data []byte) error {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
+
 	return os.WriteFile(getPath(key), data, 0o644)
 }
 

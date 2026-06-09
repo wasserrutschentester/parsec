@@ -31,6 +31,7 @@ Flags can be used to override or provide missing information.`),
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
+
 		if len(args) == 0 {
 			return identifyFile(cmd, "")
 		}
@@ -42,12 +43,14 @@ Flags can be used to override or provide missing information.`),
 				return err
 			}
 		}
+
 		return nil
 	},
 }
 
 func identifyFile(cmd *cobra.Command, filePath string) error {
 	var meta *metadata.Metadata
+
 	if filePath != "" {
 		filenameNoExt := filename.GetBaseName(filePath)
 		meta = filename.Parse(filenameNoExt)
@@ -82,9 +85,12 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 	}
 
 	shouldWriteTags := writeTagsFlag
+
 	if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
 		fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
+
 		var response string
+
 		_, _ = fmt.Scanln(&response)
 		if response == "y" || response == "Y" {
 			shouldWriteTags = true
@@ -101,6 +107,7 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 			ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
 		}
 	}
+
 	return nil
 }
 
@@ -165,12 +172,15 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 		(tagTmdb != 0 && result.TmdbID != 0 && tagTmdb != result.TmdbID) ||
 		(tagTvdb != 0 && result.TvdbID != 0 && tagTvdb != result.TvdbID) {
 		ui.Println("\n" + ui.FormatWarning("Selected result IDs do not match file tags:"))
+
 		if tagImdb != "" && tagImdb != result.ImdbID {
 			ui.Println("  " + ui.LabelValue("IMDB (File vs Selected):", fmt.Sprintf("%s / %s", tagImdb, result.ImdbID)))
 		}
+
 		if tagTmdb != 0 && tagTmdb != result.TmdbID {
 			ui.Println("  " + ui.LabelValue("TMDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTmdb, result.TmdbID)))
 		}
+
 		if tagTvdb != 0 && tagTvdb != result.TvdbID {
 			ui.Println("  " + ui.LabelValue("TVDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTvdb, result.TvdbID)))
 		}
@@ -179,8 +189,10 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 
 func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
 	var episodeResult mdb.EpisodeResult
+
 	if meta.Season > 0 && meta.Episode > 0 || meta.EpisodeTitle != "" || meta.Date != "" {
 		ui.Println(ui.Info.Render("Identifying episode..."))
+
 		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
 	}
 

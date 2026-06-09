@@ -23,6 +23,7 @@ var configInitCmd = &cobra.Command{
 	Long:  ui.Banner(".: WARP CORE LOADING PROTO :."),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: LOADING WARP CORE :."))
+
 		confDir, err := os.UserConfigDir()
 		if err != nil {
 			ui.PrintError(fmt.Sprintf("Could not determine user config directory: %v", err))
@@ -42,6 +43,7 @@ var configInitCmd = &cobra.Command{
 				ui.PrintError(fmt.Sprintf("Could not backup existing config file: %v", err))
 				return fmt.Errorf("config backup failed")
 			}
+
 			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", ui.AnonymizePath(backupFile)))
 		}
 
@@ -56,6 +58,7 @@ var configInitCmd = &cobra.Command{
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Created default configuration at %s", ui.AnonymizePath(targetFile)))
+
 		return nil
 	},
 }

@@ -15,6 +15,7 @@ func TestCache(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	SetDir(tempDir)
+
 	defer ResetDir()
 
 	key := "test-key"
@@ -30,6 +31,7 @@ func TestCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
+
 	if !bytes.Equal(cached, data) {
 		t.Errorf("Expected %s, got %s", data, cached)
 	}
@@ -41,6 +43,7 @@ func TestCache(t *testing.T) {
 
 	// Test Expiration (manual mod time change)
 	path := getPath(key)
+
 	oldTime := time.Now().Add(-7 * time.Hour)
 	if err := os.Chtimes(path, oldTime, oldTime); err != nil {
 		t.Fatal(err)
@@ -52,7 +55,9 @@ func TestCache(t *testing.T) {
 
 	// Test Clear
 	_ = Set(key, data)
+
 	Clear()
+
 	if _, err := Get(key); err == nil {
 		t.Error("Expected error after Clear")
 	}
@@ -66,6 +71,7 @@ func TestCleanup(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	SetDir(tempDir)
+
 	defer ResetDir()
 
 	// Create a fresh file
@@ -79,7 +85,9 @@ func TestCleanup(t *testing.T) {
 	if err := Set(keyOld, []byte("old-data")); err != nil {
 		t.Fatal(err)
 	}
+
 	pathOld := getPath(keyOld)
+
 	oldTime := time.Now().Add(-cacheDuration - time.Hour)
 	if err := os.Chtimes(pathOld, oldTime, oldTime); err != nil {
 		t.Fatal(err)

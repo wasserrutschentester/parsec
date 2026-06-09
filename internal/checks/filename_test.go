@@ -49,6 +49,7 @@ func TestCheckCharacterSequences(t *testing.T) {
 
 func TestRunFilenameChecks(t *testing.T) {
 	config.InitDefaults()
+
 	tests := []struct {
 		name     string
 		filename string
@@ -142,12 +143,14 @@ func TestRunFilenameChecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			results := RunFilenameChecks(tt.filename, tt.meta)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if hasFailure != tt.wantFail {
 				t.Errorf("RunFilenameChecks() [%s] hasFailure = %v, wantFail %v", tt.name, hasFailure, tt.wantFail)
 			}

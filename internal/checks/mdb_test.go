@@ -25,15 +25,18 @@ func TestCheckTitle(t *testing.T) {
 			res := &mdb.SearchResult{Title: tt.resTitle}
 			results := checkTitle(meta, res)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkTitle() expected warnings, got none")
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkTitle() expected no warnings, got failure")
 			}
@@ -59,15 +62,18 @@ func TestCheckMovieYear(t *testing.T) {
 			res := &mdb.SearchResult{Year: tt.resYear}
 			results := checkMovieYear(meta, res)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkMovieYear() expected warnings, got none")
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkMovieYear() expected no warnings, got failure")
 			}

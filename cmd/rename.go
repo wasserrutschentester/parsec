@@ -35,6 +35,7 @@ The resulting filename is generated according to the configured template.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
+
 		expandedArgs := expandArgs(args)
 		for _, filePath := range expandedArgs {
 			err := renameFile(cmd, filePath)
@@ -42,6 +43,7 @@ The resulting filename is generated according to the configured template.`),
 				return err
 			}
 		}
+
 		return nil
 	},
 }
@@ -83,10 +85,12 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	if result != nil {
 		mdb.PrintCompactResult(*result)
+
 		meta.Title = result.Title
 		if result.Year > 0 {
 			meta.Year = result.Year
 		}
+
 		if meta.IsTV {
 			episodeResult := renameGetEpisodeInfo(result, meta)
 			mdb.PrintCompactEpisodeResult(episodeResult)
@@ -102,6 +106,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	if meta.EpisodeTitle != "" {
 		meta.EpisodeTitle = filename.NormalizeTitle(meta.EpisodeTitle)
 	}
+
 	if meta.Service != "" {
 		meta.Service = filename.NormalizeService(meta.Service)
 	}
@@ -129,7 +134,9 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	if !unattendedFlag {
 		fmt.Print(ui.Info.Render("Proceed with rename? [y/N] "))
+
 		var response string
+
 		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			ui.Println(ui.Muted.Render("Skipping..."))
@@ -152,12 +159,15 @@ func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainf
 	if meta.ImdbID == "" {
 		meta.ImdbID = tagImdb
 	}
+
 	if meta.TmdbID == 0 {
 		meta.TmdbID = tagTmdb
 	}
+
 	if meta.TvdbID == 0 {
 		meta.TvdbID = tagTvdb
 	}
+
 	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
 		meta.IsTV = true
 	}
@@ -168,11 +178,13 @@ func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb
 	if (meta.Season > 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
 		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
 	}
+
 	if episodeResult.Name != "" {
 		meta.EpisodeTitle = episodeResult.Name
 		meta.Season = episodeResult.Season
 		meta.Episode = episodeResult.Episode
 	}
+
 	return episodeResult
 }
 
@@ -209,6 +221,7 @@ func init() {
 	for _, f := range metadataFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
+
 	p2pFlags := []string{"service", "source", "repack", "group"}
 	for _, f := range p2pFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})

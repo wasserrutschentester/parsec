@@ -26,15 +26,19 @@ func SanitizeUTF8Bytes(b []byte) []byte {
 
 	var res bytes.Buffer
 	res.Grow(len(b))
+
 	for len(b) > 0 {
 		r, size := utf8.DecodeRune(b)
 		if r == utf8.RuneError && size == 1 {
 			// Invalid UTF-8, treat as Windows-1252
 			r = charmap.Windows1252.DecodeByte(b[0])
 		}
+
 		res.WriteRune(r)
+
 		b = b[size:]
 	}
+
 	return res.Bytes()
 }
 
@@ -68,10 +72,12 @@ func (e Extra) GetString(key string) string {
 	if e == nil {
 		return ""
 	}
+
 	v, ok := e[key]
 	if !ok {
 		return ""
 	}
+
 	switch val := v.(type) {
 	case string:
 		return val
@@ -93,7 +99,9 @@ func (mb *MediaBool) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal(b, &boolean); err != nil {
 			return err
 		}
+
 		*mb = MediaBool(boolean)
+
 		return nil
 	}
 
@@ -105,6 +113,7 @@ func (mb *MediaBool) UnmarshalJSON(b []byte) error {
 	default:
 		*mb = false
 	}
+
 	return nil
 }
 
@@ -160,9 +169,11 @@ func (t *Track) GetDialNorm() string {
 	if val == "" {
 		val = t.Extra.GetString("Dialog_Normalization")
 	}
+
 	if val == "" {
 		val = t.Extra.GetString("dialnorm")
 	}
+
 	if val == "" {
 		val = t.Extra.GetString("dialnorm_Average")
 	}
@@ -178,11 +189,13 @@ func Get(filePath string) (*MediaInfo, error) {
 
 	ui.PrintDebug(fmt.Sprintf("Executing: mediainfo --Output=JSON --ParseSpeed=0 %s", ui.AnonymizePath(filePath)))
 	cmd := exec.Command("mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
+
 	out, err := cmd.Output()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return nil, fmt.Errorf("mediainfo is not installed or not available in PATH: %w", err)
 		}
+
 		return nil, fmt.Errorf("failed to run mediainfo: %w", err)
 	}
 
@@ -214,6 +227,7 @@ func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb, tvdb int, isTV bool) {
 
 	// TMDB
 	tmdbVal := extra.GetString("TMDB")
+
 	tmdb, tmdbType := parseID(tmdbVal)
 	if tmdbType == "tv" {
 		isTV = true
@@ -221,6 +235,7 @@ func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb, tvdb int, isTV bool) {
 
 	// TVDB
 	tvdbTag := extra.GetString("TVDB")
+
 	tvdb, tvdbType := parseID(tvdbTag)
 	if tvdbType == "series" || tvdbType == "tv" {
 		isTV = true
@@ -228,12 +243,14 @@ func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb, tvdb int, isTV bool) {
 
 	// TVDB2
 	tvdb2 := extra.GetString("TVDB2")
+
 	tvdb2ID, tvdb2Type := parseID(tvdb2)
 	switch tvdb2Type {
 	case "series":
 		if tvdb == 0 {
 			tvdb = tvdb2ID
 		}
+
 		isTV = true
 	case "episodes":
 		isTV = true
@@ -248,6 +265,7 @@ func (mi *MediaInfo) getGeneralExtra() Extra {
 			return mi.Media.Tracks[i].Extra
 		}
 	}
+
 	return nil
 }
 
@@ -255,12 +273,15 @@ func parseID(val string) (int, string) {
 	if val == "" {
 		return 0, ""
 	}
+
 	parts := strings.Split(val, "/")
 	if len(parts) > 1 {
 		id, _ := strconv.Atoi(parts[1])
 		return id, parts[0]
 	}
+
 	id, _ := strconv.Atoi(val)
+
 	return id, ""
 }
 
@@ -270,6 +291,7 @@ func (mi *MediaInfo) isVideo() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -279,6 +301,7 @@ func (mi *MediaInfo) hasAudio() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -287,21 +310,24 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" && meta.Resolution == "" {
 			meta.Resolution = metadata.HeightToResolution(track.Height, track.ScanType, track.FrameRate)
+
 			meta.VideoCodec = metadata.VideoCodecName(track.Format, track.Format_Version, track.CodecID_Hint)
 			if track.BitDepth != 8 {
 				// ignore bit depth if it's 8 (default)
 				meta.BitDepth = track.BitDepth
 			}
-			meta.HDR = track.detectHDR()
 
+			meta.HDR = track.detectHDR()
 		} else if track.Type == "Audio" && meta.AudioCodec == "" {
 			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.Format_Profile, track.Format_AdditionalFeatures)
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
 			meta.AudioMeta = metadata.AudioMetaName(track.Title, track.Format_AdditionalFeatures)
 		}
 	}
+
 	mi.SetLanguageTag(meta)
 	ui.PrintDebug(fmt.Sprintf("Mediainfo meta: %+v", meta))
+
 	return meta
 }
 
@@ -311,10 +337,12 @@ func (track *Track) detectHDR() string {
 	hdr := fmt.Sprintf("%s %s", hdrFormat, hdrCompat)
 
 	transfer := strings.ToUpper(track.Transfer_Characteristics)
+
 	var result string
 	if strings.Contains(hdr, "DOLBY VISION") {
 		result = "DV."
 	}
+
 	if strings.Contains(hdr, "HDR10+") {
 		result += "HDR10Plus"
 	} else if strings.Contains(hdr, "HDR10") {
@@ -330,7 +358,9 @@ func (track *Track) detectHDR() string {
 
 func (mi *MediaInfo) GetAudioLanguages() []string {
 	var languages []string
+
 	seen := make(map[string]bool)
+
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Audio" {
 			if !seen[track.Language] {
@@ -345,7 +375,9 @@ func (mi *MediaInfo) GetAudioLanguages() []string {
 
 func (mi *MediaInfo) GetSubtitleLanguages() []string {
 	var languages []string
+
 	seen := make(map[string]bool)
+
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Text" {
 			if !seen[track.Language] {
@@ -354,16 +386,20 @@ func (mi *MediaInfo) GetSubtitleLanguages() []string {
 			}
 		}
 	}
+
 	return languages
 }
 
 func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	languages := mi.GetAudioLanguages()
 	preferredLanguage := config.GetPreferredLanguage()
+
 	if len(languages) == 0 {
 		fmt.Println("no audio languages found")
+
 		meta.Language = ""
 		meta.LanguageExt = ""
+
 		return
 	}
 
@@ -379,6 +415,7 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 					meta.Language = metadata.LanguageName(preferredLanguage)
 					meta.LanguageExt = "SUBBED"
 					meta.Subbed = true
+
 					return
 				}
 			}
@@ -402,5 +439,6 @@ func (mi *MediaInfo) Print() {
 		fmt.Printf("Error marshaling to JSON: %v\n", err)
 		return
 	}
+
 	fmt.Println(string(b))
 }

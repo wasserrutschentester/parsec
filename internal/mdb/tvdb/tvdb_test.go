@@ -13,7 +13,9 @@ import (
 
 func TestIdentifyEpisodeByDate(t *testing.T) {
 	config.InitDefaults()
+
 	config.NoCache = true
+
 	viper.Set("api_keys.tvdb", "dummy_key")
 	viper.Set("preferred_language", "")
 
@@ -32,6 +34,7 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 	defer server.Close()
 
 	originalBaseURL := BaseURL
+
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
@@ -40,6 +43,7 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 	if result.TvdbID != 456 {
 		t.Errorf("Expected TvdbID 456, got %d", result.TvdbID)
 	}
+
 	if result.Name != "Test Episode" {
 		t.Errorf("Expected name 'Test Episode', got %q", result.Name)
 	}
@@ -47,7 +51,9 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 
 func TestIdentifyEpisodeByTitle(t *testing.T) {
 	config.InitDefaults()
+
 	config.NoCache = true
+
 	viper.Set("api_keys.tvdb", "dummy_key")
 	viper.Set("preferred_language", "")
 
@@ -66,6 +72,7 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 	defer server.Close()
 
 	originalBaseURL := BaseURL
+
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
@@ -78,7 +85,9 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 
 func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 	config.InitDefaults()
+
 	config.NoCache = true
+
 	viper.Set("api_keys.tvdb", "dummy_key")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +106,7 @@ func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 	defer server.Close()
 
 	originalBaseURL := BaseURL
+
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 

@@ -46,15 +46,18 @@ func TestCheckRedundantAudio(t *testing.T) {
 			}
 			results := checkRedundantAudio(mi)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkRedundantAudio() expected warnings, got none")
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkRedundantAudio() expected no warnings, got failure")
 			}
@@ -98,15 +101,18 @@ func TestCheckResolution(t *testing.T) {
 			}
 			results := checkResolution(track)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkResolution() expected warnings, got none")
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkResolution() expected no warnings, got failure")
 			}
@@ -137,15 +143,18 @@ func TestCheckFrameRate(t *testing.T) {
 			track := &mediainfo.Track{FrameRate: tt.fps}
 			results := checkFrameRate(track)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkFrameRate(%f) expected warning, got none", tt.fps)
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkFrameRate(%f) expected no warning, got failure", tt.fps)
 			}
@@ -173,15 +182,18 @@ func TestCheckBitRate(t *testing.T) {
 			track := &mediainfo.Track{Height: tt.height, BitRate: tt.bitrate}
 			results := checkBitRate(track)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkBitRate(%d, %d) expected warning, got none", tt.height, tt.bitrate)
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkBitRate(%d, %d) expected no warning, got failure", tt.height, tt.bitrate)
 			}
@@ -247,15 +259,18 @@ func TestCheckDurations(t *testing.T) {
 
 			results := checkDurations(mi)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkDurations() expected warnings, got none")
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkDurations() expected no warnings, got failure")
 			}
@@ -325,15 +340,18 @@ func TestCheckDialogueNormalization(t *testing.T) {
 			}
 			results := checkDialogueNormalization(mi)
 			hasFailure := false
+
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
 					break
 				}
 			}
+
 			if tt.wantWarn && !hasFailure {
 				t.Errorf("checkDialogueNormalization() expected warning, got none")
 			}
+
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkDialogueNormalization() expected no warning, got failure")
 			}

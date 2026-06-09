@@ -43,10 +43,12 @@ type ReleaseResource struct {
 
 func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]ReleaseResource, error) {
 	queries := make([]string, 0)
+
 	suffix := ""
 	if season > 0 {
 		suffix += fmt.Sprintf(" {Season:%d}", season)
 	}
+
 	if episode > 0 {
 		suffix += fmt.Sprintf(" {Episode:%d}", episode)
 	}
@@ -54,9 +56,11 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 	if imdbID != "" {
 		queries = append(queries, fmt.Sprintf("{ImdbId:%s}%s", imdbID, suffix))
 	}
+
 	if tmdbID > 0 {
 		queries = append(queries, fmt.Sprintf("{TmdbId:%d}%s", tmdbID, suffix))
 	}
+
 	if tvdbID > 0 {
 		queries = append(queries, fmt.Sprintf("{TvdbId:%d}%s", tvdbID, suffix))
 	}
@@ -67,6 +71,7 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 
 	mediaType := "movie"
 	categories := config.GetProwlarrMovieCategories()
+
 	if isTV {
 		mediaType = "tvsearch"
 		categories = config.GetProwlarrTvCategories()
@@ -90,6 +95,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 	}
 
 	var wg sync.WaitGroup
+
 	resultsChan := make(chan []ReleaseResource, len(queries))
 	errChan := make(chan error, len(queries))
 
@@ -97,6 +103,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 		wg.Add(1)
 		go func(q string) {
 			defer wg.Done()
+
 			searchURL, err := buildSearchURL(prowlarrUrl, q, mediaType, categories, indexerIds)
 			if err != nil {
 				errChan <- err
@@ -108,6 +115,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 				errChan <- err
 				return
 			}
+
 			resultsChan <- results
 		}(query)
 	}
@@ -121,8 +129,10 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 	}
 
 	var allResults []ReleaseResource
+
 	seenGuids := make(map[string]bool)
 	duplicates := 0
+
 	for results := range resultsChan {
 		for _, r := range results {
 			if !seenGuids[r.Guid] {
@@ -144,8 +154,9 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerIds []int) (*url.URL, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("invalid prowlarr url: %v", err)
+		return nil, fmt.Errorf("invalid prowlarr url: %w", err)
 	}
+
 	u.Path = "/api/v1/search"
 
 	q := u.Query()
@@ -159,8 +170,10 @@ func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerI
 	for _, id := range indexerIds {
 		q.Add("indexerIds", strconv.Itoa(id))
 	}
+
 	ui.PrintDebug(fmt.Sprintf("query: %s", q))
 	u.RawQuery = q.Encode()
+
 	return u, nil
 }
 
@@ -177,18 +190,22 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 	ui.PrintDebug(fmt.Sprintf("Prowlarr search URL: %s", searchURL.String()))
 
 	start := time.Now()
-	req, err := http.NewRequest("GET", searchURL.String(), nil)
+
+	req, err := http.NewRequest(http.MethodGet, searchURL.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+
 	req.Header.Set("X-Api-Key", apiKey)
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{}
+
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("prowlarr request failed: %v", err)
+		return nil, fmt.Errorf("prowlarr request failed: %w", err)
 	}
+
 	defer func() { _ = resp.Body.Close() }()
 
 	duration := time.Since(start)
@@ -200,15 +217,16 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read prowlarr response: %v", err)
+		return nil, fmt.Errorf("failed to read prowlarr response: %w", err)
 	}
 
 	var results []ReleaseResource
 	if err := json.Unmarshal(body, &results); err != nil {
-		return nil, fmt.Errorf("failed to decode prowlarr response: %v", err)
+		return nil, fmt.Errorf("failed to decode prowlarr response: %w", err)
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Prowlarr request took %v, returned %d results", duration, len(results)))
+
 	_ = cache.Set(cacheKey, body)
 
 	return results, nil
@@ -218,6 +236,7 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 	filtered := make([]ReleaseResource, 0)
 
 	var imdbInt int64
+
 	if imdbID != "" {
 		cleanImdb := strings.TrimPrefix(imdbID, "tt")
 		imdbInt, _ = strconv.ParseInt(cleanImdb, 10, 64)
@@ -227,6 +246,7 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 		total   int
 		matched int
 	}
+
 	stats := make(map[string]indexerStat)
 
 	for _, r := range results {
@@ -249,10 +269,12 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 
 		if match {
 			s.matched++
+
 			filtered = append(filtered, r)
 		} else {
 			ui.PrintDebug(fmt.Sprintf("Prowlarr result '%s' from %s filtered out (IMDB: %d, TMDB: %d, TVDB: %d)", r.Title, r.Indexer, r.ImdbID, r.TmdbID, r.TvdbID))
 		}
+
 		stats[r.Indexer] = s
 	}
 
@@ -266,6 +288,7 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 
 func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter bool) {
 	ui.Println("\n" + ui.Header.Render("PROWLARR RELEASES:"))
+
 	pResults, err := Search(result.ImdbID, result.TmdbID, result.TvdbID, meta.Season, meta.Episode, result.IsTV)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Prowlarr search failed: %v", err))
@@ -291,7 +314,9 @@ func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter boo
 		if meta.Resolution != "" {
 			msg = fmt.Sprintf("No releases found matching the IDs and resolution (%s).", meta.Resolution)
 		}
+
 		ui.Println(ui.Muted.Render(msg))
+
 		return
 	}
 
@@ -316,6 +341,7 @@ func FilterBestReleases(results []ReleaseResource, targetRes string) []ReleaseRe
 
 func GetBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseResource {
 	bestPerIndexer := make(map[string]ReleaseResource)
+
 	for _, r := range results {
 		// If a target resolution is specified, skip results that don't match
 		if targetRes != "" {
@@ -335,14 +361,18 @@ func GetBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseRes
 	for _, r := range bestPerIndexer {
 		best = append(best, r)
 	}
+
 	return best
 }
 
 func RenderReleasesTable(results []ReleaseResource) string {
 	headers := []string{"Indexer", "Source", "Res", "Group", "Size", "Seeders", "Age", "Info"}
+
 	var rows [][]string
+
 	for _, r := range results {
 		age := ""
+
 		if r.PublishDate != "" {
 			t, err := time.Parse(time.RFC3339, r.PublishDate)
 			if err == nil {
@@ -364,6 +394,7 @@ func RenderReleasesTable(results []ReleaseResource) string {
 			ui.Link.Render(r.InfoUrl),
 		})
 	}
+
 	return ui.TrackTable(headers, rows)
 }
 
@@ -372,11 +403,13 @@ func humanizeBytes(b int64) string {
 	if b < unit {
 		return fmt.Sprintf("%d B", b)
 	}
+
 	div, exp := int64(unit), 0
 	for n := b / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
 	}
+
 	return fmt.Sprintf("%.2f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
@@ -385,8 +418,10 @@ func humanizeTime(t time.Time) string {
 	if diff < time.Hour {
 		return fmt.Sprintf("%d min", int(diff.Minutes()))
 	}
+
 	if diff < 24*time.Hour {
 		return fmt.Sprintf("%d hours", int(diff.Hours()))
 	}
+
 	return fmt.Sprintf("%d days", int(diff.Hours()/24))
 }

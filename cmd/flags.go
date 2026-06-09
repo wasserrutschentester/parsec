@@ -46,42 +46,55 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	if titleFlag != "" {
 		meta.Title = titleFlag
 	}
+
 	if yearFlag != 0 {
 		meta.Year = yearFlag
 	}
+
 	if seasonFlag != 0 {
 		meta.Season = seasonFlag
 	}
+
 	if episodeFlag != 0 {
 		meta.Episode = episodeFlag
 	}
+
 	if dateFlag != "" {
 		meta.Date = dateFlag
 	}
+
 	if episodeTitleFlag != "" {
 		meta.EpisodeTitle = episodeTitleFlag
 	}
+
 	if cutEditionFlag != "" {
 		meta.CutEdition = cutEditionFlag
 	}
+
 	if hdrFlag != "" {
 		meta.HDR = hdrFlag
 	}
+
 	if serviceFlag != "" {
 		meta.Service = serviceFlag
 	}
+
 	if sourceFlag != "" {
 		meta.Source = sourceFlag
 	}
+
 	if isRepackFlag {
 		meta.Repack = isRepackFlag
 	}
+
 	if isSubbedFlag {
 		meta.Subbed = isSubbedFlag
 	}
+
 	if isAudioDescFlag {
 		meta.HasAudioDesc = isAudioDescFlag
 	}
+
 	if groupFlag != "" {
 		meta.Group = groupFlag
 	}
@@ -95,11 +108,14 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	if imdbIDFlag != "" {
 		meta.ImdbID = imdbIDFlag
 	}
+
 	if tmdbIDFlag != 0 {
 		meta.TmdbID = tmdbIDFlag
 	}
+
 	if tvdbIDFlag != 0 {
 		meta.TvdbID = tvdbIDFlag
 	}
+
 	ui.PrintDebug(fmt.Sprintf("Set Flag overrides: %+v", meta))
 }

@@ -54,6 +54,7 @@ func checkNameMismatch(name string, meta *metadata.Metadata) []CheckResult {
 			Actual:     meta.GetReleaseName(),
 		}}
 	}
+
 	return nil
 }
 
@@ -68,16 +69,19 @@ func checkAllowedCharacters(filename string) []CheckResult {
 			Actual:     filename,
 		}}
 	}
+
 	return nil
 }
 
 func findNotAllowedCharacters(filename string) (string, string) {
 	re := regexp.MustCompile(`[^a-zA-Z0-9\-\.]`)
 	match := re.FindStringSubmatch(filename)
+
 	cleanFilename := re.ReplaceAllString(filename, "_")
 	if match != nil {
 		return strings.Join(match, " "), cleanFilename
 	}
+
 	return "", filename
 }
 
@@ -92,16 +96,19 @@ func checkCharacterSequences(filename string) []CheckResult {
 			Actual:     filename,
 		}}
 	}
+
 	return nil
 }
 
 func findCharacterSequences(filename string) (string, string) {
 	re := regexp.MustCompile(`\.-*\.+`)
 	match := re.FindStringSubmatch(filename)
+
 	cleanFilename := re.ReplaceAllString(filename, "_")
 	if match != nil {
 		return strings.Join(match, " "), cleanFilename
 	}
+
 	return "", filename
 }
 
@@ -114,6 +121,7 @@ func checkYearMissing(meta *metadata.Metadata) []CheckResult {
 			Warning:    "year is missing for this Movie",
 		}}
 	}
+
 	return nil
 }
 
@@ -126,6 +134,7 @@ func checkYearRedundant(meta *metadata.Metadata) []CheckResult {
 			Warning:    fmt.Sprintf("redundant Year: The Season (%d) already indicates the year", meta.Season),
 		}}
 	}
+
 	return nil
 }
 
@@ -146,6 +155,7 @@ func checkStreamingService(meta *metadata.Metadata) []CheckResult {
 			Warning:    "Streaming Service Tag is not supported for non-WEB source",
 		}}
 	}
+
 	return nil
 }
 
@@ -169,5 +179,6 @@ func checkTvSpecial(meta *metadata.Metadata) []CheckResult {
 			}}
 		}
 	}
+
 	return nil
 }

@@ -106,10 +106,12 @@ func get(endpoint string, query url.Values, target interface{}) error {
 
 	query.Set("api_key", apiKey)
 	u := fmt.Sprintf("%s/%s?%s", BaseURL, endpoint, query.Encode())
+
 	resp, err := HTTPClient.Get(u)
 	if err != nil {
 		return err
 	}
+
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
@@ -160,6 +162,7 @@ func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
 		if externalIDs.Imdb != "" {
 			result.ImdbID = externalIDs.Imdb
 		}
+
 		if externalIDs.Tvdb != 0 {
 			result.TvdbID = externalIDs.Tvdb
 			if result.IsTV {
@@ -223,11 +226,13 @@ func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult
 	result.ImdbID = imdbID
 	applyExternalIDs(&result, mediaType)
 	applyAltTitles(&result, mediaType)
+
 	if result.IsTV {
 		result.TvdbType = "series"
 	} else {
 		result.TvdbType = "movies"
 	}
+
 	return &result
 }
 
@@ -236,6 +241,7 @@ func GetExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, erro
 	if err := get(fmt.Sprintf("%s/%d/external_ids", mediaType, tmdbID), nil, &data); err != nil {
 		return tmdbExternalIDsResponse{}, err
 	}
+
 	return data, nil
 }
 
@@ -277,6 +283,7 @@ func GetAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]str
 	for _, t := range data.Titles {
 		process(t.Title, t.ISO)
 	}
+
 	for _, t := range data.Results {
 		process(t.Title, t.ISO)
 	}
@@ -286,6 +293,7 @@ func GetAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]str
 
 func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tmdbEpisodeResponse
+
 	params := url.Values{}
 	if lang != "" {
 		params.Set("language", lang)

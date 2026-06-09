@@ -17,6 +17,7 @@ func GetBaseName(filePath string) string {
 	if ext := filepath.Ext(name); ext != "" {
 		name = name[:len(name)-len(ext)]
 	}
+
 	return name
 }
 
@@ -25,10 +26,12 @@ func ApplyTitleCleanRegex(title string) string {
 	if regexStr == "" {
 		return title
 	}
+
 	re, err := regexp.Compile(regexStr)
 	if err != nil {
 		return title
 	}
+
 	return strings.TrimSpace(re.ReplaceAllString(title, ""))
 }
 
@@ -76,12 +79,15 @@ func Parse(filename string) *metadata.Metadata {
 		if len(match) > 2 && match[2] != "" {
 			meta.AudioCodec += match[2]
 		}
+
 		if len(match) > 4 && match[4] != "" {
 			meta.AudioChannels = match[4]
 		}
+
 		if len(match) > 5 && match[5] != "" {
 			meta.AudioMeta = "Atmos"
 		}
+
 		if meta.AudioCodec == "Atmos" {
 			meta.AudioCodec = ""
 			meta.AudioMeta = "Atmos"
@@ -148,6 +154,7 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 		if tag == "" {
 			continue
 		}
+
 		re := regexp.MustCompile("(?i)[ .]" + regexp.QuoteMeta(tag))
 		if loc := re.FindStringIndex(filename); loc != nil {
 			if loc[0] < end {
@@ -157,6 +164,7 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 	}
 
 	title := filename[:end]
+
 	return strings.Trim(title, ". ")
 }
 
@@ -188,12 +196,14 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 
 	// Find the end of the season/episode and date tags
 	start := 0
+
 	if meta.Season != 0 || meta.Episode != 0 {
 		tag := fmt.Sprintf("S%02dE%02d", meta.Season, meta.Episode)
 		if loc := strings.Index(filename, tag); loc != -1 {
 			start = loc + len(tag)
 		}
 	}
+
 	if meta.Date != "" {
 		if loc := strings.Index(filename, meta.Date); loc != -1 {
 			if end := loc + len(meta.Date); end > start {
@@ -210,6 +220,7 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 
 	// Now find the beginning of Language or Resolution
 	end := len(sub)
+
 	if meta.Language != "" {
 		re := regexp.MustCompile("(?i)[ .]" + regexp.QuoteMeta(meta.Language))
 		if loc := re.FindStringIndex(sub); loc != nil {
@@ -231,29 +242,36 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 
 func matchTitleYear(filename string) (string, int) {
 	re := regexp.MustCompile(`^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
+
 	match := re.FindStringSubmatchIndex(filename)
 	if match != nil {
 		title := filename[match[2]:match[3]]
 		year := 0
+
 		if match[4] != -1 && match[5] != -1 {
 			yearStr := filename[match[4]:match[5]]
 			year, _ = strconv.Atoi(yearStr)
 		}
+
 		return title, year
 	}
+
 	return "", 0
 }
 
 func matchSeasonEpisode(filename string) (int, int) {
 	re := regexp.MustCompile(`S(\d{1,4})(?:E(\d{1,3}))?`)
+
 	match := re.FindStringSubmatch(filename)
 	if match != nil {
 		season, season_err := strconv.Atoi(match[1])
+
 		episode, episode_err := strconv.Atoi(match[2])
 		if episode_err == nil && season_err == nil {
 			return season, episode
 		}
 	}
+
 	return 0, 0
 }
 
@@ -309,11 +327,13 @@ func DeobfuscateTitle(title string) string {
 		if len(match) < 4 {
 			return m
 		}
+
 		prefix := match[1]
 		umlautMatch := match[2]
 		suffix := match[3]
 
 		r := getUmlautReplacement(umlautMatch, suffix)
+
 		return prefix + r + suffix
 	})
 
@@ -336,18 +356,22 @@ func getUmlautReplacement(umlautMatch, suffix string) string {
 		if isUpper {
 			return "Ä"
 		}
+
 		return "ä"
 	case "oe":
 		if isUpper {
 			return "Ö"
 		}
+
 		return "ö"
 	case "ue":
 		if isUpper {
 			return "Ü"
 		}
+
 		return "ü"
 	}
+
 	return umlautMatch
 }
 
@@ -417,8 +441,10 @@ func removeDiacritics(title string) string {
 		if r >= 0x0300 && r <= 0x036F {
 			return -1
 		}
+
 		return r
 	}, title)
+
 	return title
 }
 
@@ -428,50 +454,66 @@ func NormalizeService(service string) string {
 	if regexp.MustCompile(`^(hmax|hbom|hbo[ ._-]?max)$`).MatchString(s) {
 		return "HMAX"
 	}
+
 	if regexp.MustCompile(`^(amzn|amazon(hd)?)$`).MatchString(s) {
 		return "AMZN"
 	}
+
 	if regexp.MustCompile(`^(atvp|aptv|apple[ ._-]?tv\+?)$`).MatchString(s) {
 		return "ATVP"
 	}
+
 	if regexp.MustCompile(`^(cnlp|canp|canal\+)$`).MatchString(s) {
 		return "CNLP"
 	}
+
 	if regexp.MustCompile(`^(dsnp|dsny|disney(\+)?)$`).MatchString(s) {
 		return "DSNP"
 	}
+
 	if regexp.MustCompile(`^(it|itunes)$`).MatchString(s) {
 		return "iT"
 	}
+
 	if regexp.MustCompile(`^(nf|netflix(u?hd)?)$`).MatchString(s) {
 		return "NF"
 	}
+
 	if regexp.MustCompile(`^(pcok|peacock([ ._-]?tv)?)$`).MatchString(s) {
 		return "PCOK"
 	}
+
 	if regexp.MustCompile(`^(pmtp|paramount(\+)?)$`).MatchString(s) {
 		return "PMTP"
 	}
+
 	if regexp.MustCompile(`^(sho|showtime)$`).MatchString(s) {
 		return "SHO"
 	}
+
 	if regexp.MustCompile(`^(cr|crunchyroll)$`).MatchString(s) {
 		return "CR"
 	}
+
 	if regexp.MustCompile(`^(rtlp|rtl\+)$`).MatchString(s) {
 		return "RTLP"
 	}
+
 	if regexp.MustCompile(`^(ardp|ard\+)$`).MatchString(s) {
 		return "ARDP"
 	}
+
 	if regexp.MustCompile(`^(ard(mediathek)?|br|hr|mdr|ndr|rbb|sr|swr|wdr|rbtv)$`).MatchString(s) {
 		return "ARD"
 	}
+
 	if strings.HasPrefix(s, "zdf") {
 		return "ZDF"
 	}
+
 	if regexp.MustCompile(`^kika$`).MatchString(s) {
 		return "KiKA"
 	}
+
 	return strings.ToUpper(service)
 }

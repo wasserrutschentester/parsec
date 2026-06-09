@@ -44,6 +44,7 @@ func CheckForUpdateBackground(currentVersion string) {
 	if err == nil {
 		latestTag := string(cachedData)
 		ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
+
 		if IsNewer(latestTag, currentVersion) {
 			ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
 		}
@@ -52,6 +53,7 @@ func CheckForUpdateBackground(currentVersion string) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
+
 			if rel, err := FetchLatestRelease(ctx); err == nil {
 				_ = cache.Set(cacheKey, []byte(rel.TagName))
 			}
@@ -71,7 +73,8 @@ type Asset struct {
 
 func FetchLatestRelease(ctx context.Context) (*Release, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -111,6 +114,7 @@ func (r *Release) GetMatchingAsset() *Asset {
 			return &asset
 		}
 	}
+
 	return nil
 }
 
@@ -121,6 +125,7 @@ func (r *Release) GetChecksumsAsset() *Asset {
 			return &asset
 		}
 	}
+
 	return nil
 }
 
@@ -134,6 +139,7 @@ func getExecutablePath() (string, error) {
 	if err == nil {
 		executablePath = realPath
 	}
+
 	return executablePath, nil
 }
 
@@ -145,13 +151,15 @@ func DownloadAsset(ctx context.Context, url string) (string, error) {
 	}
 
 	tempFile := executablePath + ".new"
+
 	out, err := os.Create(tempFile)
 	if err != nil {
 		return "", fmt.Errorf("could not create temporary file: %w", err)
 	}
+
 	defer func() { _ = out.Close() }()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -180,7 +188,7 @@ func DownloadAsset(ctx context.Context, url string) (string, error) {
 
 // VerifyChecksum downloads the checksums file and verifies the downloaded binary
 func VerifyChecksum(ctx context.Context, assetName, tempFile, checksumsURL string) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", checksumsURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checksumsURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -197,9 +205,11 @@ func VerifyChecksum(ctx context.Context, assetName, tempFile, checksumsURL strin
 
 	// Expected hash from checksums.txt
 	var expectedHash string
+
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
+
 		parts := strings.Fields(line)
 		if len(parts) >= 2 && parts[1] == assetName {
 			expectedHash = parts[0]
@@ -245,6 +255,7 @@ func ReplaceExecutable(tempFile string) error {
 		if runtime.GOOS == "windows" {
 			return fmt.Errorf("could not replace running binary on Windows: %w\nPlease download the new version manually from Codeberg", err)
 		}
+
 		return fmt.Errorf("could not rename current binary: %w", err)
 	}
 
@@ -254,5 +265,6 @@ func ReplaceExecutable(tempFile string) error {
 	}
 
 	_ = os.Remove(oldFile) // Clean up old file
+
 	return nil
 }

@@ -39,6 +39,7 @@ func TestSearch(t *testing.T) {
 
 	// Override BaseURL
 	originalBaseURL := BaseURL
+
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
@@ -85,6 +86,7 @@ func TestGetByIDLocalization(t *testing.T) {
 	defer server.Close()
 
 	originalBaseURL := BaseURL
+
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 

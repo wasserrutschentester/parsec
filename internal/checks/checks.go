@@ -22,5 +22,6 @@ func normalizeForComparison(s string) string {
 	// collapse multiple spaces
 	reSpaces := regexp.MustCompile(`\s+`)
 	s = reSpaces.ReplaceAllString(s, " ")
+
 	return strings.TrimSpace(s)
 }

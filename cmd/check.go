@@ -35,12 +35,14 @@ You can also pass a JSON check report file to render it.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
+
 		var allReports []types.CheckReport
 
 		expandedArgs := expandArgs(args)
 
 		for _, filePath := range expandedArgs {
 			var currentReports []types.CheckReport
+
 			isJSON, jsonReports := loadJSONReport(filePath)
 
 			if isJSON {
@@ -51,6 +53,7 @@ You can also pass a JSON check report file to render it.`),
 					ui.PrintError(err.Error())
 					return fmt.Errorf("collecting check data failed for %s", filePath)
 				}
+
 				currentReports = []types.CheckReport{report}
 			}
 
@@ -66,6 +69,7 @@ You can also pass a JSON check report file to render it.`),
 		if jsonOutputFlag {
 			printJSONReports(allReports)
 		}
+
 		return nil
 	},
 }
@@ -79,6 +83,7 @@ func loadJSONReport(filePath string) (bool, []types.CheckReport) {
 
 	// Read a small header to see if it even looks like JSON
 	header := make([]byte, 512)
+
 	n, err := f.Read(header)
 	if err != nil || n == 0 {
 		return false, nil
@@ -111,8 +116,10 @@ func parseReports(data []byte) ([]types.CheckReport, error) {
 		if err := json.Unmarshal(data, &singleReport); err != nil {
 			return nil, err
 		}
+
 		reports = append(reports, singleReport)
 	}
+
 	return reports, nil
 }
 
@@ -123,9 +130,10 @@ func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, e
 	ui.Println(ui.LabelValue("Target Name:", filenameNoExt))
 
 	match := filename.Parse(filenameNoExt)
+
 	mi, err := mediainfo.Get(filePath)
 	if err != nil {
-		return types.CheckReport{}, fmt.Errorf("error getting mediainfo: %v", err)
+		return types.CheckReport{}, fmt.Errorf("error getting mediainfo: %w", err)
 	}
 
 	mediaMeta := mi.GetMetadata()
@@ -159,11 +167,13 @@ func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, e
 
 func appendFailed(allIssues *[]types.IssueGroup, category string, results []checks.CheckResult) {
 	var failed []checks.CheckResult
+
 	for _, r := range results {
 		if !r.Passed {
 			failed = append(failed, r)
 		}
 	}
+
 	if len(failed) > 0 {
 		*allIssues = append(*allIssues, types.IssueGroup{Category: category, Results: failed})
 	}
@@ -174,12 +184,15 @@ func setupMdbIDs(cmd *cobra.Command, mi *mediainfo.MediaInfo, match *metadata.Me
 	if match.ImdbID == "" {
 		match.ImdbID = tagImdb
 	}
+
 	if match.TmdbID == 0 {
 		match.TmdbID = tagTmdb
 	}
+
 	if match.TvdbID == 0 {
 		match.TvdbID = tagTvdb
 	}
+
 	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
 		match.IsTV = true
 	}
@@ -187,9 +200,11 @@ func setupMdbIDs(cmd *cobra.Command, mi *mediainfo.MediaInfo, match *metadata.Me
 	if imdbIDFlag != "" {
 		match.ImdbID = imdbIDFlag
 	}
+
 	if tmdbIDFlag != 0 {
 		match.TmdbID = tmdbIDFlag
 	}
+
 	if tvdbIDFlag != 0 {
 		match.TvdbID = tvdbIDFlag
 	}
@@ -201,6 +216,7 @@ func printJSONReports(reports []types.CheckReport) {
 		ui.PrintError(fmt.Sprintf("Error generating output: %v", err))
 		os.Exit(1)
 	}
+
 	fmt.Println(string(data))
 }
 

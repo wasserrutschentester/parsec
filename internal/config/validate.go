@@ -220,12 +220,14 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 				continue
 			}
 		}
+
 		if k == "prowlarr" && prefix == "" {
 			if subMap, ok := v.(map[string]interface{}); ok {
 				errors = append(errors, validateMapTypes(subMap, fullKey, prowlarrExpectedTypes)...)
 				continue
 			}
 		}
+
 		if k == "preset" && prefix == "" {
 			if subMap, ok := v.(map[string]interface{}); ok {
 				for presetName, presetContent := range subMap {
@@ -233,6 +235,7 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 						errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
 					}
 				}
+
 				continue
 			}
 		}
@@ -281,6 +284,7 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 
 func validateTemplateKeys(template, keyPath string) []string {
 	var errors []string
+
 	re := regexp.MustCompile(`\{([^}]+)\}`)
 	matches := re.FindAllStringSubmatch(template, -1)
 
@@ -296,6 +300,7 @@ func validateTemplateKeys(template, keyPath string) []string {
 
 func validateCheckIdentifiers(identifiers []interface{}, keyPath string) []string {
 	var errors []string
+
 	for _, id := range identifiers {
 		if idStr, ok := id.(string); ok {
 			if !validCheckIdentifiers[idStr] {
@@ -303,11 +308,13 @@ func validateCheckIdentifiers(identifiers []interface{}, keyPath string) []strin
 			}
 		}
 	}
+
 	return errors
 }
 
 func validateLanguage(lang, keyPath string) []string {
 	var errors []string
+
 	tag, err := language.Parse(lang)
 	if err != nil || tag == language.Und {
 		errors = append(errors, fmt.Sprintf("Invalid language tag in '%s': %s", keyPath, lang))

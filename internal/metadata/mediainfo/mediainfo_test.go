@@ -79,6 +79,7 @@ func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	}`
 
 	var mi MediaInfo
+
 	err := json.Unmarshal([]byte(jsonData), &mi)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
@@ -136,6 +137,7 @@ func TestMediaInfo_Unmarshal(t *testing.T) {
 	}`
 
 	var mi MediaInfo
+
 	err := json.Unmarshal([]byte(jsonData), &mi)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
@@ -149,12 +151,15 @@ func TestMediaInfo_Unmarshal(t *testing.T) {
 	if video.Width != 1920 || video.Height != 1080 {
 		t.Errorf("Video dimensions mismatch: %dx%d", video.Width, video.Height)
 	}
+
 	if video.FrameRate != 23.976 {
 		t.Errorf("Video FrameRate mismatch: %f", video.FrameRate)
 	}
+
 	if !bool(video.Default) {
 		t.Errorf("Video Default expected true, got false")
 	}
+
 	if bool(video.Forced) {
 		t.Errorf("Video Forced expected false, got true")
 	}
@@ -163,6 +168,7 @@ func TestMediaInfo_Unmarshal(t *testing.T) {
 	if audio.Channels != 6 {
 		t.Errorf("Audio channels mismatch: %d", audio.Channels)
 	}
+
 	if bool(audio.Default) {
 		t.Errorf("Audio Default expected false, got true")
 	}
@@ -255,16 +261,20 @@ func TestMediaInfo_GetMdbIDs(t *testing.T) {
 					},
 				},
 			}
+
 			imdb, tmdb, tvdb, isTV := mi.GetMdbIDs()
 			if imdb != tt.wantImdb {
 				t.Errorf("GetMdbIDs() imdb = %v, want %v", imdb, tt.wantImdb)
 			}
+
 			if tmdb != tt.wantTmdb {
 				t.Errorf("GetMdbIDs() tmdb = %v, want %v", tmdb, tt.wantTmdb)
 			}
+
 			if tvdb != tt.wantTvdb {
 				t.Errorf("GetMdbIDs() tvdb = %v, want %v", tvdb, tt.wantTvdb)
 			}
+
 			if isTV != tt.wantIsTV {
 				t.Errorf("GetMdbIDs() isTV = %v, want %v", isTV, tt.wantIsTV)
 			}
@@ -286,6 +296,7 @@ func TestMediaInfo_GetAudioLanguages(t *testing.T) {
 	}
 
 	want := []string{"de", "en"}
+
 	got := mi.GetAudioLanguages()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("GetAudioLanguages() = %v, want %v", got, want)
@@ -303,6 +314,7 @@ func TestMediaInfo_GetSubtitleLanguages(t *testing.T) {
 	}
 
 	want := []string{"de", "en"}
+
 	got := mi.GetSubtitleLanguages()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("GetSubtitleLanguages() = %v, want %v", got, want)
@@ -385,6 +397,7 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 			}
 			meta := &metadata.Metadata{}
 			mi.SetLanguageTag(meta)
+
 			if got := strings.Trim(meta.Language+"."+meta.LanguageExt, "."); got != tt.want {
 				t.Errorf("GetLanguageTag() = %v, want %v", got, tt.want)
 			}

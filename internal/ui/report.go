@@ -11,20 +11,24 @@ func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 	if report.Passed {
 		Println("\n" + IconCheck + Success.Render(" All systems nominal! The file fits the specification."))
 		Println()
+
 		return
 	}
 
 	// Calculate shared column widths across all tracks to ensure table alignment
 	var allTracks []types.TrackCheckResult
+
 	for _, group := range report.Issues {
 		for _, res := range group.Results {
 			allTracks = append(allTracks, res.Tracks...)
 		}
 	}
+
 	sharedWidths := CalculateTrackTableWidths(allTracks)
 
 	totalIssues := CountIssues(report.Issues)
 	Println("\n" + IconCross + Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
+
 	for _, group := range report.Issues {
 		count := len(group.Results)
 		if !unattended {
@@ -34,6 +38,7 @@ func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 		}
 
 		Println(ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
+
 		for _, res := range group.Results {
 			switch res.Severity {
 			case "error":
@@ -41,6 +46,7 @@ func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 			default:
 				PrintWarning(res.Warning)
 			}
+
 			if len(res.Tracks) == 0 {
 				printUnexpectedDiff(res)
 				continue
@@ -49,6 +55,7 @@ func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 			Println(FormatTrackTable(res.Tracks, sharedWidths))
 		}
 	}
+
 	Println()
 }
 
@@ -63,6 +70,7 @@ func printUnexpectedDiff(res types.CheckResult) {
 		} else if res.Identifier == "filename_generation_mismatch" {
 			labelE, labelA = "Original", "Generated"
 		}
+
 		indent := "   "
 		diff := FormatStringDiffAligned(labelE, res.Expected, labelA, res.Actual)
 		indentedDiff := indent + strings.ReplaceAll(diff, "\n", "\n"+indent)
@@ -75,5 +83,6 @@ func CountIssues(groups []types.IssueGroup) int {
 	for _, group := range groups {
 		count += len(group.Results)
 	}
+
 	return count
 }

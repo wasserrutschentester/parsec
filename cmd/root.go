@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,8 +28,11 @@ var rootCmd = &cobra.Command{
 		if ui.IsSilent {
 			ui.DisableColors()
 		}
+
 		ui.IsDebug = debugFlag
+
 		ui.PrintDebug("Debug output enabled")
+
 		config.NoCache = noCacheFlag
 
 		initConfig()
@@ -71,6 +75,7 @@ func init() {
 	cobra.AddTemplateFunc("filterFlags", func(fs *pflag.FlagSet, key, value string) *pflag.FlagSet {
 		newFs := pflag.NewFlagSet(value, pflag.ContinueOnError)
 		newFs.SortFlags = false
+
 		fs.VisitAll(func(f *pflag.Flag) {
 			if v, ok := f.Annotations[key]; ok {
 				for _, s := range v {
@@ -81,23 +86,28 @@ func init() {
 				}
 			}
 		})
+
 		return newFs
 	})
 	cobra.AddTemplateFunc("ungroupedFlags", func(fs *pflag.FlagSet) *pflag.FlagSet {
 		newFs := pflag.NewFlagSet("other", pflag.ContinueOnError)
 		newFs.SortFlags = false
+
 		fs.VisitAll(func(f *pflag.Flag) {
 			if _, ok := f.Annotations["group"]; !ok {
 				newFs.AddFlag(f)
 			}
 		})
+
 		return newFs
 	})
 	cobra.AddTemplateFunc("hasFlags", func(fs *pflag.FlagSet) bool {
 		has := false
+
 		fs.VisitAll(func(f *pflag.Flag) {
 			has = true
 		})
+
 		return has
 	})
 
@@ -163,13 +173,17 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 func tryLoadConfig(names ...string) bool {
 	for _, name := range names {
 		viper.SetConfigName(name)
+
 		if err := viper.ReadInConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			var configFileNotFoundError viper.ConfigFileNotFoundError
+			if !errors.As(err, &configFileNotFoundError) {
 				configPath := viper.ConfigFileUsed()
 				if configPath == "" {
 					configPath = name
 				}
+
 				ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(configPath), err))
+
 				return true // Stop trying if we found a file but it's broken
 			}
 			// If it's just not found, continue to the next name
@@ -177,12 +191,14 @@ func tryLoadConfig(names ...string) bool {
 			return true // Successfully read a config, stop trying
 		}
 	}
+
 	return false
 }
 
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
+
 		if err := viper.ReadInConfig(); err != nil {
 			ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(cfgFile), err))
 		}
@@ -214,6 +230,7 @@ func initConfig() {
 
 	if presetFlag != "" {
 		config.SetPreset(presetFlag)
+
 		if !config.PresetExists(presetFlag) {
 			ui.PrintWarning(fmt.Sprintf("Preset '%s' does not exist in your configuration", presetFlag))
 		} else {

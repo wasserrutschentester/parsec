@@ -62,7 +62,9 @@ func parseTvdbID(m *tvdbMedia) int {
 				id, _ := strconv.Atoi(parts[len(parts)-1])
 				return id
 			}
+
 			id, _ := strconv.Atoi(v)
+
 			return id
 		}
 	}
@@ -72,6 +74,7 @@ func parseTvdbID(m *tvdbMedia) int {
 
 func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 	tvdbID := parseTvdbID(m)
+
 	resYear := 0
 	if len(m.Year) >= 4 {
 		resYear, _ = strconv.Atoi(m.Year[:4])
@@ -172,6 +175,7 @@ func login() (string, error) {
 	}
 
 	authData := map[string]string{"apikey": apiKey}
+
 	jsonData, err := json.Marshal(authData)
 	if err != nil {
 		return "", err
@@ -201,6 +205,7 @@ func login() (string, error) {
 func getISO3(lang string) string {
 	tag := language.Make(lang)
 	base, _ := tag.Base()
+
 	return base.ISO3()
 }
 
@@ -210,6 +215,7 @@ func get(endpoint string, target interface{}) error {
 
 func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
 	prefLang := config.GetPreferredLanguage()
+
 	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
 	if cached, err := cache.Get(cacheKey); err == nil {
 		return json.Unmarshal(cached, target)
@@ -221,10 +227,12 @@ func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
 	}
 
 	u := fmt.Sprintf("%s/%s", BaseURL, endpoint)
-	req, err := http.NewRequest("GET", u, nil)
+
+	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	if prefLang != "" {
@@ -240,10 +248,12 @@ func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusUnauthorized {
 			_ = cache.Remove("tvdb_token")
+
 			if allowRetry {
 				return getWithRetry(endpoint, target, false)
 			}
 		}
+
 		return fmt.Errorf("TVDB API returned status %d", resp.StatusCode)
 	}
 
@@ -270,6 +280,7 @@ func toTvdbType(mediaType string) string {
 
 func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	tvdbType := toTvdbType(mediaType)
+
 	endpoint := fmt.Sprintf("search?query=%s&type=%s", query, tvdbType)
 	if year > 0 {
 		endpoint = fmt.Sprintf("%s&year=%d", endpoint, year)
@@ -311,6 +322,7 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 	}
 
 	var r *tvdbMedia
+
 	actualType := ""
 
 	if mediaType == "tv" {
@@ -318,6 +330,7 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 			if item.Series != nil {
 				r = item.Series
 				actualType = "series"
+
 				break
 			}
 		}
@@ -326,6 +339,7 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 			if item.Movie != nil {
 				r = item.Movie
 				actualType = "movies"
+
 				break
 			}
 		}
@@ -337,10 +351,12 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 			if item.Series != nil {
 				r = item.Series
 				actualType = "series"
+
 				break
 			} else if item.Movie != nil {
 				r = item.Movie
 				actualType = "movies"
+
 				break
 			}
 		}
@@ -378,6 +394,7 @@ func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
 	if translation.Data.Name != "" {
 		result.Title = translation.Data.Name
 	}
+
 	if translation.Data.Overview != "" {
 		result.Overview = translation.Data.Overview
 	}
@@ -385,6 +402,7 @@ func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
 
 func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	endpoint := toTvdbType(mediaType)
+
 	var data struct {
 		Data tvdbMedia `json:"data"`
 	}
@@ -398,6 +416,7 @@ func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	if result.TvdbType == "" {
 		result.TvdbType = endpoint
 	}
+
 	result.IsTV = endpoint == "series"
 
 	applyTranslation(&result, tvdbID, endpoint)
@@ -419,12 +438,15 @@ type tvdbTranslationResponse struct {
 func GetTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse, error) {
 	tvdbType := toTvdbType(mediaType)
 	iso3 := getISO3(lang)
+
 	var data tvdbTranslationResponse
+
 	endpoint := fmt.Sprintf("%s/%d/translations/%s", tvdbType, tvdbID, iso3)
 
 	if err := get(endpoint, &data); err != nil {
 		return tvdbTranslationResponse{}, err
 	}
+
 	return data, nil
 }
 
@@ -448,6 +470,7 @@ func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 				result.ImdbID = ext.ID
 			case "TheMovieDB.com", "TMDB":
 				tmdbID, _ := strconv.Atoi(ext.ID)
+
 				result.TmdbID = tmdbID
 				if result.IsTV {
 					result.TmdbType = "tv"
@@ -461,15 +484,18 @@ func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 
 func GetExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, error) {
 	endpoint := toTvdbType(mediaType)
+
 	var data tvdbExternalIDsResponse
 	if err := get(fmt.Sprintf("%s/%d/extended", endpoint, tvdbID), &data); err != nil {
 		return tvdbExternalIDsResponse{}, err
 	}
+
 	return data, nil
 }
 
 func GetEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	var data tvdbEpisodeResponse
+
 	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
 	if lang != "" {
 		endpoint = fmt.Sprintf("%s/%s", endpoint, lang)
@@ -478,21 +504,25 @@ func GetEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	if err := get(fmt.Sprintf("%s?page=%d", endpoint, page), &data); err != nil {
 		return tvdbEpisodeResponse{}, err
 	}
+
 	return data, nil
 }
 
 func GetAllEpisodes(seriesID int, lang string) ([]TvdbEpisode, error) {
 	var episodes []TvdbEpisode
+
 	for page := 0; page < 20; page++ {
 		data, err := GetEpisodes(seriesID, page, lang)
 		if err != nil {
 			break
 		}
+
 		episodes = append(episodes, data.Data.Episodes...)
 		if data.Links.Next == "" {
 			break
 		}
 	}
+
 	return episodes, nil
 }
 
@@ -508,6 +538,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		if err != nil {
 			continue
 		}
+
 		ui.PrintDebug(fmt.Sprintf("found %d episodes combined", len(episodes)))
 
 		var ep *TvdbEpisode
@@ -527,13 +558,16 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		if normalizedQueryTitle != "" && ep == nil {
 			ep = matchByTitleFuzzy(episodes, normalizedQueryTitle)
 		}
+
 		if ep != nil {
 			res := ep.toEpisodeResult()
 			ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
 			fillEpisodeTranslation(&res, ep.ID, lang)
+
 			return res, nil
 		}
 	}
+
 	return mdb.EpisodeResult{}, fmt.Errorf("no episode found")
 }
 
@@ -543,6 +577,7 @@ func matchBySeasonEpisode(episodes []TvdbEpisode, season, episode int) *TvdbEpis
 			return &ep
 		}
 	}
+
 	return nil
 }
 
@@ -552,9 +587,11 @@ func matchByAirDate(episodes []TvdbEpisode, date string, allowSpecials bool) *Tv
 			if ep.SeasonNumber == 0 && !allowSpecials {
 				continue
 			}
+
 			return &ep
 		}
 	}
+
 	return nil
 }
 
@@ -564,16 +601,20 @@ func matchByTitle(episodes []TvdbEpisode, normTitle string, allowSpecials bool) 
 			if ep.SeasonNumber == 0 && !allowSpecials {
 				continue
 			}
+
 			return &ep
 		}
 	}
+
 	return nil
 }
 
 func matchByTitleFuzzy(episodes []TvdbEpisode, normTitle string) *TvdbEpisode {
 	var bestMatch TvdbEpisode
+
 	maxSim := 0.0
 	found := false
+
 	for _, ep := range episodes {
 		sim := mdb.CalculateSimilarity(normTitle, metadata.Normalize(ep.Name))
 		if sim > maxSim {
@@ -586,6 +627,7 @@ func matchByTitleFuzzy(episodes []TvdbEpisode, normTitle string) *TvdbEpisode {
 	if found && maxSim > 0.8 {
 		return &bestMatch
 	}
+
 	return nil
 }
 
@@ -597,10 +639,12 @@ func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 
 	translation, err := GetTranslation(tvdbID, "episodes", lang)
 	ui.PrintDebug(fmt.Sprintf("translation: %+v, err: %v", translation, err))
+
 	if err == nil {
 		if translation.Data.Name != "" {
 			res.Name = translation.Data.Name
 		}
+
 		if translation.Data.Overview != "" {
 			res.Overview = translation.Data.Overview
 		}
@@ -609,13 +653,16 @@ func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 
 func isLanguageMatch(lang string, targets ...string) bool {
 	tag := language.Make(lang)
+
 	for _, target := range targets {
 		if target == "" {
 			continue
 		}
+
 		if tag == language.Make(target) {
 			return true
 		}
 	}
+
 	return false
 }
