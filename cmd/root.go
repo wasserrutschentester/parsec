@@ -157,6 +157,29 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 `)
 }
 
+// tryLoadConfig attempts to load the configuration using the provided names.
+// It returns true if a config was successfully loaded or if a parsing error occurred
+// (in which case it prints the error and stops further searching).
+func tryLoadConfig(names ...string) bool {
+	for _, name := range names {
+		viper.SetConfigName(name)
+		if err := viper.ReadInConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				configPath := viper.ConfigFileUsed()
+				if configPath == "" {
+					configPath = name
+				}
+				ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(configPath), err))
+				return true // Stop trying if we found a file but it's broken
+			}
+			// If it's just not found, continue to the next name
+		} else {
+			return true // Successfully read a config, stop trying
+		}
+	}
+	return false
+}
+
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -164,32 +187,20 @@ func initConfig() {
 			ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(cfgFile), err))
 		}
 	} else {
-		// Set search paths
+		// Set search paths (only system dir initially)
 		confDir, err := os.UserConfigDir()
 		if err == nil {
 			viper.AddConfigPath(filepath.Join(confDir, "parsec"))
 		}
-		viper.AddConfigPath(".")
 
 		// Set preferred type to TOML
 		viper.SetConfigType("toml")
 
-		// Try preferred names in order
-		for _, name := range []string{"config", ".parsec"} {
-			viper.SetConfigName(name)
-			if err := viper.ReadInConfig(); err != nil {
-				if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-					configPath := viper.ConfigFileUsed()
-					if configPath == "" {
-						configPath = name
-					}
-					ui.PrintError(fmt.Sprintf("Error reading config file %s: %v", ui.AnonymizePath(configPath), err))
-					break // Stop trying if we found a file but it's broken
-				}
-				// If it's just not found, continue to the next name
-			} else {
-				break // Successfully read a config, stop trying
-			}
+		// 1. Try 'config' (only in system config dir)
+		if !tryLoadConfig("config") {
+			// 2. If not found, allow searching in the current directory for parsec specific names
+			viper.AddConfigPath(".")
+			tryLoadConfig("parsec.toml", ".parsec")
 		}
 	}
 

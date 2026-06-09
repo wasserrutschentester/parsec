@@ -3,7 +3,7 @@
 Parsec uses a TOML-based configuration system. By default, it looks for a configuration file in the following locations:
 
 1.  `$HOME/.config/parsec/config.toml` (Linux/macOS) or `%AppData%\parsec\config.toml` (Windows)
-2.  `config.toml` in the current working directory
+2.  `parsec.toml` in the current working directory or the config directory
 3.  `.parsec.toml` in the current working directory
 
 ## Managing Configuration
