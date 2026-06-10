@@ -1,6 +1,7 @@
 package prowlarr
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,7 +78,7 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 		categories = config.GetProwlarrTvCategories()
 	}
 
-	allResults, err := performParallelSearch(queries, mediaType, categories, season, episode)
+	allResults, err := performParallelSearch(queries, mediaType, categories)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +86,7 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 	return filterFalsePositives(allResults, imdbID, tmdbID, tvdbID), nil
 }
 
-func performParallelSearch(queries []string, mediaType string, categories []int, season, episode int) ([]ReleaseResource, error) {
+func performParallelSearch(queries []string, mediaType string, categories []int) ([]ReleaseResource, error) {
 	prowlarrUrl := config.GetProwlarrUrl()
 	apiKey := config.GetProwlarrApiKey()
 	indexerIds := config.GetProwlarrIndexers()
@@ -195,7 +196,7 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 
 	start := time.Now()
 
-	req, err := http.NewRequest(http.MethodGet, searchURL.String(), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, searchURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -365,7 +366,7 @@ func GetBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseRes
 		}
 	}
 
-	var best []ReleaseResource
+	best := make([]ReleaseResource, 0, len(bestPerIndexer))
 	for _, r := range bestPerIndexer {
 		best = append(best, r)
 	}
@@ -376,7 +377,7 @@ func GetBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseRes
 func RenderReleasesTable(results []ReleaseResource) string {
 	headers := []string{"Indexer", "Source", "Res", "Group", "Size", "Seeders", "Age", "Info"}
 
-	var rows [][]string
+	rows := make([][]string, 0, len(results))
 
 	for _, r := range results {
 		age := ""

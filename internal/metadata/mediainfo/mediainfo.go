@@ -2,6 +2,7 @@ package mediainfo
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -188,7 +189,7 @@ func Get(filePath string) (*MediaInfo, error) {
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Executing: mediainfo --Output=JSON --ParseSpeed=0 %s", ui.AnonymizePath(filePath)))
-	cmd := exec.Command("mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
+	cmd := exec.CommandContext(context.Background(), "mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
 
 	out, err := cmd.Output()
 	if err != nil {
@@ -343,13 +344,14 @@ func (track *Track) detectHDR() string {
 		result = "DV."
 	}
 
-	if strings.Contains(hdr, "HDR10+") {
+	switch {
+	case strings.Contains(hdr, "HDR10+"):
 		result += "HDR10Plus"
-	} else if strings.Contains(hdr, "HDR10") {
+	case strings.Contains(hdr, "HDR10"):
 		result += "HDR"
-	} else if strings.Contains(transfer, "HLG") {
+	case strings.Contains(transfer, "HLG"):
 		result += "HLG"
-	} else if strings.Contains(hdr, "PQ10") || strings.Contains(transfer, "PQ") {
+	case strings.Contains(hdr, "PQ10") || strings.Contains(transfer, "PQ"):
 		result += "PQ10"
 	}
 

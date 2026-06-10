@@ -1,6 +1,7 @@
 package tmdb
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -107,7 +108,12 @@ func get(endpoint string, query url.Values, target interface{}) error {
 	query.Set("api_key", apiKey)
 	u := fmt.Sprintf("%s/%s?%s", BaseURL, endpoint, query.Encode())
 
-	resp, err := HTTPClient.Get(u)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -222,7 +228,7 @@ func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
 	}
 
 	// No strict match found.
-	return nil, nil
+	return nil, mdb.ErrNotFound
 }
 
 func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult {

@@ -1,6 +1,7 @@
 package mdb
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -26,6 +27,8 @@ type SearchResult struct {
 	Similarity       float64
 	Overview         string
 }
+
+var ErrNotFound = errors.New("no result found")
 
 type EpisodeResult struct {
 	Name     string

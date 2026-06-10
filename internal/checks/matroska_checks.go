@@ -199,11 +199,13 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 
 	if props.Default != shouldBeDefault {
 		var warning string
-		if shouldBeDefault {
+
+		switch {
+		case shouldBeDefault:
 			warning = fmt.Sprintf("%s first standard track for %s", ui.Success.Render("[+]"), ui.Warning.Render(props.Language))
-		} else if isSpecialized {
+		case isSpecialized:
 			warning = fmt.Sprintf("%s %s", ui.Error.Render("[-]"), ui.Warning.Render("specialized track"))
-		} else {
+		default:
 			warning = fmt.Sprintf("%s redundant standard track for %s", ui.Error.Render("[-]"), ui.Warning.Render(props.Language))
 		}
 
@@ -376,13 +378,15 @@ func calculateLangScore(lang string, isOriginal bool) int64 {
 	prefTag := language.Make(config.GetPreferredLanguage())
 
 	var langScore int64
-	if tag == prefTag {
+
+	switch {
+	case tag == prefTag:
 		langScore = priorityPreferred
-	} else if isOriginal {
+	case isOriginal:
 		langScore = priorityOriginal
-	} else if tag == language.Make("mul") {
+	case tag == language.Make("mul"):
 		langScore = priorityMul
-	} else {
+	default:
 		langScore = priorityOther
 	}
 
@@ -403,19 +407,21 @@ func calculatePropertyScore(track matroska.EbmlTrack) int64 {
 
 	switch track.Type {
 	case "audio":
-		if track.Properties.Commentary {
+		switch {
+		case track.Properties.Commentary:
 			propertyScore = propScoreCommentary
-		} else if track.Properties.VisualImpaired {
+		case track.Properties.VisualImpaired:
 			propertyScore = propScoreAD
-		} else if track.Properties.TextDescriptions {
+		case track.Properties.TextDescriptions:
 			propertyScore = propScoreDescription
 		}
 	case "subtitles":
-		if track.Properties.Forced {
+		switch {
+		case track.Properties.Forced:
 			propertyScore = propScoreForced
-		} else if track.Properties.HearingImpaired {
+		case track.Properties.HearingImpaired:
 			propertyScore = propScoreSDH
-		} else {
+		default:
 			propertyScore = propScoreStandard
 		}
 		// text subs should be before image based subs

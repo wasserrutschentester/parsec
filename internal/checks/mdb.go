@@ -29,7 +29,7 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 	mdb.PrintCompactResult(*searchResult)
 
 	if config.IsCheckEnabled("mdb_unknown_original_lang") {
-		results = append(results, checkUnknownOriginalLang(mi, searchResult)...)
+		results = append(results, checkUnknownOriginalLang(searchResult)...)
 	}
 
 	if config.IsCheckEnabled("mdb_title") {
@@ -129,7 +129,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 	return results
 }
 
-func checkUnknownOriginalLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
+func checkUnknownOriginalLang(result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
 
 	origLang := result.OriginalLanguage

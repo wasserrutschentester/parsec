@@ -390,7 +390,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 }
 
 func getTrackRows(tracks []types.TrackCheckResult) [][]string {
-	var rows [][]string
+	rows := make([][]string, 0, len(tracks))
 	for _, t := range tracks {
 		rows = append(rows, []string{
 			t.ID,

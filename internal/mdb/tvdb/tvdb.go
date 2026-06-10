@@ -2,6 +2,7 @@ package tvdb
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -181,7 +182,14 @@ func login() (string, error) {
 		return "", err
 	}
 
-	resp, err := HTTPClient.Post(BaseURL+"/login", "application/json", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, BaseURL+"/login", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -228,7 +236,7 @@ func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
 
 	u := fmt.Sprintf("%s/%s", BaseURL, endpoint)
 
-	req, err := http.NewRequest(http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
 	if err != nil {
 		return err
 	}
@@ -320,12 +328,12 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 	}
 
 	if len(data.Data) == 0 {
-		return nil, nil
+		return nil, mdb.ErrNotFound
 	}
 
 	r, actualType := selectBestRemoteMatch(data.Data, mediaType)
 	if r == nil {
-		return nil, nil
+		return nil, mdb.ErrNotFound
 	}
 
 	// Manually set type for toSearchResult

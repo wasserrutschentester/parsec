@@ -2,6 +2,7 @@ package matroska
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -26,7 +27,7 @@ type EbmlTrack struct {
 	Codec      string              `json:"codec,omitempty"`
 	Type       string              `json:"type,omitempty"`
 	Properties EbmlTrackProperties `json:"properties,omitempty"`
-	TypeOrder  int
+	TypeOrder  int                 `json:"-"`
 }
 
 type EbmlTrackProperties struct {
@@ -121,7 +122,7 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Executing: mkvmerge -J %s", ui.AnonymizePath(filePath)))
-	cmd := exec.Command("mkvmerge", "-J", filePath)
+	cmd := exec.CommandContext(context.Background(), "mkvmerge", "-J", filePath)
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -177,7 +178,7 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 		return err
 	}
 
-	tagsXML, err := createTagsXML(filePath, tags)
+	tagsXML, err := createTagsXML(tags)
 	if err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 
 	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --tags global:%s", ui.AnonymizePath(filePath), tagsXML))
 
-	cmd := exec.Command("mkvpropedit", filePath, "--tags", "global:"+tagsXML)
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", filePath, "--tags", "global:"+tagsXML)
 	if err := cmd.Run(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
@@ -197,7 +198,7 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	return nil
 }
 
-func createTagsXML(filePath string, tags mdb.MatroskaTags) (string, error) {
+func createTagsXML(tags mdb.MatroskaTags) (string, error) {
 	mkvTags := mkvTags{
 		Tags: []mkvTag{
 			{

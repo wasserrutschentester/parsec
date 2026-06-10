@@ -30,7 +30,7 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 
 	// 1. Interlaced WEB
 	if config.IsCheckEnabled("mediainfo_interlaced_web") {
-		results = append(results, checkInterlacedWeb(videoTrack, meta, mi)...)
+		results = append(results, checkInterlacedWeb(videoTrack, meta)...)
 	}
 
 	// 2. Non-standard Framerate
@@ -89,7 +89,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 				res.Passed = false
 				res.Severity = "warning"
 				res.Warning = "Dialogue Normalization should be removed for lossless/HRA tracks"
-				res.Tracks = append(res.Tracks, miTrackToResult(track, false, fmt.Sprintf("contains dialnorm: %s", dialnorm)))
+				res.Tracks = append(res.Tracks, miTrackToResult(track, fmt.Sprintf("contains dialnorm: %s", dialnorm)))
 			}
 		}
 	}
@@ -97,7 +97,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 	return []CheckResult{res}
 }
 
-func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata, mi *mediainfo.MediaInfo) []CheckResult {
+func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata) []CheckResult {
 	res := CheckResult{
 		Identifier: "mediainfo_interlaced_web",
 		Passed:     true,
@@ -108,13 +108,13 @@ func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata, mi
 		res.Passed = false
 		res.Severity = "warning"
 		res.Warning = "WEB source should not be Interlaced"
-		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, res.Warning)}
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, res.Warning)}
 	}
 
 	return []CheckResult{res}
 }
 
-func miTrackToResult(t *mediainfo.Track, passed bool, warning string) TrackCheckResult {
+func miTrackToResult(t *mediainfo.Track, warning string) TrackCheckResult {
 	order := 0
 	if t.TypeOrder != nil {
 		order = *t.TypeOrder
@@ -127,7 +127,7 @@ func miTrackToResult(t *mediainfo.Track, passed bool, warning string) TrackCheck
 		Codec:     t.Format,
 		Name:      t.Title,
 		Language:  t.Language,
-		Passed:    passed,
+		Passed:    false,
 		Warning:   warning,
 	}
 }
@@ -163,7 +163,7 @@ func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 
 			res.Warning = "Redundant audio tracks found for the same language"
 			for _, t := range tracks {
-				res.Tracks = append(res.Tracks, miTrackToResult(t, false, "Redundant track"))
+				res.Tracks = append(res.Tracks, miTrackToResult(t, "Redundant track"))
 			}
 		}
 	}
@@ -248,7 +248,7 @@ func checkFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 		res.Passed = false
 		res.Severity = "warning"
 		res.Warning = "Non-standard framerate"
-		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, false, fmt.Sprintf("non-standard %s: %.3f fps", ui.Warning.Render("framerate"), fps))}
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, fmt.Sprintf("non-standard %s: %.3f fps", ui.Warning.Render("framerate"), fps))}
 	}
 
 	return []CheckResult{res}
@@ -269,11 +269,13 @@ func checkBitRate(videoTrack *mediainfo.Track) []CheckResult {
 	height := videoTrack.Height
 
 	threshold := 0
-	if height >= 1080 {
+
+	switch {
+	case height >= 1080:
 		threshold = 2000000 // 2 Mbps
-	} else if height >= 720 {
+	case height >= 720:
 		threshold = 1000000 // 1 Mbps
-	} else if height >= 540 {
+	case height >= 540:
 		threshold = 500000 // 500 kbps
 	}
 
@@ -320,7 +322,7 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 			}
 
 			res.Warning = "Inconsistent track durations"
-			res.Tracks = append(res.Tracks, miTrackToResult(track, false, trackWarning))
+			res.Tracks = append(res.Tracks, miTrackToResult(track, trackWarning))
 		}
 	}
 

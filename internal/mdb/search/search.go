@@ -83,7 +83,7 @@ func promptForResultSelection(results []mdb.SearchResult) (*mdb.SearchResult, er
 
 	headers := []string{"#", "Title", "Year", "Match", "Language"}
 
-	var rows [][]string
+	rows := make([][]string, 0, len(results))
 	for i, r := range results {
 		rows = append(rows, []string{
 			strconv.Itoa(i),
@@ -449,7 +449,7 @@ func initialSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool, mediaType s
 		return tvdb.GetByID(tvdbID, mediaType)
 	}
 
-	return nil, nil
+	return nil, mdb.ErrNotFound
 }
 
 func searchByImdbID(imdbID string, isTV bool, mediaType string) (*mdb.SearchResult, error) {

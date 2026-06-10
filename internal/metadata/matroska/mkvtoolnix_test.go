@@ -17,7 +17,7 @@ func TestCreateTagsXML(t *testing.T) {
 		Tvdb2: "series/456",
 	}
 
-	xmlPath, err := createTagsXML("dummy.mkv", tags)
+	xmlPath, err := createTagsXML(tags)
 	if err != nil {
 		t.Fatalf("createTagsXML failed: %v", err)
 	}
