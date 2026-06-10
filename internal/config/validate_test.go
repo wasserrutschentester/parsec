@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"codeberg.org/upPollo/parsec/internal/ui"
 	"github.com/pelletier/go-toml/v2"
+
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 //nolint:funlen

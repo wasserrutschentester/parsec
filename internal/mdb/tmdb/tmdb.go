@@ -10,10 +10,11 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/text/language"
+
 	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
-	"golang.org/x/text/language"
 )
 
 var (

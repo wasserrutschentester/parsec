@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/ui"
-	"github.com/spf13/cobra"
 )
 
 var configCmd = &cobra.Command{

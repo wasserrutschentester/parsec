@@ -6,8 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"codeberg.org/upPollo/parsec/internal/config"
 	"github.com/spf13/viper"
+
+	"codeberg.org/upPollo/parsec/internal/config"
 )
 
 func TestSearch(t *testing.T) {

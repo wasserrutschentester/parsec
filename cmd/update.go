@@ -6,9 +6,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"codeberg.org/upPollo/parsec/internal/ui"
 	"codeberg.org/upPollo/parsec/internal/update"
-	"github.com/spf13/cobra"
 )
 
 var forceUpdate bool

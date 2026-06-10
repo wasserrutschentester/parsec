@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
@@ -16,7 +18,6 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 	"codeberg.org/upPollo/parsec/internal/ui"
-	"github.com/spf13/cobra"
 )
 
 // renameCmd represents the rename command

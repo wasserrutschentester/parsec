@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
-	"github.com/spf13/viper"
 )
 
 func TestSanitizeUTF8(t *testing.T) {

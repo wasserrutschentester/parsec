@@ -6,10 +6,11 @@ import (
 	"regexp"
 	"strings"
 
-	"codeberg.org/upPollo/parsec/internal/config"
-	"codeberg.org/upPollo/parsec/internal/ui"
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
+
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 // Metadata represents the metadata for a media file.

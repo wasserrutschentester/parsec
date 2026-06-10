@@ -12,11 +12,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/language"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/ui"
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/language"
 )
 
 // SanitizeUTF8Bytes ensures a byte slice is valid UTF-8, converting invalid sequences from Windows-1252.

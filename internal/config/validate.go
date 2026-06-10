@@ -7,9 +7,10 @@ import (
 	"regexp"
 	"strings"
 
-	"codeberg.org/upPollo/parsec/internal/ui"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/text/language"
+
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 // Validate performs a series of checks on the current configuration.

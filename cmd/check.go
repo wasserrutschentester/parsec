@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
@@ -13,8 +15,6 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 	"codeberg.org/upPollo/parsec/internal/types"
 	"codeberg.org/upPollo/parsec/internal/ui"
-
-	"github.com/spf13/cobra"
 )
 
 var jsonOutputFlag bool

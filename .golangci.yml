@@ -34,3 +34,11 @@ linters:
 formatters:
     enable:
         - gofumpt
+        - gci
+
+    settings:
+        gci:
+            sections:
+                - standard
+                - default
+                - prefix(codeberg.org/upPollo/parsec)

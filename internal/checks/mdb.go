@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/text/language"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
-	"golang.org/x/text/language"
 )
 
 // RunMdbChecks performs checks against online media databases (TMDB/TVDB).

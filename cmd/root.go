@@ -6,12 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"codeberg.org/upPollo/parsec/internal/config"
-	"codeberg.org/upPollo/parsec/internal/ui"
-	"codeberg.org/upPollo/parsec/internal/update"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/ui"
+	"codeberg.org/upPollo/parsec/internal/update"
 )
 
 var (

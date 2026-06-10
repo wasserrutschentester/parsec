@@ -5,12 +5,13 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
-	"golang.org/x/text/language"
-	"golang.org/x/text/language/display"
 )
 
 var (

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
