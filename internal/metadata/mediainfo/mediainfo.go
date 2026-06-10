@@ -103,7 +103,7 @@ func (mb *MediaBool) UnmarshalJSON(b []byte) error {
 		// Try unmarshaling as a literal bool
 		var boolean bool
 		if err := json.Unmarshal(b, &boolean); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal MediaBool: %w", err)
 		}
 
 		*mb = MediaBool(boolean)

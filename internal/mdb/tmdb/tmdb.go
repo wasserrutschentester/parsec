@@ -88,6 +88,19 @@ type tmdbEpisodeResponse struct {
 	Overview      string `json:"overview"`
 }
 
+func getFromCache(key string, target interface{}) (bool, error) {
+	cached, err := cache.Get(key)
+	if err != nil {
+		return false, nil
+	}
+
+	if err := json.Unmarshal(cached, target); err != nil {
+		return true, fmt.Errorf("failed to unmarshal cached TMDB response: %w", err)
+	}
+
+	return true, nil
+}
+
 func get(endpoint string, query url.Values, target interface{}) error {
 	apiKey := config.GetTmdbApiKey()
 	if apiKey == "" {
@@ -102,10 +115,9 @@ func get(endpoint string, query url.Values, target interface{}) error {
 		query.Set("language", config.GetPreferredLanguage())
 	}
 
-	// Create cache key without api_key
 	cacheKey := fmt.Sprintf("tmdb:%s?%s", endpoint, query.Encode())
-	if cached, err := cache.Get(cacheKey); err == nil {
-		return json.Unmarshal(cached, target)
+	if ok, err := getFromCache(cacheKey, target); ok {
+		return err
 	}
 
 	query.Set("api_key", apiKey)
@@ -113,14 +125,13 @@ func get(endpoint string, query url.Values, target interface{}) error {
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create TMDB request: %w", err)
 	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("TMDB request failed: %w", err)
 	}
-
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
@@ -129,12 +140,16 @@ func get(endpoint string, query url.Values, target interface{}) error {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read TMDB response body: %w", err)
 	}
 
 	_ = cache.Set(cacheKey, body)
 
-	return json.Unmarshal(body, target)
+	if err := json.Unmarshal(body, target); err != nil {
+		return fmt.Errorf("failed to unmarshal TMDB response: %w", err)
+	}
+
+	return nil
 }
 
 // Search searches for media on TMDB by query and optionally by year.

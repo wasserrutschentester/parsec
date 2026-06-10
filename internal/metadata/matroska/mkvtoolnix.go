@@ -82,7 +82,7 @@ type simple struct {
 func isMatroska(filePath string) (bool, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
@@ -90,7 +90,7 @@ func isMatroska(filePath string) (bool, error) {
 
 	n, err := f.Read(header)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to read file header: %w", err)
 	}
 
 	if n < 4 {

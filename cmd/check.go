@@ -114,7 +114,7 @@ func parseReports(data []byte) ([]types.CheckReport, error) {
 		// Try unmarshaling a single report
 		var singleReport types.CheckReport
 		if err := json.Unmarshal(data, &singleReport); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal single report: %w", err)
 		}
 
 		reports = append(reports, singleReport)

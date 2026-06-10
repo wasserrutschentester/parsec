@@ -87,7 +87,7 @@ func Get(key string) ([]byte, error) {
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to stat cache file: %w", err)
 	}
 
 	if time.Since(info.ModTime()) > cacheDuration {
@@ -95,21 +95,34 @@ func Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("cache expired")
 	}
 
-	return os.ReadFile(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cache file: %w", err)
+	}
+
+	return data, nil
 }
 
 // Set stores data in the cache for the given key.
 func Set(key string, data []byte) error {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		return err
+		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
-	return os.WriteFile(getPath(key), data, 0o644)
+	if err := os.WriteFile(getPath(key), data, 0o644); err != nil {
+		return fmt.Errorf("failed to write cache file: %w", err)
+	}
+
+	return nil
 }
 
 // Remove deletes data from the cache for the given key.
 func Remove(key string) error {
-	return os.Remove(getPath(key))
+	if err := os.Remove(getPath(key)); err != nil {
+		return fmt.Errorf("failed to remove cache file: %w", err)
+	}
+
+	return nil
 }
 
 func getPath(key string) string {

@@ -183,19 +183,19 @@ func login() (string, error) {
 
 	jsonData, err := json.Marshal(authData)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal login data: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, BaseURL+"/login", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create login request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("login request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -205,7 +205,7 @@ func login() (string, error) {
 
 	var data loginResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decode login response: %w", err)
 	}
 
 	// Cache token (cache.Get already handles 6h expiration, but token might be shorter or we want to be safe)
@@ -225,24 +225,25 @@ func get(endpoint string, target interface{}) error {
 	return getWithRetry(endpoint, target, true)
 }
 
-func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
-	prefLang := config.GetPreferredLanguage()
-
-	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
-	if cached, err := cache.Get(cacheKey); err == nil {
-		return json.Unmarshal(cached, target)
-	}
-
-	token, err := login()
+func getFromCache(key string, target interface{}) (bool, error) {
+	cached, err := cache.Get(key)
 	if err != nil {
-		return err
+		return false, nil
 	}
 
+	if err := json.Unmarshal(cached, target); err != nil {
+		return true, fmt.Errorf("failed to unmarshal cached TVDB response: %w", err)
+	}
+
+	return true, nil
+}
+
+func doRequest(endpoint, token, prefLang string) (*http.Response, error) {
 	u := fmt.Sprintf("%s/%s", BaseURL, endpoint)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to create TVDB request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -253,30 +254,53 @@ func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
+		return nil, fmt.Errorf("TVDB request failed: %w", err)
+	}
+
+	return resp, nil
+}
+
+func getWithRetry(endpoint string, target interface{}, allowRetry bool) error {
+	prefLang := config.GetPreferredLanguage()
+	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
+
+	if ok, err := getFromCache(cacheKey, target); ok {
+		return err
+	}
+
+	token, err := login()
+	if err != nil {
+		return err
+	}
+
+	resp, err := doRequest(endpoint, token, prefLang)
+	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == http.StatusUnauthorized && allowRetry {
+		_ = cache.Remove("tvdb_token")
+
+		return getWithRetry(endpoint, target, false)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnauthorized {
-			_ = cache.Remove("tvdb_token")
-
-			if allowRetry {
-				return getWithRetry(endpoint, target, false)
-			}
-		}
-
 		return fmt.Errorf("TVDB API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read TVDB response body: %w", err)
 	}
 
 	_ = cache.Set(cacheKey, body)
 
-	return json.Unmarshal(body, target)
+	if err := json.Unmarshal(body, target); err != nil {
+		return fmt.Errorf("failed to unmarshal TVDB response: %w", err)
+	}
+
+	return nil
 }
 
 func toTvdbType(mediaType string) string {

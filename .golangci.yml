@@ -24,12 +24,17 @@ linters:
         - unparam
         - unconvert
         - revive
+        - wrapcheck
 
     settings:
         revive:
             rules:
                 - name: exported
                   severity: warning
+
+        wrapcheck:
+            ignore-package-globs:
+                - codeberg.org/upPollo/parsec/internal/*
 
 formatters:
     enable:
