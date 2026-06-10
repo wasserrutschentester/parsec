@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+//nolint:paralleltest // depends on shared global state (viper)
 func TestPresets(t *testing.T) {
 	viper.Reset()
 	InitDefaults()
@@ -57,6 +58,7 @@ func TestPresets(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state (viper)
 func TestIsCheckEnabled(t *testing.T) {
 	viper.Reset()
 	InitDefaults()

@@ -8,6 +8,8 @@ import (
 )
 
 func TestCalculateSimilarity(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		s1   string
 		s2   string
@@ -22,14 +24,20 @@ func TestCalculateSimilarity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := mdb.CalculateSimilarity(tt.s1, tt.s2)
-		if (got-tt.want) > 0.001 || (tt.want-got) > 0.001 {
-			t.Errorf("CalculateSimilarity(%q, %q) = %v, want %v", tt.s1, tt.s2, got, tt.want)
-		}
+		t.Run(tt.s1+"_"+tt.s2, func(t *testing.T) {
+			t.Parallel()
+
+			got := mdb.CalculateSimilarity(tt.s1, tt.s2)
+			if (got-tt.want) > 0.001 || (tt.want-got) > 0.001 {
+				t.Errorf("CalculateSimilarity(%q, %q) = %v, want %v", tt.s1, tt.s2, got, tt.want)
+			}
+		})
 	}
 }
 
 func TestAddUniqueAltTitle(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		titles         []string
 		newTitle       string
@@ -44,24 +52,28 @@ func TestAddUniqueAltTitle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := addUniqueAltTitle(tt.titles, tt.newTitle, tt.existingTitles...)
-		if len(got) != len(tt.want) {
-			t.Errorf("addUniqueAltTitle(%v, %q) len = %d, want %d", tt.titles, tt.newTitle, len(got), len(tt.want))
+		t.Run(tt.newTitle, func(t *testing.T) {
+			t.Parallel()
 
-			continue
-		}
+			got := addUniqueAltTitle(tt.titles, tt.newTitle, tt.existingTitles...)
+			if len(got) != len(tt.want) {
+				t.Errorf("addUniqueAltTitle(%v, %q) len = %d, want %d", tt.titles, tt.newTitle, len(got), len(tt.want))
 
-		for i := range got {
-			if got[i] != tt.want[i] {
-				t.Errorf("addUniqueAltTitle(%v, %q) = %v, want %v", tt.titles, tt.newTitle, got, tt.want)
-
-				break
+				return
 			}
-		}
+
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("addUniqueAltTitle(%v, %q) = %v, want %v", tt.titles, tt.newTitle, got, tt.want)
+
+					break
+				}
+			}
+		})
 	}
 }
 
-//nolint:funlen // merging results involves many test cases
+//nolint:funlen,paralleltest // merging results involves many test cases; not easily parallelizable
 func TestMergeResults(t *testing.T) {
 	tmdbResults := []mdb.SearchResult{
 		{

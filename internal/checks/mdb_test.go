@@ -7,6 +7,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckTitle(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -45,6 +46,7 @@ func TestCheckTitle(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckMovieYear(t *testing.T) {
 	tests := []struct {
 		name     string

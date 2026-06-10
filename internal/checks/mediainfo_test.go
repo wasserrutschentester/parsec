@@ -6,6 +6,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckRedundantAudio(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -66,6 +67,7 @@ func TestCheckRedundantAudio(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckResolution(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -122,6 +124,7 @@ func TestCheckResolution(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckFrameRate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -165,6 +168,7 @@ func TestCheckFrameRate(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckBitRate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -205,7 +209,7 @@ func TestCheckBitRate(t *testing.T) {
 	}
 }
 
-//nolint:funlen,cyclop // test cases cover many edge cases in duration checks
+//nolint:funlen,cyclop,paralleltest // test cases cover many edge cases in duration checks; depends on shared global state
 func TestCheckDurations(t *testing.T) {
 	order0 := 0
 	order1 := 1
@@ -284,7 +288,7 @@ func TestCheckDurations(t *testing.T) {
 	}
 }
 
-//nolint:funlen // numerous test cases are needed to cover many codec and normalization combinations
+//nolint:funlen,paralleltest // numerous test cases are needed to cover many codec and normalization combinations; depends on shared global state
 func TestCheckDialogueNormalization(t *testing.T) {
 	tests := []struct {
 		name     string

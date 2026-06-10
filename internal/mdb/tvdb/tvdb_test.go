@@ -12,6 +12,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeByDate(t *testing.T) {
 	config.InitDefaults()
 
@@ -50,6 +51,7 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeByTitle(t *testing.T) {
 	config.InitDefaults()
 
@@ -84,6 +86,7 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 	config.InitDefaults()
 

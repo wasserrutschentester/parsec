@@ -6,6 +6,8 @@ import (
 
 //nolint:cyclop // URL building involves many combinations of IDs, categories, and types
 func TestBuildSearchURL(t *testing.T) {
+	t.Parallel()
+
 	baseURL := "http://localhost:9696"
 	searchQuery := "{TmdbId:123}"
 	mediaType := "movie"
@@ -53,7 +55,8 @@ func TestBuildSearchURL(t *testing.T) {
 	}
 }
 
-func TestSearchLogic(_ *testing.T) {
+func TestSearchLogic(t *testing.T) {
+	t.Parallel()
 	// This is a bit hard to test without mocking the HTTP client or performParallelSearch
 	// but we can at least check if it compiles and the logic for mediaType/categories is correct.
 }

@@ -13,6 +13,8 @@ import (
 )
 
 func TestSanitizeUTF8(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    []byte
@@ -42,6 +44,8 @@ func TestSanitizeUTF8(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := SanitizeUTF8(string(tt.input))
 			if got != tt.expected {
 				t.Errorf("SanitizeUTF8() = %q, want %q", got, tt.expected)
@@ -52,6 +56,8 @@ func TestSanitizeUTF8(t *testing.T) {
 
 //nolint:cyclop // complex nested JSON structure used for unmarshalling tests
 func TestMediaInfo_UnmarshalFields(t *testing.T) {
+	t.Parallel()
+
 	jsonData := `{
 		"media": {
 			"track": [
@@ -105,6 +111,8 @@ func TestMediaInfo_UnmarshalFields(t *testing.T) {
 
 //nolint:funlen // large embedded JSON string is needed for comprehensive unmarshalling tests
 func TestMediaInfo_Unmarshal(t *testing.T) {
+	t.Parallel()
+
 	jsonData := `{
 		"creatingLibrary": {
 			"name": "MediaInfoLib",
@@ -178,6 +186,8 @@ func TestMediaInfo_Unmarshal(t *testing.T) {
 }
 
 func TestExtra_GetString(t *testing.T) {
+	t.Parallel()
+
 	e := Extra{
 		"stringKey": "stringValue",
 		"floatKey":  float64(123),
@@ -196,6 +206,8 @@ func TestExtra_GetString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
+			t.Parallel()
+
 			if got := e.GetString(tt.key); got != tt.want {
 				t.Errorf("GetString(%q) = %q, want %q", tt.key, got, tt.want)
 			}
@@ -205,6 +217,8 @@ func TestExtra_GetString(t *testing.T) {
 
 //nolint:funlen // test cases cover various combinations of database IDs and types
 func TestMediaInfo_GetMdbIDs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		extra    Extra
@@ -255,6 +269,8 @@ func TestMediaInfo_GetMdbIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mi := &MediaInfo{
 				Media: Media{
 					Tracks: []Track{
@@ -287,6 +303,8 @@ func TestMediaInfo_GetMdbIDs(t *testing.T) {
 }
 
 func TestMediaInfo_GetAudioLanguages(t *testing.T) {
+	t.Parallel()
+
 	mi := &MediaInfo{
 		Media: Media{
 			Tracks: []Track{
@@ -308,6 +326,8 @@ func TestMediaInfo_GetAudioLanguages(t *testing.T) {
 }
 
 func TestMediaInfo_GetSubtitleLanguages(t *testing.T) {
+	t.Parallel()
+
 	mi := &MediaInfo{
 		Media: Media{
 			Tracks: []Track{
@@ -325,7 +345,7 @@ func TestMediaInfo_GetSubtitleLanguages(t *testing.T) {
 	}
 }
 
-//nolint:funlen // test cases for language tagging involve many scenarios and track combinations
+//nolint:funlen,paralleltest // test cases for language tagging involve many scenarios and track combinations; depends on shared global state (viper, config.InitDefaults)
 func TestMediaInfo_GetLanguageTag(t *testing.T) {
 	config.InitDefaults() // preferred_language = "de"
 
@@ -411,6 +431,8 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 }
 
 func TestMediaInfo_GetMetadata(t *testing.T) {
+	t.Parallel()
+
 	mi := &MediaInfo{
 		Media: Media{
 			Tracks: []Track{
@@ -451,6 +473,8 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 }
 
 func TestTrack_detectHDR(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		track    Track
@@ -496,6 +520,8 @@ func TestTrack_detectHDR(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if got := tt.track.detectHDR(); got != tt.expected {
 				t.Errorf("detectHDR() = %v, want %v", got, tt.expected)
 			}

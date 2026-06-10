@@ -7,6 +7,8 @@ import (
 )
 
 func TestNormalize(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input string
 		want  string
@@ -20,6 +22,8 @@ func TestNormalize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			if got := Normalize(tt.input); got != tt.want {
 				t.Errorf("Normalize(%q) = %q, want %q", tt.input, got, tt.want)
 			}
@@ -28,6 +32,8 @@ func TestNormalize(t *testing.T) {
 }
 
 func TestLanguageName(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		lang string
 		want string
@@ -39,6 +45,8 @@ func TestLanguageName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.lang, func(t *testing.T) {
+			t.Parallel()
+
 			if got := LanguageName(tt.lang); got != tt.want {
 				t.Errorf("LanguageName() = %v, want %v", got, tt.want)
 			}
@@ -47,6 +55,8 @@ func TestLanguageName(t *testing.T) {
 }
 
 func TestChanToNotation(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		channels int
 		want     string
@@ -61,6 +71,8 @@ func TestChanToNotation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(string(rune(tt.channels)), func(t *testing.T) {
+			t.Parallel()
+
 			if got := ChanToNotation(tt.channels); got != tt.want {
 				t.Errorf("ChanToNotation(%d) = %v, want %v", tt.channels, got, tt.want)
 			}
@@ -69,6 +81,8 @@ func TestChanToNotation(t *testing.T) {
 }
 
 func TestAudioCodecName(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		format   string
 		profile  string
@@ -97,6 +111,8 @@ func TestAudioCodecName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.format+"_"+tt.profile+"_"+tt.features, func(t *testing.T) {
+			t.Parallel()
+
 			if got := AudioCodecName(tt.format, tt.profile, tt.features); got != tt.want {
 				t.Errorf("AudioCodecName(%s, %s, %s) = %v, want %v", tt.format, tt.profile, tt.features, got, tt.want)
 			}
@@ -104,6 +120,7 @@ func TestAudioCodecName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state (config.InitDefaults)
 func TestVideoCodecName(t *testing.T) {
 	config.InitDefaults()
 
@@ -131,6 +148,8 @@ func TestVideoCodecName(t *testing.T) {
 }
 
 func TestHeightToResolution(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		height    int
@@ -153,6 +172,8 @@ func TestHeightToResolution(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if got := HeightToResolution(tt.height, tt.scanType, tt.frameRate); got != tt.want {
 				t.Errorf("HeightToResolution(%d, %s, %f) = %v, want %v", tt.height, tt.scanType, tt.frameRate, got, tt.want)
 			}
@@ -160,6 +181,7 @@ func TestHeightToResolution(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state (config.InitDefaults)
 func TestMetadata_SetDefaults(t *testing.T) {
 	config.InitDefaults()
 
@@ -175,7 +197,7 @@ func TestMetadata_SetDefaults(t *testing.T) {
 	}
 }
 
-//nolint:funlen // many test cases needed for different formatting combinations
+//nolint:funlen,paralleltest // many test cases needed for different formatting combinations; depends on shared global state (config.InitDefaults)
 func TestMetadata_String(t *testing.T) {
 	tests := []struct {
 		name string
@@ -260,6 +282,8 @@ func TestMetadata_String(t *testing.T) {
 }
 
 func TestMetadata_Override(t *testing.T) {
+	t.Parallel()
+
 	meta := &Metadata{
 		Title:  "Old",
 		Year:   2000,

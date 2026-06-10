@@ -11,6 +11,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 )
 
+//nolint:paralleltest // depends on shared global state (viper, BaseURL)
 func TestSearch(t *testing.T) {
 	// Provide dummy API key
 	viper.Set("api_keys.tmdb", "dummy_key")
@@ -62,6 +63,7 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state (viper, BaseURL)
 func TestGetByIDLocalization(t *testing.T) {
 	config.InitDefaults()
 	viper.Set("api_keys.tmdb", "dummy_key")

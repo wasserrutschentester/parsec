@@ -3,6 +3,8 @@ package update
 import "testing"
 
 func TestIsNewer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		latest  string
 		current string
@@ -35,6 +37,8 @@ func TestIsNewer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.latest+" vs "+tt.current, func(t *testing.T) {
+			t.Parallel()
+
 			if got := IsNewer(tt.latest, tt.current); got != tt.want {
 				t.Errorf("IsNewer(%q, %q) = %v, want %v", tt.latest, tt.current, got, tt.want)
 			}

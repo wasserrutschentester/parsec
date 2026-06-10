@@ -7,6 +7,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckAllowedCharacters(t *testing.T) {
 	tests := []struct {
 		filename string
@@ -27,6 +28,7 @@ func TestCheckAllowedCharacters(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestCheckCharacterSequences(t *testing.T) {
 	tests := []struct {
 		filename string
@@ -47,7 +49,7 @@ func TestCheckCharacterSequences(t *testing.T) {
 	}
 }
 
-//nolint:funlen // comprehensive test cases for filename parsing
+//nolint:funlen,paralleltest // comprehensive test cases for filename parsing; depends on shared global state
 func TestRunFilenameChecks(t *testing.T) {
 	config.InitDefaults()
 

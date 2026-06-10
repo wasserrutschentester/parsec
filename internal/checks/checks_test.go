@@ -5,6 +5,8 @@ import (
 )
 
 func TestNormalizeForComparison(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input string
 		want  string

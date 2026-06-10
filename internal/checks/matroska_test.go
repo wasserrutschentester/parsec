@@ -8,7 +8,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
-//nolint:funlen // comprehensive test cases for diverse matroska track configurations
+//nolint:funlen,paralleltest // comprehensive test cases for diverse matroska track configurations; depends on shared global state
 func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
 
@@ -249,6 +249,7 @@ func TestRunTrackChecks(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestGetTrackPriority(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -304,6 +305,7 @@ func TestGetTrackPriority(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global state
 func TestRunTrackChecksMultiTrack(t *testing.T) {
 	config.InitDefaults()
 

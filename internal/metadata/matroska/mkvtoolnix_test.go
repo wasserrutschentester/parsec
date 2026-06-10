@@ -9,6 +9,8 @@ import (
 )
 
 func TestCreateTagsXML(t *testing.T) {
+	t.Parallel()
+
 	tags := mdb.MatroskaTags{
 		Title: "Test Movie",
 		Imdb:  "tt1234567",
@@ -64,6 +66,8 @@ func TestCreateTagsXML(t *testing.T) {
 }
 
 func TestCountTypes(t *testing.T) {
+	t.Parallel()
+
 	metadata := &EbmlMetadata{
 		Tracks: []EbmlTrack{
 			{Type: "video"},

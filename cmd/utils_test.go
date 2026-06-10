@@ -8,6 +8,8 @@ import (
 
 //nolint:funlen,cyclop // test cases are numerous and involve setup/teardown
 func TestExpandArgs(t *testing.T) {
+	t.Parallel()
+
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "parsec-test-*")
 	if err != nil {

@@ -28,9 +28,10 @@ linters:
         - modernize
         - perfsprint
         - nlreturn
-
         - nolintlint
         - err113
+        - paralleltest
+        # - gosec
 
     settings:
         wrapcheck:

@@ -35,6 +35,8 @@ func runTableTest[T any](t *testing.T, tests []struct {
 ) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			got := fn(tt.input)
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("Differences found:\n%s", compare(got, tt.expected))
@@ -47,6 +49,8 @@ func runTableTest[T any](t *testing.T, tests []struct {
 //
 //nolint:funlen // long list of test cases is required to cover various naming conventions
 func TestParse(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected metadata.Metadata
@@ -482,6 +486,8 @@ func TestParse(t *testing.T) {
 }
 
 func TestDeobfuscateTitle(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected string
@@ -507,6 +513,8 @@ func TestDeobfuscateTitle(t *testing.T) {
 }
 
 func TestNormalizeTitle(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected string
@@ -532,6 +540,8 @@ func TestNormalizeTitle(t *testing.T) {
 }
 
 func TestNormalizeService(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected string

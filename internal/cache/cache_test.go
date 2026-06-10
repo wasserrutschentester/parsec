@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+//nolint:paralleltest // modifies package-level state (cacheDir)
 func TestCache(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "parsec-test-cache")
 	if err != nil {
@@ -63,6 +64,7 @@ func TestCache(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies package-level state (cacheDir)
 func TestCleanup(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "parsec-test-cleanup")
 	if err != nil {
