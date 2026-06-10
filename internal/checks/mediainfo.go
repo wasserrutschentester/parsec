@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/config"
@@ -11,7 +12,8 @@ import (
 )
 
 // RunMediaInfoChecks performs checks based on technical metadata from MediaInfo.
-// nolint:cyclop
+//
+//nolint:cyclop
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var (
 		results    []CheckResult
@@ -21,6 +23,7 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 	for i := range mi.Media.Tracks {
 		if mi.Media.Tracks[i].Type == "Video" {
 			videoTrack = &mi.Media.Tracks[i]
+
 			break
 		}
 	}
@@ -90,7 +93,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 				res.Passed = false
 				res.Severity = "warning"
 				res.Warning = "Dialogue Normalization should be removed for lossless/HRA tracks"
-				res.Tracks = append(res.Tracks, miTrackToResult(track, fmt.Sprintf("contains dialnorm: %s", dialnorm)))
+				res.Tracks = append(res.Tracks, miTrackToResult(track, "contains dialnorm: "+dialnorm))
 			}
 		}
 	}
@@ -197,14 +200,7 @@ func checkResolution(videoTrack *mediainfo.Track) []CheckResult {
 
 	// 2. Standard Widths (common for scene/P2P)
 	standardWidths := []int{3840, 1920, 1280, 1024, 960, 854, 768, 720, 640}
-	isStandardWidth := false
-
-	for _, w := range standardWidths {
-		if width == w {
-			isStandardWidth = true
-			break
-		}
-	}
+	isStandardWidth := slices.Contains(standardWidths, width)
 
 	if !isStandardWidth {
 		trackWarnings = append(trackWarnings, "non-standard width")
@@ -241,6 +237,7 @@ func checkFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 	for _, s := range standardFPS {
 		if (fps > s-0.1) && (fps < s+0.1) {
 			isStandard = true
+
 			break
 		}
 	}

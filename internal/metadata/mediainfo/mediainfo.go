@@ -71,7 +71,7 @@ type Media struct {
 }
 
 // Extra represents the extra fields in a MediaInfo track.
-type Extra map[string]interface{}
+type Extra map[string]any
 
 // GetString returns the value of the extra field with the given key as a string.
 func (e Extra) GetString(key string) string {
@@ -197,7 +197,7 @@ func Get(filePath string) (*MediaInfo, error) {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mediainfo --Output=JSON --ParseSpeed=0 %s", ui.AnonymizePath(filePath)))
+	ui.PrintDebug("Executing: mediainfo --Output=JSON --ParseSpeed=0 " + ui.AnonymizePath(filePath))
 	cmd := exec.CommandContext(context.Background(), "mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
 
 	out, err := cmd.Output()
@@ -217,11 +217,11 @@ func Get(filePath string) (*MediaInfo, error) {
 	}
 
 	if !mi.isVideo() {
-		return nil, fmt.Errorf("no video track found")
+		return nil, errors.New("no video track found")
 	}
 
 	if !mi.hasAudio() {
-		return nil, fmt.Errorf("no audio track found")
+		return nil, errors.New("no audio track found")
 	}
 
 	return &mi, nil
@@ -288,6 +288,7 @@ func parseID(val string) (int, string) {
 	parts := strings.Split(val, "/")
 	if len(parts) > 1 {
 		id, _ := strconv.Atoi(parts[1])
+
 		return id, parts[0]
 	}
 

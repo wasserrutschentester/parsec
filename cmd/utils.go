@@ -15,6 +15,7 @@ func expandArgs(args []string) []string {
 		info, err := os.Stat(arg)
 		if err != nil {
 			expanded = append(expanded, arg)
+
 			continue
 		}
 

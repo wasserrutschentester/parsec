@@ -237,6 +237,7 @@ func TestRunTrackChecks(t *testing.T) {
 			for _, r := range res {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}

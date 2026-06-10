@@ -56,6 +56,7 @@ func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
 
 		if len(res.Tracks) == 0 {
 			printUnexpectedDiff(res)
+
 			continue
 		}
 

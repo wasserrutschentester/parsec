@@ -27,7 +27,7 @@ func TestValidate(t *testing.T) {
 
 		data, _ := os.ReadFile(confPath)
 
-		var configMap map[string]interface{}
+		var configMap map[string]any
 
 		_ = toml.Unmarshal(data, &configMap)
 
@@ -57,7 +57,7 @@ template = "{year}{bad_token}"
 enabled_checks = ["mediainfo_bitrate", "unknown_identifier"]
 `
 
-		var configMap map[string]interface{}
+		var configMap map[string]any
 
 		_ = toml.Unmarshal([]byte(badConfig), &configMap)
 

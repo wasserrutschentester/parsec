@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -89,7 +90,7 @@ func ChanToNotation(channels int) string {
 	case 8:
 		return "7.1"
 	default:
-		return fmt.Sprintf("%d", channels)
+		return strconv.Itoa(channels)
 	}
 }
 
@@ -351,7 +352,7 @@ func (meta *Metadata) setTypeDefaults() {
 // GetReleaseName returns the full release name generated from metadata.
 func (meta *Metadata) GetReleaseName() string {
 	template := config.GetTemplate()
-	ui.PrintDebug(fmt.Sprintf("using template: %s", template))
+	ui.PrintDebug("using template: " + template)
 
 	return meta.render(template)
 }
@@ -381,17 +382,17 @@ func (meta *Metadata) render(template string) string {
 	}
 
 	if meta.Year > 0 {
-		replacements["{year}"] = fmt.Sprintf("%d", meta.Year)
+		replacements["{year}"] = strconv.Itoa(meta.Year)
 	}
 
 	if meta.Season > 0 || meta.IsTV {
-		replacements["{season_raw}"] = fmt.Sprintf("%d", meta.Season)
+		replacements["{season_raw}"] = strconv.Itoa(meta.Season)
 		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
 		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
 	}
 
 	if meta.Episode > 0 {
-		replacements["{episode_raw}"] = fmt.Sprintf("%d", meta.Episode)
+		replacements["{episode_raw}"] = strconv.Itoa(meta.Episode)
 		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
 		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
 		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)

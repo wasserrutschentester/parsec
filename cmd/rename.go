@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -85,6 +86,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	if filepath.Base(filePath) == newName {
 		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' already has the correct name.", filepath.Base(filePath))))
+
 		return nil
 	}
 
@@ -98,6 +100,7 @@ func renameCommit(filePath, newPath, newName string) error {
 
 	if dryRunFlag {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))
+
 		return nil
 	}
 
@@ -109,6 +112,7 @@ func renameCommit(filePath, newPath, newName string) error {
 		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			ui.Println(ui.Muted.Render("Skipping..."))
+
 			return nil
 		}
 	}
@@ -116,7 +120,8 @@ func renameCommit(filePath, newPath, newName string) error {
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
-		return fmt.Errorf("rename failed")
+
+		return errors.New("rename failed")
 	}
 
 	ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
@@ -132,7 +137,8 @@ func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainf
 		meta.Override(mediaMeta)
 	} else {
 		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", ui.AnonymizePath(filePath), err))
-		return nil, fmt.Errorf("mediainfo parsing failed")
+
+		return nil, errors.New("mediainfo parsing failed")
 	}
 
 	// 2.2 Get EBML Metadata for Visual Impaired flag

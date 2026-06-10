@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -155,7 +156,7 @@ func getFooterItems(result SearchResult) []footerLine {
 		items = append(items, footerLine{
 			label: "IMDB ID",
 			id:    result.ImdbID,
-			url:   fmt.Sprintf("https://imdb.com/title/%s", result.ImdbID),
+			url:   "https://imdb.com/title/" + result.ImdbID,
 		})
 	}
 
@@ -179,7 +180,7 @@ func getFooterItems(result SearchResult) []footerLine {
 // PrintEpisodeResult prints a detailed EpisodeResult to the UI.
 func PrintEpisodeResult(result EpisodeResult) {
 	title := fmt.Sprintf("%s (S%02dE%02d)", result.Name, result.Season, result.Episode)
-	subtitle := fmt.Sprintf("Transmission Date: %s", result.Airdate)
+	subtitle := "Transmission Date: " + result.Airdate
 
 	body := ""
 	if result.Overview != "" {
@@ -191,7 +192,7 @@ func PrintEpisodeResult(result EpisodeResult) {
 	if result.TvdbID > 0 {
 		idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 		labelPart := ui.Muted.Render("TVDB ID:")
-		idPart := idStyle.Render(fmt.Sprintf("%d", result.TvdbID))
+		idPart := idStyle.Render(strconv.Itoa(result.TvdbID))
 		urlLabel := ui.Muted.Render("URL:")
 		link := ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=episode&id=%d", result.TvdbID))
 		footer = fmt.Sprintf("%s %s   %s %s", labelPart, idPart, urlLabel, link)

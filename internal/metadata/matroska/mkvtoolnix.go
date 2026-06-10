@@ -29,7 +29,7 @@ type EbmlTrack struct {
 	ID         int                 `json:"id,omitempty"`
 	Codec      string              `json:"codec,omitempty"`
 	Type       string              `json:"type,omitempty"`
-	Properties EbmlTrackProperties `json:"properties,omitempty"`
+	Properties EbmlTrackProperties `json:"properties,omitzero"`
 	TypeOrder  int                 `json:"-"`
 }
 
@@ -128,7 +128,7 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 		return nil, err
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvmerge -J %s", ui.AnonymizePath(filePath)))
+	ui.PrintDebug("Executing: mkvmerge -J " + ui.AnonymizePath(filePath))
 	cmd := exec.CommandContext(context.Background(), "mkvmerge", "-J", filePath)
 
 	output, err := cmd.Output()
@@ -173,6 +173,7 @@ func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 	for _, track := range metadata.Tracks {
 		if track.Type == "audio" && track.Properties.VisualImpaired {
 			ui.PrintDebug("found Visual Impaired audio Track")
+
 			return true
 		}
 	}

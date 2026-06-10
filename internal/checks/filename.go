@@ -65,7 +65,7 @@ func checkAllowedCharacters(filename string) []CheckResult {
 			Identifier: "filename_characters",
 			Passed:     false,
 			Severity:   "warning",
-			Warning:    fmt.Sprintf("disallowed character found: %s", match),
+			Warning:    "disallowed character found: " + match,
 			Expected:   cleanName,
 			Actual:     filename,
 		}}
@@ -92,7 +92,7 @@ func checkCharacterSequences(filename string) []CheckResult {
 			Identifier: "filename_sequences",
 			Passed:     false,
 			Severity:   "warning",
-			Warning:    fmt.Sprintf("disallowed character sequence found: %s", match),
+			Warning:    "disallowed character sequence found: " + match,
 			Expected:   cleanName,
 			Actual:     filename,
 		}}
@@ -180,6 +180,6 @@ func checkTvSpecial(meta *metadata.Metadata) []CheckResult {
 		Identifier: "filename_tv_special",
 		Passed:     false,
 		Severity:   "warning",
-		Warning:    fmt.Sprintf("%s is missing for TV Special", warning),
+		Warning:    warning + " is missing for TV Special",
 	}}
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -335,7 +336,7 @@ func calculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {
 		row := []string{
 			t.ID,
 			t.Type,
-			fmt.Sprintf("%d", t.TypeOrder),
+			strconv.Itoa(t.TypeOrder),
 			t.Codec,
 			t.Language,
 			t.Name,
@@ -399,7 +400,7 @@ func getTrackRows(tracks []types.TrackCheckResult) [][]string {
 		rows = append(rows, []string{
 			t.ID,
 			t.Type,
-			fmt.Sprintf("%d", t.TypeOrder),
+			strconv.Itoa(t.TypeOrder),
 			t.Codec,
 			t.Language,
 			t.Name,
@@ -432,15 +433,7 @@ func calculateNameColumnWidth(headers []string, contentWidths map[int]int) int {
 	}
 
 	maxNameContentWidth := contentWidths[5]
-	nameWidth := termWidth - overhead - otherColsWidth
-
-	if nameWidth < 20 {
-		nameWidth = 20
-	}
-
-	if nameWidth > maxNameContentWidth {
-		nameWidth = maxNameContentWidth
-	}
+	nameWidth := min(max(termWidth-overhead-otherColsWidth, 20), maxNameContentWidth)
 
 	return nameWidth
 }
@@ -503,10 +496,7 @@ func PropertyLayout(pairs [][2]string) string {
 
 	labelWidth := maxLabelLen + 2
 
-	valueWidth := innerWidth - labelWidth
-	if valueWidth < 20 {
-		valueWidth = 20
-	}
+	valueWidth := max(innerWidth-labelWidth, 20)
 
 	var lines []string
 
@@ -577,8 +567,8 @@ func AnonymizePath(path string) string {
 		return path
 	}
 
-	if strings.HasPrefix(path, home) {
-		return "~" + strings.TrimPrefix(path, home)
+	if after, ok := strings.CutPrefix(path, home); ok {
+		return "~" + after
 	}
 
 	return path

@@ -25,6 +25,9 @@ linters:
         - unconvert
         - revive
         - wrapcheck
+        - modernize
+        - perfsprint
+        - nlreturn
 
     settings:
         wrapcheck:

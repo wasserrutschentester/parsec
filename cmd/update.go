@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -36,13 +37,15 @@ func runUpdate() error {
 	rel, err := update.FetchLatestRelease(ctx)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to check for updates: %v", err))
-		return fmt.Errorf("fetching release info failed")
+
+		return errors.New("fetching release info failed")
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Latest version: %s (Current: %s)", rel.TagName, Version))
 
 	if !forceUpdate && !update.IsNewer(rel.TagName, Version) {
 		ui.PrintSuccess(fmt.Sprintf("You are already on the latest version (%s)", Version))
+
 		return nil
 	}
 
@@ -67,7 +70,7 @@ func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error)
 			ui.PrintInfo("- " + a.Name)
 		}
 
-		return "", fmt.Errorf("no matching asset found")
+		return "", errors.New("no matching asset found")
 	}
 
 	// 1. Download
@@ -76,7 +79,8 @@ func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error)
 	tempFile, err := update.DownloadAsset(ctx, asset.BrowserDownloadURL)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to download update: %v", err))
-		return "", fmt.Errorf("download failed")
+
+		return "", errors.New("download failed")
 	}
 
 	// 2. Verify Checksum
@@ -86,7 +90,8 @@ func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error)
 
 		if err := update.VerifyChecksum(ctx, asset.Name, tempFile, checksumAsset.BrowserDownloadURL); err != nil {
 			ui.PrintError(fmt.Sprintf("Security check failed: %v", err))
-			return tempFile, fmt.Errorf("checksum verification failed")
+
+			return tempFile, errors.New("checksum verification failed")
 		}
 
 		ui.PrintSuccess("Checksum verified")
@@ -103,10 +108,11 @@ func finalizeUpdate(tempFile, tagName string) error {
 
 	if err := update.ReplaceExecutable(tempFile); err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to replace binary: %v", err))
-		return fmt.Errorf("update failed")
+
+		return errors.New("update failed")
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Successfully updated to %s", tagName))
+	ui.PrintSuccess("Successfully updated to " + tagName)
 
 	return nil
 }

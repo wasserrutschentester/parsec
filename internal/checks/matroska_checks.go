@@ -59,7 +59,7 @@ func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int64, lastP
 		}
 
 		if prevTrack != nil && !reportedTracks[prevTrack.Properties.Number] {
-			warning := fmt.Sprintf("score: %s", formatPriority(*lastPriority))
+			warning := "score: " + formatPriority(*lastPriority)
 			res.Tracks = append(res.Tracks, ebmlTrackToResult(prevTrack, true, warning))
 			reportedTracks[prevTrack.Properties.Number] = true
 		}
@@ -94,6 +94,7 @@ func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 	for _, junk := range junkKeywords {
 		if strings.Contains(nameUpper, junk) {
 			warning := fmt.Sprintf("junk keyword '%s' in Name", ui.Warning.Render(junk))
+
 			return newFailedTrackResult("matroska_name_quality", "Track Name contains junk keywords", "info", &track, warning)
 		}
 	}
@@ -106,6 +107,7 @@ func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 	for _, codec := range simpleCodecs {
 		if strings.Contains(nameUpper, codec) {
 			warning := fmt.Sprintf("simple codec '%s' in Name", ui.Warning.Render(codec))
+
 			return newFailedTrackResult("matroska_name_codecs", "Track Name contains simple codec", "info", &track, warning)
 		}
 	}
@@ -113,6 +115,7 @@ func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 	if strings.Contains(nameUpper, "DTS") && !strings.Contains(nameUpper, "DTS-HD") && !strings.Contains(nameUpper, "DTS:X") && !strings.Contains(nameUpper, "DTS-ES") {
 		if dtsRegex.MatchString(nameUpper) {
 			warning := fmt.Sprintf("simple codec '%s' in Name", ui.Warning.Render("DTS"))
+
 			return newFailedTrackResult("matroska_name_codecs", "Track Name contains simple codec", "info", &track, warning)
 		}
 	}
@@ -182,6 +185,7 @@ func getLanguageCodeFromName(word string) string {
 		langName := display.English.Languages().Name(tag)
 		if strings.EqualFold(langName, word) {
 			base, _ := tag.Base()
+
 			return base.String()
 		}
 	}
@@ -247,7 +251,7 @@ func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts m
 func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 	codec := track.Codec
 	if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
-		warning := fmt.Sprintf("text-based but codec is %s", codec)
+		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
 		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track isn't in SRT format", "warning", &track, warning)
@@ -257,8 +261,7 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 }
 
 func checkZlibCompression(track matroska.EbmlTrack) *CheckResult {
-	algos := strings.Split(track.Properties.ContentEncodingAlgorithms, ",")
-	for _, algo := range algos {
+	for algo := range strings.SplitSeq(track.Properties.ContentEncodingAlgorithms, ",") {
 		if algo == "0" { // 0 = zlib
 			return newFailedTrackResult("matroska_zlib_compression", "Track uses zlib compression", "warning", &track, ui.Warning.Render("zlib compression enabled"))
 		}
@@ -276,7 +279,7 @@ func validateTrackBasics(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
-		return newFailedTrackResult("matroska_multi_lang", "Multi-language track must have a Name", "warning", &track, fmt.Sprintf("%s for 'mul' language", ui.Warning.Render("missing Name")))
+		return newFailedTrackResult("matroska_multi_lang", "Multi-language track must have a Name", "warning", &track, ui.Warning.Render("missing Name")+" for 'mul' language")
 	}
 
 	return nil
@@ -356,11 +359,13 @@ func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywo
 
 	if flag && !hasKeyword {
 		warning := fmt.Sprintf("is %s but Name missing '%s'", ui.Warning.Render(flagName), ui.Warning.Render(keywordStr))
+
 		return newFailedTrackResult(identifier, checkWarning, "info", &track, warning)
 	}
 
 	if !flag && hasKeyword {
 		warning := fmt.Sprintf("'%s' in Name but no %s flag", ui.Warning.Render(keywordStr), ui.Warning.Render(flagName))
+
 		return newFailedTrackResult(identifier, checkWarning, "info", &track, warning)
 	}
 
@@ -437,7 +442,7 @@ func calculatePropertyScore(track matroska.EbmlTrack) int64 {
 func calcScore(name string) int64 {
 	s := int64(0)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		val := int64(0)
 
 		if i < len(name) {

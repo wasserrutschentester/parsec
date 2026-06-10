@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"strconv"
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
@@ -207,7 +208,7 @@ func getOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
 
 func ebmlTrackToResult(t *matroska.EbmlTrack, passed bool, warning string) TrackCheckResult {
 	return TrackCheckResult{
-		ID:        fmt.Sprintf("%d", t.Properties.Number),
+		ID:        strconv.Itoa(t.Properties.Number),
 		Type:      t.Type,
 		TypeOrder: t.TypeOrder,
 		Codec:     t.Codec,

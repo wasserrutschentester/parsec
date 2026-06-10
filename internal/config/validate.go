@@ -25,7 +25,7 @@ func checkConfigFile() {
 	if configFile == "" {
 		ui.PrintWarning("No configuration file found. Using internal defaults.")
 	} else {
-		ui.PrintInfo(fmt.Sprintf("Using configuration file: %s", ui.AnonymizePath(configFile)))
+		ui.PrintInfo("Using configuration file: " + ui.AnonymizePath(configFile))
 	}
 }
 
@@ -38,12 +38,12 @@ func isValidAPIKey(key string) bool {
 func checkKey(key, name string) {
 	if key != "" {
 		if isValidAPIKey(key) {
-			ui.PrintSuccess(fmt.Sprintf("%s API key found and appears valid.", name))
+			ui.PrintSuccess(name + " API key found and appears valid.")
 		} else {
-			ui.PrintWarning(fmt.Sprintf("%s API key found, but is probably invalid.", name))
+			ui.PrintWarning(name + " API key found, but is probably invalid.")
 		}
 	} else {
-		ui.PrintWarning(fmt.Sprintf("%s API key missing.", name))
+		ui.PrintWarning(name + " API key missing.")
 	}
 }
 
@@ -186,12 +186,14 @@ func checkValueTypes() {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Could not read config file for validation: %v", err))
+
 		return
 	}
 
-	var configMap map[string]interface{}
+	var configMap map[string]any
 	if err := toml.Unmarshal(data, &configMap); err != nil {
 		ui.PrintError(fmt.Sprintf("Could not parse config file for validation: %v", err))
+
 		return
 	}
 
@@ -205,7 +207,7 @@ func checkValueTypes() {
 	}
 }
 
-func validateMapTypes(m map[string]interface{}, prefix string, schema map[string]string) []string {
+func validateMapTypes(m map[string]any, prefix string, schema map[string]string) []string {
 	var errors []string
 
 	for k, v := range m {
@@ -217,12 +219,14 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 		// Handle structural sections FIRST
 		if structuralErrors, handled := validateStructuralSections(k, v, prefix, fullKey); handled {
 			errors = append(errors, structuralErrors...)
+
 			continue
 		}
 
 		expected, ok := schema[strings.ToLower(k)]
 		if !ok {
 			errors = append(errors, fmt.Sprintf("Unknown configuration key: '%s'", fullKey))
+
 			continue
 		}
 
@@ -234,6 +238,7 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 		actualType := reflect.TypeOf(v).String()
 		if actualType != expected {
 			errors = append(errors, fmt.Sprintf("Invalid type for '%s': expected %s, got %s", fullKey, expected, actualType))
+
 			continue
 		}
 
@@ -243,26 +248,26 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 	return errors
 }
 
-func validateStructuralSections(k string, v interface{}, prefix, fullKey string) ([]string, bool) {
+func validateStructuralSections(k string, v any, prefix, fullKey string) ([]string, bool) {
 	if prefix != "" {
 		return nil, false
 	}
 
 	switch k {
 	case "api_keys":
-		if subMap, ok := v.(map[string]interface{}); ok {
+		if subMap, ok := v.(map[string]any); ok {
 			return validateMapTypes(subMap, fullKey, apiKeysExpectedTypes), true
 		}
 	case "prowlarr":
-		if subMap, ok := v.(map[string]interface{}); ok {
+		if subMap, ok := v.(map[string]any); ok {
 			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
 		}
 	case "preset":
-		if subMap, ok := v.(map[string]interface{}); ok {
+		if subMap, ok := v.(map[string]any); ok {
 			var errors []string
 
 			for presetName, presetContent := range subMap {
-				if pcMap, ok := presetContent.(map[string]interface{}); ok {
+				if pcMap, ok := presetContent.(map[string]any); ok {
 					errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
 				}
 			}
@@ -274,7 +279,7 @@ func validateStructuralSections(k string, v interface{}, prefix, fullKey string)
 	return nil, false
 }
 
-func validateSpecificKeys(k string, v interface{}, fullKey string) []string {
+func validateSpecificKeys(k string, v any, fullKey string) []string {
 	var errors []string
 
 	switch k {
@@ -287,7 +292,7 @@ func validateSpecificKeys(k string, v interface{}, fullKey string) []string {
 			errors = append(errors, validateLanguage(langStr, fullKey)...)
 		}
 	case "enabled_checks", "disabled_checks":
-		if checkList, ok := v.([]interface{}); ok {
+		if checkList, ok := v.([]any); ok {
 			errors = append(errors, validateCheckIdentifiers(checkList, fullKey)...)
 		}
 	}
@@ -311,7 +316,7 @@ func validateTemplateKeys(template, keyPath string) []string {
 	return errors
 }
 
-func validateCheckIdentifiers(identifiers []interface{}, keyPath string) []string {
+func validateCheckIdentifiers(identifiers []any, keyPath string) []string {
 	var errors []string
 
 	for _, id := range identifiers {
@@ -331,6 +336,7 @@ func validateLanguage(lang, keyPath string) []string {
 	tag, err := language.Parse(lang)
 	if err != nil || tag == language.Und {
 		errors = append(errors, fmt.Sprintf("Invalid language tag in '%s': %s", keyPath, lang))
+
 		return errors
 	}
 

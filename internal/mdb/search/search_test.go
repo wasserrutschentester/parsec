@@ -1,6 +1,7 @@
 package search
 
 import (
+	"slices"
 	"testing"
 
 	"codeberg.org/upPollo/parsec/internal/mdb"
@@ -46,19 +47,21 @@ func TestAddUniqueAltTitle(t *testing.T) {
 		got := addUniqueAltTitle(tt.titles, tt.newTitle, tt.existingTitles...)
 		if len(got) != len(tt.want) {
 			t.Errorf("addUniqueAltTitle(%v, %q) len = %d, want %d", tt.titles, tt.newTitle, len(got), len(tt.want))
+
 			continue
 		}
 
 		for i := range got {
 			if got[i] != tt.want[i] {
 				t.Errorf("addUniqueAltTitle(%v, %q) = %v, want %v", tt.titles, tt.newTitle, got, tt.want)
+
 				break
 			}
 		}
 	}
 }
 
-// nolint:funlen,cyclop
+//nolint:funlen,cyclop
 func TestMergeResults(t *testing.T) {
 	tmdbResults := []mdb.SearchResult{
 		{
@@ -102,14 +105,7 @@ func TestMergeResults(t *testing.T) {
 				t.Errorf("Movie 1: expected TvdbID 101, got %d", r.TvdbID)
 			}
 
-			foundAlt := false
-
-			for _, alt := range r.AltTitle {
-				if alt == "Movie One" {
-					foundAlt = true
-					break
-				}
-			}
+			foundAlt := slices.Contains(r.AltTitle, "Movie One")
 
 			if !foundAlt {
 				t.Errorf("Movie 1: expected 'Movie One' in AltTitles")

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -54,7 +55,8 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 	if err != nil {
 		ui.PrintError(err.Error())
-		return fmt.Errorf("search failed")
+
+		return errors.New("search failed")
 	}
 
 	processIdentificationResult(filePath, result, meta)

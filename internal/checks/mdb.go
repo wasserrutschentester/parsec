@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -15,7 +16,8 @@ import (
 )
 
 // RunMdbChecks performs checks against online media databases (TMDB/TVDB).
-// nolint:cyclop
+//
+//nolint:cyclop
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 
@@ -101,6 +103,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		for _, l := range langs {
 			if language.Make(l) == targetTag {
 				found = true
+
 				break
 			}
 		}
@@ -193,9 +196,9 @@ func checkMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckRe
 		Passed:     true,
 	}
 	if !meta.IsTV && meta.Year > 0 && result.Year > 0 {
-		res.Expected = fmt.Sprintf("%d", result.Year)
+		res.Expected = strconv.Itoa(result.Year)
 
-		res.Actual = fmt.Sprintf("%d", meta.Year)
+		res.Actual = strconv.Itoa(meta.Year)
 		if meta.Year != result.Year {
 			res.Passed = false
 			res.Severity = "warning"
@@ -212,9 +215,9 @@ func checkSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 		Passed:     true,
 	}
 	if meta.Year > 0 && result.Year > 0 && meta.Season < 1900 {
-		res.Expected = fmt.Sprintf("%d", result.Year)
+		res.Expected = strconv.Itoa(result.Year)
 
-		res.Actual = fmt.Sprintf("%d", meta.Year)
+		res.Actual = strconv.Itoa(meta.Year)
 		if meta.Year != result.Year {
 			res.Passed = false
 			res.Severity = "warning"

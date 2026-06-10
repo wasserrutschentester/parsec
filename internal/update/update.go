@@ -276,6 +276,7 @@ func ReplaceExecutable(tempFile string) error {
 
 	if err := os.Rename(tempFile, executablePath); err != nil {
 		_ = os.Rename(oldFile, executablePath) // Try to restore old file on failure
+
 		return fmt.Errorf("could not replace current binary: %w", err)
 	}
 

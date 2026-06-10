@@ -51,6 +51,7 @@ You can also pass a JSON check report file to render it.`),
 				report, err := collectCheckData(cmd, filePath)
 				if err != nil {
 					ui.PrintError(err.Error())
+
 					return fmt.Errorf("collecting check data failed for %s", filePath)
 				}
 

@@ -50,6 +50,7 @@ func TestCheckRedundantAudio(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}
@@ -105,6 +106,7 @@ func TestCheckResolution(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}
@@ -147,6 +149,7 @@ func TestCheckFrameRate(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}
@@ -186,6 +189,7 @@ func TestCheckBitRate(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}
@@ -201,7 +205,7 @@ func TestCheckBitRate(t *testing.T) {
 	}
 }
 
-// nolint:funlen,cyclop
+//nolint:funlen,cyclop
 func TestCheckDurations(t *testing.T) {
 	order0 := 0
 	order1 := 1
@@ -264,6 +268,7 @@ func TestCheckDurations(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}
@@ -346,6 +351,7 @@ func TestCheckDialogueNormalization(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}

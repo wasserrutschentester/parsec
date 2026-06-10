@@ -4,6 +4,7 @@ package tmdb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,7 +90,7 @@ type tmdbEpisodeResponse struct {
 	Overview      string `json:"overview"`
 }
 
-func getFromCache(key string, target interface{}) (bool, error) {
+func getFromCache(key string, target any) (bool, error) {
 	cached, err := cache.Get(key)
 	if err != nil {
 		return false, nil
@@ -102,10 +103,10 @@ func getFromCache(key string, target interface{}) (bool, error) {
 	return true, nil
 }
 
-func get(endpoint string, query url.Values, target interface{}) error {
+func get(endpoint string, query url.Values, target any) error {
 	apiKey := config.GetTmdbAPIKey()
 	if apiKey == "" {
-		return fmt.Errorf("TMDB API key not configured")
+		return errors.New("TMDB API key not configured")
 	}
 
 	if query == nil {

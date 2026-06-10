@@ -50,7 +50,7 @@ func TestSanitizeUTF8(t *testing.T) {
 	}
 }
 
-// nolint:cyclop
+//nolint:cyclop
 func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	jsonData := `{
 		"media": {

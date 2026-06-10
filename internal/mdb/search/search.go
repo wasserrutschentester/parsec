@@ -2,6 +2,7 @@
 package search
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -21,7 +22,7 @@ import (
 // InteractiveSearch performs a search by ID or title, prompting the user if multiple matches are found.
 func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
 	if meta.Title == "" && meta.ImdbID == "" && meta.TmdbID == 0 && meta.TvdbID == 0 {
-		return nil, fmt.Errorf("title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
+		return nil, errors.New("title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
 	}
 
 	if meta.ImdbID != "" || meta.TmdbID > 0 || meta.TvdbID > 0 {
@@ -45,7 +46,7 @@ func interactiveSearchByID(meta *metadata.Metadata) (*mdb.SearchResult, error) {
 	}
 
 	if result == nil {
-		return nil, fmt.Errorf("no results found")
+		return nil, errors.New("no results found")
 	}
 
 	ui.PrintDebug(fmt.Sprintf("InteractiveSearch ID result: %+v", result))
@@ -69,11 +70,12 @@ func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.Se
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("no results found")
+		return nil, errors.New("no results found")
 	}
 
 	if len(results) == 1 || unattended {
 		ui.PrintDebug(fmt.Sprintf("InteractiveSearch auto-selected: %+v", results[0]))
+
 		return &results[0], nil
 	}
 
@@ -109,7 +111,7 @@ func promptForResultSelection(results []mdb.SearchResult) (*mdb.SearchResult, er
 
 	choice, err := strconv.Atoi(input)
 	if err != nil || choice < 0 || choice >= len(results) {
-		return nil, fmt.Errorf("invalid selection")
+		return nil, errors.New("invalid selection")
 	}
 
 	result := &results[choice]
@@ -232,7 +234,7 @@ func findMatchingResult(r mdb.SearchResult, tvdbMap, tmdbMap map[int]mdb.SearchR
 	return mdb.SearchResult{}, false
 }
 
-// nolint:cyclop
+//nolint:cyclop
 func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 	// Merge TVDB data into TMDB result
 	if res.TvdbID == 0 {
@@ -422,7 +424,7 @@ func searchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult
 	}
 
 	if result == nil {
-		return nil, fmt.Errorf("no results found")
+		return nil, errors.New("no results found")
 	}
 
 	// If we have a TMDB result but it's missing TVDB info, try to fetch it if we have a TVDB ID

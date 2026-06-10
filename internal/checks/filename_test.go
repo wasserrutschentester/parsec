@@ -148,6 +148,7 @@ func TestRunFilenameChecks(t *testing.T) {
 			for _, r := range results {
 				if !r.Passed {
 					hasFailure = true
+
 					break
 				}
 			}

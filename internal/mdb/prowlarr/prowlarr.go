@@ -4,6 +4,7 @@ package prowlarr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -70,7 +71,7 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 	}
 
 	if len(queries) == 0 {
-		return nil, fmt.Errorf("at least one ID (IMDB, TMDB, or TVDB) is required for Prowlarr search")
+		return nil, errors.New("at least one ID (IMDB, TMDB, or TVDB) is required for Prowlarr search")
 	}
 
 	mediaType := "movie"
@@ -95,7 +96,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int)
 	indexerIDs := config.GetProwlarrIndexers()
 
 	if prowlarrURL == "" || apiKey == "" {
-		return nil, fmt.Errorf("prowlarr is not configured (url or api_key missing)")
+		return nil, errors.New("prowlarr is not configured (url or api_key missing)")
 	}
 
 	var wg sync.WaitGroup
@@ -111,12 +112,14 @@ func performParallelSearch(queries []string, mediaType string, categories []int)
 			searchURL, err := buildSearchURL(prowlarrURL, q, mediaType, categories, indexerIDs)
 			if err != nil {
 				errChan <- err
+
 				return
 			}
 
 			results, err := fetchReleases(searchURL, apiKey)
 			if err != nil {
 				errChan <- err
+
 				return
 			}
 
@@ -186,16 +189,17 @@ func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerI
 }
 
 func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error) {
-	cacheKey := fmt.Sprintf("prowlarr:%s", searchURL.String())
+	cacheKey := "prowlarr:" + searchURL.String()
 	if cached, err := cache.Get(cacheKey); err == nil {
 		var results []ReleaseResource
 		if err := json.Unmarshal(cached, &results); err == nil {
-			ui.PrintDebug(fmt.Sprintf("Prowlarr cache hit: %s", searchURL.String()))
+			ui.PrintDebug("Prowlarr cache hit: " + searchURL.String())
+
 			return results, nil
 		}
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Prowlarr search URL: %s", searchURL.String()))
+	ui.PrintDebug("Prowlarr search URL: " + searchURL.String())
 
 	start := time.Now()
 
@@ -220,6 +224,7 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+
 		return nil, fmt.Errorf("prowlarr returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -305,11 +310,13 @@ func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter boo
 	pResults, err := Search(result.ImdbID, result.TmdbID, result.TvdbID, meta.Season, meta.Episode, result.IsTV)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Prowlarr search failed: %v", err))
+
 		return
 	}
 
 	if len(pResults) == 0 {
 		ui.Println(ui.Muted.Render("No releases found matching the IDs."))
+
 		return
 	}
 

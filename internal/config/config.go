@@ -4,6 +4,7 @@ package config
 import (
 	_ "embed"
 	"fmt"
+	"slices"
 
 	"github.com/spf13/viper"
 )
@@ -204,23 +205,12 @@ func GetDisableUpdateCheck() bool {
 func IsCheckEnabled(checkName string) bool {
 	enabledChecks := getStringSlice("enabled_checks")
 	if len(enabledChecks) > 0 {
-		for _, c := range enabledChecks {
-			if c == checkName {
-				return true
-			}
-		}
-
-		return false
+		return slices.Contains(enabledChecks, checkName)
 	}
 
 	disabledChecks := getStringSlice("disabled_checks")
-	for _, c := range disabledChecks {
-		if c == checkName {
-			return false
-		}
-	}
 
-	return true
+	return !slices.Contains(disabledChecks, checkName)
 }
 
 // GetTmdbAPIKey returns the TMDB API key.

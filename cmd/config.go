@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,7 +29,8 @@ var configInitCmd = &cobra.Command{
 		confDir, err := os.UserConfigDir()
 		if err != nil {
 			ui.PrintError(fmt.Sprintf("Could not determine user config directory: %v", err))
-			return fmt.Errorf("config dir determination failed")
+
+			return errors.New("config dir determination failed")
 		}
 
 		targetDir := filepath.Join(confDir, "parsec")
@@ -42,23 +44,26 @@ var configInitCmd = &cobra.Command{
 			backupFile := targetFile + "." + time.Now().Format("2006-01-02_15-04-05") + ".bak"
 			if err := os.Rename(targetFile, backupFile); err != nil {
 				ui.PrintError(fmt.Sprintf("Could not backup existing config file: %v", err))
-				return fmt.Errorf("config backup failed")
+
+				return errors.New("config backup failed")
 			}
 
-			ui.PrintInfo(fmt.Sprintf("Existing configuration backed up to %s", ui.AnonymizePath(backupFile)))
+			ui.PrintInfo("Existing configuration backed up to " + ui.AnonymizePath(backupFile))
 		}
 
 		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not create config directory: %v", err))
-			return fmt.Errorf("config dir creation failed")
+
+			return errors.New("config dir creation failed")
 		}
 
 		if err := os.WriteFile(targetFile, []byte(config.GetDefaultConfig()), 0o644); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not write config file: %v", err))
-			return fmt.Errorf("config write failed")
+
+			return errors.New("config write failed")
 		}
 
-		ui.PrintSuccess(fmt.Sprintf("Created default configuration at %s", ui.AnonymizePath(targetFile)))
+		ui.PrintSuccess("Created default configuration at " + ui.AnonymizePath(targetFile))
 
 		return nil
 	},

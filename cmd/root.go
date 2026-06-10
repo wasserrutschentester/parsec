@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -82,11 +83,8 @@ func init() {
 
 		fs.VisitAll(func(f *pflag.Flag) {
 			if v, ok := f.Annotations[key]; ok {
-				for _, s := range v {
-					if s == value {
-						newFs.AddFlag(f)
-						break
-					}
+				if slices.Contains(v, value) {
+					newFs.AddFlag(f)
 				}
 			}
 		})
@@ -229,7 +227,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if viper.ConfigFileUsed() != "" {
-		ui.PrintDebug(fmt.Sprintf("Using config file: %s", ui.AnonymizePath(viper.ConfigFileUsed())))
+		ui.PrintDebug("Using config file: " + ui.AnonymizePath(viper.ConfigFileUsed()))
 	} else if cfgFile == "" {
 		ui.PrintWarning("No config file found, using defaults")
 	}
@@ -240,7 +238,7 @@ func initConfig() {
 		if !config.PresetExists(presetFlag) {
 			ui.PrintWarning(fmt.Sprintf("Preset '%s' does not exist in your configuration", presetFlag))
 		} else {
-			ui.PrintDebug(fmt.Sprintf("Using configuration preset: %s", presetFlag))
+			ui.PrintDebug("Using configuration preset: " + presetFlag)
 		}
 	}
 }

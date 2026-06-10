@@ -3,6 +3,8 @@ package cache
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,7 +83,7 @@ func clearCache() {
 // Get retrieves data from the cache for the given key.
 func Get(key string) ([]byte, error) {
 	if config.NoCache {
-		return nil, fmt.Errorf("cache bypassed")
+		return nil, errors.New("cache bypassed")
 	}
 
 	path := getPath(key)
@@ -93,7 +95,8 @@ func Get(key string) ([]byte, error) {
 
 	if time.Since(info.ModTime()) > cacheDuration {
 		_ = os.Remove(path)
-		return nil, fmt.Errorf("cache expired")
+
+		return nil, errors.New("cache expired")
 	}
 
 	data, err := os.ReadFile(path)
@@ -128,5 +131,6 @@ func Remove(key string) error {
 
 func getPath(key string) string {
 	hash := sha256.Sum256([]byte(key))
-	return filepath.Join(cacheDir, fmt.Sprintf("%x", hash))
+
+	return filepath.Join(cacheDir, hex.EncodeToString(hash[:]))
 }
