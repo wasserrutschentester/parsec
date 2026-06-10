@@ -47,6 +47,7 @@ func TestCheckCharacterSequences(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestRunFilenameChecks(t *testing.T) {
 	config.InitDefaults()
 

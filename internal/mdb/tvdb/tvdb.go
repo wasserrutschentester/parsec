@@ -301,12 +301,14 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	return results, nil
 }
 
+type tvdbRemoteMatch struct {
+	Series *tvdbMedia `json:"series"`
+	Movie  *tvdbMedia `json:"movie"`
+}
+
 type tvdbRemoteIdResponse struct {
-	Status string `json:"status"`
-	Data   []struct {
-		Series *tvdbMedia `json:"series"`
-		Movie  *tvdbMedia `json:"movie"`
-	} `json:"data"`
+	Status string            `json:"status"`
+	Data   []tvdbRemoteMatch `json:"data"`
 }
 
 func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
@@ -321,47 +323,7 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 		return nil, nil
 	}
 
-	var r *tvdbMedia
-
-	actualType := ""
-
-	if mediaType == "tv" {
-		for _, item := range data.Data {
-			if item.Series != nil {
-				r = item.Series
-				actualType = "series"
-
-				break
-			}
-		}
-	} else {
-		for _, item := range data.Data {
-			if item.Movie != nil {
-				r = item.Movie
-				actualType = "movies"
-
-				break
-			}
-		}
-	}
-
-	// Fallback to whatever is available if requested type not found
-	if r == nil {
-		for _, item := range data.Data {
-			if item.Series != nil {
-				r = item.Series
-				actualType = "series"
-
-				break
-			} else if item.Movie != nil {
-				r = item.Movie
-				actualType = "movies"
-
-				break
-			}
-		}
-	}
-
+	r, actualType := selectBestRemoteMatch(data.Data, mediaType)
 	if r == nil {
 		return nil, nil
 	}
@@ -378,6 +340,36 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 	applyTranslation(&result, tvdbID, actualType)
 
 	return &result, nil
+}
+
+func selectBestRemoteMatch(data []tvdbRemoteMatch, mediaType string) (*tvdbMedia, string) {
+	// Try requested type first
+	if mediaType == "tv" {
+		for _, item := range data {
+			if item.Series != nil {
+				return item.Series, "series"
+			}
+		}
+	} else {
+		for _, item := range data {
+			if item.Movie != nil {
+				return item.Movie, "movies"
+			}
+		}
+	}
+
+	// Fallback to whatever is available
+	for _, item := range data {
+		if item.Series != nil {
+			return item.Series, "series"
+		}
+
+		if item.Movie != nil {
+			return item.Movie, "movies"
+		}
+	}
+
+	return nil, ""
 }
 
 func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {

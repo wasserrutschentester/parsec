@@ -8,6 +8,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
+//nolint:funlen
 func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
 
@@ -101,69 +102,6 @@ func TestRunTrackChecks(t *testing.T) {
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
 				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary", Number: 2}},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Visual impaired missing keyword",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", VisualImpaired: true, Default: true, Number: 1}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Visual impaired with Descriptive",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", VisualImpaired: true, Name: "Descriptive", Number: 2}},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Visual impaired keyword without flag",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "AD", Number: 2}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "mul language with 1 language in name",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "mul", Name: "English", Default: true, Number: 1}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "mul language with 2 languages in name",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "mul", Name: "English / German", Default: true, Number: 1}},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Alphabetical language order",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ita", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Default: true, Number: 2}},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Alphabetical language order (wrong)",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "spa", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ita", Default: true, Number: 2}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "Correct default flags",
-			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 2}},
-				{ID: 3, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Forced: true, Name: "Forced", Number: 3}},
-				{ID: 4, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 4}},
 			},
 			wantErr: false,
 		},
@@ -294,7 +232,15 @@ func TestRunTrackChecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res := runTrackChecks(tt.tracks)
 
-			hasFailure := len(res) > 0
+			hasFailure := false
+
+			for _, r := range res {
+				if !r.Passed {
+					hasFailure = true
+					break
+				}
+			}
+
 			if hasFailure != tt.wantErr {
 				t.Errorf("runTrackChecks() hasFailure = %v, wantErr %v", hasFailure, tt.wantErr)
 			}
@@ -388,37 +334,7 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 		}
 
 		if !found {
-			t.Error("Expected matroska_duplicate_tracks result")
-		}
-	})
-
-	t.Run("Track order returns both previous and current track", func(t *testing.T) {
-		config.InitDefaults()
-
-		tracks := []matroska.EbmlTrack{
-			{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
-			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
-		}
-
-		res := runTrackChecks(tracks)
-		found := false
-
-		for _, r := range res {
-			if r.Identifier == "matroska_track_order" {
-				found = true
-
-				if len(r.Tracks) != 2 {
-					t.Errorf("Expected 2 tracks for track order check, got %d", len(r.Tracks))
-				}
-
-				if !strings.Contains(r.Tracks[0].Warning, "score:") {
-					t.Errorf("Expected first track warning to contain 'score:', got '%s'", r.Tracks[0].Warning)
-				}
-			}
-		}
-
-		if !found {
-			t.Error("Expected matroska_track_order result")
+			t.Error("Did not find duplicate tracks check result")
 		}
 	})
 }

@@ -345,20 +345,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 	}
 
 	headers := []string{"ID", "Type", "#", "Codec", "Lang", "Name", "Flags", "Warning"}
-
-	var rows [][]string
-	for _, t := range tracks {
-		rows = append(rows, []string{
-			t.ID,
-			t.Type,
-			fmt.Sprintf("%d", t.TypeOrder),
-			t.Codec,
-			t.Language,
-			t.Name,
-			strings.Join(t.Flags, ", "),
-			t.Warning,
-		})
-	}
+	rows := getTrackRows(tracks)
 
 	// Use shared widths if provided, otherwise calculate for this set of tracks
 	contentWidths := sharedWidths
@@ -366,35 +353,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 		contentWidths = CalculateTrackTableWidths(tracks)
 	}
 
-	// Calculate terminal width and available space for Name
-	termWidth, _, _ := term.GetSize(os.Stdout.Fd())
-	if termWidth <= 0 {
-		termWidth = 120 // Default fallback
-	}
-
-	// Overhead: 6 spaces indentation + 1 border per column + 1 final border + 2 padding per column
-	overhead := 6 + len(headers) + 1 + (len(headers) * 2)
-
-	otherColsWidth := 0
-
-	for i := range headers {
-		if i == 5 { // Name column
-			continue
-		}
-
-		otherColsWidth += contentWidths[i]
-	}
-
-	maxNameContentWidth := contentWidths[5]
-
-	nameWidth := termWidth - overhead - otherColsWidth
-	if nameWidth < 20 {
-		nameWidth = 20
-	}
-
-	if nameWidth > maxNameContentWidth {
-		nameWidth = maxNameContentWidth
-	}
+	nameWidth := calculateNameColumnWidth(headers, contentWidths)
 
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
@@ -417,6 +376,58 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 		Wrap(true)
 
 	return "      " + strings.ReplaceAll(t.Render(), "\n", "\n      ")
+}
+
+func getTrackRows(tracks []types.TrackCheckResult) [][]string {
+	var rows [][]string
+	for _, t := range tracks {
+		rows = append(rows, []string{
+			t.ID,
+			t.Type,
+			fmt.Sprintf("%d", t.TypeOrder),
+			t.Codec,
+			t.Language,
+			t.Name,
+			strings.Join(t.Flags, ", "),
+			t.Warning,
+		})
+	}
+
+	return rows
+}
+
+func calculateNameColumnWidth(headers []string, contentWidths map[int]int) int {
+	// Calculate terminal width and available space for Name
+	termWidth, _, _ := term.GetSize(os.Stdout.Fd())
+	if termWidth <= 0 {
+		termWidth = 120 // Default fallback
+	}
+
+	// Overhead: 6 spaces indentation + 1 border per column + 1 final border + 2 padding per column
+	overhead := 6 + len(headers) + 1 + (len(headers) * 2)
+
+	otherColsWidth := 0
+
+	for i := range headers {
+		if i == 5 { // Name column
+			continue
+		}
+
+		otherColsWidth += contentWidths[i]
+	}
+
+	maxNameContentWidth := contentWidths[5]
+	nameWidth := termWidth - overhead - otherColsWidth
+
+	if nameWidth < 20 {
+		nameWidth = 20
+	}
+
+	if nameWidth > maxNameContentWidth {
+		nameWidth = maxNameContentWidth
+	}
+
+	return nameWidth
 }
 
 // ReportSection returns a header for a specific section in a check report.

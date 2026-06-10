@@ -60,6 +60,13 @@ func PrintResult(result SearchResult) {
 		subtitle = fmt.Sprintf("[ %.0f%% MATCH ]", result.Similarity*100)
 	}
 
+	body := getResultBody(result)
+	footer := getResultFooter(result)
+
+	ui.Println(ui.Card(title, subtitle, body, footer))
+}
+
+func getResultBody(result SearchResult) string {
 	var props [][2]string
 	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
 		props = append(props, [2]string{"Origin Title", result.OriginalTitle})
@@ -82,12 +89,47 @@ func PrintResult(result SearchResult) {
 		body += ui.LabelStyle.Render("OVERVIEW") + "\n" + result.Overview
 	}
 
-	type footerLine struct {
-		label string
-		id    string
-		url   string
+	return body
+}
+
+type footerLine struct {
+	label string
+	id    string
+	url   string
+}
+
+func getResultFooter(result SearchResult) string {
+	items := getFooterItems(result)
+	if len(items) == 0 {
+		return ""
 	}
 
+	maxLen := 0
+
+	for _, item := range items {
+		l := len(item.label) + len(item.id) + 2 // "Label: ID"
+		if l > maxLen {
+			maxLen = l
+		}
+	}
+
+	var lines []string
+
+	idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+
+	for _, item := range items {
+		labelPart := ui.Muted.Render(item.label + ":")
+		idPart := idStyle.Render(item.id)
+		urlLabel := ui.Muted.Render("URL:")
+		padding := strings.Repeat(" ", maxLen-(len(item.label)+len(item.id)+2)+3)
+		line := fmt.Sprintf("%s %s%s%s %s", labelPart, idPart, padding, urlLabel, ui.Link.Render(item.url))
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func getFooterItems(result SearchResult) []footerLine {
 	var items []footerLine
 
 	if result.TmdbID > 0 && result.TmdbType != "" {
@@ -120,31 +162,7 @@ func PrintResult(result SearchResult) {
 		})
 	}
 
-	maxLen := 0
-
-	for _, item := range items {
-		l := len(item.label) + len(item.id) + 2 // "Label: ID"
-		if l > maxLen {
-			maxLen = l
-		}
-	}
-
-	var lines []string
-
-	idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-
-	for _, item := range items {
-		labelPart := ui.Muted.Render(item.label + ":")
-		idPart := idStyle.Render(item.id)
-		urlLabel := ui.Muted.Render("URL:")
-		padding := strings.Repeat(" ", maxLen-(len(item.label)+len(item.id)+2)+3)
-		line := fmt.Sprintf("%s %s%s%s %s", labelPart, idPart, padding, urlLabel, ui.Link.Render(item.url))
-		lines = append(lines, line)
-	}
-
-	footer := strings.Join(lines, "\n")
-
-	ui.Println(ui.Card(title, subtitle, body, footer))
+	return items
 }
 
 func PrintEpisodeResult(result EpisodeResult) {

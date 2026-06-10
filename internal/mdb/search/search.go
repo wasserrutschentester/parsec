@@ -22,26 +22,39 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 		return nil, fmt.Errorf("title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
 	}
 
+	if meta.ImdbID != "" || meta.TmdbID > 0 || meta.TvdbID > 0 {
+		return interactiveSearchByID(meta)
+	}
+
+	return interactiveSearchByTitle(meta, unattended)
+}
+
+func interactiveSearchByID(meta *metadata.Metadata) (*mdb.SearchResult, error) {
 	mediaType := "movie"
 	if meta.IsTV {
 		mediaType = "tv"
 	}
 
-	if meta.ImdbID != "" || meta.TmdbID > 0 || meta.TvdbID > 0 {
-		ui.Println(ui.Info.Render(fmt.Sprintf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)))
+	ui.Println(ui.Info.Render(fmt.Sprintf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)))
 
-		result, err := SearchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
-		if err != nil {
-			return nil, err
-		}
+	result, err := SearchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
+	if err != nil {
+		return nil, err
+	}
 
-		if result == nil {
-			return nil, fmt.Errorf("no results found")
-		}
+	if result == nil {
+		return nil, fmt.Errorf("no results found")
+	}
 
-		ui.PrintDebug(fmt.Sprintf("InteractiveSearch ID result: %+v", result))
+	ui.PrintDebug(fmt.Sprintf("InteractiveSearch ID result: %+v", result))
 
-		return result, nil
+	return result, nil
+}
+
+func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
+	mediaType := "movie"
+	if meta.IsTV {
+		mediaType = "tv"
 	}
 
 	// Replace dots with spaces for the search query
@@ -62,6 +75,10 @@ func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchRes
 		return &results[0], nil
 	}
 
+	return promptForResultSelection(results)
+}
+
+func promptForResultSelection(results []mdb.SearchResult) (*mdb.SearchResult, error) {
 	ui.Println("\n" + ui.Header.Render("AMBIGUOUS CORRELATIONS DETECTED:"))
 
 	headers := []string{"#", "Title", "Year", "Match", "Language"}
@@ -146,58 +163,12 @@ func search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 
 func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResult {
 	merged := make([]mdb.SearchResult, 0, len(resultsTMDB)+len(resultsTVDB))
-	tvdbMap := make(map[int]mdb.SearchResult)
-	tmdbMap := make(map[int]mdb.SearchResult)
-	imdbMap := make(map[string]mdb.SearchResult)
-
-	for _, r := range resultsTVDB {
-		if r.TvdbID != 0 {
-			tvdbMap[r.TvdbID] = r
-		}
-
-		if r.TmdbID != 0 {
-			tmdbMap[r.TmdbID] = r
-		}
-
-		if r.ImdbID != "" {
-			imdbMap[r.ImdbID] = r
-		}
-	}
+	tvdbMap, tmdbMap, imdbMap := buildResultMaps(resultsTVDB)
 
 	matchedTVDB := make(map[int]bool)
 
 	for _, r := range resultsTMDB {
-		var (
-			matched bool
-			tvdbRes mdb.SearchResult
-		)
-
-		// Match by TVDB ID
-		if r.TvdbID != 0 {
-			if res, ok := tvdbMap[r.TvdbID]; ok {
-				tvdbRes = res
-				matched = true
-			}
-		}
-
-		// Match by TMDB ID (if not already matched by TVDB ID)
-		if !matched && r.TmdbID != 0 {
-			if res, ok := tmdbMap[r.TmdbID]; ok {
-				tvdbRes = res
-				matched = true
-			}
-		}
-
-		// Match by IMDB ID (if not already matched)
-		if !matched && r.ImdbID != "" {
-			if res, ok := imdbMap[r.ImdbID]; ok {
-				tvdbRes = res
-				matched = true
-			}
-		}
-
-		if matched {
-			// Merge TVDB data into TMDB result
+		if tvdbRes, ok := findMatchingResult(r, tvdbMap, tmdbMap, imdbMap); ok {
 			mergeMatchedResult(&r, &tvdbRes)
 			matchedTVDB[tvdbRes.TvdbID] = true
 		}
@@ -213,6 +184,50 @@ func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResul
 	}
 
 	return merged
+}
+
+func buildResultMaps(results []mdb.SearchResult) (tvdbMap, tmdbMap map[int]mdb.SearchResult, imdbMap map[string]mdb.SearchResult) {
+	tvdbMap = make(map[int]mdb.SearchResult)
+	tmdbMap = make(map[int]mdb.SearchResult)
+	imdbMap = make(map[string]mdb.SearchResult)
+
+	for _, r := range results {
+		if r.TvdbID != 0 {
+			tvdbMap[r.TvdbID] = r
+		}
+
+		if r.TmdbID != 0 {
+			tmdbMap[r.TmdbID] = r
+		}
+
+		if r.ImdbID != "" {
+			imdbMap[r.ImdbID] = r
+		}
+	}
+
+	return
+}
+
+func findMatchingResult(r mdb.SearchResult, tvdbMap, tmdbMap map[int]mdb.SearchResult, imdbMap map[string]mdb.SearchResult) (mdb.SearchResult, bool) {
+	if r.TvdbID != 0 {
+		if res, ok := tvdbMap[r.TvdbID]; ok {
+			return res, true
+		}
+	}
+
+	if r.TmdbID != 0 {
+		if res, ok := tmdbMap[r.TmdbID]; ok {
+			return res, true
+		}
+	}
+
+	if r.ImdbID != "" {
+		if res, ok := imdbMap[r.ImdbID]; ok {
+			return res, true
+		}
+	}
+
+	return mdb.SearchResult{}, false
 }
 
 func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
@@ -421,37 +436,34 @@ func SearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult
 }
 
 func initialSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool, mediaType string) (*mdb.SearchResult, error) {
-	var (
-		result *mdb.SearchResult
-		err    error
-	)
 	if imdbID != "" {
-		result, err = tmdb.GetByImdbID(imdbID, isTV)
-		if err != nil {
-			return nil, err
-		}
-		// If TMDB didn't find it, try TVDB
-		if result == nil {
-			ui.PrintDebug(fmt.Sprintf("IMDB ID %s not found on TMDB as %s, trying TVDB...", imdbID, mediaType))
-
-			result, err = tvdb.GetByRemoteID(imdbID, mediaType)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else if tmdbID > 0 {
-		result, err = tmdb.GetByID(tmdbID, mediaType)
-		if err != nil {
-			return nil, err
-		}
-	} else if tvdbID > 0 {
-		result, err = tvdb.GetByID(tvdbID, mediaType)
-		if err != nil {
-			return nil, err
-		}
+		return searchByImdbID(imdbID, isTV, mediaType)
 	}
 
-	return result, nil
+	if tmdbID > 0 {
+		return tmdb.GetByID(tmdbID, mediaType)
+	}
+
+	if tvdbID > 0 {
+		return tvdb.GetByID(tvdbID, mediaType)
+	}
+
+	return nil, nil
+}
+
+func searchByImdbID(imdbID string, isTV bool, mediaType string) (*mdb.SearchResult, error) {
+	result, err := tmdb.GetByImdbID(imdbID, isTV)
+	if err != nil {
+		return nil, err
+	}
+
+	if result != nil {
+		return result, nil
+	}
+
+	ui.PrintDebug(fmt.Sprintf("IMDB ID %s not found on TMDB as %s, trying TVDB...", imdbID, mediaType))
+
+	return tvdb.GetByRemoteID(imdbID, mediaType)
 }
 
 func addMissingTvdbInfo(result *mdb.SearchResult, mediaType string) {

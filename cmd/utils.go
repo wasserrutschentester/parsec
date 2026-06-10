@@ -20,14 +20,12 @@ func expandArgs(args []string) []string {
 
 		if info.IsDir() {
 			_ = filepath.WalkDir(arg, func(path string, d os.DirEntry, err error) error {
-				if err != nil {
-					return nil // ignore errors walking
+				if err != nil || d.IsDir() {
+					return nil
 				}
 
-				if !d.IsDir() && filepath.Ext(path) == ".mkv" {
-					if matroska.CheckForMatroska(path) == nil {
-						expanded = append(expanded, path)
-					}
+				if filepath.Ext(path) == ".mkv" && matroska.CheckForMatroska(path) == nil {
+					expanded = append(expanded, path)
 				}
 
 				return nil

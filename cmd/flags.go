@@ -42,6 +42,7 @@ var (
 	bestFlag       bool
 )
 
+// nolint:funlen
 func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	if titleFlag != "" {
 		meta.Title = titleFlag

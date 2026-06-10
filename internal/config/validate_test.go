@@ -9,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+//nolint:funlen
 func TestValidate(t *testing.T) {
 	// Silence UI output during tests
 	ui.IsSilent = true

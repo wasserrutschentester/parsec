@@ -47,6 +47,16 @@ func runUpdate() error {
 
 	ui.PrintInfo(fmt.Sprintf("Updating to %s...", rel.TagName))
 
+	tempFile, err := downloadAndVerify(ctx, rel)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tempFile) }()
+
+	return finalizeUpdate(tempFile, rel.TagName)
+}
+
+func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error) {
 	asset := rel.GetMatchingAsset()
 	if asset == nil {
 		ui.PrintError("No prebuilt binary found for your platform")
@@ -56,7 +66,7 @@ func runUpdate() error {
 			ui.PrintInfo("- " + a.Name)
 		}
 
-		return fmt.Errorf("no matching asset found")
+		return "", fmt.Errorf("no matching asset found")
 	}
 
 	// 1. Download
@@ -65,10 +75,8 @@ func runUpdate() error {
 	tempFile, err := update.DownloadAsset(ctx, asset.BrowserDownloadURL)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to download update: %v", err))
-		return fmt.Errorf("download failed")
+		return "", fmt.Errorf("download failed")
 	}
-
-	defer func() { _ = os.Remove(tempFile) }() // Cleanup if we return early (e.g. checksum fail)
 
 	// 2. Verify Checksum
 	checksumAsset := rel.GetChecksumsAsset()
@@ -77,7 +85,7 @@ func runUpdate() error {
 
 		if err := update.VerifyChecksum(ctx, asset.Name, tempFile, checksumAsset.BrowserDownloadURL); err != nil {
 			ui.PrintError(fmt.Sprintf("Security check failed: %v", err))
-			return fmt.Errorf("checksum verification failed")
+			return tempFile, fmt.Errorf("checksum verification failed")
 		}
 
 		ui.PrintSuccess("Checksum verified")
@@ -85,6 +93,10 @@ func runUpdate() error {
 		ui.PrintWarning("No checksums.txt found in release, skipping verification")
 	}
 
+	return tempFile, nil
+}
+
+func finalizeUpdate(tempFile, tagName string) error {
 	// 3. Finalize Replacement
 	ui.PrintInfo("Finalizing update...")
 
@@ -93,7 +105,7 @@ func runUpdate() error {
 		return fmt.Errorf("update failed")
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Successfully updated to %s", rel.TagName))
+	ui.PrintSuccess(fmt.Sprintf("Successfully updated to %s", tagName))
 
 	return nil
 }

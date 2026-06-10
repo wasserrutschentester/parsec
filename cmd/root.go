@@ -112,7 +112,10 @@ func init() {
 	})
 
 	// Apply global usage template to support flag grouping
-	rootCmd.SetUsageTemplate(`Usage:{{if .Runnable}}
+	rootCmd.SetUsageTemplate(usageTemplate)
+}
+
+const usageTemplate = `Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
 
@@ -164,8 +167,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
 
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
-`)
-}
+`
 
 // tryLoadConfig attempts to load the configuration using the provided names.
 // It returns true if a config was successfully loaded or if a parsing error occurred

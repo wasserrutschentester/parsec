@@ -101,6 +101,7 @@ func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMediaInfo_Unmarshal(t *testing.T) {
 	jsonData := `{
 		"creatingLibrary": {
@@ -200,6 +201,7 @@ func TestExtra_GetString(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMediaInfo_GetMdbIDs(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -321,6 +323,7 @@ func TestMediaInfo_GetSubtitleLanguages(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMediaInfo_GetLanguageTag(t *testing.T) {
 	config.InitDefaults() // preferred_language = "de"
 

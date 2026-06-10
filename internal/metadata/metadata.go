@@ -49,22 +49,24 @@ func LanguageName(lang string) string {
 	}
 
 	tag := language.Make(lang)
-	if tag != language.Und {
-		if tag == language.Make("mul") {
-			return "MULTI"
-		} else if tag == language.Make("zxx") {
-			return "SILENT"
-		} else {
-			name := display.English.Languages().Name(tag)
-			if name != "" {
-				return strings.ToUpper(name)
-			} else {
-				return strings.ToUpper(lang)
-			}
-		}
-	} else {
+	if tag == language.Und {
 		return strings.ToUpper(lang)
 	}
+
+	if tag == language.Make("mul") {
+		return "MULTI"
+	}
+
+	if tag == language.Make("zxx") {
+		return "SILENT"
+	}
+
+	name := display.English.Languages().Name(tag)
+	if name != "" {
+		return strings.ToUpper(name)
+	}
+
+	return strings.ToUpper(lang)
 }
 
 func ChanToNotation(channels int) string {
@@ -230,6 +232,15 @@ func HeightToResolution(height int, scanType string, frameRate float64) string {
 }
 
 func (meta *Metadata) SetDefaults() {
+	meta.setBasicDefaults()
+	meta.setTechnicalDefaults()
+	meta.setIDDefaults()
+	meta.setTypeDefaults()
+
+	ui.PrintDebug(fmt.Sprintf("set config overrides: %+v", meta))
+}
+
+func (meta *Metadata) setBasicDefaults() {
 	if meta.Title == "" {
 		meta.Title = config.GetTitle()
 	}
@@ -253,7 +264,9 @@ func (meta *Metadata) SetDefaults() {
 	if meta.EpisodeTitle == "" {
 		meta.EpisodeTitle = config.GetEpisodeTitle()
 	}
+}
 
+func (meta *Metadata) setTechnicalDefaults() {
 	if meta.CutEdition == "" {
 		meta.CutEdition = config.GetCutEdition()
 	}
@@ -281,7 +294,9 @@ func (meta *Metadata) SetDefaults() {
 	if meta.Group == "" {
 		meta.Group = config.GetGroup()
 	}
+}
 
+func (meta *Metadata) setIDDefaults() {
 	if meta.ImdbID == "" {
 		meta.ImdbID = config.GetImdbID()
 	}
@@ -293,14 +308,14 @@ func (meta *Metadata) SetDefaults() {
 	if meta.TvdbID == 0 {
 		meta.TvdbID = config.GetTvdbID()
 	}
+}
 
+func (meta *Metadata) setTypeDefaults() {
 	if !meta.IsTV && config.GetIsTV() {
 		meta.IsTV = true
 	} else if meta.IsTV && config.GetIsMovie() {
 		meta.IsTV = false
 	}
-
-	ui.PrintDebug(fmt.Sprintf("set config overrides: %+v", meta))
 }
 
 func (meta *Metadata) GetReleaseName() string {

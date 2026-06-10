@@ -58,6 +58,7 @@ func TestAddUniqueAltTitle(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMergeResults(t *testing.T) {
 	tmdbResults := []mdb.SearchResult{
 		{

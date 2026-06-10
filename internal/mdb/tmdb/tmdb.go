@@ -158,19 +158,23 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 
 func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
 	externalIDs, err := GetExternalIDs(result.TmdbID, mediaType)
-	if err == nil {
-		if externalIDs.Imdb != "" {
-			result.ImdbID = externalIDs.Imdb
-		}
+	if err != nil {
+		return
+	}
 
-		if externalIDs.Tvdb != 0 {
-			result.TvdbID = externalIDs.Tvdb
-			if result.IsTV {
-				result.TvdbType = "series"
-			} else {
-				result.TvdbType = "movies"
-			}
-		}
+	if externalIDs.Imdb != "" {
+		result.ImdbID = externalIDs.Imdb
+	}
+
+	if externalIDs.Tvdb == 0 {
+		return
+	}
+
+	result.TvdbID = externalIDs.Tvdb
+
+	result.TvdbType = "movies"
+	if result.IsTV {
+		result.TvdbType = "series"
 	}
 }
 

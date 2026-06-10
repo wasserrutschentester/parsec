@@ -44,6 +44,8 @@ func runTableTest[T any](t *testing.T, tests []struct {
 }
 
 // Test cases for filename parsing
+//
+//nolint:funlen
 func TestParse(t *testing.T) {
 	tests := []struct {
 		input    string

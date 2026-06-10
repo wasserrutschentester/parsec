@@ -310,32 +310,42 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
-		if (track.Type == "Audio" || track.Type == "Text") && track.Duration != 0 {
-			dur := track.Duration
-			diff := dur - videoDur
-			percentDiff := diff / videoDur * -100
+		if (track.Type != "Audio" && track.Type != "Text") || track.Duration == 0 {
+			continue
+		}
 
-			var trackWarning string
-			if diff > 5.0 {
-				trackWarning = fmt.Sprintf("%s (diff: %.1fs)", ui.Error.Render("significantly longer"), diff)
-				res.Severity = "error"
-			} else if diff < -20.0 && track.Type == "Audio" {
-				trackWarning = fmt.Sprintf("%s (diff: %.1fs)", ui.Warning.Render("significantly shorter"), diff)
-			} else if percentDiff > 10.0 {
-				trackWarning = fmt.Sprintf("%.1f%% %s (diff: %.1fs)", percentDiff, ui.Warning.Render("shorter"), diff)
+		dur := track.Duration
+		diff := dur - videoDur
+		percentDiff := diff / videoDur * -100
+
+		trackWarning := getDurationWarning(track, diff, percentDiff)
+
+		if trackWarning != "" {
+			res.Passed = false
+			if res.Severity == "" {
+				res.Severity = "warning"
 			}
 
-			if trackWarning != "" {
-				res.Passed = false
-				if res.Severity == "" {
-					res.Severity = "warning"
-				}
-
-				res.Warning = "Inconsistent track durations"
-				res.Tracks = append(res.Tracks, miTrackToResult(track, false, trackWarning))
-			}
+			res.Warning = "Inconsistent track durations"
+			res.Tracks = append(res.Tracks, miTrackToResult(track, false, trackWarning))
 		}
 	}
 
 	return []CheckResult{res}
+}
+
+func getDurationWarning(track *mediainfo.Track, diff, percentDiff float64) string {
+	if diff > 5.0 {
+		return fmt.Sprintf("%s (diff: %.1fs)", ui.Error.Render("significantly longer"), diff)
+	}
+
+	if diff < -20.0 && track.Type == "Audio" {
+		return fmt.Sprintf("%s (diff: %.1fs)", ui.Warning.Render("significantly shorter"), diff)
+	}
+
+	if percentDiff > 10.0 {
+		return fmt.Sprintf("%.1f%% %s (diff: %.1fs)", percentDiff, ui.Warning.Render("shorter"), diff)
+	}
+
+	return ""
 }

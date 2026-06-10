@@ -160,25 +160,25 @@ func checkStreamingService(meta *metadata.Metadata) []CheckResult {
 }
 
 func checkTvSpecial(meta *metadata.Metadata) []CheckResult {
-	if meta.IsTV && meta.Season == 0 {
-		if meta.Date == "" || meta.EpisodeTitle == "" {
-			warning := ""
-			if meta.Date == "" {
-				warning = "Date"
-			} else if meta.EpisodeTitle != "" {
-				warning = "Episode Title"
-			} else {
-				warning = "Date and Episode Title"
-			}
-
-			return []CheckResult{{
-				Identifier: "filename_tv_special",
-				Passed:     false,
-				Severity:   "warning",
-				Warning:    fmt.Sprintf("%s is missing for TV Special", warning),
-			}}
-		}
+	if !meta.IsTV || meta.Season != 0 {
+		return nil
 	}
 
-	return nil
+	if meta.Date != "" && meta.EpisodeTitle != "" {
+		return nil
+	}
+
+	warning := "Date and Episode Title"
+	if meta.Date == "" && meta.EpisodeTitle != "" {
+		warning = "Date"
+	} else if meta.Date != "" && meta.EpisodeTitle == "" {
+		warning = "Episode Title"
+	}
+
+	return []CheckResult{{
+		Identifier: "filename_tv_special",
+		Passed:     false,
+		Severity:   "warning",
+		Warning:    fmt.Sprintf("%s is missing for TV Special", warning),
+	}}
 }

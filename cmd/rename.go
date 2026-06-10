@@ -55,22 +55,10 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	// 1. Parse filename for initial metadata
 	meta := filename.Parse(filenameNoExt)
 
-	// 2.1 Get MediaInfo and merge
-	mi, err := mediainfo.Get(filePath)
-	if err == nil {
-		mediaMeta := mi.GetMetadata()
-		meta.Override(mediaMeta)
-	} else {
-		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", ui.AnonymizePath(filePath), err))
-		return fmt.Errorf("mediainfo parsing failed")
-	}
-
-	// 2.2 Get EBML Metadata for Visual Impaired flag
-	ebml, err := matroska.GetEbmlMetadata(filePath)
-	if err == nil {
-		if ebml.HasVisualImpairedAudio() {
-			meta.HasAudioDesc = true
-		}
+	// 2. Get MediaInfo/EBML and merge
+	mi, err := renameGetMediaMetadata(filePath, meta)
+	if err != nil {
+		return err
 	}
 
 	// 2.3 Apply MDB IDs from file tags
@@ -80,32 +68,10 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	applyMetadataFlags(cmd, meta)
 
 	// 4. MDB Search to get "correct" title and year
-	meta.SetDefaults()
-	result, _ := mdbSearch.InteractiveSearch(meta, true)
+	renameApplyMdbSearch(meta)
 
-	if result != nil {
-		mdb.PrintCompactResult(*result)
-
-		meta.Title = result.Title
-		if result.Year > 0 {
-			meta.Year = result.Year
-		}
-
-		if meta.IsTV {
-			episodeResult := renameGetEpisodeInfo(result, meta)
-			mdb.PrintCompactEpisodeResult(episodeResult)
-		}
-	} else {
-		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
-	}
-
-	ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
-
-	// 6. Apply normalization to Title, EpisodeTitle and Service
-	meta.Title = filename.NormalizeTitle(meta.Title)
-	if meta.EpisodeTitle != "" {
-		meta.EpisodeTitle = filename.NormalizeTitle(meta.EpisodeTitle)
-	}
+	// 6. Apply normalization
+	renameApplyNormalization(meta)
 
 	if meta.Service != "" {
 		meta.Service = filename.NormalizeService(meta.Service)
@@ -123,6 +89,10 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 		return nil
 	}
 
+	return renameCommit(filePath, newPath, newName)
+}
+
+func renameCommit(filePath, newPath, newName string) error {
 	ui.Println()
 	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath), "Proposed Vector", newName))
 	ui.Println()
@@ -148,9 +118,63 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
 		return fmt.Errorf("rename failed")
+	}
+
+	ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
+
+	return nil
+}
+
+func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainfo.MediaInfo, error) {
+	// 2.1 Get MediaInfo and merge
+	mi, err := mediainfo.Get(filePath)
+	if err == nil {
+		mediaMeta := mi.GetMetadata()
+		meta.Override(mediaMeta)
 	} else {
-		ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
-		return nil
+		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", ui.AnonymizePath(filePath), err))
+		return nil, fmt.Errorf("mediainfo parsing failed")
+	}
+
+	// 2.2 Get EBML Metadata for Visual Impaired flag
+	ebml, err := matroska.GetEbmlMetadata(filePath)
+	if err == nil {
+		if ebml.HasVisualImpairedAudio() {
+			meta.HasAudioDesc = true
+		}
+	}
+
+	return mi, nil
+}
+
+func renameApplyMdbSearch(meta *metadata.Metadata) {
+	meta.SetDefaults()
+	result, _ := mdbSearch.InteractiveSearch(meta, true)
+
+	if result != nil {
+		mdb.PrintCompactResult(*result)
+
+		meta.Title = result.Title
+		if result.Year > 0 {
+			meta.Year = result.Year
+		}
+
+		if meta.IsTV {
+			episodeResult := renameGetEpisodeInfo(result, meta)
+			mdb.PrintCompactEpisodeResult(episodeResult)
+		}
+	} else {
+		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
+	}
+
+	ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
+}
+
+func renameApplyNormalization(meta *metadata.Metadata) {
+	// Apply normalization to Title, EpisodeTitle and Service
+	meta.Title = filename.NormalizeTitle(meta.Title)
+	if meta.EpisodeTitle != "" {
+		meta.EpisodeTitle = filename.NormalizeTitle(meta.EpisodeTitle)
 	}
 }
 

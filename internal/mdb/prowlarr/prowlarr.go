@@ -128,6 +128,10 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 		return nil, <-errChan
 	}
 
+	return processParallelResults(resultsChan), nil
+}
+
+func processParallelResults(resultsChan <-chan []ReleaseResource) []ReleaseResource {
 	var allResults []ReleaseResource
 
 	seenGuids := make(map[string]bool)
@@ -148,7 +152,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int,
 		ui.PrintDebug(fmt.Sprintf("Removed %d duplicate Prowlarr results across multiple queries", duplicates))
 	}
 
-	return allResults, nil
+	return allResults
 }
 
 func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerIds []int) (*url.URL, error) {

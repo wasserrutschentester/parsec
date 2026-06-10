@@ -201,6 +201,7 @@ func TestCheckBitRate(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestCheckDurations(t *testing.T) {
 	order0 := 0
 	order1 := 1
@@ -278,6 +279,7 @@ func TestCheckDurations(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestCheckDialogueNormalization(t *testing.T) {
 	tests := []struct {
 		name     string

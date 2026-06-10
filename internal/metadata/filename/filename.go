@@ -47,10 +47,7 @@ func Parse(filename string) *metadata.Metadata {
 	meta.Season, meta.Episode = matchSeasonEpisode(filename)
 
 	// Date (YYYY-MM-DD)
-	dataRegex := regexp.MustCompile(`[ .](\d{4}-\d{2}-\d{2})([ .]|$)`)
-	if match := dataRegex.FindStringSubmatch(filename); len(match) > 1 {
-		meta.Date = match[1]
-	}
+	matchDate(filename, meta)
 
 	// TV Show
 	if meta.Season > 0 || meta.Episode > 0 || meta.Date != "" {
@@ -61,68 +58,28 @@ func Parse(filename string) *metadata.Metadata {
 	matchLanguage(filename, meta)
 
 	// match REPACK
-	repackRegex := regexp.MustCompile(`[ .]REPACK([ .-]|$|\d)`)
-	if repackRegex.MatchString(filename) {
-		meta.Repack = true
-	}
+	matchRepack(filename, meta)
 
 	// Basic regex for resolution
-	resRegex := regexp.MustCompile(`[ .](\d{3,4}[p|i])([ .-]|$| )`)
-	if match := resRegex.FindStringSubmatch(filename); len(match) > 1 {
-		meta.Resolution = match[1]
-	}
+	matchResolution(filename, meta)
 
 	// Basic regex for Audio (AAC|DDP|DD|DTS|TrueHD|Atmos|Opus|FLAC) and channels
-	audioRegex := regexp.MustCompile(`[ .](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .-]|$| )`)
-	if match := audioRegex.FindStringSubmatch(filename); len(match) > 1 {
-		meta.AudioCodec = match[1]
-		if len(match) > 2 && match[2] != "" {
-			meta.AudioCodec += match[2]
-		}
-
-		if len(match) > 4 && match[4] != "" {
-			meta.AudioChannels = match[4]
-		}
-
-		if len(match) > 5 && match[5] != "" {
-			meta.AudioMeta = "Atmos"
-		}
-
-		if meta.AudioCodec == "Atmos" {
-			meta.AudioCodec = ""
-			meta.AudioMeta = "Atmos"
-		}
-	}
+	matchAudio(filename, meta)
 
 	// Basic regex for Video Codec
-	videoRegex := regexp.MustCompile(`[ .]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .-]|$| )`)
-	if match := videoRegex.FindStringSubmatch(filename); len(match) > 1 {
-		meta.VideoCodec = match[1]
-	}
+	matchVideo(filename, meta)
 
 	// Service
 	meta.Service = matchStreamingService(filename)
 
 	// Source
-	sourceRegex := regexp.MustCompile(`(?i)[ .](WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .-]|$| )`)
-	if match := sourceRegex.FindStringSubmatch(filename); len(match) > 1 {
-		meta.Source = match[1]
-	}
+	matchSource(filename, meta)
 
 	// Edition
 	matchEdition(filename, meta)
 
 	// Group after last - in the filename
-	groupRegex := regexp.MustCompile(`\-([^-]+)$`)
-	if match := groupRegex.FindStringSubmatch(filename); len(match) > 1 {
-		group := match[1]
-		// Don't match WEB-DL as group if it's the source
-		if (group == "DL" || strings.HasPrefix(group, "DL.")) && strings.HasSuffix(filename[:strings.LastIndex(filename, "-")], "WEB") {
-			// skip
-		} else {
-			meta.Group = group
-		}
-	}
+	matchGroup(filename, meta)
 
 	if meta.Title == "" {
 		meta.Title = extractTitleFallback(filename, meta)
@@ -451,69 +408,109 @@ func removeDiacritics(title string) string {
 func NormalizeService(service string) string {
 	s := strings.ToLower(service)
 
-	if regexp.MustCompile(`^(hmax|hbom|hbo[ ._-]?max)$`).MatchString(s) {
-		return "HMAX"
+	type serviceMap struct {
+		pattern string
+		code    string
 	}
 
-	if regexp.MustCompile(`^(amzn|amazon(hd)?)$`).MatchString(s) {
-		return "AMZN"
+	services := []serviceMap{
+		{`^(hmax|hbom|hbo[ ._-]?max)$`, "HMAX"},
+		{`^(amzn|amazon(hd)?)$`, "AMZN"},
+		{`^(atvp|aptv|apple[ ._-]?tv\+?)$`, "ATVP"},
+		{`^(cnlp|canp|canal\+)$`, "CNLP"},
+		{`^(dsnp|dsny|disney(\+)?)$`, "DSNP"},
+		{`^(it|itunes)$`, "iT"},
+		{`^(nf|netflix(u?hd)?)$`, "NF"},
+		{`^(pcok|peacock([ ._-]?tv)?)$`, "PCOK"},
+		{`^(pmtp|paramount(\+)?)$`, "PMTP"},
+		{`^(sho|showtime)$`, "SHO"},
+		{`^(cr|crunchyroll)$`, "CR"},
+		{`^(rtlp|rtl\+)$`, "RTLP"},
+		{`^(ardp|ard\+)$`, "ARDP"},
+		{`^(ard(mediathek)?|br|hr|mdr|ndr|rbb|sr|swr|wdr|rbtv)$`, "ARD"},
+		{`^kika$`, "KiKA"},
 	}
 
-	if regexp.MustCompile(`^(atvp|aptv|apple[ ._-]?tv\+?)$`).MatchString(s) {
-		return "ATVP"
-	}
-
-	if regexp.MustCompile(`^(cnlp|canp|canal\+)$`).MatchString(s) {
-		return "CNLP"
-	}
-
-	if regexp.MustCompile(`^(dsnp|dsny|disney(\+)?)$`).MatchString(s) {
-		return "DSNP"
-	}
-
-	if regexp.MustCompile(`^(it|itunes)$`).MatchString(s) {
-		return "iT"
-	}
-
-	if regexp.MustCompile(`^(nf|netflix(u?hd)?)$`).MatchString(s) {
-		return "NF"
-	}
-
-	if regexp.MustCompile(`^(pcok|peacock([ ._-]?tv)?)$`).MatchString(s) {
-		return "PCOK"
-	}
-
-	if regexp.MustCompile(`^(pmtp|paramount(\+)?)$`).MatchString(s) {
-		return "PMTP"
-	}
-
-	if regexp.MustCompile(`^(sho|showtime)$`).MatchString(s) {
-		return "SHO"
-	}
-
-	if regexp.MustCompile(`^(cr|crunchyroll)$`).MatchString(s) {
-		return "CR"
-	}
-
-	if regexp.MustCompile(`^(rtlp|rtl\+)$`).MatchString(s) {
-		return "RTLP"
-	}
-
-	if regexp.MustCompile(`^(ardp|ard\+)$`).MatchString(s) {
-		return "ARDP"
-	}
-
-	if regexp.MustCompile(`^(ard(mediathek)?|br|hr|mdr|ndr|rbb|sr|swr|wdr|rbtv)$`).MatchString(s) {
-		return "ARD"
+	for _, sm := range services {
+		if regexp.MustCompile(sm.pattern).MatchString(s) {
+			return sm.code
+		}
 	}
 
 	if strings.HasPrefix(s, "zdf") {
 		return "ZDF"
 	}
 
-	if regexp.MustCompile(`^kika$`).MatchString(s) {
-		return "KiKA"
-	}
-
 	return strings.ToUpper(service)
+}
+
+func matchDate(filename string, meta *metadata.Metadata) {
+	dataRegex := regexp.MustCompile(`[ .](\d{4}-\d{2}-\d{2})([ .]|$)`)
+	if match := dataRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.Date = match[1]
+	}
+}
+
+func matchRepack(filename string, meta *metadata.Metadata) {
+	repackRegex := regexp.MustCompile(`[ .]REPACK([ .-]|$|\d)`)
+	if repackRegex.MatchString(filename) {
+		meta.Repack = true
+	}
+}
+
+func matchResolution(filename string, meta *metadata.Metadata) {
+	resRegex := regexp.MustCompile(`[ .](\d{3,4}[p|i])([ .-]|$| )`)
+	if match := resRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.Resolution = match[1]
+	}
+}
+
+func matchAudio(filename string, meta *metadata.Metadata) {
+	audioRegex := regexp.MustCompile(`[ .](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .-]|$| )`)
+	if match := audioRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.AudioCodec = match[1]
+		if len(match) > 2 && match[2] != "" {
+			meta.AudioCodec += match[2]
+		}
+
+		if len(match) > 4 && match[4] != "" {
+			meta.AudioChannels = match[4]
+		}
+
+		if len(match) > 5 && match[5] != "" {
+			meta.AudioMeta = "Atmos"
+		}
+
+		if meta.AudioCodec == "Atmos" {
+			meta.AudioCodec = ""
+			meta.AudioMeta = "Atmos"
+		}
+	}
+}
+
+func matchVideo(filename string, meta *metadata.Metadata) {
+	videoRegex := regexp.MustCompile(`[ .]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .-]|$| )`)
+	if match := videoRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.VideoCodec = match[1]
+	}
+}
+
+func matchSource(filename string, meta *metadata.Metadata) {
+	sourceRegex := regexp.MustCompile(`(?i)[ .](WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .-]|$| )`)
+	if match := sourceRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.Source = match[1]
+	}
+}
+
+func matchGroup(filename string, meta *metadata.Metadata) {
+	groupRegex := regexp.MustCompile(`\-([^-]+)$`)
+	if match := groupRegex.FindStringSubmatch(filename); len(match) > 1 {
+		group := match[1]
+		// Don't match WEB-DL as group if it's the source
+		if (group == "DL" || strings.HasPrefix(group, "DL.")) && strings.HasSuffix(filename[:strings.LastIndex(filename, "-")], "WEB") {
+			// skip
+		} else {
+			meta.Group = group
+		}
+	}
 }

@@ -223,33 +223,37 @@ func checkSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 }
 
 func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
+	if meta.Season == 0 && meta.Episode == 0 {
+		return nil
+	}
+
 	var results []CheckResult
 
-	if meta.Season > 0 || meta.Episode > 0 {
-		epResult := mdbSearch.FindEpisode(*result, meta, false)
+	epResult := mdbSearch.FindEpisode(*result, meta, false)
 
-		existenceCheck := CheckResult{
-			Identifier: "mdb_episode_existence",
-			Passed:     true,
-		}
+	existenceCheck := CheckResult{
+		Identifier: "mdb_episode_existence",
+		Passed:     true,
+	}
 
-		if epResult.Name == "" {
-			if config.IsCheckEnabled("mdb_episode_existence") {
-				existenceCheck.Passed = false
-				existenceCheck.Severity = "warning"
-				existenceCheck.Warning = fmt.Sprintf("Episode S%02dE%02d not found on TVDB/TMDB.", meta.Season, meta.Episode)
-				results = append(results, existenceCheck)
-			}
-		} else {
+	if epResult.Name == "" {
+		if config.IsCheckEnabled("mdb_episode_existence") {
+			existenceCheck.Passed = false
+			existenceCheck.Severity = "warning"
+			existenceCheck.Warning = fmt.Sprintf("Episode S%02dE%02d not found on TVDB/TMDB.", meta.Season, meta.Episode)
 			results = append(results, existenceCheck)
-			if config.IsCheckEnabled("mdb_episode_title") {
-				results = append(results, checkEpisodeTitle(meta, epResult)...)
-			}
-
-			if config.IsCheckEnabled("mdb_episode_date") {
-				results = append(results, checkSpecialDate(meta, epResult)...)
-			}
 		}
+
+		return results
+	}
+
+	results = append(results, existenceCheck)
+	if config.IsCheckEnabled("mdb_episode_title") {
+		results = append(results, checkEpisodeTitle(meta, epResult)...)
+	}
+
+	if config.IsCheckEnabled("mdb_episode_date") {
+		results = append(results, checkSpecialDate(meta, epResult)...)
 	}
 
 	return results

@@ -10,6 +10,8 @@ linters:
         - errorlint
         - usestdlibvars
         - wsl_v5
+        - funlen
+        - nestif
 
 formatters:
     enable:

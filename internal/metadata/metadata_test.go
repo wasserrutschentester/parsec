@@ -175,6 +175,7 @@ func TestMetadata_SetDefaults(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMetadata_String(t *testing.T) {
 	tests := []struct {
 		name string

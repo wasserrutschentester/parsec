@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+//nolint:funlen
 func TestExpandArgs(t *testing.T) {
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "parsec-test-*")

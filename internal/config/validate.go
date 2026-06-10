@@ -214,30 +214,9 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 		}
 
 		// Handle structural sections FIRST
-		if k == "api_keys" && prefix == "" {
-			if subMap, ok := v.(map[string]interface{}); ok {
-				errors = append(errors, validateMapTypes(subMap, fullKey, apiKeysExpectedTypes)...)
-				continue
-			}
-		}
-
-		if k == "prowlarr" && prefix == "" {
-			if subMap, ok := v.(map[string]interface{}); ok {
-				errors = append(errors, validateMapTypes(subMap, fullKey, prowlarrExpectedTypes)...)
-				continue
-			}
-		}
-
-		if k == "preset" && prefix == "" {
-			if subMap, ok := v.(map[string]interface{}); ok {
-				for presetName, presetContent := range subMap {
-					if pcMap, ok := presetContent.(map[string]interface{}); ok {
-						errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
-					}
-				}
-
-				continue
-			}
+		if structuralErrors, handled := validateStructuralSections(k, v, prefix, fullKey); handled {
+			errors = append(errors, structuralErrors...)
+			continue
 		}
 
 		expected, ok := schema[strings.ToLower(k)]
@@ -257,25 +236,58 @@ func validateMapTypes(m map[string]interface{}, prefix string, schema map[string
 			continue
 		}
 
-		// Template key validation
-		if k == "template" {
-			if templateStr, ok := v.(string); ok {
-				errors = append(errors, validateTemplateKeys(templateStr, fullKey)...)
-			}
-		}
+		errors = append(errors, validateSpecificKeys(k, v, fullKey)...)
+	}
 
-		// Language validation
-		if k == "preferred_language" {
-			if langStr, ok := v.(string); ok {
-				errors = append(errors, validateLanguage(langStr, fullKey)...)
-			}
-		}
+	return errors
+}
 
-		// Check identifier validation
-		if k == "enabled_checks" || k == "disabled_checks" {
-			if checkList, ok := v.([]interface{}); ok {
-				errors = append(errors, validateCheckIdentifiers(checkList, fullKey)...)
+func validateStructuralSections(k string, v interface{}, prefix, fullKey string) ([]string, bool) {
+	if prefix != "" {
+		return nil, false
+	}
+
+	switch k {
+	case "api_keys":
+		if subMap, ok := v.(map[string]interface{}); ok {
+			return validateMapTypes(subMap, fullKey, apiKeysExpectedTypes), true
+		}
+	case "prowlarr":
+		if subMap, ok := v.(map[string]interface{}); ok {
+			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
+		}
+	case "preset":
+		if subMap, ok := v.(map[string]interface{}); ok {
+			var errors []string
+
+			for presetName, presetContent := range subMap {
+				if pcMap, ok := presetContent.(map[string]interface{}); ok {
+					errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
+				}
 			}
+
+			return errors, true
+		}
+	}
+
+	return nil, false
+}
+
+func validateSpecificKeys(k string, v interface{}, fullKey string) []string {
+	var errors []string
+
+	switch k {
+	case "template":
+		if templateStr, ok := v.(string); ok {
+			errors = append(errors, validateTemplateKeys(templateStr, fullKey)...)
+		}
+	case "preferred_language":
+		if langStr, ok := v.(string); ok {
+			errors = append(errors, validateLanguage(langStr, fullKey)...)
+		}
+	case "enabled_checks", "disabled_checks":
+		if checkList, ok := v.([]interface{}); ok {
+			errors = append(errors, validateCheckIdentifiers(checkList, fullKey)...)
 		}
 	}
 
