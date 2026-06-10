@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/language"
 )
 
+// RunMdbChecks performs checks against online media databases (TMDB/TVDB).
 // nolint:cyclop
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult

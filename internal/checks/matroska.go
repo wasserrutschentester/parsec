@@ -54,6 +54,7 @@ func newFailedTrackResult(id, desc, severity string, track *matroska.EbmlTrack, 
 	}
 }
 
+// RunMatroskaChecks performs checks on the Matroska container and its tracks.
 func RunMatroskaChecks(filePath string) []CheckResult {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {

@@ -19,7 +19,9 @@ import (
 )
 
 var (
-	BaseURL    = "https://api4.thetvdb.com/v4"
+	// BaseURL is the TVDB API base URL.
+	BaseURL = "https://api4.thetvdb.com/v4"
+	// HTTPClient is the HTTP client used for TVDB requests.
 	HTTPClient = http.DefaultClient
 )
 
@@ -113,7 +115,8 @@ type tvdbSearchResponse struct {
 	Data   []tvdbMedia `json:"data"`
 }
 
-type TvdbEpisode struct {
+// Episode represents a single episode in the TVDB API.
+type Episode struct {
 	ID           int    `json:"id"`
 	Name         string `json:"name"`
 	Aired        string `json:"aired"`
@@ -122,7 +125,7 @@ type TvdbEpisode struct {
 	Overview     string `json:"overview"`
 }
 
-func (e *TvdbEpisode) toEpisodeResult() mdb.EpisodeResult {
+func (e *Episode) toEpisodeResult() mdb.EpisodeResult {
 	return mdb.EpisodeResult{
 		Name:     e.Name,
 		Airdate:  e.Aired,
@@ -136,7 +139,7 @@ func (e *TvdbEpisode) toEpisodeResult() mdb.EpisodeResult {
 type tvdbEpisodeResponse struct {
 	Status string `json:"status"`
 	Data   struct {
-		Episodes []TvdbEpisode `json:"episodes"`
+		Episodes []Episode `json:"episodes"`
 	} `json:"data"`
 	Links struct {
 		Prev string `json:"prev"`
@@ -286,6 +289,7 @@ func toTvdbType(mediaType string) string {
 	}
 }
 
+// Search searches for media on TVDB by query and optionally by year.
 func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	tvdbType := toTvdbType(mediaType)
 
@@ -319,6 +323,7 @@ type tvdbRemoteIdResponse struct {
 	Data   []tvdbRemoteMatch `json:"data"`
 }
 
+// GetByRemoteID retrieves media from TVDB using a remote ID (e.g. IMDB ID).
 func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 	endpoint := fmt.Sprintf("search/remoteid/%s", remoteID)
 
@@ -386,7 +391,7 @@ func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
 		return
 	}
 
-	translation, err := GetTranslation(tvdbID, mediaType, prefLang)
+	translation, err := getTranslation(tvdbID, mediaType, prefLang)
 	if err != nil {
 		return
 	}
@@ -400,6 +405,7 @@ func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
 	}
 }
 
+// GetByID retrieves a single media item from TVDB by its ID.
 func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	endpoint := toTvdbType(mediaType)
 
@@ -435,7 +441,7 @@ type tvdbTranslationResponse struct {
 	} `json:"data"`
 }
 
-func GetTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse, error) {
+func getTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse, error) {
 	tvdbType := toTvdbType(mediaType)
 	iso3 := getISO3(lang)
 
@@ -451,7 +457,7 @@ func GetTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse
 }
 
 func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
-	externalIDs, err := GetExternalIDs(tvdbID, mediaType)
+	externalIDs, err := getExternalIDs(tvdbID, mediaType)
 	if err == nil {
 		result.OriginalLanguage = externalIDs.Data.OriginalLanguage
 
@@ -482,7 +488,7 @@ func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 	}
 }
 
-func GetExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, error) {
+func getExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, error) {
 	endpoint := toTvdbType(mediaType)
 
 	var data tvdbExternalIDsResponse
@@ -493,7 +499,7 @@ func GetExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, erro
 	return data, nil
 }
 
-func GetEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
+func getEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	var data tvdbEpisodeResponse
 
 	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
@@ -508,12 +514,16 @@ func GetEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	return data, nil
 }
 
-func GetAllEpisodes(seriesID int, lang string) ([]TvdbEpisode, error) {
-	var episodes []TvdbEpisode
+func getAllEpisodes(seriesID int, lang string) ([]Episode, error) {
+	var episodes []Episode
 
 	for page := 0; page < 20; page++ {
-		data, err := GetEpisodes(seriesID, page, lang)
+		data, err := getEpisodes(seriesID, page, lang)
 		if err != nil {
+			if page == 0 {
+				return nil, err
+			}
+
 			break
 		}
 
@@ -526,6 +536,7 @@ func GetAllEpisodes(seriesID int, lang string) ([]TvdbEpisode, error) {
 	return episodes, nil
 }
 
+// IdentifyEpisode attempts to find a specific episode in a TVDB series based on metadata.
 func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
 	preferred := config.GetPreferredLanguage()
 	langs := []string{preferred, result.OriginalLanguage, "en"}
@@ -534,7 +545,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 	normalizedQueryTitle := metadata.Normalize(meta.EpisodeTitle)
 
 	for _, lang := range uniqueLangs {
-		episodes, err := GetAllEpisodes(result.TvdbID, lang)
+		episodes, err := getAllEpisodes(result.TvdbID, lang)
 		if err != nil {
 			continue
 		}
@@ -555,8 +566,8 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 	return mdb.EpisodeResult{}, fmt.Errorf("no episode found")
 }
 
-func findEpisodeInList(episodes []TvdbEpisode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *TvdbEpisode {
-	var ep *TvdbEpisode
+func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *Episode {
+	var ep *Episode
 	// 1. Season/Episode Number Match
 	if (meta.Season > 0 && meta.Episode > 0) || allowSpecials {
 		ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episode)
@@ -577,7 +588,7 @@ func findEpisodeInList(episodes []TvdbEpisode, meta *metadata.Metadata, normaliz
 	return ep
 }
 
-func matchBySeasonEpisode(episodes []TvdbEpisode, season, episode int) *TvdbEpisode {
+func matchBySeasonEpisode(episodes []Episode, season, episode int) *Episode {
 	for _, ep := range episodes {
 		if ep.SeasonNumber == season && ep.Number == episode {
 			return &ep
@@ -587,7 +598,7 @@ func matchBySeasonEpisode(episodes []TvdbEpisode, season, episode int) *TvdbEpis
 	return nil
 }
 
-func matchByAirDate(episodes []TvdbEpisode, date string, allowSpecials bool) *TvdbEpisode {
+func matchByAirDate(episodes []Episode, date string, allowSpecials bool) *Episode {
 	for _, ep := range episodes {
 		if ep.Aired == date {
 			if ep.SeasonNumber == 0 && !allowSpecials {
@@ -601,7 +612,7 @@ func matchByAirDate(episodes []TvdbEpisode, date string, allowSpecials bool) *Tv
 	return nil
 }
 
-func matchByTitle(episodes []TvdbEpisode, normTitle string, allowSpecials bool) *TvdbEpisode {
+func matchByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Episode {
 	for _, ep := range episodes {
 		if metadata.Normalize(ep.Name) == normTitle {
 			if ep.SeasonNumber == 0 && !allowSpecials {
@@ -615,8 +626,8 @@ func matchByTitle(episodes []TvdbEpisode, normTitle string, allowSpecials bool) 
 	return nil
 }
 
-func matchByTitleFuzzy(episodes []TvdbEpisode, normTitle string) *TvdbEpisode {
-	var bestMatch TvdbEpisode
+func matchByTitleFuzzy(episodes []Episode, normTitle string) *Episode {
+	var bestMatch Episode
 
 	maxSim := 0.0
 	found := false
@@ -643,7 +654,7 @@ func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 		return
 	}
 
-	translation, err := GetTranslation(tvdbID, "episodes", lang)
+	translation, err := getTranslation(tvdbID, "episodes", lang)
 	ui.PrintDebug(fmt.Sprintf("translation: %+v, err: %v", translation, err))
 
 	if err == nil {

@@ -10,6 +10,7 @@ import (
 //go:embed default_config.toml
 var defaultConfig string
 
+// InitDefaults initializes the default configuration values in viper.
 func InitDefaults() {
 	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
@@ -27,9 +28,11 @@ func InitDefaults() {
 
 var (
 	activePreset string
-	NoCache      bool
+	// NoCache bypasses the API cache if set to true.
+	NoCache bool
 )
 
+// SetPreset sets the active configuration preset.
 func SetPreset(name string) {
 	activePreset = name
 }
@@ -45,6 +48,7 @@ func getPresetKey(key string) string {
 	return key
 }
 
+// PresetExists returns true if the given preset name exists in the configuration.
 func PresetExists(name string) bool {
 	return viper.IsSet("preset." + name)
 }
@@ -65,110 +69,137 @@ func getStringSlice(key string) []string {
 	return viper.GetStringSlice(getPresetKey(key))
 }
 
+// GetTemplate returns the naming template from the configuration.
 func GetTemplate() string {
 	return getString("template")
 }
 
+// GetPreferredLanguage returns the preferred language code from the configuration.
 func GetPreferredLanguage() string {
 	return getString("preferred_language")
 }
 
+// GetSubbedTagging returns true if subbed tagging is enabled.
 func GetSubbedTagging() bool {
 	return getBool("subbed_tagging")
 }
 
+// GetTitle returns the title override from the configuration.
 func GetTitle() string {
 	return getString("title")
 }
 
+// GetYear returns the year override from the configuration.
 func GetYear() int {
 	return getInt("year")
 }
 
+// GetSeason returns the season override from the configuration.
 func GetSeason() int {
 	return getInt("season")
 }
 
+// GetEpisode returns the episode override from the configuration.
 func GetEpisode() int {
 	return getInt("episode")
 }
 
+// GetDate returns the date override from the configuration.
 func GetDate() string {
 	return getString("date")
 }
 
+// GetEpisodeTitle returns the episode title override from the configuration.
 func GetEpisodeTitle() string {
 	return getString("episode_title")
 }
 
+// GetCutEdition returns the cut/edition override from the configuration.
 func GetCutEdition() string {
 	return getString("cut_edition")
 }
 
+// GetHDR returns the HDR override from the configuration.
 func GetHDR() string {
 	return getString("hdr")
 }
 
+// GetService returns the service override from the configuration.
 func GetService() string {
 	return getString("service")
 }
 
+// GetSource returns the source override from the configuration.
 func GetSource() string {
 	return getString("source")
 }
 
+// GetRepack returns true if repack override is enabled.
 func GetRepack() bool {
 	return getBool("repack")
 }
 
+// GetAudioDescription returns true if audio description is enabled.
 func GetAudioDescription() bool {
 	return getBool("audio_description")
 }
 
+// GetGroup returns the group override from the configuration.
 func GetGroup() string {
 	return getString("group")
 }
 
+// GetIsTV returns true if the media is a TV show.
 func GetIsTV() bool {
 	return getBool("is_tv")
 }
 
+// GetIsMovie returns true if the media is a movie.
 func GetIsMovie() bool {
 	return getBool("is_movie")
 }
 
+// GetImdbID returns the IMDB ID override from the configuration.
 func GetImdbID() string {
 	return getString("imdb_id")
 }
 
+// GetTmdbID returns the TMDB ID override from the configuration.
 func GetTmdbID() int {
 	return getInt("tmdb_id")
 }
 
+// GetTvdbID returns the TVDB ID override from the configuration.
 func GetTvdbID() int {
 	return getInt("tvdb_id")
 }
 
+// GetAllowSpecials returns true if special episodes are allowed.
 func GetAllowSpecials() bool {
 	return getBool("allow_special_matches")
 }
 
+// GetTitleCleaningRegex returns the regex used for title cleaning.
 func GetTitleCleaningRegex() string {
 	return getString("title_cleaning_regex")
 }
 
+// GetVideoCodecAVC returns the AVC video codec name.
 func GetVideoCodecAVC() string {
 	return getString("video_codec_avc")
 }
 
+// GetVideoCodecHEVC returns the HEVC video codec name.
 func GetVideoCodecHEVC() string {
 	return getString("video_codec_hevc")
 }
 
+// GetDisableUpdateCheck returns true if background update checks are disabled.
 func GetDisableUpdateCheck() bool {
 	return getBool("disable_update_check")
 }
 
+// IsCheckEnabled returns true if the given check is enabled in the configuration.
 func IsCheckEnabled(checkName string) bool {
 	enabledChecks := getStringSlice("enabled_checks")
 	if len(enabledChecks) > 0 {
@@ -191,38 +222,47 @@ func IsCheckEnabled(checkName string) bool {
 	return true
 }
 
+// GetTmdbApiKey returns the TMDB API key.
 func GetTmdbApiKey() string {
 	return viper.GetString("api_keys.tmdb")
 }
 
+// GetTvdbApiKey returns the TVDB API key.
 func GetTvdbApiKey() string {
 	return viper.GetString("api_keys.tvdb")
 }
 
+// GetProwlarrUrl returns the Prowlarr URL.
 func GetProwlarrUrl() string {
 	return viper.GetString("prowlarr.url")
 }
 
+// GetProwlarrApiKey returns the Prowlarr API key.
 func GetProwlarrApiKey() string {
 	return viper.GetString("prowlarr.api_key")
 }
 
+// GetProwlarrIndexers returns the list of Prowlarr indexer IDs to use.
 func GetProwlarrIndexers() []int {
 	return viper.GetIntSlice("prowlarr.indexers")
 }
 
+// GetProwlarrMovieCategories returns the list of Prowlarr movie categories to search.
 func GetProwlarrMovieCategories() []int {
 	return viper.GetIntSlice("prowlarr.movie_categories")
 }
 
+// GetProwlarrTvCategories returns the list of Prowlarr TV categories to search.
 func GetProwlarrTvCategories() []int {
 	return viper.GetIntSlice("prowlarr.tv_categories")
 }
 
+// GetConfigFileUsed returns the path to the configuration file being used.
 func GetConfigFileUsed() string {
 	return viper.ConfigFileUsed()
 }
 
+// GetDefaultConfig returns the default configuration as a TOML string.
 func GetDefaultConfig() string {
 	return defaultConfig
 }

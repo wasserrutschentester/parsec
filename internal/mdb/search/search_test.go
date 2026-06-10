@@ -85,7 +85,7 @@ func TestMergeResults(t *testing.T) {
 		},
 	}
 
-	merged := MergeResults(tmdbResults, tvdbResults)
+	merged := mergeResults(tmdbResults, tvdbResults)
 
 	if len(merged) != 3 {
 		t.Errorf("Expected 3 merged results, got %d", len(merged))

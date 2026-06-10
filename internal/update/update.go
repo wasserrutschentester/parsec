@@ -61,16 +61,19 @@ func CheckForUpdateBackground(currentVersion string) {
 	}
 }
 
+// Release represents a GitHub-like release from Codeberg.
 type Release struct {
 	TagName string  `json:"tag_name"`
 	Assets  []Asset `json:"assets"`
 }
 
+// Asset represents a single file asset in a release.
 type Asset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
+// FetchLatestRelease retrieves the latest release information from the Codeberg API.
 func FetchLatestRelease(ctx context.Context) (*Release, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
 
@@ -97,6 +100,7 @@ func FetchLatestRelease(ctx context.Context) (*Release, error) {
 	return &rel, nil
 }
 
+// IsNewer compares two semver tags and returns true if latest is newer than current.
 func IsNewer(latest, current string) bool {
 	// semver.Compare(v, w) returns +1 if v > w
 	return semver.Compare(latest, current) > 0

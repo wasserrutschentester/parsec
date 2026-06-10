@@ -12,6 +12,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// GetBaseName returns the filename without extension.
 func GetBaseName(filePath string) string {
 	name := filepath.Base(filePath)
 	if ext := filepath.Ext(name); ext != "" {
@@ -21,6 +22,7 @@ func GetBaseName(filePath string) string {
 	return name
 }
 
+// ApplyTitleCleanRegex applies the title cleaning regex from the configuration.
 func ApplyTitleCleanRegex(title string) string {
 	regexStr := config.GetTitleCleaningRegex()
 	if regexStr == "" {
@@ -35,6 +37,7 @@ func ApplyTitleCleanRegex(title string) string {
 	return strings.TrimSpace(re.ReplaceAllString(title, ""))
 }
 
+// Parse parses a filename to extract metadata.
 func Parse(filename string) *metadata.Metadata {
 	meta := &metadata.Metadata{}
 
@@ -279,6 +282,7 @@ func matchEdition(filename string, meta *metadata.Metadata) {
 	}
 }
 
+// DeobfuscateTitle removes common obfuscation from titles (e.g. dots, umlaut replacements).
 func DeobfuscateTitle(title string) string {
 	result := title
 	result = strings.ReplaceAll(result, ".", " ")
@@ -344,6 +348,7 @@ func isEnglishUmlautException(lowerUmlaut, suffix string) bool {
 	return lowerUmlaut == "oe" && isEndOfWord
 }
 
+// NormalizeTitle normalizes a title for use in filenames.
 func NormalizeTitle(title string) string {
 	// 0. Apply custom cleaning regex from config
 	title = ApplyTitleCleanRegex(title)
@@ -417,6 +422,7 @@ func removeDiacritics(title string) string {
 	return title
 }
 
+// NormalizeService normalizes a streaming service name to a standard code.
 func NormalizeService(service string) string {
 	s := strings.ToLower(service)
 

@@ -10,6 +10,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// RunMediaInfoChecks performs checks based on technical metadata from MediaInfo.
 // nolint:cyclop
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var (

@@ -17,7 +17,9 @@ import (
 )
 
 var (
-	BaseURL    = "https://api.themoviedb.org/3"
+	// BaseURL is the TMDB API base URL.
+	BaseURL = "https://api.themoviedb.org/3"
+	// HTTPClient is the HTTP client used for TMDB requests.
 	HTTPClient = http.DefaultClient
 )
 
@@ -134,6 +136,7 @@ func get(endpoint string, query url.Values, target interface{}) error {
 	return json.Unmarshal(body, target)
 }
 
+// Search searches for media on TMDB by query and optionally by year.
 func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	params := url.Values{}
 	params.Add("query", query)
@@ -163,7 +166,7 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 }
 
 func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
-	externalIDs, err := GetExternalIDs(result.TmdbID, mediaType)
+	externalIDs, err := getExternalIDs(result.TmdbID, mediaType)
 	if err != nil {
 		return
 	}
@@ -185,12 +188,13 @@ func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
 }
 
 func applyAltTitles(result *mdb.SearchResult, mediaType string) {
-	altTitles, err := GetAlternativeTitles(result.TmdbID, mediaType, result.OriginalLanguage)
+	altTitles, err := getAlternativeTitles(result.TmdbID, mediaType, result.OriginalLanguage)
 	if err == nil {
 		result.AltTitle = altTitles
 	}
 }
 
+// GetByID retrieves a single media item from TMDB by its ID.
 func GetByID(tmdbID int, mediaType string) (*mdb.SearchResult, error) {
 	var r tmdbMedia
 	if err := get(fmt.Sprintf("%s/%d", mediaType, tmdbID), nil, &r); err != nil {
@@ -204,6 +208,7 @@ func GetByID(tmdbID int, mediaType string) (*mdb.SearchResult, error) {
 	return &result, nil
 }
 
+// GetByImdbID retrieves a media item from TMDB using its IMDB ID.
 func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
 	params := url.Values{}
 	params.Set("external_source", "imdb_id")
@@ -246,7 +251,7 @@ func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult
 	return &result
 }
 
-func GetExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, error) {
+func getExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, error) {
 	var data tmdbExternalIDsResponse
 	if err := get(fmt.Sprintf("%s/%d/external_ids", mediaType, tmdbID), nil, &data); err != nil {
 		return tmdbExternalIDsResponse{}, err
@@ -255,7 +260,7 @@ func GetExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, erro
 	return data, nil
 }
 
-func GetAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]string, error) {
+func getAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]string, error) {
 	var data struct {
 		Titles []struct {
 			Title string `json:"title"`
@@ -301,6 +306,7 @@ func GetAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]str
 	return titles, nil
 }
 
+// GetEpisodeMetadata retrieves detailed metadata for a specific TV episode from TMDB.
 func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tmdbEpisodeResponse
 

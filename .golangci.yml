@@ -23,6 +23,13 @@ linters:
         - musttag
         - unparam
         - unconvert
+        - revive
+
+    settings:
+        revive:
+            rules:
+                - name: exported
+                  severity: warning
 
 formatters:
     enable:

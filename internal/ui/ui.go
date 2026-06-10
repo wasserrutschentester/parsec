@@ -32,15 +32,25 @@ var (
 	black  = lipgloss.Color("0")
 
 	// Functional Styles
-	Info    = lipgloss.NewStyle().Foreground(blue)
+
+	// Info is the style for information messages.
+	Info = lipgloss.NewStyle().Foreground(blue)
+	// Success is the style for success messages.
 	Success = lipgloss.NewStyle().Foreground(green)
+	// Warning is the style for warning messages.
 	Warning = lipgloss.NewStyle().Foreground(yellow)
-	Error   = lipgloss.NewStyle().Foreground(red)
-	Muted   = lipgloss.NewStyle().Foreground(gray)
-	Debug   = lipgloss.NewStyle().Foreground(gray)
-	Link    = lipgloss.NewStyle().Foreground(blue).Underline(true)
+	// Error is the style for error messages.
+	Error = lipgloss.NewStyle().Foreground(red)
+	// Muted is the style for muted/secondary text.
+	Muted = lipgloss.NewStyle().Foreground(gray)
+	// Debug is the style for debug messages.
+	Debug = lipgloss.NewStyle().Foreground(gray)
+	// Link is the style for clickable-like links.
+	Link = lipgloss.NewStyle().Foreground(blue).Underline(true)
 
 	// Structural Styles
+
+	// Header is the style for section headers.
 	Header = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(purple).
@@ -49,47 +59,61 @@ var (
 		BorderBottom(true).
 		BorderForeground(purple)
 
+	// LabelStyle is the style for property labels.
 	LabelStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(blue)
 
+	// ValueStyle is the style for property values.
 	ValueStyle = lipgloss.NewStyle().
 			Foreground(white)
 
 	// Icons
+
+	// IconCheck is a success checkmark icon.
 	IconCheck = Success.Render("✓")
+	// IconCross is a failure cross icon.
 	IconCross = Error.Render("✗")
 
 	// Component Styles
+
+	// BadgeStyle is the base style for badges.
 	BadgeStyle = lipgloss.NewStyle().
 			Bold(true).
 			Padding(0, 1).
 			MarginRight(1)
 
+	// CardStyle is the base style for cards.
 	CardStyle = lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
 			BorderForeground(purple).
 			Padding(0, 1)
 
 	// Legacy Styles (keeping for compatibility)
+
+	// Label is the legacy style for labels.
 	Label = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(blue).
 		Width(20)
 
+	// Value is the legacy style for values.
 	Value = lipgloss.NewStyle().
 		Foreground(white)
 
+	// WarningTag is a pre-rendered warning badge.
 	WarningTag = BadgeStyle.
 			Background(yellow).
 			Foreground(black).
 			Render("ANOMALY")
 
+	// ErrorTag is a pre-rendered error badge.
 	ErrorTag = BadgeStyle.
 			Background(red).
 			Foreground(white).
 			Render("CRITICAL")
 
+	// DebugTag is a pre-rendered debug badge.
 	DebugTag = BadgeStyle.
 			Background(gray).
 			Foreground(white).
@@ -138,19 +162,6 @@ func DisableColors() {
 	DebugTag = BadgeStyle.Render("DEBUG")
 }
 
-// Status Badges
-func SuccessBadge(msg string) string {
-	return BadgeStyle.Background(green).Foreground(black).Render("NOMINAL") + " " + Success.Render(msg)
-}
-
-func WarningBadge(msg string) string {
-	return WarningTag + " " + Warning.Render(msg)
-}
-
-func ErrorBadge(msg string) string {
-	return ErrorTag + " " + Error.Render(msg)
-}
-
 // Card renders a visual card with title, subtitle, body and footer.
 func Card(title, subtitle, body, footer string) string {
 	// Determine card width based on terminal size
@@ -197,16 +208,8 @@ func Card(title, subtitle, body, footer string) string {
 	return CardStyle.Width(width).Render(content)
 }
 
-// FormatDiff visualizes a mismatch between an expected and actual value.
-func FormatDiff(expectedLabel, expectedValue, actualLabel, actualValue string) string {
-	expectedLine := lipgloss.NewStyle().Foreground(green).Render(fmt.Sprintf("+ %s: %s", expectedLabel, expectedValue))
-	actualLine := lipgloss.NewStyle().Foreground(red).Render(fmt.Sprintf("- %s: %s", actualLabel, actualValue))
-
-	return lipgloss.JoinVertical(lipgloss.Left, actualLine, expectedLine)
-}
-
-// FormatStringDiff visualizes a mismatch between two strings with character-level alignment.
-func FormatStringDiff(oldStr, newStr string) string {
+// formatStringDiff visualizes a mismatch between two strings with character-level alignment.
+func formatStringDiff(oldStr, newStr string) string {
 	edits := udiff.Strings(oldStr, newStr)
 
 	var line1, line2 strings.Builder
@@ -281,7 +284,7 @@ func renderNewPart(b *strings.Builder, newText string, maxW int) {
 
 // FormatStringDiffAligned visualizes a mismatch between two strings with labels and character-level alignment.
 func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualValue string) string {
-	diff := FormatStringDiff(expectedValue, actualValue)
+	diff := formatStringDiff(expectedValue, actualValue)
 
 	lines := strings.Split(diff, "\n")
 	if len(lines) != 2 {
@@ -317,9 +320,9 @@ func TrackTable(headers []string, rows [][]string) string {
 	return t.Render()
 }
 
-// CalculateTrackTableWidths calculates the maximum width for each column across all provided tracks.
+// calculateTrackTableWidths calculates the maximum width for each column across all provided tracks.
 // It returns a map of column index to its content width (excluding padding and borders).
-func CalculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {
+func calculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {
 	headers := []string{"ID", "Type", "#", "Codec", "Lang", "Name", "Flags", "Warning"}
 	widths := make(map[int]int)
 
@@ -349,8 +352,8 @@ func CalculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {
 	return widths
 }
 
-// FormatTrackTable renders a table of track issues.
-func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int) string {
+// formatTrackTable renders a table of track issues.
+func formatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int) string {
 	if len(tracks) == 0 {
 		return ""
 	}
@@ -361,7 +364,7 @@ func FormatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 	// Use shared widths if provided, otherwise calculate for this set of tracks
 	contentWidths := sharedWidths
 	if contentWidths == nil {
-		contentWidths = CalculateTrackTableWidths(tracks)
+		contentWidths = calculateTrackTableWidths(tracks)
 	}
 
 	nameWidth := calculateNameColumnWidth(headers, contentWidths)
@@ -515,45 +518,51 @@ func PropertyLayout(pairs [][2]string) string {
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
-// Helper functions for common patterns
+// LabelValue returns a formatted string with a bold label and a white value.
 func LabelValue(label, value string) string {
 	return Label.Render(label) + Value.Render(value)
 }
 
+// FormatWarning returns a formatted warning message with a badge.
 func FormatWarning(msg string) string {
 	return WarningTag + " " + Warning.Render(msg)
 }
 
-func FormatError(msg string) string {
+func formatError(msg string) string {
 	return ErrorTag + " " + Error.Render(msg)
 }
 
-func FormatDebug(msg string) string {
+func formatDebug(msg string) string {
 	return DebugTag + " " + Debug.Render(msg)
 }
 
+// PrintWarning prints a warning message to stdout.
 func PrintWarning(msg string) {
 	if !IsSilent {
 		_, _ = lipgloss.Println(FormatWarning(msg))
 	}
 }
 
+// PrintError prints an error message to stderr.
 func PrintError(msg string) {
-	_, _ = lipgloss.Fprintln(os.Stderr, FormatError(msg))
+	_, _ = lipgloss.Fprintln(os.Stderr, formatError(msg))
 }
 
+// PrintDebug prints a debug message to stdout if debug output is enabled.
 func PrintDebug(msg string) {
 	if IsDebug && !IsSilent {
-		_, _ = lipgloss.Println(FormatDebug(msg))
+		_, _ = lipgloss.Println(formatDebug(msg))
 	}
 }
 
+// PrintSuccess prints a success message to stdout.
 func PrintSuccess(msg string) {
 	if !IsSilent {
 		_, _ = lipgloss.Println(Success.Render("✓ ") + msg)
 	}
 }
 
+// PrintInfo prints an info message to stdout.
 func PrintInfo(msg string) {
 	if !IsSilent {
 		_, _ = lipgloss.Println(Info.Render("i ") + msg)
@@ -574,14 +583,15 @@ func AnonymizePath(path string) string {
 	return path
 }
 
+// Println prints the given arguments to stdout if output is not suppressed.
 func Println(a ...any) {
 	if !IsSilent {
 		_, _ = lipgloss.Println(a...)
 	}
 }
 
-// ConfirmContinue prompts the user to continue.
-// Empty input returns true, "no" returns false.
+// ConfirmContinue prompts the user to continue with a [Y/n] prompt.
+// Empty input returns true, "no" or "n" returns false.
 func ConfirmContinue(msg string) bool {
 	if IsSilent || !IsTerminal() {
 		return true

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/text/language/display"
 )
 
+// Metadata represents the metadata for a media file.
 type Metadata struct {
 	Title   string
 	Year    int
@@ -43,6 +44,7 @@ type Metadata struct {
 	IsTV          bool
 }
 
+// LanguageName returns the full name of a language given its code.
 func LanguageName(lang string) string {
 	if lang == "" {
 		return ""
@@ -69,6 +71,7 @@ func LanguageName(lang string) string {
 	return strings.ToUpper(lang)
 }
 
+// ChanToNotation converts a number of channels to a string notation (e.g. 6 -> "5.1").
 func ChanToNotation(channels int) string {
 	switch channels {
 	case 1:
@@ -88,6 +91,7 @@ func ChanToNotation(channels int) string {
 	}
 }
 
+// AudioMetaName returns the audio metadata name (e.g. "Atmos") from title and features.
 func AudioMetaName(title, additionalFeatures string) string {
 	uTitle := strings.ToUpper(title)
 	uFeatures := strings.ToUpper(additionalFeatures)
@@ -103,6 +107,7 @@ func AudioMetaName(title, additionalFeatures string) string {
 	return ""
 }
 
+// AudioCodecName returns a standard audio codec name.
 func AudioCodecName(format, profile, additionalFeatures string) string {
 	uFormat := strings.ToUpper(format)
 	uProfile := strings.ToUpper(profile)
@@ -159,6 +164,7 @@ func detectDTS(uProfile, uFeatures string) string {
 	return "DTS"
 }
 
+// VideoCodecName returns a standard video codec name.
 func VideoCodecName(format, formatVersion, codecIDHint string) string {
 	switch format {
 	case "AVC":
@@ -186,6 +192,7 @@ func VideoCodecName(format, formatVersion, codecIDHint string) string {
 	}
 }
 
+// HeightToResolution converts a video height to a resolution string (e.g. 1080 -> "1080p").
 func HeightToResolution(height int, scanType string, frameRate float64) string {
 	if height <= 0 {
 		return ""
@@ -251,6 +258,7 @@ func isNTSCFrameRate(frameRate float64) bool {
 	return (frameRate >= 23.9 && frameRate <= 24.1) || (frameRate >= 29.9 && frameRate <= 30.1) || (frameRate >= 59.9 && frameRate <= 60.1)
 }
 
+// SetDefaults enriches metadata with default values from the configuration.
 func (meta *Metadata) SetDefaults() {
 	meta.setBasicDefaults()
 	meta.setTechnicalDefaults()
@@ -338,14 +346,15 @@ func (meta *Metadata) setTypeDefaults() {
 	}
 }
 
+// GetReleaseName returns the full release name generated from metadata.
 func (meta *Metadata) GetReleaseName() string {
 	template := config.GetTemplate()
 	ui.PrintDebug(fmt.Sprintf("using template: %s", template))
 
-	return meta.Render(template)
+	return meta.render(template)
 }
 
-func (meta *Metadata) Render(template string) string {
+func (meta *Metadata) render(template string) string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
 		"{date}":           meta.Date,
@@ -399,10 +408,10 @@ func (meta *Metadata) Render(template string) string {
 		result = strings.ReplaceAll(result, tag, val)
 	}
 
-	return CleanName(result)
+	return cleanName(result)
 }
 
-func CleanName(name string) string {
+func cleanName(name string) string {
 	// 0. remove remaining keys
 	reKeys := []*regexp.Regexp{
 		regexp.MustCompile(`\{[^}]*\}`),
@@ -438,6 +447,7 @@ func CleanName(name string) string {
 	return name
 }
 
+// Normalize normalizes a string by lowercasing and removing non-alphanumeric characters.
 func Normalize(s string) string {
 	s = strings.ToLower(s)
 
@@ -453,6 +463,7 @@ func Normalize(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// Override overrides metadata fields with values from another Metadata struct.
 func (meta *Metadata) Override(newMeta *Metadata) bool {
 	updated := false
 	mVal := reflect.ValueOf(meta).Elem()
@@ -484,6 +495,7 @@ func (meta *Metadata) Override(newMeta *Metadata) bool {
 	return updated
 }
 
+// RemoveDuplicates removes duplicate elements from a slice.
 func RemoveDuplicates[T comparable](slice []T) []T {
 	seen := make(map[T]struct{})
 

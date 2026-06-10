@@ -23,9 +23,9 @@ func TestPrintDebug(t *testing.T) {
 func TestFormatDebug(t *testing.T) {
 	msg := "test message"
 
-	formatted := FormatDebug(msg)
+	formatted := formatDebug(msg)
 	if formatted == "" {
-		t.Error("FormatDebug returned empty string")
+		t.Error("formatDebug returned empty string")
 	}
 }
 
@@ -44,9 +44,9 @@ func TestFormatStringDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FormatStringDiff(tt.old, tt.new)
+			got := formatStringDiff(tt.old, tt.new)
 			if got == "" {
-				t.Error("FormatStringDiff returned empty string")
+				t.Error("formatStringDiff returned empty string")
 			}
 
 			t.Logf("\n%s", got)

@@ -10,6 +10,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// SearchResult represents a media item found in an online database.
 type SearchResult struct {
 	TmdbID           int
 	TmdbType         string
@@ -28,8 +29,10 @@ type SearchResult struct {
 	Overview         string
 }
 
+// ErrNotFound is returned when no results are found in the database.
 var ErrNotFound = errors.New("no result found")
 
+// EpisodeResult represents a TV episode found in an online database.
 type EpisodeResult struct {
 	Name     string
 	Airdate  string
@@ -39,6 +42,7 @@ type EpisodeResult struct {
 	TvdbID   int
 }
 
+// MatroskaTags represents metadata tags that can be written to a Matroska file.
 type MatroskaTags struct {
 	Title string
 	Imdb  string
@@ -47,6 +51,7 @@ type MatroskaTags struct {
 	Tvdb2 string
 }
 
+// FormatLanguage returns a human-readable language string.
 func FormatLanguage(lang string) string {
 	if lang == "zxx" {
 		return "zxx (No Dialogue)"
@@ -55,6 +60,7 @@ func FormatLanguage(lang string) string {
 	return lang
 }
 
+// PrintResult prints a detailed SearchResult to the UI.
 func PrintResult(result SearchResult) {
 	title := fmt.Sprintf("%s (%d)", result.Title, result.Year)
 
@@ -168,6 +174,7 @@ func getFooterItems(result SearchResult) []footerLine {
 	return items
 }
 
+// PrintEpisodeResult prints a detailed EpisodeResult to the UI.
 func PrintEpisodeResult(result EpisodeResult) {
 	title := fmt.Sprintf("%s (S%02dE%02d)", result.Name, result.Season, result.Episode)
 	subtitle := fmt.Sprintf("Transmission Date: %s", result.Airdate)
@@ -191,6 +198,7 @@ func PrintEpisodeResult(result EpisodeResult) {
 	ui.Println(ui.Card(title, subtitle, body, footer))
 }
 
+// PrintCompactResult prints a one-line summary of a SearchResult to the UI.
 func PrintCompactResult(result SearchResult) {
 	title := fmt.Sprintf("%s (%d) [OV: %s]", result.Title, result.Year, FormatLanguage(result.OriginalLanguage))
 
@@ -212,11 +220,13 @@ func PrintCompactResult(result SearchResult) {
 	ui.Println("Match:", title, ids)
 }
 
+// PrintCompactEpisodeResult prints a one-line summary of an EpisodeResult to the UI.
 func PrintCompactEpisodeResult(result EpisodeResult) {
 	// indented to align to Match:
 	ui.Println(fmt.Sprintf("       %s (S%02dE%02d) %s", result.Name, result.Season, result.Episode, result.Airdate))
 }
 
+// GetMatroskaTags creates a MatroskaTags struct from a SearchResult.
 func GetMatroskaTags(result SearchResult) MatroskaTags {
 	tags := MatroskaTags{}
 	if result.Title != "" {
@@ -244,6 +254,7 @@ func GetMatroskaTags(result SearchResult) MatroskaTags {
 	return tags
 }
 
+// SetEpisodeTags updates MatroskaTags with episode information.
 func (tags *MatroskaTags) SetEpisodeTags(result EpisodeResult) {
 	if result.Name != "" {
 		tags.Title = result.Name
@@ -254,6 +265,7 @@ func (tags *MatroskaTags) SetEpisodeTags(result EpisodeResult) {
 	}
 }
 
+// CalculateSimilarity calculates the Levenshtein similarity between two strings (0.0 to 1.0).
 func CalculateSimilarity(s1, s2 string) float64 {
 	if s1 == s2 {
 		return 1.0

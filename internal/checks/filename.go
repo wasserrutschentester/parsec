@@ -9,6 +9,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
+// RunFilenameChecks performs checks on the filename and metadata.
 func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 

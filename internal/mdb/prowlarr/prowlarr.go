@@ -21,6 +21,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// ReleaseResource represents a media release found on Prowlarr.
 type ReleaseResource struct {
 	Title       string  `json:"title"`
 	Size        int64   `json:"size"`
@@ -42,6 +43,7 @@ type ReleaseResource struct {
 	Guid        string  `json:"guid"`
 }
 
+// Search performs a parallel search across Prowlarr indexers using available IDs and episode info.
 func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]ReleaseResource, error) {
 	queries := make([]string, 0)
 
@@ -295,6 +297,7 @@ func isMatch(r ReleaseResource, imdbInt int64, tmdbID, tvdbID int) bool {
 	return false
 }
 
+// PrintReleases searches for and prints available releases for the given media and metadata.
 func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter bool) {
 	ui.Println("\n" + ui.Header.Render("PROWLARR RELEASES:"))
 
@@ -311,7 +314,7 @@ func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter boo
 
 	finalResults := pResults
 	if filter {
-		finalResults = FilterBestReleases(pResults, meta.Resolution)
+		finalResults = filterBestReleases(pResults, meta.Resolution)
 	} else {
 		sort.Slice(finalResults, func(i, j int) bool {
 			return finalResults[i].Seeders > finalResults[j].Seeders
@@ -329,16 +332,16 @@ func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter boo
 		return
 	}
 
-	ui.Println(RenderReleasesTable(finalResults))
+	ui.Println(renderReleasesTable(finalResults))
 }
 
-func FilterBestReleases(results []ReleaseResource, targetRes string) []ReleaseResource {
+func filterBestReleases(results []ReleaseResource, targetRes string) []ReleaseResource {
 	// 1. Try to find the best releases per indexer that match the target resolution
-	finalResults := GetBestPerIndexer(results, targetRes)
+	finalResults := getBestPerIndexer(results, targetRes)
 
 	// 2. Fallback: If no exact resolution matches, return the best releases per indexer regardless of resolution
 	if len(finalResults) == 0 && targetRes != "" {
-		finalResults = GetBestPerIndexer(results, "")
+		finalResults = getBestPerIndexer(results, "")
 	}
 
 	sort.Slice(finalResults, func(i, j int) bool {
@@ -348,7 +351,7 @@ func FilterBestReleases(results []ReleaseResource, targetRes string) []ReleaseRe
 	return finalResults
 }
 
-func GetBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseResource {
+func getBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseResource {
 	bestPerIndexer := make(map[string]ReleaseResource)
 
 	for _, r := range results {
@@ -374,7 +377,7 @@ func GetBestPerIndexer(results []ReleaseResource, targetRes string) []ReleaseRes
 	return best
 }
 
-func RenderReleasesTable(results []ReleaseResource) string {
+func renderReleasesTable(results []ReleaseResource) string {
 	headers := []string{"Indexer", "Source", "Res", "Group", "Size", "Seeders", "Age", "Info"}
 
 	rows := make([][]string, 0, len(results))

@@ -14,9 +14,9 @@ func TestCache(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	SetDir(tempDir)
+	setDir(tempDir)
 
-	defer ResetDir()
+	defer resetDir()
 
 	key := "test-key"
 	data := []byte("test-data")
@@ -56,10 +56,10 @@ func TestCache(t *testing.T) {
 	// Test Clear
 	_ = Set(key, data)
 
-	Clear()
+	clear()
 
 	if _, err := Get(key); err == nil {
-		t.Error("Expected error after Clear")
+		t.Error("Expected error after clear")
 	}
 }
 
@@ -70,9 +70,9 @@ func TestCleanup(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	SetDir(tempDir)
+	setDir(tempDir)
 
-	defer ResetDir()
+	defer resetDir()
 
 	// Create a fresh file
 	keyFresh := "fresh"
@@ -93,8 +93,8 @@ func TestCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Run Cleanup
-	Cleanup()
+	// Run cleanup
+	cleanup()
 
 	// Fresh file should still exist
 	if _, err := os.Stat(getPath(keyFresh)); err != nil {

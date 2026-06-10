@@ -15,11 +15,11 @@ var cacheDir string
 const cacheDuration = 6 * time.Hour
 
 func init() {
-	ResetDir()
-	Cleanup()
+	resetDir()
+	cleanup()
 }
 
-func ResetDir() {
+func resetDir() {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir = os.TempDir()
@@ -28,11 +28,11 @@ func ResetDir() {
 	cacheDir = filepath.Join(dir, "parsec", "api")
 }
 
-func SetDir(dir string) {
+func setDir(dir string) {
 	cacheDir = dir
 }
 
-func Cleanup() {
+func cleanup() {
 	// check if cache directory exists`
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
 		return
@@ -73,10 +73,11 @@ func removeExpiredFiles() {
 	}
 }
 
-func Clear() {
+func clear() {
 	_ = os.RemoveAll(cacheDir)
 }
 
+// Get retrieves data from the cache for the given key.
 func Get(key string) ([]byte, error) {
 	if config.NoCache {
 		return nil, fmt.Errorf("cache bypassed")
@@ -97,6 +98,7 @@ func Get(key string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
+// Set stores data in the cache for the given key.
 func Set(key string, data []byte) error {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
@@ -105,6 +107,7 @@ func Set(key string, data []byte) error {
 	return os.WriteFile(getPath(key), data, 0o644)
 }
 
+// Remove deletes data from the cache for the given key.
 func Remove(key string) error {
 	return os.Remove(getPath(key))
 }

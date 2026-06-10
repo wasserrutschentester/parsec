@@ -48,17 +48,20 @@ func SanitizeUTF8(s string) string {
 	return string(SanitizeUTF8Bytes([]byte(s)))
 }
 
+// MediaInfo represents the complete JSON output from mediainfo.
 type MediaInfo struct {
 	CreatingLibrary CreatingLibrary `json:"creatingLibrary"`
 	Media           Media           `json:"media"`
 }
 
+// CreatingLibrary contains information about the library that created the mediainfo output.
 type CreatingLibrary struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	URL     string `json:"url"`
 }
 
+// Media contains the tracks of the media file.
 type Media struct {
 	Ref          string  `json:"@ref"`
 	GeneralTrack *Track  `json:"-"`
@@ -92,6 +95,7 @@ func (e Extra) GetString(key string) string {
 // MediaBool represents a boolean value that can be unmarshaled  from "Yes"/"No" or standard boolean strings.
 type MediaBool bool
 
+// UnmarshalJSON custom unmarshaler for MediaBool to handle "Yes"/"No" strings.
 func (mb *MediaBool) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
@@ -118,6 +122,7 @@ func (mb *MediaBool) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Track represents a single track in the mediainfo output.
 type Track struct {
 	Type                      string    `json:"@type"`
 	TypeOrder                 *int      `json:"@typeorder,string,omitempty"`
@@ -165,6 +170,7 @@ type Track struct {
 	Extra Extra `json:"extra,omitempty"`
 }
 
+// GetDialNorm returns the dialog normalization value from the track properties.
 func (t *Track) GetDialNorm() string {
 	val := t.Dialog_Normalization
 	if val == "" {
@@ -183,6 +189,7 @@ func (t *Track) GetDialNorm() string {
 	return strings.TrimSuffix(val, " dB")
 }
 
+// Get runs mediainfo on the given file path and returns a MediaInfo struct.
 func Get(filePath string) (*MediaInfo, error) {
 	if _, err := os.Stat(filePath); err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
@@ -218,6 +225,7 @@ func Get(filePath string) (*MediaInfo, error) {
 	return &mi, nil
 }
 
+// GetMdbIDs extracts IMDB, TMDB, and TVDB IDs from the General track's extra metadata.
 func (mi *MediaInfo) GetMdbIDs() (imdb string, tmdb, tvdb int, isTV bool) {
 	extra := mi.getGeneralExtra()
 	if extra == nil {
@@ -306,6 +314,7 @@ func (mi *MediaInfo) hasAudio() bool {
 	return false
 }
 
+// GetMetadata converts MediaInfo data into a normalized Metadata struct.
 func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	meta := &metadata.Metadata{}
 	for _, track := range mi.Media.Tracks {
@@ -358,6 +367,7 @@ func (track *Track) detectHDR() string {
 	return strings.Trim(result, ".")
 }
 
+// GetAudioLanguages returns a list of unique audio language codes.
 func (mi *MediaInfo) GetAudioLanguages() []string {
 	var languages []string
 
@@ -375,6 +385,7 @@ func (mi *MediaInfo) GetAudioLanguages() []string {
 	return languages
 }
 
+// GetSubtitleLanguages returns a list of unique subtitle language codes.
 func (mi *MediaInfo) GetSubtitleLanguages() []string {
 	var languages []string
 
@@ -392,6 +403,7 @@ func (mi *MediaInfo) GetSubtitleLanguages() []string {
 	return languages
 }
 
+// SetLanguageTag determines the primary language and tagging for the metadata.
 func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	languages := mi.GetAudioLanguages()
 	preferredLanguage := config.GetPreferredLanguage()
@@ -441,14 +453,4 @@ func (mi *MediaInfo) checkIsSubbed(meta *metadata.Metadata, prefTag language.Tag
 	}
 
 	return false
-}
-
-func (mi *MediaInfo) Print() {
-	b, err := json.MarshalIndent(mi, "", "  ")
-	if err != nil {
-		fmt.Printf("Error marshaling to JSON: %v\n", err)
-		return
-	}
-
-	fmt.Println(string(b))
 }

@@ -247,8 +247,8 @@ func TestMetadata_String(t *testing.T) {
 
 			if tt.name == "Literal Brackets" || tt.name == "Empty Literal Brackets Removal" {
 				template := "{title}.[{service}]-{group}"
-				if got := tt.meta.Render(template); got != tt.want {
-					t.Errorf("Metadata.Render() = %v, want %v", got, tt.want)
+				if got := tt.meta.render(template); got != tt.want {
+					t.Errorf("Metadata.render() = %v, want %v", got, tt.want)
 				}
 			} else {
 				if got := tt.meta.GetReleaseName(); got != tt.want {

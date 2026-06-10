@@ -15,6 +15,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// EbmlMetadata represents the JSON output from mkvmerge -J.
 type EbmlMetadata struct {
 	Attachments []EbmlAttachment `json:"attachments,omitempty"`
 	Errors      []string         `json:"errors,omitempty"`
@@ -22,6 +23,7 @@ type EbmlMetadata struct {
 	Tracks      []EbmlTrack      `json:"tracks,omitempty"`
 }
 
+// EbmlTrack represents a single track in a Matroska container.
 type EbmlTrack struct {
 	ID         int                 `json:"id,omitempty"`
 	Codec      string              `json:"codec,omitempty"`
@@ -30,6 +32,7 @@ type EbmlTrack struct {
 	TypeOrder  int                 `json:"-"`
 }
 
+// EbmlTrackProperties contains detailed properties of a Matroska track.
 type EbmlTrackProperties struct {
 	Language                  string `json:"language,omitempty"`
 	LanguageIetf              string `json:"language_ietf,omitempty"`
@@ -49,6 +52,7 @@ type EbmlTrackProperties struct {
 	ContentEncodingAlgorithms string `json:"content_encoding_algorithms,omitempty"`
 }
 
+// EbmlAttachment represents an attachment in a Matroska container.
 type EbmlAttachment struct {
 	ID          int    `json:"id,omitempty"`
 	ContentType string `json:"content_type,omitempty"`
@@ -98,6 +102,7 @@ func isMatroska(filePath string) (bool, error) {
 	return bytes.Equal(header, ebmlHeader), nil
 }
 
+// CheckForMatroska verifies if the given file exists and is a valid Matroska container.
 func CheckForMatroska(filePath string) error {
 	if _, err := os.Stat(filePath); err != nil {
 		return fmt.Errorf("file not found: %w", err)
@@ -115,6 +120,7 @@ func CheckForMatroska(filePath string) error {
 	return nil
 }
 
+// GetEbmlMetadata runs mkvmerge -J on the file to extract detailed EBML metadata.
 func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 	err := CheckForMatroska(filePath)
 	if err != nil {
@@ -161,6 +167,7 @@ func (metadata *EbmlMetadata) countTypes() {
 	}
 }
 
+// HasVisualImpairedAudio returns true if the metadata contains an audio track with the visual impaired flag set.
 func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 	for _, track := range metadata.Tracks {
 		if track.Type == "audio" && track.Properties.VisualImpaired {
@@ -172,6 +179,7 @@ func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 	return false
 }
 
+// SetGlobalTags uses mkvpropedit to set global tags (TITLE, IMDB, TMDB, TVDB) on a Matroska file.
 func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	err := CheckForMatroska(filePath)
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 
 var (
 	cfgFile string
+	// Version is the current version of parsec, set during build via ldflags.
 	Version = "v0.0.0"
 )
 
@@ -55,6 +56,8 @@ func isCompletionCommand(cmd *cobra.Command) bool {
 	}
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	// Version is now injected via ldflags during build
 	rootCmd.Version = Version

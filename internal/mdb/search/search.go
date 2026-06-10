@@ -17,6 +17,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// InteractiveSearch performs a search by ID or title, prompting the user if multiple matches are found.
 func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
 	if meta.Title == "" && meta.ImdbID == "" && meta.TmdbID == 0 && meta.TvdbID == 0 {
 		return nil, fmt.Errorf("title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
@@ -37,7 +38,7 @@ func interactiveSearchByID(meta *metadata.Metadata) (*mdb.SearchResult, error) {
 
 	ui.Println(ui.Info.Render(fmt.Sprintf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)))
 
-	result, err := SearchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
+	result, err := searchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.Se
 	searchQuery := filename.DeobfuscateTitle(meta.Title)
 	ui.Println(ui.Info.Render(fmt.Sprintf("Searching for %s (%d) [%s]...", searchQuery, meta.Year, mediaType)))
 
-	results, err := FuzzySearch(searchQuery, meta.Year, meta.IsTV)
+	results, err := fuzzySearch(searchQuery, meta.Year, meta.IsTV)
 	if err != nil {
 		return nil, err
 	}
@@ -116,11 +117,11 @@ func promptForResultSelection(results []mdb.SearchResult) (*mdb.SearchResult, er
 	return result, nil
 }
 
-func SearchMovie(query string, year int) ([]mdb.SearchResult, error) {
+func searchMovie(query string, year int) ([]mdb.SearchResult, error) {
 	return search("movie", query, year)
 }
 
-func SearchTV(query string, year int) ([]mdb.SearchResult, error) {
+func searchTV(query string, year int) ([]mdb.SearchResult, error) {
 	return search("tv", query, year)
 }
 
@@ -158,10 +159,10 @@ func search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 		return nil, fmt.Errorf("TVDB search failed: %w", errTVDB)
 	}
 
-	return MergeResults(resultsTMDB, resultsTVDB), nil
+	return mergeResults(resultsTMDB, resultsTVDB), nil
 }
 
-func MergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResult {
+func mergeResults(resultsTMDB, resultsTVDB []mdb.SearchResult) []mdb.SearchResult {
 	merged := make([]mdb.SearchResult, 0, len(resultsTMDB)+len(resultsTVDB))
 	tvdbMap, tmdbMap, imdbMap := buildResultMaps(resultsTVDB)
 
@@ -298,9 +299,9 @@ func queryWithRetry(query string, year int, isTV bool) ([]mdb.SearchResult, erro
 	)
 
 	if isTV {
-		results, err = SearchTV(query, year)
+		results, err = searchTV(query, year)
 	} else {
-		results, err = SearchMovie(query, year)
+		results, err = searchMovie(query, year)
 	}
 
 	if err != nil {
@@ -315,8 +316,8 @@ func queryWithRetry(query string, year int, isTV bool) ([]mdb.SearchResult, erro
 	return results, err
 }
 
-// FuzzySearch combines search and filtering/sorting to find the best match
-func FuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
+// fuzzySearch combines search and filtering/sorting to find the best match
+func fuzzySearch(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
 	var (
 		results []mdb.SearchResult
 		err     error
@@ -408,7 +409,7 @@ func filterResults(results []mdb.SearchResult) []mdb.SearchResult {
 	return filteredResults
 }
 
-func SearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
+func searchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
 	mediaType := "movie"
 	if isTV {
 		mediaType = "tv"
@@ -517,6 +518,7 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 	}
 }
 
+// FindEpisode attempts to identify an episode on TVDB or TMDB based on search results and metadata.
 func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
 	if result.TvdbID > 0 {
 		ui.PrintDebug(fmt.Sprintf("Searching for episode on TVDB: ID=%d, S%02dE%02d", result.TvdbID, meta.Season, meta.Episode))

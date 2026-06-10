@@ -7,6 +7,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/types"
 )
 
+// PrintInteractiveReport displays a formatted report of check results, optionally asking for confirmation before showing details.
 func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 	if report.Passed {
 		Println("\n" + IconCheck + Success.Render(" All systems nominal! The file fits the specification."))
@@ -16,9 +17,9 @@ func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 	}
 
 	allTracks := getAllTracks(report.Issues)
-	sharedWidths := CalculateTrackTableWidths(allTracks)
+	sharedWidths := calculateTrackTableWidths(allTracks)
 
-	totalIssues := CountIssues(report.Issues)
+	totalIssues := countIssues(report.Issues)
 	Println("\n" + IconCross + Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
 
 	for _, group := range report.Issues {
@@ -57,7 +58,7 @@ func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
 			continue
 		}
 
-		Println(FormatTrackTable(res.Tracks, sharedWidths))
+		Println(formatTrackTable(res.Tracks, sharedWidths))
 	}
 }
 
@@ -80,7 +81,7 @@ func printUnexpectedDiff(res types.CheckResult) {
 	}
 }
 
-func CountIssues(groups []types.IssueGroup) int {
+func countIssues(groups []types.IssueGroup) int {
 	count := 0
 	for _, group := range groups {
 		count += len(group.Results)

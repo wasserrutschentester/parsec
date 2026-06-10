@@ -8,8 +8,10 @@ import (
 )
 
 type (
+	// TrackCheckResult is an alias for types.TrackCheckResult.
 	TrackCheckResult = types.TrackCheckResult
-	CheckResult      = types.CheckResult
+	// CheckResult is an alias for types.CheckResult.
+	CheckResult = types.CheckResult
 )
 
 func normalizeForComparison(s string) string {
