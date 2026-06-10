@@ -13,6 +13,13 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var (
+	errConfigDirDetermination = errors.New("config dir determination failed")
+	errConfigBackup           = errors.New("config backup failed")
+	errConfigDirCreation      = errors.New("config dir creation failed")
+	errConfigWrite            = errors.New("config write failed")
+)
+
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage parsec configuration",
@@ -30,7 +37,7 @@ var configInitCmd = &cobra.Command{
 		if err != nil {
 			ui.PrintError(fmt.Sprintf("Could not determine user config directory: %v", err))
 
-			return errors.New("config dir determination failed")
+			return errConfigDirDetermination
 		}
 
 		targetDir := filepath.Join(confDir, "parsec")
@@ -45,7 +52,7 @@ var configInitCmd = &cobra.Command{
 			if err := os.Rename(targetFile, backupFile); err != nil {
 				ui.PrintError(fmt.Sprintf("Could not backup existing config file: %v", err))
 
-				return errors.New("config backup failed")
+				return errConfigBackup
 			}
 
 			ui.PrintInfo("Existing configuration backed up to " + ui.AnonymizePath(backupFile))
@@ -54,13 +61,13 @@ var configInitCmd = &cobra.Command{
 		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not create config directory: %v", err))
 
-			return errors.New("config dir creation failed")
+			return errConfigDirCreation
 		}
 
 		if err := os.WriteFile(targetFile, []byte(config.GetDefaultConfig()), 0o644); err != nil {
 			ui.PrintError(fmt.Sprintf("Could not write config file: %v", err))
 
-			return errors.New("config write failed")
+			return errConfigWrite
 		}
 
 		ui.PrintSuccess("Created default configuration at " + ui.AnonymizePath(targetFile))

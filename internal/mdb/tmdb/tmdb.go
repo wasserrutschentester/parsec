@@ -103,10 +103,15 @@ func getFromCache(key string, target any) (bool, error) {
 	return true, nil
 }
 
+var (
+	errNotConfigured = errors.New("TMDB API key not configured")
+	errTMDBStatus    = errors.New("TMDB API returned status")
+)
+
 func get(endpoint string, query url.Values, target any) error {
 	apiKey := config.GetTmdbAPIKey()
 	if apiKey == "" {
-		return errors.New("TMDB API key not configured")
+		return errNotConfigured
 	}
 
 	if query == nil {
@@ -137,7 +142,7 @@ func get(endpoint string, query url.Values, target any) error {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("TMDB API returned status %d", resp.StatusCode)
+		return fmt.Errorf("%w %d", errTMDBStatus, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)

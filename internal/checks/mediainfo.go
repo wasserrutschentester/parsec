@@ -13,7 +13,7 @@ import (
 
 // RunMediaInfoChecks performs checks based on technical metadata from MediaInfo.
 //
-//nolint:cyclop
+//nolint:cyclop // technical quality checks involve many different codecs, formats, and bitrate combinations
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var (
 		results    []CheckResult

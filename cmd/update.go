@@ -13,7 +13,15 @@ import (
 	"codeberg.org/upPollo/parsec/internal/update"
 )
 
-var forceUpdate bool
+var (
+	forceUpdate bool
+
+	errFetchReleaseInfo     = errors.New("fetching release info failed")
+	errNoMatchingAsset      = errors.New("no matching asset found")
+	errDownload             = errors.New("download failed")
+	errChecksumVerification = errors.New("checksum verification failed")
+	errUpdate               = errors.New("update failed")
+)
 
 func init() {
 	updateCmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "force update even if version is the same or lower")
@@ -38,7 +46,7 @@ func runUpdate() error {
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to check for updates: %v", err))
 
-		return errors.New("fetching release info failed")
+		return errFetchReleaseInfo
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Latest version: %s (Current: %s)", rel.TagName, Version))
@@ -70,7 +78,7 @@ func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error)
 			ui.PrintInfo("- " + a.Name)
 		}
 
-		return "", errors.New("no matching asset found")
+		return "", errNoMatchingAsset
 	}
 
 	// 1. Download
@@ -80,7 +88,7 @@ func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to download update: %v", err))
 
-		return "", errors.New("download failed")
+		return "", errDownload
 	}
 
 	// 2. Verify Checksum
@@ -91,7 +99,7 @@ func downloadAndVerify(ctx context.Context, rel *update.Release) (string, error)
 		if err := update.VerifyChecksum(ctx, asset.Name, tempFile, checksumAsset.BrowserDownloadURL); err != nil {
 			ui.PrintError(fmt.Sprintf("Security check failed: %v", err))
 
-			return tempFile, errors.New("checksum verification failed")
+			return tempFile, errChecksumVerification
 		}
 
 		ui.PrintSuccess("Checksum verified")
@@ -109,7 +117,7 @@ func finalizeUpdate(tempFile, tagName string) error {
 	if err := update.ReplaceExecutable(tempFile); err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to replace binary: %v", err))
 
-		return errors.New("update failed")
+		return errUpdate
 	}
 
 	ui.PrintSuccess("Successfully updated to " + tagName)

@@ -13,7 +13,12 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 )
 
-var cacheDir string
+var (
+	cacheDir string
+
+	errCacheBypassed = errors.New("cache bypassed")
+	errCacheExpired  = errors.New("cache expired")
+)
 
 const cacheDuration = 6 * time.Hour
 
@@ -83,7 +88,7 @@ func clearCache() {
 // Get retrieves data from the cache for the given key.
 func Get(key string) ([]byte, error) {
 	if config.NoCache {
-		return nil, errors.New("cache bypassed")
+		return nil, errCacheBypassed
 	}
 
 	path := getPath(key)
@@ -96,7 +101,7 @@ func Get(key string) ([]byte, error) {
 	if time.Since(info.ModTime()) > cacheDuration {
 		_ = os.Remove(path)
 
-		return nil, errors.New("cache expired")
+		return nil, errCacheExpired
 	}
 
 	data, err := os.ReadFile(path)

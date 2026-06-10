@@ -205,7 +205,7 @@ func TestCheckBitRate(t *testing.T) {
 	}
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop // test cases cover many edge cases in duration checks
 func TestCheckDurations(t *testing.T) {
 	order0 := 0
 	order1 := 1
@@ -284,7 +284,7 @@ func TestCheckDurations(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // numerous test cases are needed to cover many codec and normalization combinations
 func TestCheckDialogueNormalization(t *testing.T) {
 	tests := []struct {
 		name     string

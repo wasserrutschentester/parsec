@@ -17,7 +17,7 @@ import (
 
 // RunMdbChecks performs checks against online media databases (TMDB/TVDB).
 //
-//nolint:cyclop
+//nolint:cyclop // multi-step search and verification process against external databases requires many conditional paths
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 

@@ -17,7 +17,10 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-var writeTagsFlag bool
+var (
+	writeTagsFlag bool
+	errSearch     = errors.New("search failed")
+)
 
 // identifyCmd represents the identify command
 var identifyCmd = &cobra.Command{
@@ -56,7 +59,7 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 	if err != nil {
 		ui.PrintError(err.Error())
 
-		return errors.New("search failed")
+		return errSearch
 	}
 
 	processIdentificationResult(filePath, result, meta)

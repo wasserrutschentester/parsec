@@ -50,7 +50,7 @@ func TestSanitizeUTF8(t *testing.T) {
 	}
 }
 
-//nolint:cyclop
+//nolint:cyclop // complex nested JSON structure used for unmarshalling tests
 func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	jsonData := `{
 		"media": {
@@ -103,7 +103,7 @@ func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // large embedded JSON string is needed for comprehensive unmarshalling tests
 func TestMediaInfo_Unmarshal(t *testing.T) {
 	jsonData := `{
 		"creatingLibrary": {
@@ -203,7 +203,7 @@ func TestExtra_GetString(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // test cases cover various combinations of database IDs and types
 func TestMediaInfo_GetMdbIDs(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -325,7 +325,7 @@ func TestMediaInfo_GetSubtitleLanguages(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // test cases for language tagging involve many scenarios and track combinations
 func TestMediaInfo_GetLanguageTag(t *testing.T) {
 	config.InitDefaults() // preferred_language = "de"
 

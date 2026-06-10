@@ -10,7 +10,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-//nolint:funlen
+//nolint:funlen // test cases cover many validation scenarios
 func TestValidate(t *testing.T) {
 	// Silence UI output during tests
 	ui.IsSilent = true

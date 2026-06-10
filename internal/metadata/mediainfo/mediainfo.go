@@ -21,6 +21,11 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var (
+	errNoVideoTrack = errors.New("no video track found")
+	errNoAudioTrack = errors.New("no audio track found")
+)
+
 // SanitizeUTF8Bytes ensures a byte slice is valid UTF-8, converting invalid sequences from Windows-1252.
 func SanitizeUTF8Bytes(b []byte) []byte {
 	if utf8.Valid(b) {
@@ -217,11 +222,11 @@ func Get(filePath string) (*MediaInfo, error) {
 	}
 
 	if !mi.isVideo() {
-		return nil, errors.New("no video track found")
+		return nil, errNoVideoTrack
 	}
 
 	if !mi.hasAudio() {
-		return nil, errors.New("no audio track found")
+		return nil, errNoAudioTrack
 	}
 
 	return &mi, nil

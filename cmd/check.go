@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -18,6 +19,8 @@ import (
 )
 
 var jsonOutputFlag bool
+
+var errCheckDataCollection = errors.New("collecting check data failed")
 
 var checkCmd = &cobra.Command{
 	Use:   "check [path...]",
@@ -52,7 +55,7 @@ You can also pass a JSON check report file to render it.`),
 				if err != nil {
 					ui.PrintError(err.Error())
 
-					return fmt.Errorf("collecting check data failed for %s", filePath)
+					return fmt.Errorf("%w for %s", errCheckDataCollection, filePath)
 				}
 
 				currentReports = []types.CheckReport{report}

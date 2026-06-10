@@ -8,7 +8,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
-//nolint:funlen
+//nolint:funlen // comprehensive test cases for diverse matroska track configurations
 func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
 

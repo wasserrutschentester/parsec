@@ -19,6 +19,11 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var (
+	errRename           = errors.New("rename failed")
+	errMediaInfoParsing = errors.New("mediainfo parsing failed")
+)
+
 // renameCmd represents the rename command
 var renameCmd = &cobra.Command{
 	Use:   "rename [path...]",
@@ -121,7 +126,7 @@ func renameCommit(filePath, newPath, newName string) error {
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
 
-		return errors.New("rename failed")
+		return errRename
 	}
 
 	ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
@@ -138,7 +143,7 @@ func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainf
 	} else {
 		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", ui.AnonymizePath(filePath), err))
 
-		return nil, errors.New("mediainfo parsing failed")
+		return nil, errMediaInfoParsing
 	}
 
 	// 2.2 Get EBML Metadata for Visual Impaired flag

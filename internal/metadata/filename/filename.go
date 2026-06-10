@@ -130,7 +130,7 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 }
 
 func matchStreamingService(filename string) string {
-	serviceRegex := regexp.MustCompile(`(?i)[ .](hmax|hbom|hbo[ ._-]?max|hbo|amzn|amazon(hd)?|atvp|aptv|apple[ ._-]?tv\+?|atv|cnlp|canp|canal\+|dsnp|dsny|disney(\+)?|hulu|itunes|nf|netflix(u?hd)?|pcok|peacock([ ._-]?tv)?|pmtp|paramount(\+)?|sho|showtime|stan|syfy|wowtv|cr|crunchyroll|adn|joyn|rtlp|rtl\+|ardp|ard\+|ard|br|hr|mdr|ndr|rbb|sr|swr|wdr|ardmediathek|3sat|kika|arte)([ .]|$)`) //nolint:misspell
+	serviceRegex := regexp.MustCompile(`(?i)[ .](hmax|hbom|hbo[ ._-]?max|hbo|amzn|amazon(hd)?|atvp|aptv|apple[ ._-]?tv\+?|atv|cnlp|canp|canal\+|dsnp|dsny|disney(\+)?|hulu|itunes|nf|netflix(u?hd)?|pcok|peacock([ ._-]?tv)?|pmtp|paramount(\+)?|sho|showtime|stan|syfy|wowtv|cr|crunchyroll|adn|joyn|rtlp|rtl\+|ardp|ard\+|ard|br|hr|mdr|ndr|rbb|sr|swr|wdr|ardmediathek|3sat|kika|arte)([ .]|$)`) //nolint:misspell // "adn" is Animation Digital Network, not a misspelling of "and"
 	if match := serviceRegex.FindStringSubmatch(filename); len(match) > 1 {
 		return match[1]
 	}

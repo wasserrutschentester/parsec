@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,10 +25,15 @@ import (
 )
 
 var (
+	errCodebergStatus   = errors.New("codeberg returned status")
+	errChecksumNotFound = errors.New("checksum not found in checksums.txt")
+	errChecksumMismatch = errors.New("checksum mismatch")
+
 	// owner is the Codeberg user/org
 	owner = "upPollo"
 	// repo is the repository name
 	repo = "parsec"
+
 	// baseURL is the Codeberg API base URL
 	baseURL = "https://codeberg.org/api/v1"
 
@@ -91,7 +97,7 @@ func FetchLatestRelease(ctx context.Context) (*Release, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("codeberg returned status %s", resp.Status)
+		return nil, fmt.Errorf("%w %s", errCodebergStatus, resp.Status)
 	}
 
 	var rel Release
@@ -177,7 +183,7 @@ func DownloadAsset(ctx context.Context, url string) (string, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed: Codeberg returned status %s", resp.Status)
+		return "", fmt.Errorf("%w: Codeberg returned status %s", errCodebergStatus, resp.Status)
 	}
 
 	_, err = io.Copy(out, resp.Body)
@@ -206,12 +212,12 @@ func VerifyChecksum(ctx context.Context, assetName, tempFile, checksumsURL strin
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download checksums: Codeberg returned status %s", resp.Status)
+		return fmt.Errorf("failed to download checksums: %w (%s)", errCodebergStatus, resp.Status)
 	}
 
 	expectedHash := getExpectedHash(resp.Body, assetName)
 	if expectedHash == "" {
-		return fmt.Errorf("checksum for %s not found in checksums.txt", assetName)
+		return fmt.Errorf("%w: for %s", errChecksumNotFound, assetName)
 	}
 
 	actualHash, err := calculateSHA256(tempFile)
@@ -220,7 +226,7 @@ func VerifyChecksum(ctx context.Context, assetName, tempFile, checksumsURL strin
 	}
 
 	if actualHash != expectedHash {
-		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedHash, actualHash)
+		return fmt.Errorf("%w: expected %s, got %s", errChecksumMismatch, expectedHash, actualHash)
 	}
 
 	return nil

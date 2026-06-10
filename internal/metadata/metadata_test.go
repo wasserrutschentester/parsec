@@ -175,7 +175,7 @@ func TestMetadata_SetDefaults(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // many test cases needed for different formatting combinations
 func TestMetadata_String(t *testing.T) {
 	tests := []struct {
 		name string

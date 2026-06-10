@@ -45,7 +45,7 @@ func runTableTest[T any](t *testing.T, tests []struct {
 
 // Test cases for filename parsing
 //
-//nolint:funlen
+//nolint:funlen // long list of test cases is required to cover various naming conventions
 func TestParse(t *testing.T) {
 	tests := []struct {
 		input    string

@@ -29,10 +29,15 @@ linters:
         - perfsprint
         - nlreturn
 
+        - nolintlint
+        - err113
+
     settings:
         wrapcheck:
             ignore-package-globs:
                 - codeberg.org/upPollo/parsec/internal/*
+        nolintlint:
+            require-explanation: true
 
 formatters:
     enable:

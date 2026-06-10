@@ -170,6 +170,13 @@ type tvdbExternalIDsResponse struct {
 	} `json:"data"`
 }
 
+var (
+	errNotConfigured = errors.New("TVDB API key not configured")
+	errLoginStatus   = errors.New("TVDB login failed with status")
+	errTVDBStatus    = errors.New("TVDB API returned status")
+	errNotFound      = errors.New("no episode found")
+)
+
 func login() (string, error) {
 	// Try to get cached token
 	tokenKey := "tvdb_token"
@@ -179,7 +186,7 @@ func login() (string, error) {
 
 	apiKey := config.GetTvdbAPIKey()
 	if apiKey == "" {
-		return "", errors.New("TVDB API key not configured")
+		return "", errNotConfigured
 	}
 
 	authData := map[string]string{"apikey": apiKey}
@@ -203,7 +210,7 @@ func login() (string, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("TVDB login failed with status %d", resp.StatusCode)
+		return "", fmt.Errorf("%w %d", errLoginStatus, resp.StatusCode)
 	}
 
 	var data loginResponse
@@ -289,7 +296,7 @@ func getWithRetry(endpoint string, target any, allowRetry bool) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("TVDB API returned status %d", resp.StatusCode)
+		return fmt.Errorf("%w %d", errTVDBStatus, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -591,7 +598,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		}
 	}
 
-	return mdb.EpisodeResult{}, errors.New("no episode found")
+	return mdb.EpisodeResult{}, errNotFound
 }
 
 func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *Episode {

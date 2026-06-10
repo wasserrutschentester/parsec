@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-//nolint:cyclop
+//nolint:cyclop // URL building involves many combinations of IDs, categories, and types
 func TestBuildSearchURL(t *testing.T) {
 	baseURL := "http://localhost:9696"
 	searchQuery := "{TmdbId:123}"

@@ -45,6 +45,12 @@ type ReleaseResource struct {
 	GUID        string  `json:"guid"`
 }
 
+var (
+	errIDRequired     = errors.New("at least one ID (IMDB, TMDB, or TVDB) is required for Prowlarr search")
+	errNotConfigured  = errors.New("prowlarr is not configured (url or api_key missing)")
+	errProwlarrStatus = errors.New("prowlarr returned status")
+)
+
 // Search performs a parallel search across Prowlarr indexers using available IDs and episode info.
 func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]ReleaseResource, error) {
 	queries := make([]string, 0)
@@ -71,7 +77,7 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 	}
 
 	if len(queries) == 0 {
-		return nil, errors.New("at least one ID (IMDB, TMDB, or TVDB) is required for Prowlarr search")
+		return nil, errIDRequired
 	}
 
 	mediaType := "movie"
@@ -96,7 +102,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int)
 	indexerIDs := config.GetProwlarrIndexers()
 
 	if prowlarrURL == "" || apiKey == "" {
-		return nil, errors.New("prowlarr is not configured (url or api_key missing)")
+		return nil, errNotConfigured
 	}
 
 	var wg sync.WaitGroup
@@ -225,7 +231,7 @@ func fetchReleases(searchURL *url.URL, apiKey string) ([]ReleaseResource, error)
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 
-		return nil, fmt.Errorf("prowlarr returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%w %d: %s", errProwlarrStatus, resp.StatusCode, string(body))
 	}
 
 	body, err := io.ReadAll(resp.Body)

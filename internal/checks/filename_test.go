@@ -47,7 +47,7 @@ func TestCheckCharacterSequences(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // comprehensive test cases for filename parsing
 func TestRunFilenameChecks(t *testing.T) {
 	config.InitDefaults()
 

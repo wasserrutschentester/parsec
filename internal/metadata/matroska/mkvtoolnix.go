@@ -16,6 +16,8 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var errNotMatroska = errors.New("file is not a Matroska file")
+
 // EbmlMetadata represents the JSON output from mkvmerge -J.
 type EbmlMetadata struct {
 	Attachments []EbmlAttachment `json:"attachments,omitempty"`
@@ -115,7 +117,7 @@ func CheckForMatroska(filePath string) error {
 	}
 
 	if !isMKV {
-		return fmt.Errorf("file is not a Matroska file: %s", filePath)
+		return fmt.Errorf("%w: %s", errNotMatroska, filePath)
 	}
 
 	return nil
