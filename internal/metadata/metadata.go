@@ -196,6 +196,10 @@ func HeightToResolution(height int, scanType string, frameRate float64) string {
 		suffix = "i"
 	}
 
+	return matchResolution(height, suffix, frameRate)
+}
+
+func matchResolution(height int, suffix string, frameRate float64) string {
 	switch {
 	case height >= 3200:
 		return "4320p"
@@ -209,26 +213,42 @@ func HeightToResolution(height int, scanType string, frameRate float64) string {
 		return "720p"
 	case height >= 576:
 		return "576" + suffix
-	case height >= 480 && frameRate < 24.9:
+	case height >= 480:
+		return handleSDResolution(suffix, frameRate)
+	default:
+		return handleLowResolution(height, suffix, frameRate)
+	}
+}
+
+func handleSDResolution(suffix string, frameRate float64) string {
+	if frameRate < 24.9 {
 		// If it's at least 480 but frame rate is NTSC-like, it's 480
 		return "480" + suffix
-	case height >= 480 && frameRate >= 24.9:
-		// If it's at least 480 and frame rate is PAL-like, it's 576 (likely cropped 576)
-		return "576" + suffix
-	default:
-		// Logic for SD/DVD to differentiate PAL/NTSC based on frame rate if height is non-standard (cropped below 480)
-		if frameRate > 0 {
-			if frameRate >= 24.9 && frameRate <= 25.1 || frameRate >= 49.9 && frameRate <= 50.1 {
-				return "576" + suffix
-			}
+	}
+	// If it's at least 480 and frame rate is PAL-like, it's 576 (likely cropped 576)
+	return "576" + suffix
+}
 
-			if frameRate >= 23.9 && frameRate <= 24.1 || frameRate >= 29.9 && frameRate <= 30.1 || frameRate >= 59.9 && frameRate <= 60.1 {
-				return "480" + suffix
-			}
+func handleLowResolution(height int, suffix string, frameRate float64) string {
+	if frameRate > 0 {
+		if isPALFrameRate(frameRate) {
+			return "576" + suffix
 		}
 
-		return fmt.Sprintf("%d%s", height, suffix)
+		if isNTSCFrameRate(frameRate) {
+			return "480" + suffix
+		}
 	}
+
+	return fmt.Sprintf("%d%s", height, suffix)
+}
+
+func isPALFrameRate(frameRate float64) bool {
+	return (frameRate >= 24.9 && frameRate <= 25.1) || (frameRate >= 49.9 && frameRate <= 50.1)
+}
+
+func isNTSCFrameRate(frameRate float64) bool {
+	return (frameRate >= 23.9 && frameRate <= 24.1) || (frameRate >= 29.9 && frameRate <= 30.1) || (frameRate >= 59.9 && frameRate <= 60.1)
 }
 
 func (meta *Metadata) SetDefaults() {

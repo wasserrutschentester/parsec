@@ -15,48 +15,50 @@ func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 		return
 	}
 
-	// Calculate shared column widths across all tracks to ensure table alignment
-	var allTracks []types.TrackCheckResult
-
-	for _, group := range report.Issues {
-		for _, res := range group.Results {
-			allTracks = append(allTracks, res.Tracks...)
-		}
-	}
-
+	allTracks := getAllTracks(report.Issues)
 	sharedWidths := CalculateTrackTableWidths(allTracks)
 
 	totalIssues := CountIssues(report.Issues)
 	Println("\n" + IconCross + Error.Render(fmt.Sprintf(" %d issues found:", totalIssues)))
 
 	for _, group := range report.Issues {
-		count := len(group.Results)
-		if !unattended {
-			if !ConfirmContinue(fmt.Sprintf("\nDisplay %d %s issues?", count, group.Category)) {
-				return
-			}
+		if !unattended && !ConfirmContinue(fmt.Sprintf("\nDisplay %d %s issues?", len(group.Results), group.Category)) {
+			return
 		}
 
-		Println(ReportSection(fmt.Sprintf("%s (%d)", group.Category, count)))
+		printIssueGroup(group, sharedWidths)
+	}
+}
 
+func getAllTracks(issues []types.IssueGroup) []types.TrackCheckResult {
+	var allTracks []types.TrackCheckResult
+
+	for _, group := range issues {
 		for _, res := range group.Results {
-			switch res.Severity {
-			case "error":
-				PrintError(res.Warning)
-			default:
-				PrintWarning(res.Warning)
-			}
-
-			if len(res.Tracks) == 0 {
-				printUnexpectedDiff(res)
-				continue
-			}
-
-			Println(FormatTrackTable(res.Tracks, sharedWidths))
+			allTracks = append(allTracks, res.Tracks...)
 		}
 	}
 
-	Println()
+	return allTracks
+}
+
+func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
+	Println(ReportSection(fmt.Sprintf("%s (%d)", group.Category, len(group.Results))))
+
+	for _, res := range group.Results {
+		if res.Severity == "error" {
+			PrintError(res.Warning)
+		} else {
+			PrintWarning(res.Warning)
+		}
+
+		if len(res.Tracks) == 0 {
+			printUnexpectedDiff(res)
+			continue
+		}
+
+		Println(FormatTrackTable(res.Tracks, sharedWidths))
+	}
 }
 
 func printUnexpectedDiff(res types.CheckResult) {

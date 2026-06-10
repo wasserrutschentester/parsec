@@ -151,7 +151,22 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 		return ""
 	}
 
-	// Find the end of the season/episode and date tags
+	start := findEpisodeTitleStart(filename, meta)
+	if start == 0 || start >= len(filename) {
+		return ""
+	}
+
+	sub := filename[start:]
+	end := findEpisodeTitleEnd(sub, meta)
+
+	if end <= 0 {
+		return ""
+	}
+
+	return strings.Trim(sub[:end], ". ")
+}
+
+func findEpisodeTitleStart(filename string, meta *metadata.Metadata) int {
 	start := 0
 
 	if meta.Season != 0 || meta.Episode != 0 {
@@ -169,13 +184,10 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 		}
 	}
 
-	if start == 0 || start >= len(filename) {
-		return ""
-	}
+	return start
+}
 
-	sub := filename[start:]
-
-	// Now find the beginning of Language or Resolution
+func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 	end := len(sub)
 
 	if meta.Language != "" {
@@ -190,11 +202,7 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 		}
 	}
 
-	if end <= 0 {
-		return ""
-	}
-
-	return strings.Trim(sub[:end], ". ")
+	return end
 }
 
 func matchTitleYear(filename string) (string, int) {
@@ -300,9 +308,7 @@ func DeobfuscateTitle(title string) string {
 func getUmlautReplacement(umlautMatch, suffix string) string {
 	lowerUmlaut := strings.ToLower(umlautMatch)
 
-	// Exception: English words ending in "oe" (e.g. Monroe, Poe, Toe, Aloe)
-	isEndOfWord := suffix == "" || !regexp.MustCompile(`(?i)[a-z]`).MatchString(suffix)
-	if lowerUmlaut == "oe" && isEndOfWord {
+	if isEnglishUmlautException(lowerUmlaut, suffix) {
 		return umlautMatch
 	}
 
@@ -327,9 +333,15 @@ func getUmlautReplacement(umlautMatch, suffix string) string {
 		}
 
 		return "ü"
+	default:
+		return umlautMatch
 	}
+}
 
-	return umlautMatch
+func isEnglishUmlautException(lowerUmlaut, suffix string) bool {
+	// Exception: English words ending in "oe" (e.g. Monroe, Poe, Toe, Aloe)
+	isEndOfWord := suffix == "" || !regexp.MustCompile(`(?i)[a-z]`).MatchString(suffix)
+	return lowerUmlaut == "oe" && isEndOfWord
 }
 
 func NormalizeTitle(title string) string {

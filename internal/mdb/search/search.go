@@ -230,6 +230,7 @@ func findMatchingResult(r mdb.SearchResult, tvdbMap, tmdbMap map[int]mdb.SearchR
 	return mdb.SearchResult{}, false
 }
 
+// nolint:cyclop
 func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 	// Merge TVDB data into TMDB result
 	if res.TvdbID == 0 {

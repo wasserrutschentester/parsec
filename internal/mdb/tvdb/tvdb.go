@@ -533,23 +533,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 
 		ui.PrintDebug(fmt.Sprintf("found %d episodes combined", len(episodes)))
 
-		var ep *TvdbEpisode
-		// 1. Season/Episode Number Match
-		if (meta.Season > 0 && meta.Episode > 0) || allowSpecials {
-			ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episode)
-		}
-		// 2. Air Date Match
-		if meta.Date != "" && ep == nil {
-			ep = matchByAirDate(episodes, meta.Date, allowSpecials)
-		}
-		// 3. Normalized Title Match
-		if normalizedQueryTitle != "" && ep == nil {
-			ep = matchByTitle(episodes, normalizedQueryTitle, allowSpecials)
-		}
-		// 4. Fuzzy Match (Fallback)
-		if normalizedQueryTitle != "" && ep == nil {
-			ep = matchByTitleFuzzy(episodes, normalizedQueryTitle)
-		}
+		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials)
 
 		if ep != nil {
 			res := ep.toEpisodeResult()
@@ -561,6 +545,28 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 	}
 
 	return mdb.EpisodeResult{}, fmt.Errorf("no episode found")
+}
+
+func findEpisodeInList(episodes []TvdbEpisode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *TvdbEpisode {
+	var ep *TvdbEpisode
+	// 1. Season/Episode Number Match
+	if (meta.Season > 0 && meta.Episode > 0) || allowSpecials {
+		ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episode)
+	}
+	// 2. Air Date Match
+	if meta.Date != "" && ep == nil {
+		ep = matchByAirDate(episodes, meta.Date, allowSpecials)
+	}
+	// 3. Normalized Title Match
+	if normalizedQueryTitle != "" && ep == nil {
+		ep = matchByTitle(episodes, normalizedQueryTitle, allowSpecials)
+	}
+	// 4. Fuzzy Match (Fallback)
+	if normalizedQueryTitle != "" && ep == nil {
+		ep = matchByTitleFuzzy(episodes, normalizedQueryTitle)
+	}
+
+	return ep
 }
 
 func matchBySeasonEpisode(episodes []TvdbEpisode, season, episode int) *TvdbEpisode {

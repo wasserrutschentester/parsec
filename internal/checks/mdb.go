@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/language"
 )
 
+// nolint:cyclop
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 

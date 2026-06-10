@@ -49,6 +49,20 @@ Flags can be used to override or provide missing information.`),
 }
 
 func identifyFile(cmd *cobra.Command, filePath string) error {
+	meta := initializeMetadata(cmd, filePath)
+
+	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
+	if err != nil {
+		ui.PrintError(err.Error())
+		return fmt.Errorf("search failed")
+	}
+
+	processIdentificationResult(filePath, result, meta)
+
+	return nil
+}
+
+func initializeMetadata(cmd *cobra.Command, filePath string) *metadata.Metadata {
 	var meta *metadata.Metadata
 
 	if filePath != "" {
@@ -62,22 +76,17 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 	applyMetadataFlags(cmd, meta)
 	meta.SetDefaults()
 
-	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
-	if err != nil {
-		ui.PrintError(err.Error())
-		return fmt.Errorf("search failed")
-	}
+	return meta
+}
 
+func processIdentificationResult(filePath string, result *mdb.SearchResult, meta *metadata.Metadata) {
 	warnOnIDMismatch(filePath, result)
 
 	mdb.PrintResult(*result)
 	tags := mdb.GetMatroskaTags(*result)
 
 	if meta.IsTV {
-		episodeResult := getEpisodeResult(result, meta)
-		if episodeResult.Name != "" {
-			tags.SetEpisodeTags(episodeResult)
-		}
+		handleTVEpisode(result, meta, &tags)
 	}
 
 	if releasesFlag {
@@ -85,30 +94,45 @@ func identifyFile(cmd *cobra.Command, filePath string) error {
 	}
 
 	shouldWriteTags := writeTagsFlag
-
 	if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
-		fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
-
-		var response string
-
-		_, _ = fmt.Scanln(&response)
-		if response == "y" || response == "Y" {
-			shouldWriteTags = true
-		} else {
-			ui.Println(ui.Muted.Render("Skipping..."))
-		}
+		shouldWriteTags = shouldWriteTagsInteractively()
 	}
 
 	if shouldWriteTags && filePath != "" {
-		err := matroska.SetGlobalTags(filePath, tags)
-		if err != nil {
-			ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
-		} else {
-			ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
-		}
+		writeTags(filePath, tags)
+	}
+}
+
+func handleTVEpisode(result *mdb.SearchResult, meta *metadata.Metadata, tags *mdb.MatroskaTags) {
+	episodeResult := getEpisodeResult(result, meta)
+	if episodeResult.Name != "" {
+		tags.SetEpisodeTags(episodeResult)
+	}
+}
+
+func shouldWriteTagsInteractively() bool {
+	fmt.Print(ui.Info.Render("\nDo you want to write the tags to the file? [y/N] "))
+
+	var response string
+
+	_, _ = fmt.Scanln(&response)
+
+	if response == "y" || response == "Y" {
+		return true
 	}
 
-	return nil
+	ui.Println(ui.Muted.Render("Skipping..."))
+
+	return false
+}
+
+func writeTags(filePath string, tags mdb.MatroskaTags) {
+	err := matroska.SetGlobalTags(filePath, tags)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
+	} else {
+		ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
+	}
 }
 
 func init() {
@@ -168,23 +192,32 @@ func warnOnIDMismatch(filePath string, result *mdb.SearchResult) {
 	}
 
 	tagImdb, tagTmdb, tagTvdb, _ := mi.GetMdbIDs()
-	if (tagImdb != "" && result.ImdbID != "" && tagImdb != result.ImdbID) ||
-		(tagTmdb != 0 && result.TmdbID != 0 && tagTmdb != result.TmdbID) ||
-		(tagTvdb != 0 && result.TvdbID != 0 && tagTvdb != result.TvdbID) {
+	mismatches := collectMismatches(tagImdb, result.ImdbID, tagTmdb, result.TmdbID, tagTvdb, result.TvdbID)
+
+	if len(mismatches) > 0 {
 		ui.Println("\n" + ui.FormatWarning("Selected result IDs do not match file tags:"))
 
-		if tagImdb != "" && tagImdb != result.ImdbID {
-			ui.Println("  " + ui.LabelValue("IMDB (File vs Selected):", fmt.Sprintf("%s / %s", tagImdb, result.ImdbID)))
-		}
-
-		if tagTmdb != 0 && tagTmdb != result.TmdbID {
-			ui.Println("  " + ui.LabelValue("TMDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTmdb, result.TmdbID)))
-		}
-
-		if tagTvdb != 0 && tagTvdb != result.TvdbID {
-			ui.Println("  " + ui.LabelValue("TVDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTvdb, result.TvdbID)))
+		for _, m := range mismatches {
+			ui.Println("  " + m)
 		}
 	}
+}
+
+func collectMismatches(tagImdb, resImdb string, tagTmdb, resTmdb, tagTvdb, resTvdb int) []string {
+	var mismatches []string
+	if tagImdb != "" && resImdb != "" && tagImdb != resImdb {
+		mismatches = append(mismatches, ui.LabelValue("IMDB (File vs Selected):", fmt.Sprintf("%s / %s", tagImdb, resImdb)))
+	}
+
+	if tagTmdb != 0 && resTmdb != 0 && tagTmdb != resTmdb {
+		mismatches = append(mismatches, ui.LabelValue("TMDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTmdb, resTmdb)))
+	}
+
+	if tagTvdb != 0 && resTvdb != 0 && tagTvdb != resTvdb {
+		mismatches = append(mismatches, ui.LabelValue("TVDB (File vs Selected):", fmt.Sprintf("%d / %d", tagTvdb, resTvdb)))
+	}
+
+	return mismatches
 }
 
 func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {

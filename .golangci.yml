@@ -12,6 +12,8 @@ linters:
         - wsl_v5
         - funlen
         - nestif
+        - cyclop
+        - gocognit
 
 formatters:
     enable:

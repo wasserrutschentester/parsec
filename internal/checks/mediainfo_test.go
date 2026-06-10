@@ -201,7 +201,7 @@ func TestCheckBitRate(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+// nolint:funlen,cyclop
 func TestCheckDurations(t *testing.T) {
 	order0 := 0
 	order1 := 1

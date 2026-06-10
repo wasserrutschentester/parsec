@@ -10,6 +10,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+// nolint:cyclop
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var (
 		results    []CheckResult
@@ -291,15 +292,7 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 		Passed:     true,
 	}
 
-	var videoDur float64
-
-	for i := range mi.Media.Tracks {
-		if mi.Media.Tracks[i].Type == "Video" && mi.Media.Tracks[i].Duration != 0 {
-			videoDur = mi.Media.Tracks[i].Duration
-			break
-		}
-	}
-
+	videoDur := getVideoDuration(mi)
 	if videoDur == 0 {
 		res.Passed = false
 		res.Severity = "error"
@@ -332,6 +325,16 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 	}
 
 	return []CheckResult{res}
+}
+
+func getVideoDuration(mi *mediainfo.MediaInfo) float64 {
+	for i := range mi.Media.Tracks {
+		if mi.Media.Tracks[i].Type == "Video" && mi.Media.Tracks[i].Duration != 0 {
+			return mi.Media.Tracks[i].Duration
+		}
+	}
+
+	return 0
 }
 
 func getDurationWarning(track *mediainfo.Track, diff, percentDiff float64) string {

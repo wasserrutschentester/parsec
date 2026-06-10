@@ -408,17 +408,8 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 
 	// check for preferred language subs if it's not the first audio language
 	if config.GetSubbedTagging() && prefTag != firstAudioTag {
-		subtitleLanguages := mi.GetSubtitleLanguages()
-		if len(subtitleLanguages) > 0 {
-			for _, lang := range subtitleLanguages {
-				if language.Make(lang) == prefTag {
-					meta.Language = metadata.LanguageName(preferredLanguage)
-					meta.LanguageExt = "SUBBED"
-					meta.Subbed = true
-
-					return
-				}
-			}
+		if mi.checkIsSubbed(meta, prefTag, preferredLanguage) {
+			return
 		}
 	}
 
@@ -431,6 +422,23 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	default:
 		meta.LanguageExt = "ML"
 	}
+}
+
+func (mi *MediaInfo) checkIsSubbed(meta *metadata.Metadata, prefTag language.Tag, preferredLanguage string) bool {
+	subtitleLanguages := mi.GetSubtitleLanguages()
+	if len(subtitleLanguages) > 0 {
+		for _, lang := range subtitleLanguages {
+			if language.Make(lang) == prefTag {
+				meta.Language = metadata.LanguageName(preferredLanguage)
+				meta.LanguageExt = "SUBBED"
+				meta.Subbed = true
+
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (mi *MediaInfo) Print() {

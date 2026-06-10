@@ -224,36 +224,10 @@ func FormatStringDiff(oldStr, newStr string) string {
 		oldText := oldStr[edit.Start:edit.End]
 		newText := edit.New
 
-		// Calculate visual widths for alignment
-		oldW := lipgloss.Width(oldText)
-		newW := lipgloss.Width(newText)
+		maxW := calculateMaxW(oldText, newText)
 
-		maxW := oldW
-		if newW > maxW {
-			maxW = newW
-		}
-
-		// Add deleted part (red) to line 1
-		if oldW > 0 {
-			line1.WriteString(lipgloss.NewStyle().Foreground(red).Render(oldText))
-
-			if maxW > oldW {
-				line1.WriteString(strings.Repeat(" ", maxW-oldW))
-			}
-		} else if maxW > 0 {
-			line1.WriteString(strings.Repeat(" ", maxW))
-		}
-
-		// Add inserted part (green) to line 2
-		if newW > 0 {
-			line2.WriteString(lipgloss.NewStyle().Foreground(green).Render(newText))
-
-			if maxW > newW {
-				line2.WriteString(strings.Repeat(" ", maxW-newW))
-			}
-		} else if maxW > 0 {
-			line2.WriteString(strings.Repeat(" ", maxW))
-		}
+		renderOldPart(&line1, oldText, maxW)
+		renderNewPart(&line2, newText, maxW)
 
 		pos = edit.End
 	}
@@ -266,6 +240,43 @@ func FormatStringDiff(oldStr, newStr string) string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, line1.String(), line2.String())
+}
+
+func calculateMaxW(oldText, newText string) int {
+	oldW := lipgloss.Width(oldText)
+
+	newW := lipgloss.Width(newText)
+	if newW > oldW {
+		return newW
+	}
+
+	return oldW
+}
+
+func renderOldPart(b *strings.Builder, oldText string, maxW int) {
+	oldW := lipgloss.Width(oldText)
+	if oldW > 0 {
+		b.WriteString(lipgloss.NewStyle().Foreground(red).Render(oldText))
+
+		if maxW > oldW {
+			b.WriteString(strings.Repeat(" ", maxW-oldW))
+		}
+	} else if maxW > 0 {
+		b.WriteString(strings.Repeat(" ", maxW))
+	}
+}
+
+func renderNewPart(b *strings.Builder, newText string, maxW int) {
+	newW := lipgloss.Width(newText)
+	if newW > 0 {
+		b.WriteString(lipgloss.NewStyle().Foreground(green).Render(newText))
+
+		if maxW > newW {
+			b.WriteString(strings.Repeat(" ", maxW-newW))
+		}
+	} else if maxW > 0 {
+		b.WriteString(strings.Repeat(" ", maxW))
+	}
 }
 
 // FormatStringDiffAligned visualizes a mismatch between two strings with labels and character-level alignment.

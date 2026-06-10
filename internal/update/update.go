@@ -203,41 +203,50 @@ func VerifyChecksum(ctx context.Context, assetName, tempFile, checksumsURL strin
 		return fmt.Errorf("failed to download checksums: Codeberg returned status %s", resp.Status)
 	}
 
-	// Expected hash from checksums.txt
-	var expectedHash string
-
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		parts := strings.Fields(line)
-		if len(parts) >= 2 && parts[1] == assetName {
-			expectedHash = parts[0]
-			break
-		}
-	}
-
+	expectedHash := getExpectedHash(resp.Body, assetName)
 	if expectedHash == "" {
 		return fmt.Errorf("checksum for %s not found in checksums.txt", assetName)
 	}
 
-	f, err := os.Open(tempFile)
+	actualHash, err := calculateSHA256(tempFile)
 	if err != nil {
-		return fmt.Errorf("could not open downloaded file for verification: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return fmt.Errorf("failed to calculate checksum: %w", err)
+		return err
 	}
 
-	actualHash := hex.EncodeToString(h.Sum(nil))
 	if actualHash != expectedHash {
 		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedHash, actualHash)
 	}
 
 	return nil
+}
+
+func getExpectedHash(body io.Reader, assetName string) string {
+	scanner := bufio.NewScanner(body)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		parts := strings.Fields(line)
+		if len(parts) >= 2 && parts[1] == assetName {
+			return parts[0]
+		}
+	}
+
+	return ""
+}
+
+func calculateSHA256(filePath string) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("could not open downloaded file for verification: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", fmt.Errorf("failed to calculate checksum: %w", err)
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // ReplaceExecutable replaces the current executable with the new one

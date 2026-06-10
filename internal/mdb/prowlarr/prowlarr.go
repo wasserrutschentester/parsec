@@ -254,19 +254,7 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 	stats := make(map[string]indexerStat)
 
 	for _, r := range results {
-		match := false
-
-		if imdbID != "" && r.ImdbID == imdbInt {
-			match = true
-		}
-
-		if tmdbID > 0 && r.TmdbID == int64(tmdbID) {
-			match = true
-		}
-
-		if tvdbID > 0 && r.TvdbID == int64(tvdbID) {
-			match = true
-		}
+		match := isMatch(r, imdbInt, tmdbID, tvdbID)
 
 		s := stats[r.Indexer]
 		s.total++
@@ -288,6 +276,22 @@ func filterFalsePositives(results []ReleaseResource, imdbID string, tmdbID, tvdb
 	}
 
 	return filtered
+}
+
+func isMatch(r ReleaseResource, imdbInt int64, tmdbID, tvdbID int) bool {
+	if imdbInt > 0 && r.ImdbID == imdbInt {
+		return true
+	}
+
+	if tmdbID > 0 && r.TmdbID == int64(tmdbID) {
+		return true
+	}
+
+	if tvdbID > 0 && r.TvdbID == int64(tvdbID) {
+		return true
+	}
+
+	return false
 }
 
 func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter bool) {

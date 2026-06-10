@@ -190,32 +190,11 @@ func getLanguageCodeFromName(word string) string {
 
 func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) *CheckResult {
 	props := track.Properties
-	shouldBeDefault := false
-
-	// Specialized tracks MUST NEVER be default
 	isSpecialized := props.Forced || props.Commentary || props.VisualImpaired || props.HearingImpaired || props.TextDescriptions
 
+	shouldBeDefault := false
 	if !isSpecialized {
-		switch track.Type {
-		case "audio":
-			if !seenAudioLangs[props.Language] {
-				shouldBeDefault = true
-				seenAudioLangs[props.Language] = true
-			}
-			// Relaxation: if only one track in this language, it is fine to not set the default flag
-			if audioCounts[props.Language] == 1 && !props.Default {
-				shouldBeDefault = false
-			}
-		case "subtitles":
-			if !seenSubLangs[props.Language] {
-				shouldBeDefault = true
-				seenSubLangs[props.Language] = true
-			}
-			// Relaxation: if only one track in this language, it is fine to not set the default flag
-			if subCounts[props.Language] == 1 && !props.Default {
-				shouldBeDefault = false
-			}
-		}
+		shouldBeDefault = determineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
 	}
 
 	if props.Default != shouldBeDefault {
@@ -232,6 +211,34 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 	}
 
 	return nil
+}
+
+func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
+	props := track.Properties
+	switch track.Type {
+	case "audio":
+		if !seenAudioLangs[props.Language] {
+			seenAudioLangs[props.Language] = true
+			// Relaxation: if only one track in this language, it is fine to not set the default flag
+			if audioCounts[props.Language] == 1 && !props.Default {
+				return false
+			}
+
+			return true
+		}
+	case "subtitles":
+		if !seenSubLangs[props.Language] {
+			seenSubLangs[props.Language] = true
+			// Relaxation: if only one track in this language, it is fine to not set the default flag
+			if subCounts[props.Language] == 1 && !props.Default {
+				return false
+			}
+
+			return true
+		}
+	}
+
+	return false
 }
 
 func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
@@ -358,14 +365,20 @@ func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywo
 }
 
 func getTrackPriority(track matroska.EbmlTrack) int64 {
-	lang := track.Properties.Language
+	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
+	propertyScore := calculatePropertyScore(track)
+
+	return langScore + propertyScore
+}
+
+func calculateLangScore(lang string, isOriginal bool) int64 {
 	tag := language.Make(lang)
 	prefTag := language.Make(config.GetPreferredLanguage())
 
 	var langScore int64
 	if tag == prefTag {
 		langScore = priorityPreferred
-	} else if track.Properties.OriginalLanguage {
+	} else if isOriginal {
 		langScore = priorityOriginal
 	} else if tag == language.Make("mul") {
 		langScore = priorityMul
@@ -382,6 +395,10 @@ func getTrackPriority(track matroska.EbmlTrack) int64 {
 		langScore += calcScore(langName) << 10
 	}
 
+	return langScore
+}
+
+func calculatePropertyScore(track matroska.EbmlTrack) int64 {
 	var propertyScore int64
 
 	switch track.Type {
@@ -407,7 +424,7 @@ func getTrackPriority(track matroska.EbmlTrack) int64 {
 		}
 	}
 
-	return langScore + propertyScore
+	return propertyScore
 }
 
 func calcScore(name string) int64 {

@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// nolint:cyclop
 func TestBuildSearchURL(t *testing.T) {
 	baseURL := "http://localhost:9696"
 	searchQuery := "{TmdbId:123}"
