@@ -56,7 +56,7 @@ func TestCache(t *testing.T) {
 	// Test Clear
 	_ = Set(key, data)
 
-	clear()
+	clearCache()
 
 	if _, err := Get(key); err == nil {
 		t.Error("Expected error after clear")

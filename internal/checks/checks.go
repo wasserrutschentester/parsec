@@ -1,3 +1,4 @@
+// Package checks provides validation logic for media files.
 package checks
 
 import (

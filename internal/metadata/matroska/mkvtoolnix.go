@@ -1,3 +1,4 @@
+// Package matroska provides tools for interacting with Matroska (MKV) files using mkvtoolnix.
 package matroska
 
 import (
@@ -155,13 +156,13 @@ func (metadata *EbmlMetadata) countTypes() {
 	for i := range metadata.Tracks {
 		switch metadata.Tracks[i].Type {
 		case "video":
-			numVideo += 1
+			numVideo++
 			metadata.Tracks[i].TypeOrder = numVideo
 		case "audio":
-			numAudio += 1
+			numAudio++
 			metadata.Tracks[i].TypeOrder = numAudio
 		case "subtitles", "subtitle":
-			numSubtitles += 1
+			numSubtitles++
 			metadata.Tracks[i].TypeOrder = numSubtitles
 		}
 	}

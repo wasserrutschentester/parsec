@@ -52,8 +52,8 @@ func TestPresets(t *testing.T) {
 
 	SetPreset("my_preset")
 
-	if GetTmdbApiKey() != "GlobalKey" {
-		t.Errorf("GetTmdbApiKey() = %v, want GlobalKey", GetTmdbApiKey())
+	if GetTmdbAPIKey() != "GlobalKey" {
+		t.Errorf("GetTmdbAPIKey() = %v, want GlobalKey", GetTmdbAPIKey())
 	}
 }
 

@@ -48,10 +48,10 @@ func checkKey(key, name string) {
 }
 
 func checkAPIKeys() {
-	tmdbKey := GetTmdbApiKey()
-	tvdbKey := GetTvdbApiKey()
-	prowlarrKey := GetProwlarrApiKey()
-	prowlarrUrl := GetProwlarrUrl()
+	tmdbKey := GetTmdbAPIKey()
+	tvdbKey := GetTvdbAPIKey()
+	prowlarrKey := GetProwlarrAPIKey()
+	prowlarrURL := GetProwlarrURL()
 
 	if tmdbKey == "" && tvdbKey == "" {
 		ui.PrintWarning("No API keys found. Metadata fetching might be limited.")
@@ -60,7 +60,7 @@ func checkAPIKeys() {
 		checkKey(tvdbKey, "TVDB")
 	}
 
-	if prowlarrUrl != "" {
+	if prowlarrURL != "" {
 		checkKey(prowlarrKey, "Prowlarr")
 	}
 }

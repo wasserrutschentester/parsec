@@ -8,7 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func TestPrintDebug(t *testing.T) {
+func TestPrintDebug(_ *testing.T) {
 	// This is hard to test because it prints to stdout/stderr using lipgloss.
 	// But we can at least check if it doesn't crash.
 	IsDebug = true

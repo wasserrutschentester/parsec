@@ -1,3 +1,4 @@
+// Package cache provides a simple file-based cache for API responses.
 package cache
 
 import (
@@ -73,7 +74,7 @@ func removeExpiredFiles() {
 	}
 }
 
-func clear() {
+func clearCache() {
 	_ = os.RemoveAll(cacheDir)
 }
 

@@ -308,7 +308,7 @@ func TrackTable(headers []string, rows [][]string) string {
 	t := table.New().
 		Border(lipgloss.DoubleBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(white)).
-		StyleFunc(func(row, col int) lipgloss.Style {
+		StyleFunc(func(row, _ int) lipgloss.Style {
 			if row < 0 { // Header row
 				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
@@ -628,12 +628,4 @@ func IsTerminal() bool {
 	}
 
 	return (fi.Mode() & os.ModeCharDevice) != 0
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-
-	return b
 }

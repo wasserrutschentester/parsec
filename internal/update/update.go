@@ -1,3 +1,4 @@
+// Package update provides functionality for self-updating the parsec binary.
 package update
 
 import (

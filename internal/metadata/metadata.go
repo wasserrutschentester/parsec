@@ -1,3 +1,4 @@
+// Package metadata defines structures and utilities for media metadata processing.
 package metadata
 
 import (

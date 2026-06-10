@@ -1,3 +1,4 @@
+// Package tmdb provides a client for the TheMovieDB (TMDB) API.
 package tmdb
 
 import (
@@ -102,7 +103,7 @@ func getFromCache(key string, target interface{}) (bool, error) {
 }
 
 func get(endpoint string, query url.Values, target interface{}) error {
-	apiKey := config.GetTmdbApiKey()
+	apiKey := config.GetTmdbAPIKey()
 	if apiKey == "" {
 		return fmt.Errorf("TMDB API key not configured")
 	}

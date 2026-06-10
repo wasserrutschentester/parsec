@@ -1,3 +1,4 @@
+// Package ui provides components and utilities for the terminal user interface.
 package ui
 
 import (

@@ -1,3 +1,4 @@
+// Package tvdb provides a client for the TheTVDB (TVDB) API.
 package tvdb
 
 import (
@@ -163,7 +164,7 @@ type tvdbExternalIDsResponse struct {
 			Name     string `json:"name"`
 			Language string `json:"language"`
 		} `json:"alias"`
-		RemoteIds []remoteID `json:"remoteIds"`
+		RemoteIDs []remoteID `json:"remoteIds"`
 	} `json:"data"`
 }
 
@@ -174,7 +175,7 @@ func login() (string, error) {
 		return string(cached), nil
 	}
 
-	apiKey := config.GetTvdbApiKey()
+	apiKey := config.GetTvdbAPIKey()
 	if apiKey == "" {
 		return "", fmt.Errorf("TVDB API key not configured")
 	}
@@ -343,7 +344,7 @@ type tvdbRemoteMatch struct {
 	Movie  *tvdbMedia `json:"movie"`
 }
 
-type tvdbRemoteIdResponse struct {
+type tvdbRemoteIDResponse struct {
 	Status string            `json:"status"`
 	Data   []tvdbRemoteMatch `json:"data"`
 }
@@ -352,7 +353,7 @@ type tvdbRemoteIdResponse struct {
 func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 	endpoint := fmt.Sprintf("search/remoteid/%s", remoteID)
 
-	var data tvdbRemoteIdResponse
+	var data tvdbRemoteIDResponse
 	if err := get(endpoint, &data); err != nil {
 		return nil, err
 	}
@@ -495,7 +496,7 @@ func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 			}
 		}
 
-		for _, ext := range externalIDs.Data.RemoteIds {
+		for _, ext := range externalIDs.Data.RemoteIDs {
 			switch ext.SourceName {
 			case "IMDB":
 				result.ImdbID = ext.ID

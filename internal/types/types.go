@@ -1,3 +1,4 @@
+// Package types defines common types used across the parsec codebase.
 package types
 
 // CheckResult represents the result of a single check.

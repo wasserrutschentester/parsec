@@ -22,7 +22,7 @@ var configInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Create a default configuration file",
 	Long:  ui.Banner(".: WARP CORE LOADING PROTO :."),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		ui.Println(ui.Banner(".: LOADING WARP CORE :."))
 
 		confDir, err := os.UserConfigDir()
@@ -68,7 +68,7 @@ var configValidateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Verify the current configuration",
 	Long:  ui.Banner(".: STABILITY ASSESSMENT :."),
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		ui.Println(ui.Banner(".: ASSESSING STABILITY :."))
 		config.Validate()
 		ui.PrintSuccess("Configuration validation complete.")

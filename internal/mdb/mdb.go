@@ -1,3 +1,4 @@
+// Package mdb provides interfaces and utilities for interacting with media databases.
 package mdb
 
 import (
@@ -314,16 +315,4 @@ func levenshteinDistance(s1, s2 string) int {
 	}
 
 	return row[n]
-}
-
-func min(a, b, c int) int {
-	if a <= b && a <= c {
-		return a
-	}
-
-	if b <= a && b <= c {
-		return b
-	}
-
-	return c
 }

@@ -78,7 +78,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 
 		dialnorm := track.GetDialNorm()
 		if track.Type == "Audio" && dialnorm != "" {
-			codec := metadata.AudioCodecName(track.Format, track.Format_Profile, track.Format_AdditionalFeatures)
+			codec := metadata.AudioCodecName(track.Format, track.FormatProfile, track.FormatAdditionalFeatures)
 			isLosslessOrHRA := false
 
 			switch codec {

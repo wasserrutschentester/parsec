@@ -25,7 +25,7 @@ var rootCmd = &cobra.Command{
 	Use:   "parsec",
 	Short: "parsec allows you to parse, check and create releases",
 	Long:  ui.Banner(".: FIRST STEPS? :."),
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		ui.IsSilent = jsonOutputFlag // make sure only json is printed
 		if ui.IsSilent {
 			ui.DisableColors()
@@ -108,7 +108,7 @@ func init() {
 	cobra.AddTemplateFunc("hasFlags", func(fs *pflag.FlagSet) bool {
 		has := false
 
-		fs.VisitAll(func(f *pflag.Flag) {
+		fs.VisitAll(func(_ *pflag.Flag) {
 			has = true
 		})
 

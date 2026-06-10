@@ -427,7 +427,7 @@ func calculatePropertyScore(track matroska.EbmlTrack) int64 {
 		}
 		// text subs should be before image based subs
 		if !track.Properties.TextSubtitles {
-			propertyScore += 1
+			propertyScore++
 		}
 	}
 

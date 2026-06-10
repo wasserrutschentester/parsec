@@ -10,9 +10,9 @@ func TestBuildSearchURL(t *testing.T) {
 	searchQuery := "{TmdbId:123}"
 	mediaType := "movie"
 	categories := []int{2000}
-	indexerIds := []int{1, 2}
+	indexerIDs := []int{1, 2}
 
-	u, err := buildSearchURL(baseURL, searchQuery, mediaType, categories, indexerIds)
+	u, err := buildSearchURL(baseURL, searchQuery, mediaType, categories, indexerIDs)
 	if err != nil {
 		t.Fatalf("failed to build search URL: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestBuildSearchURL(t *testing.T) {
 
 	ids := q["indexerIds"]
 	if len(ids) != 2 {
-		t.Errorf("expected 2 indexerIds, got %d", len(ids))
+		t.Errorf("expected 2 indexerIDs, got %d", len(ids))
 	}
 
 	found1, found2 := false, false
@@ -53,7 +53,7 @@ func TestBuildSearchURL(t *testing.T) {
 	}
 }
 
-func TestSearchLogic(t *testing.T) {
+func TestSearchLogic(_ *testing.T) {
 	// This is a bit hard to test without mocking the HTTP client or performParallelSearch
 	// but we can at least check if it compiles and the logic for mediaType/categories is correct.
 }

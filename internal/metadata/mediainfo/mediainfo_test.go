@@ -93,12 +93,12 @@ func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	}
 
 	video := mi.Media.Tracks[1]
-	if video.Format_Profile != "High@L4.1" || video.BitDepth != 8 || video.ChromaSubsampling != "4:2:0" || video.StreamSize != 1000000 || video.FrameCount != 24000 || video.Encoded_Library != "x264" {
+	if video.FormatProfile != "High@L4.1" || video.BitDepth != 8 || video.ChromaSubsampling != "4:2:0" || video.StreamSize != 1000000 || video.FrameCount != 24000 || video.EncodedLibrary != "x264" {
 		t.Errorf("Video track fields mismatch: %+v", video)
 	}
 
 	audio := mi.Media.Tracks[2]
-	if audio.SamplingRate != 48000 || audio.BitRate_Mode != "CBR" {
+	if audio.SamplingRate != 48000 || audio.BitRateMode != "CBR" {
 		t.Errorf("Audio track fields mismatch: %+v", audio)
 	}
 }
@@ -415,19 +415,19 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 		Media: Media{
 			Tracks: []Track{
 				{
-					Type:       "Video",
-					Height:     1080,
-					Format:     "AVC",
-					HDR_Format: "Dolby Vision / HDR10",
-					BitDepth:   10,
+					Type:      "Video",
+					Height:    1080,
+					Format:    "AVC",
+					HDRFormat: "Dolby Vision / HDR10",
+					BitDepth:  10,
 				},
 				{
-					Type:                      "Audio",
-					Format:                    "E-AC-3",
-					Format_AdditionalFeatures: "JOC", // Atmos
-					Title:                     "Atmos",
-					Channels:                  6,
-					Language:                  "de",
+					Type:                     "Audio",
+					Format:                   "E-AC-3",
+					FormatAdditionalFeatures: "JOC", // Atmos
+					Title:                    "Atmos",
+					Channels:                 6,
+					Language:                 "de",
 				},
 			},
 		},
@@ -459,36 +459,36 @@ func TestTrack_detectHDR(t *testing.T) {
 		{
 			name: "Dolby Vision and HDR10",
 			track: Track{
-				HDR_Format:               "Dolby Vision",
-				HDR_Format_Compatibility: "HDR10",
+				HDRFormat:              "Dolby Vision",
+				HDRFormatCompatibility: "HDR10",
 			},
 			expected: "DV.HDR",
 		},
 		{
 			name: "HDR10+",
 			track: Track{
-				HDR_Format: "HDR10+",
+				HDRFormat: "HDR10+",
 			},
 			expected: "HDR10Plus",
 		},
 		{
 			name: "HLG",
 			track: Track{
-				Transfer_Characteristics: "HLG",
+				TransferCharacteristics: "HLG",
 			},
 			expected: "HLG",
 		},
 		{
 			name: "PQ10",
 			track: Track{
-				Transfer_Characteristics: "PQ",
+				TransferCharacteristics: "PQ",
 			},
 			expected: "PQ10",
 		},
 		{
 			name: "No HDR",
 			track: Track{
-				HDR_Format: "",
+				HDRFormat: "",
 			},
 			expected: "",
 		},

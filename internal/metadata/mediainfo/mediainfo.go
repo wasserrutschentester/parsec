@@ -1,3 +1,4 @@
+// Package mediainfo provides tools to extract and parse metadata using MediaInfo.
 package mediainfo
 
 import (
@@ -125,39 +126,39 @@ func (mb *MediaBool) UnmarshalJSON(b []byte) error {
 
 // Track represents a single track in the mediainfo output.
 type Track struct {
-	Type                      string    `json:"@type"`
-	TypeOrder                 *int      `json:"@typeorder,string,omitempty"`
-	ID                        string    `json:"ID,omitempty"`
-	UniqueID                  string    `json:"UniqueID,omitempty"`
-	Format                    string    `json:"Format,omitempty"`
-	Format_Profile            string    `json:"Format_Profile,omitempty"`
-	Format_Version            string    `json:"Format_Version,omitempty"`
-	Format_AdditionalFeatures string    `json:"Format_AdditionalFeatures,omitempty"`
-	Title                     string    `json:"Title,omitempty"`
-	Language                  string    `json:"Language,omitempty"`
-	Duration                  float64   `json:"Duration,string,omitempty"`
-	Channels                  int       `json:"Channels,string,omitempty"`
-	BitRate                   int       `json:"BitRate,string,omitempty"`
-	BitRate_Mode              string    `json:"BitRate_Mode,omitempty"`
-	HDR_Format_Compatibility  string    `json:"HDR_Format_Compatibility,omitempty"`
-	HDR_Format                string    `json:"HDR_Format,omitempty"`
-	Transfer_Characteristics  string    `json:"transfer_characteristics,omitempty"`
-	Height                    int       `json:"Height,string,omitempty"`
-	Width                     int       `json:"Width,string,omitempty"`
-	DisplayAspectRatio        string    `json:"DisplayAspectRatio,omitempty"`
-	ScanType                  string    `json:"ScanType,omitempty"`
-	FrameRate                 float64   `json:"FrameRate,string,omitempty"`
-	FrameCount                int       `json:"FrameCount,string,omitempty"`
-	BitDepth                  int       `json:"BitDepth,string,omitempty"`
-	ChromaSubsampling         string    `json:"ChromaSubsampling,omitempty"`
-	SamplingRate              int       `json:"SamplingRate,string,omitempty"`
-	Dialog_Normalization      string    `json:"Dialog_Normalization,omitempty"`
-	CodecID                   string    `json:"CodecID,omitempty"`
-	CodecID_Hint              string    `json:"CodecID_Hint,omitempty"`
-	Encoded_Library           string    `json:"Encoded_Library,omitempty"`
-	StreamSize                int64     `json:"StreamSize,string,omitempty"`
-	Default                   MediaBool `json:"Default,omitempty"`
-	Forced                    MediaBool `json:"Forced,omitempty"`
+	Type                     string    `json:"@type"`
+	TypeOrder                *int      `json:"@typeorder,string,omitempty"`
+	ID                       string    `json:"ID,omitempty"`
+	UniqueID                 string    `json:"UniqueID,omitempty"`
+	Format                   string    `json:"Format,omitempty"`
+	FormatProfile            string    `json:"Format_Profile,omitempty"`
+	FormatVersion            string    `json:"Format_Version,omitempty"`
+	FormatAdditionalFeatures string    `json:"Format_AdditionalFeatures,omitempty"`
+	Title                    string    `json:"Title,omitempty"`
+	Language                 string    `json:"Language,omitempty"`
+	Duration                 float64   `json:"Duration,string,omitempty"`
+	Channels                 int       `json:"Channels,string,omitempty"`
+	BitRate                  int       `json:"BitRate,string,omitempty"`
+	BitRateMode              string    `json:"BitRate_Mode,omitempty"`
+	HDRFormatCompatibility   string    `json:"HDR_Format_Compatibility,omitempty"`
+	HDRFormat                string    `json:"HDR_Format,omitempty"`
+	TransferCharacteristics  string    `json:"transfer_characteristics,omitempty"`
+	Height                   int       `json:"Height,string,omitempty"`
+	Width                    int       `json:"Width,string,omitempty"`
+	DisplayAspectRatio       string    `json:"DisplayAspectRatio,omitempty"`
+	ScanType                 string    `json:"ScanType,omitempty"`
+	FrameRate                float64   `json:"FrameRate,string,omitempty"`
+	FrameCount               int       `json:"FrameCount,string,omitempty"`
+	BitDepth                 int       `json:"BitDepth,string,omitempty"`
+	ChromaSubsampling        string    `json:"ChromaSubsampling,omitempty"`
+	SamplingRate             int       `json:"SamplingRate,string,omitempty"`
+	DialogNormalization      string    `json:"Dialog_Normalization,omitempty"`
+	CodecID                  string    `json:"CodecID,omitempty"`
+	CodecIDHint              string    `json:"CodecID_Hint,omitempty"`
+	EncodedLibrary           string    `json:"Encoded_Library,omitempty"`
+	StreamSize               int64     `json:"StreamSize,string,omitempty"`
+	Default                  MediaBool `json:"Default,omitempty"`
+	Forced                   MediaBool `json:"Forced,omitempty"`
 
 	// General track specific
 	VideoCount     int    `json:"VideoCount,string,omitempty"`
@@ -173,7 +174,7 @@ type Track struct {
 
 // GetDialNorm returns the dialog normalization value from the track properties.
 func (t *Track) GetDialNorm() string {
-	val := t.Dialog_Normalization
+	val := t.DialogNormalization
 	if val == "" {
 		val = t.Extra.GetString("Dialog_Normalization")
 	}
@@ -322,7 +323,7 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 		if track.Type == "Video" && meta.Resolution == "" {
 			meta.Resolution = metadata.HeightToResolution(track.Height, track.ScanType, track.FrameRate)
 
-			meta.VideoCodec = metadata.VideoCodecName(track.Format, track.Format_Version, track.CodecID_Hint)
+			meta.VideoCodec = metadata.VideoCodecName(track.Format, track.FormatVersion, track.CodecIDHint)
 			if track.BitDepth != 8 {
 				// ignore bit depth if it's 8 (default)
 				meta.BitDepth = track.BitDepth
@@ -330,9 +331,9 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 
 			meta.HDR = track.detectHDR()
 		} else if track.Type == "Audio" && meta.AudioCodec == "" {
-			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.Format_Profile, track.Format_AdditionalFeatures)
+			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.FormatProfile, track.FormatAdditionalFeatures)
 			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
-			meta.AudioMeta = metadata.AudioMetaName(track.Title, track.Format_AdditionalFeatures)
+			meta.AudioMeta = metadata.AudioMetaName(track.Title, track.FormatAdditionalFeatures)
 		}
 	}
 
@@ -342,12 +343,12 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	return meta
 }
 
-func (track *Track) detectHDR() string {
-	hdrFormat := strings.ToUpper(track.HDR_Format)
-	hdrCompat := strings.ToUpper(track.HDR_Format_Compatibility)
+func (t *Track) detectHDR() string {
+	hdrFormat := strings.ToUpper(t.HDRFormat)
+	hdrCompat := strings.ToUpper(t.HDRFormatCompatibility)
 	hdr := fmt.Sprintf("%s %s", hdrFormat, hdrCompat)
 
-	transfer := strings.ToUpper(track.Transfer_Characteristics)
+	transfer := strings.ToUpper(t.TransferCharacteristics)
 
 	var result string
 	if strings.Contains(hdr, "DOLBY VISION") {

@@ -1,3 +1,4 @@
+// Package prowlarr provides a client for the Prowlarr API.
 package prowlarr
 
 import (
@@ -32,15 +33,15 @@ type ReleaseResource struct {
 	ImdbID      int64   `json:"imdbId"`
 	TmdbID      int64   `json:"tmdbId"`
 	TvdbID      int64   `json:"tvdbId"`
-	IndexerId   int     `json:"indexerId"`
-	InfoUrl     string  `json:"infoUrl"`
-	DownloadUrl string  `json:"downloadUrl"`
-	MagnetUrl   string  `json:"magnetUrl"`
+	IndexerID   int     `json:"indexerId"`
+	InfoURL     string  `json:"infoUrl"`
+	DownloadURL string  `json:"downloadUrl"`
+	MagnetURL   string  `json:"magnetUrl"`
 	Protocol    string  `json:"protocol"`
 	Age         int     `json:"age"`
 	AgeHours    float64 `json:"ageHours"`
 	AgeMinutes  float64 `json:"ageMinutes"`
-	Guid        string  `json:"guid"`
+	GUID        string  `json:"guid"`
 }
 
 // Search performs a parallel search across Prowlarr indexers using available IDs and episode info.
@@ -89,11 +90,11 @@ func Search(imdbID string, tmdbID, tvdbID, season, episode int, isTV bool) ([]Re
 }
 
 func performParallelSearch(queries []string, mediaType string, categories []int) ([]ReleaseResource, error) {
-	prowlarrUrl := config.GetProwlarrUrl()
-	apiKey := config.GetProwlarrApiKey()
-	indexerIds := config.GetProwlarrIndexers()
+	prowlarrURL := config.GetProwlarrURL()
+	apiKey := config.GetProwlarrAPIKey()
+	indexerIDs := config.GetProwlarrIndexers()
 
-	if prowlarrUrl == "" || apiKey == "" {
+	if prowlarrURL == "" || apiKey == "" {
 		return nil, fmt.Errorf("prowlarr is not configured (url or api_key missing)")
 	}
 
@@ -107,7 +108,7 @@ func performParallelSearch(queries []string, mediaType string, categories []int)
 		go func(q string) {
 			defer wg.Done()
 
-			searchURL, err := buildSearchURL(prowlarrUrl, q, mediaType, categories, indexerIds)
+			searchURL, err := buildSearchURL(prowlarrURL, q, mediaType, categories, indexerIDs)
 			if err != nil {
 				errChan <- err
 				return
@@ -137,14 +138,14 @@ func performParallelSearch(queries []string, mediaType string, categories []int)
 func processParallelResults(resultsChan <-chan []ReleaseResource) []ReleaseResource {
 	var allResults []ReleaseResource
 
-	seenGuids := make(map[string]bool)
+	seenGUIDs := make(map[string]bool)
 	duplicates := 0
 
 	for results := range resultsChan {
 		for _, r := range results {
-			if !seenGuids[r.Guid] {
+			if !seenGUIDs[r.GUID] {
 				allResults = append(allResults, r)
-				seenGuids[r.Guid] = true
+				seenGUIDs[r.GUID] = true
 			} else {
 				duplicates++
 			}
@@ -158,7 +159,7 @@ func processParallelResults(resultsChan <-chan []ReleaseResource) []ReleaseResou
 	return allResults
 }
 
-func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerIds []int) (*url.URL, error) {
+func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerIDs []int) (*url.URL, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid prowlarr url: %w", err)
@@ -174,7 +175,7 @@ func buildSearchURL(baseURL, searchQuery, mediaType string, categories, indexerI
 		q.Add("categories", strconv.Itoa(cat))
 	}
 
-	for _, id := range indexerIds {
+	for _, id := range indexerIDs {
 		q.Add("indexerIds", strconv.Itoa(id))
 	}
 
@@ -403,7 +404,7 @@ func renderReleasesTable(results []ReleaseResource) string {
 			humanizeBytes(r.Size),
 			strconv.Itoa(r.Seeders),
 			age,
-			ui.Link.Render(r.InfoUrl),
+			ui.Link.Render(r.InfoURL),
 		})
 	}
 

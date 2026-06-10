@@ -1,3 +1,4 @@
+// Package search implements interactive and automatic search logic for media databases.
 package search
 
 import (

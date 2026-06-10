@@ -289,9 +289,9 @@ func TestCheckDialogueNormalization(t *testing.T) {
 		{
 			name: "TrueHD with Dialog_Normalization",
 			track: mediainfo.Track{
-				Type:                 "Audio",
-				Format:               "MLP FBA",
-				Dialog_Normalization: "-27 dB",
+				Type:                "Audio",
+				Format:              "MLP FBA",
+				DialogNormalization: "-27 dB",
 			},
 			wantWarn: true,
 		},
@@ -315,19 +315,19 @@ func TestCheckDialogueNormalization(t *testing.T) {
 		{
 			name: "DTS-HD MA with DialNorm",
 			track: mediainfo.Track{
-				Type:                 "Audio",
-				Format:               "DTS",
-				Format_Profile:       "MA / Core",
-				Dialog_Normalization: "-27 dB",
+				Type:                "Audio",
+				Format:              "DTS",
+				FormatProfile:       "MA / Core",
+				DialogNormalization: "-27 dB",
 			},
 			wantWarn: true,
 		},
 		{
 			name: "AC-3 with DialNorm (Allowed)",
 			track: mediainfo.Track{
-				Type:                 "Audio",
-				Format:               "AC-3",
-				Dialog_Normalization: "-27 dB",
+				Type:                "Audio",
+				Format:              "AC-3",
+				DialogNormalization: "-27 dB",
 			},
 			wantWarn: false,
 		},

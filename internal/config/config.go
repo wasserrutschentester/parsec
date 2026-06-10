@@ -1,3 +1,4 @@
+// Package config handles parsec configuration management.
 package config
 
 import (
@@ -222,23 +223,23 @@ func IsCheckEnabled(checkName string) bool {
 	return true
 }
 
-// GetTmdbApiKey returns the TMDB API key.
-func GetTmdbApiKey() string {
+// GetTmdbAPIKey returns the TMDB API key.
+func GetTmdbAPIKey() string {
 	return viper.GetString("api_keys.tmdb")
 }
 
-// GetTvdbApiKey returns the TVDB API key.
-func GetTvdbApiKey() string {
+// GetTvdbAPIKey returns the TVDB API key.
+func GetTvdbAPIKey() string {
 	return viper.GetString("api_keys.tvdb")
 }
 
-// GetProwlarrUrl returns the Prowlarr URL.
-func GetProwlarrUrl() string {
+// GetProwlarrURL returns the Prowlarr URL.
+func GetProwlarrURL() string {
 	return viper.GetString("prowlarr.url")
 }
 
-// GetProwlarrApiKey returns the Prowlarr API key.
-func GetProwlarrApiKey() string {
+// GetProwlarrAPIKey returns the Prowlarr API key.
+func GetProwlarrAPIKey() string {
 	return viper.GetString("prowlarr.api_key")
 }
 

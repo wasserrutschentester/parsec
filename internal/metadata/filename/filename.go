@@ -1,3 +1,4 @@
+// Package filename provides utilities for parsing and normalizing media filenames.
 package filename
 
 import (
@@ -232,10 +233,10 @@ func matchSeasonEpisode(filename string) (int, int) {
 
 	match := re.FindStringSubmatch(filename)
 	if match != nil {
-		season, season_err := strconv.Atoi(match[1])
+		season, seasonErr := strconv.Atoi(match[1])
 
-		episode, episode_err := strconv.Atoi(match[2])
-		if episode_err == nil && season_err == nil {
+		episode, episodeErr := strconv.Atoi(match[2])
+		if episodeErr == nil && seasonErr == nil {
 			return season, episode
 		}
 	}
@@ -525,9 +526,8 @@ func matchGroup(filename string, meta *metadata.Metadata) {
 	if match := groupRegex.FindStringSubmatch(filename); len(match) > 1 {
 		group := match[1]
 		// Don't match WEB-DL as group if it's the source
-		if (group == "DL" || strings.HasPrefix(group, "DL.")) && strings.HasSuffix(filename[:strings.LastIndex(filename, "-")], "WEB") {
-			// skip
-		} else {
+		isWebDL := (group == "DL" || strings.HasPrefix(group, "DL.")) && strings.HasSuffix(filename[:strings.LastIndex(filename, "-")], "WEB")
+		if !isWebDL {
 			meta.Group = group
 		}
 	}
