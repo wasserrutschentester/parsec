@@ -172,7 +172,7 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `matroska_name_keywords`: Ensure names match flags (SDH, Forced, AD, etc.).
 -   `matroska_duplicate_tracks`: Identify identical tracks.
 -   `matroska_default_flags`: Ensure specialized tracks (Forced, SDH, etc.) are NOT default and standard tracks have correct default flags.
--   `matroska_subtitle_format`: Verify SRT-only requirement.
+-   `matroska_subtitle_format`: Verify SRT or ASS requirement for text subtitles.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.

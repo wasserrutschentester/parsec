@@ -258,11 +258,11 @@ func shouldTrackBeDefault(track matroska.EbmlTrack, counts map[string]int, seenL
 
 func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 	codec := track.Codec
-	if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
+	if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") && !strings.Contains(codec, "SubStationAlpha") {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track isn't in SRT format", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should be converted to SRT", "warning", &track, warning)
 	}
 
 	return nil

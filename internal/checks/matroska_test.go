@@ -163,10 +163,24 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Contains non-SRT subtitle",
+			name: "Contains SRT and ASS subtitles",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
-				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "eng", Number: 2}},
+				{ID: 1, Type: "subtitles", Codec: "SubRip/SRT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "SubStationAlpha", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "eng", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Contains SSA subtitle",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "subtitles", Codec: "SubStationAlpha", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Contains unsupported text subtitle (WebVTT)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/WEBVTT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
 			},
 			wantErr: true,
 		},
