@@ -168,7 +168,7 @@ func runIndividualTrackChecks(track matroska.EbmlTrack, langHasOriginalFlag map[
 	return results
 }
 
-func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool, seenAudioLangs, seenSubLangs map[string]bool) []*CheckResult {
+func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates, seenAudioLangs, seenSubLangs map[string]bool) []*CheckResult {
 	var results []*CheckResult
 
 	if config.IsCheckEnabled("matroska_duplicate_tracks") {

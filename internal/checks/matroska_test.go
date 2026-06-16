@@ -141,8 +141,16 @@ func TestRunTrackChecks(t *testing.T) {
 		{
 			name: "Multiple default flags for same language",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "Full", Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "Main", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Second standard track is only default",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: false, Name: "Full", Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "Main", Number: 2}},
 			},
 			wantErr: true,
 		},
