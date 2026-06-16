@@ -252,7 +252,7 @@ func TestRunTrackChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := runTrackChecks(tt.tracks)
+			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks})
 
 			hasFailure := false
 
@@ -337,7 +337,7 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 		}
 
-		res := runTrackChecks(tracks)
+		res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks})
 		found := false
 
 		for _, r := range res {

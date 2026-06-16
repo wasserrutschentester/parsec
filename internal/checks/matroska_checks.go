@@ -262,10 +262,126 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should be converted to SRT", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should be in SRT or SubStationAlpha format (convert others to SRT)", "warning", &track, warning)
 	}
 
 	return nil
+}
+
+func checkSubtitleFonts(filePath string, track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
+	if track.Type != "subtitles" || (!strings.Contains(track.Codec, "ASS") && !strings.Contains(track.Codec, "SSA") && !strings.Contains(track.Codec, "SubStationAlpha")) {
+		return nil
+	}
+
+	content, err := matroska.ExtractTrack(filePath, track.ID)
+	if err != nil {
+		return nil
+	}
+
+	usedFonts := parseUsedFonts(content)
+	if len(usedFonts) == 0 {
+		return nil
+	}
+
+	missing := findMissingFonts(usedFonts, attachments)
+
+	if len(missing) > 0 {
+		warning := "missing fonts: " + strings.Join(missing, ", ")
+
+		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts not included as attachments", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAttachment) []string {
+	var missing []string
+
+	for font := range usedFonts {
+		found := false
+
+		for _, att := range attachments {
+			if strings.Contains(strings.ToLower(att.FileName), strings.ToLower(font)) {
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			missing = append(missing, font)
+		}
+	}
+
+	return missing
+}
+
+func parseUsedFonts(content []byte) map[string]bool {
+	fonts := make(map[string]bool)
+	contentStr := string(content)
+	lines := strings.Split(contentStr, "\n")
+
+	parseFontsFromStyles(lines, fonts)
+	parseFontsFromInlineTags(contentStr, fonts)
+
+	return fonts
+}
+
+func parseFontsFromStyles(lines []string, fonts map[string]bool) {
+	inStyles := false
+	formatFields := []string{}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "[V4+ Styles]" || line == "[V4 Styles]" {
+			inStyles = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") {
+			inStyles = false
+		}
+
+		if !inStyles {
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
+			formatFields = parseStyleFormat(rest)
+		} else if rest, ok := strings.CutPrefix(line, "Style:"); ok {
+			extractFontFromStyle(rest, formatFields, fonts)
+		}
+	}
+}
+
+func parseStyleFormat(rest string) []string {
+	fields := strings.Split(rest, ",")
+	for i := range fields {
+		fields[i] = strings.TrimSpace(fields[i])
+	}
+
+	return fields
+}
+
+func extractFontFromStyle(rest string, formatFields []string, fonts map[string]bool) {
+	values := strings.Split(rest, ",")
+
+	for i, field := range formatFields {
+		if i < len(values) && field == "Fontname" {
+			fonts[strings.TrimSpace(values[i])] = true
+		}
+	}
+}
+
+func parseFontsFromInlineTags(content string, fonts map[string]bool) {
+	re := regexp.MustCompile(`\\fn([^\\}]+)`)
+	matches := re.FindAllStringSubmatch(content, -1)
+
+	for _, match := range matches {
+		fonts[strings.TrimSpace(match[1])] = true
+	}
 }
 
 func checkZlibCompression(track matroska.EbmlTrack) *CheckResult {
