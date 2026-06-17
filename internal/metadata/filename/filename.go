@@ -356,7 +356,7 @@ func NormalizeTitle(title string) string {
 	title = ApplyTitleCleanRegex(title)
 
 	// replace umlauts and similar characters
-	title = removeDiacritics(title)
+	title = RemoveDiacritics(title)
 
 	// replace ampersand
 	title = strings.ReplaceAll(title, "&", "und")
@@ -388,7 +388,8 @@ func NormalizeTitle(title string) string {
 	return strings.Trim(title, ".")
 }
 
-func removeDiacritics(title string) string {
+// RemoveDiacritics replaces diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss).
+func RemoveDiacritics(title string) string {
 	replacements := map[string]string{
 		"ä": "ae", "ö": "oe", "ü": "ue",
 		"Ä": "Ae", "Ö": "Oe", "Ü": "Ue",

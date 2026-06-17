@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/types"
 )
 
@@ -17,6 +18,7 @@ type (
 
 func normalizeForComparison(s string) string {
 	s = strings.ToLower(s)
+	s = filename.RemoveDiacritics(s)
 	s = strings.ReplaceAll(s, ".", " ")
 	s = strings.ReplaceAll(s, "-", " ")
 	// remove all non-alphanumeric chars (except spaces)

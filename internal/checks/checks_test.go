@@ -15,6 +15,8 @@ func TestNormalizeForComparison(t *testing.T) {
 		{"Movie-Title-2023", "movie title 2023"},
 		{"Movie Title (2023)", "movie title 2023"},
 		{"Movie   Title", "movie title"},
+		{"Gefühle", "gefuehle"},
+		{"Groß", "gross"},
 	}
 
 	for _, tt := range tests {
