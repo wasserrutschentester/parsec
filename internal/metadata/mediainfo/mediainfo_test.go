@@ -374,6 +374,26 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 			want:          "GERMAN.DL",
 		},
 		{
+			name: "Dual language preferred audio after first audio is not subbed",
+			tracks: []Track{
+				{Type: "Audio", Language: "en"},
+				{Type: "Audio", Language: "de"},
+				{Type: "Text", Language: "de"},
+			},
+			subbedTagging: true,
+			want:          "GERMAN.DL",
+		},
+		{
+			name: "Dual language preferred audio after first audio with three-letter tags",
+			tracks: []Track{
+				{Type: "Audio", Language: "eng"},
+				{Type: "Audio", Language: "ger"},
+				{Type: "Text", Language: "ger"},
+			},
+			subbedTagging: true,
+			want:          "GERMAN.DL",
+		},
+		{
 			name: "Multi language (3+)",
 			tracks: []Track{
 				{Type: "Audio", Language: "de"},
