@@ -175,7 +175,7 @@ func findEpisodeTitleStart(filename string, meta *metadata.Metadata) int {
 
 	if meta.Season != 0 || meta.Episode != 0 {
 		tag := fmt.Sprintf("S%02dE%02d", meta.Season, meta.Episode)
-		if loc := strings.Index(filename, tag); loc != -1 {
+		if loc := strings.Index(strings.ToUpper(filename), tag); loc != -1 {
 			start = loc + len(tag)
 		}
 	}
@@ -210,7 +210,7 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 }
 
 func matchTitleYear(filename string) (string, int) {
-	re := regexp.MustCompile(`^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
+	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
 
 	match := re.FindStringSubmatchIndex(filename)
 	if match != nil {
@@ -229,7 +229,7 @@ func matchTitleYear(filename string) (string, int) {
 }
 
 func matchSeasonEpisode(filename string) (int, int) {
-	re := regexp.MustCompile(`S(\d{1,4})(?:E(\d{1,3}))?`)
+	re := regexp.MustCompile(`(?i)S(\d{1,4})(?:E(\d{1,3}))?`)
 
 	match := re.FindStringSubmatch(filename)
 	if match != nil {
