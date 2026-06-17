@@ -351,3 +351,33 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 		Episode:  episode,
 	}, nil
 }
+
+// GetSeasonMetadata retrieves metadata for all episodes in a specific season from TMDB.
+func GetSeasonMetadata(seriesID, season int, lang string) ([]mdb.EpisodeResult, error) {
+	var data struct {
+		Episodes []tmdbEpisodeResponse `json:"episodes"`
+	}
+
+	params := url.Values{}
+	if lang != "" {
+		params.Set("language", lang)
+	}
+
+	endpoint := fmt.Sprintf("tv/%d/season/%d", seriesID, season)
+	if err := get(endpoint, params, &data); err != nil {
+		return nil, err
+	}
+
+	results := make([]mdb.EpisodeResult, 0, len(data.Episodes))
+	for _, ep := range data.Episodes {
+		results = append(results, mdb.EpisodeResult{
+			Name:     ep.Name,
+			Airdate:  ep.AirDate,
+			Overview: ep.Overview,
+			Season:   ep.SeasonNumber,
+			Episode:  ep.EpisodeNumber,
+		})
+	}
+
+	return results, nil
+}

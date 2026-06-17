@@ -129,7 +129,8 @@ type Episode struct {
 	Overview     string `json:"overview"`
 }
 
-func (e *Episode) toEpisodeResult() mdb.EpisodeResult {
+// ToEpisodeResult converts a TVDB Episode to an mdb.EpisodeResult.
+func (e *Episode) ToEpisodeResult() mdb.EpisodeResult {
 	return mdb.EpisodeResult{
 		Name:     e.Name,
 		Airdate:  e.Aired,
@@ -549,7 +550,8 @@ func getEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	return data, nil
 }
 
-func getAllEpisodes(seriesID int, lang string) ([]Episode, error) {
+// GetAllEpisodes retrieves all episodes for a given series from TVDB.
+func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
 	var episodes []Episode
 
 	for page := range 20 {
@@ -580,7 +582,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 	normalizedQueryTitle := metadata.Normalize(meta.EpisodeTitle)
 
 	for _, lang := range uniqueLangs {
-		episodes, err := getAllEpisodes(result.TvdbID, lang)
+		episodes, err := GetAllEpisodes(result.TvdbID, lang)
 		if err != nil {
 			continue
 		}
@@ -590,7 +592,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials)
 
 		if ep != nil {
-			res := ep.toEpisodeResult()
+			res := ep.ToEpisodeResult()
 			ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
 			fillEpisodeTranslation(&res, ep.ID, lang)
 

@@ -128,6 +128,25 @@ Many of these issues can be repaired automatically with the [`fix`](fix.md) comm
 | Special Date Match | `checkSpecialDate` | `mdb_episode_date` | Yes | Verifies air date for TV specials against database records. |
 | Track Languages | `checkTrackLanguages` | `mdb_track_languages` | Yes | Verifies presence of audio and subtitle tracks in both preferred and original languages. |
 
+## Aggregate Checks
+
+Aggregate checks are performed after all individual files have been processed. They evaluate consistency and completeness across the entire set of provided files.
+
+| Check | Function | Identifier | Description |
+|-------|----------|------------|-------------|
+| Season Completeness | `RunSeasonCompletenessCheck` | `mdb_season_completeness` | Compares the set of local episodes against the official episode list on TVDB/TMDB for a given season. |
+
+### Season Completeness Check
+
+This check identifies missing episodes in a season pack. It is designed to be helpful but non-intrusive:
+
+- **Activation**: Only runs when more than one episode of the same season is provided in a single command.
+- **Verification**: Cross-references local episode numbers with the official list from TVDB (preferred) or TMDB (fallback).
+- **Season 0**: Automatically skips Season 0 (Specials), as these are often inconsistent across databases.
+- **Output**: Provides a summary of whether the season is complete or lists the specific missing episode numbers.
+
+Note: This check is currently only displayed in the interactive terminal output and is not included in JSON reports.
+
 ## JSON Output
 
 When the `--json` flag is used, `parsec check` always outputs detailed reports as a JSON **array** of objects, even when processing a single file.
