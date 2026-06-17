@@ -62,7 +62,7 @@ func RunMatroskaChecks(filePath string) []CheckResult {
 		return checkMatroskaFormat(err)
 	}
 
-	return runTrackChecks(ebml.Tracks)
+	return runTrackChecks(filePath, ebml)
 }
 
 func checkMatroskaFormat(err error) []CheckResult {
@@ -74,7 +74,9 @@ func checkMatroskaFormat(err error) []CheckResult {
 	}}
 }
 
-func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
+func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata) []CheckResult {
+	tracks := ebml.Tracks
+
 	var (
 		results                            []CheckResult
 		lastAudioPriority, lastSubPriority int64
@@ -98,7 +100,7 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 			continue
 		}
 
-		agg.AddAll(runIndividualTrackChecks(*track, langHasOriginalFlag))
+		agg.AddAll(runIndividualTrackChecks(filePath, *track, langHasOriginalFlag, ebml.Attachments))
 		agg.AddAll(runStatefulTrackChecks(track, audioCounts, subCounts, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs))
 
 		if config.IsCheckEnabled("matroska_track_order") {
@@ -118,6 +120,7 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 		"matroska_name_keywords",
 		"matroska_default_flags",
 		"matroska_subtitle_format",
+		"matroska_subtitle_fonts",
 		"matroska_zlib_compression",
 		"matroska_track_order",
 	}
@@ -130,12 +133,39 @@ func runTrackChecks(tracks []matroska.EbmlTrack) []CheckResult {
 	return results
 }
 
-func runIndividualTrackChecks(track matroska.EbmlTrack, langHasOriginalFlag map[string]bool) []*CheckResult {
+func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHasOriginalFlag map[string]bool, attachments []matroska.EbmlAttachment) []*CheckResult {
 	var results []*CheckResult
 
+	// Basic checks
 	if config.IsCheckEnabled("matroska_language_tag") || config.IsCheckEnabled("matroska_multi_lang") {
 		results = append(results, validateTrackBasics(track))
 	}
+
+	// Name-based checks
+	results = append(results, runNameChecks(track)...)
+
+	// Consistency and format checks
+	if config.IsCheckEnabled("matroska_original_language") {
+		results = append(results, checkOriginalLanguageConsistency(track, langHasOriginalFlag))
+	}
+
+	if config.IsCheckEnabled("matroska_subtitle_format") {
+		results = append(results, checkSubtitleFormat(track))
+	}
+
+	if config.IsCheckEnabled("matroska_subtitle_fonts") {
+		results = append(results, checkSubtitleFonts(filePath, track, attachments))
+	}
+
+	if config.IsCheckEnabled("matroska_zlib_compression") {
+		results = append(results, checkZlibCompression(track))
+	}
+
+	return results
+}
+
+func runNameChecks(track matroska.EbmlTrack) []*CheckResult {
+	var results []*CheckResult
 
 	if config.IsCheckEnabled("matroska_name_quality") {
 		results = append(results, checkTrackNameQuality(track))
@@ -149,26 +179,14 @@ func runIndividualTrackChecks(track matroska.EbmlTrack, langHasOriginalFlag map[
 		results = append(results, checkTrackNameRedundantLang(track))
 	}
 
-	if config.IsCheckEnabled("matroska_original_language") {
-		results = append(results, checkOriginalLanguageConsistency(track, langHasOriginalFlag))
-	}
-
 	if config.IsCheckEnabled("matroska_name_keywords") {
 		results = append(results, checkNameKeywords(track))
-	}
-
-	if config.IsCheckEnabled("matroska_subtitle_format") {
-		results = append(results, checkSubtitleFormat(track))
-	}
-
-	if config.IsCheckEnabled("matroska_zlib_compression") {
-		results = append(results, checkZlibCompression(track))
 	}
 
 	return results
 }
 
-func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool, seenAudioLangs, seenSubLangs map[string]bool) []*CheckResult {
+func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates, seenAudioLangs, seenSubLangs map[string]bool) []*CheckResult {
 	var results []*CheckResult
 
 	if config.IsCheckEnabled("matroska_duplicate_tracks") {

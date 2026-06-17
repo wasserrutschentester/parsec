@@ -425,17 +425,19 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 		return
 	}
 
-	prefTag := language.Make(preferredLanguage)
-	firstAudioTag := language.Make(languages[0])
+	selectedLanguage, hasPreferredAudio := selectAudioLanguage(languages, preferredLanguage)
 
-	// check for preferred language subs if it's not the first audio language
-	if config.GetSubbedTagging() && prefTag != firstAudioTag {
-		if mi.checkIsSubbed(meta, prefTag, preferredLanguage) {
+	// Only tag SUBBED when preferred-language subtitles exist but preferred
+	// audio does not. A preferred audio track later in the file still makes the
+	// release dual-/multi-language, even if another audio track is first.
+	if config.GetSubbedTagging() && !hasPreferredAudio {
+		if mi.checkIsSubbed(meta, preferredLanguage) {
 			return
 		}
 	}
 
-	meta.Language = metadata.LanguageName(languages[0])
+	meta.Language = metadata.LanguageName(selectedLanguage)
+
 	switch len(languages) {
 	case 0:
 	case 1:
@@ -446,11 +448,24 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	}
 }
 
-func (mi *MediaInfo) checkIsSubbed(meta *metadata.Metadata, prefTag language.Tag, preferredLanguage string) bool {
+// selectAudioLanguage returns the preferred audio language when one of the
+// tracks matches it, otherwise the first available language. The boolean
+// reports whether a preferred audio track was found.
+func selectAudioLanguage(languages []string, preferredLanguage string) (string, bool) {
+	for _, lang := range languages {
+		if sameLanguage(lang, preferredLanguage) {
+			return preferredLanguage, true
+		}
+	}
+
+	return languages[0], false
+}
+
+func (mi *MediaInfo) checkIsSubbed(meta *metadata.Metadata, preferredLanguage string) bool {
 	subtitleLanguages := mi.GetSubtitleLanguages()
 	if len(subtitleLanguages) > 0 {
 		for _, lang := range subtitleLanguages {
-			if language.Make(lang) == prefTag {
+			if sameLanguage(lang, preferredLanguage) {
 				meta.Language = metadata.LanguageName(preferredLanguage)
 				meta.LanguageExt = "SUBBED"
 				meta.Subbed = true
@@ -461,4 +476,23 @@ func (mi *MediaInfo) checkIsSubbed(meta *metadata.Metadata, prefTag language.Tag
 	}
 
 	return false
+}
+
+func sameLanguage(a, b string) bool {
+	return languageKey(a) == languageKey(b)
+}
+
+func languageKey(lang string) string {
+	if lang == "" {
+		return ""
+	}
+
+	tag := language.Make(lang)
+	if tag == language.Und {
+		return strings.ToLower(lang)
+	}
+
+	base, _ := tag.Base()
+
+	return base.String()
 }

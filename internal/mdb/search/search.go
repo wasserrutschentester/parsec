@@ -214,7 +214,7 @@ func buildResultMaps(results []mdb.SearchResult) (tvdbMap, tmdbMap map[int]mdb.S
 		}
 	}
 
-	return
+	return tvdbMap, tmdbMap, imdbMap
 }
 
 func findMatchingResult(r mdb.SearchResult, tvdbMap, tmdbMap map[int]mdb.SearchResult, imdbMap map[string]mdb.SearchResult) (mdb.SearchResult, bool) {

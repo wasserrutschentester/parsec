@@ -97,8 +97,9 @@ Many of these issues can be repaired automatically with the [`fix`](fix.md) comm
 | Redundant Language | `checkTrackNameRedundantLang` | `matroska_name_redundant_lang` | Yes | Flags full language names (e.g., "German") in the track title that match the track's language tag. |
 | Flag Keywords | `checkNameKeywords` | `matroska_name_keywords` | Yes | Enforces strict two-way correlation between flags and keywords (SDH, Forced, Commentary, Descriptive/AD) in track names. |
 | Duplicate Tracks | `checkDuplicateTracks` | `matroska_duplicate_tracks` | Yes | Identifies identical tracks (same language, flags, and name). |
-| Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures only the first standard track per language is marked as Default. |
-| Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all subtitle tracks are in SRT format. |
+| Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures specialized tracks (Forced, SDH, Commentary, etc.) are NOT marked as Default, and that the first standard track per language IS marked as Default. |
+| Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all text subtitle tracks are in SRT or ASS format. All other text formats should be converted to SRT. |
+| Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | Yes | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle tracks are included as attachments in the Matroska container. |
 | Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
 
 ### Media Database (MDB) Consistency Checks

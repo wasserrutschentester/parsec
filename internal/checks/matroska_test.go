@@ -141,8 +141,16 @@ func TestRunTrackChecks(t *testing.T) {
 		{
 			name: "Multiple default flags for same language",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
-				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "Full", Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "Main", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Second standard track is only default",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: false, Name: "Full", Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "Main", Number: 2}},
 			},
 			wantErr: true,
 		},
@@ -155,10 +163,24 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Contains non-SRT subtitle",
+			name: "Contains SRT and ASS subtitles",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "subtitles", Codec: "S_TEXT/SRT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
-				{ID: 2, Type: "subtitles", Codec: "S_TEXT/ASS", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "eng", Number: 2}},
+				{ID: 1, Type: "subtitles", Codec: "SubRip/SRT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "SubStationAlpha", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "eng", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Contains SSA subtitle",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "subtitles", Codec: "SubStationAlpha", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Contains unsupported text subtitle (WebVTT)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "subtitles", Codec: "S_TEXT/WEBVTT", Properties: matroska.EbmlTrackProperties{TextSubtitles: true, Language: "ger", Number: 1}},
 			},
 			wantErr: true,
 		},
@@ -230,7 +252,7 @@ func TestRunTrackChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := runTrackChecks(tt.tracks)
+			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks})
 
 			hasFailure := false
 
@@ -315,7 +337,7 @@ func TestRunTrackChecksMultiTrack(t *testing.T) {
 			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 		}
 
-		res := runTrackChecks(tracks)
+		res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks})
 		found := false
 
 		for _, r := range res {

@@ -156,6 +156,28 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 	return &metadata, nil
 }
 
+// ExtractTrack uses mkvextract to extract a specific track from a Matroska file.
+func ExtractTrack(filePath string, trackID int) ([]byte, error) {
+	err := CheckForMatroska(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tracks %d:-", ui.AnonymizePath(filePath), trackID))
+	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tracks", fmt.Sprintf("%d:-", trackID))
+
+	output, err := cmd.Output()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
+		}
+
+		return nil, fmt.Errorf("failed to extract track %d: %w", trackID, err)
+	}
+
+	return output, nil
+}
+
 func (metadata *EbmlMetadata) countTypes() {
 	numVideo, numAudio, numSubtitles := 0, 0, 0
 

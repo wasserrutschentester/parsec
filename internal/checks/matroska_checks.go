@@ -193,9 +193,15 @@ func getLanguageCodeFromName(word string) string {
 	return ""
 }
 
+func isSpecializedTrack(track matroska.EbmlTrack) bool {
+	props := track.Properties
+
+	return props.Forced || props.Commentary || props.VisualImpaired || props.HearingImpaired || props.TextDescriptions
+}
+
 func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) *CheckResult {
 	props := track.Properties
-	isSpecialized := props.Forced || props.Commentary || props.VisualImpaired || props.HearingImpaired || props.TextDescriptions
+	isSpecialized := isSpecializedTrack(track)
 
 	shouldBeDefault := false
 	if !isSpecialized {
@@ -211,7 +217,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 		case isSpecialized:
 			warning = fmt.Sprintf("%s %s", ui.Error.Render("[-]"), ui.Warning.Render("specialized track"))
 		default:
-			warning = fmt.Sprintf("%s redundant standard track for %s", ui.Error.Render("[-]"), ui.Warning.Render(props.Language))
+			return nil
 		}
 
 		return newFailedTrackResult("matroska_default_flags", "Default flags aren't correctly Assigned", "warning", &track, warning)
@@ -221,43 +227,161 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 }
 
 func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
-	props := track.Properties
 	switch track.Type {
 	case "audio":
-		if !seenAudioLangs[props.Language] {
-			seenAudioLangs[props.Language] = true
-			// Relaxation: if only one track in this language, it is fine to not set the default flag
-			if audioCounts[props.Language] == 1 && !props.Default {
-				return false
-			}
-
-			return true
-		}
+		return shouldTrackBeDefault(track, audioCounts, seenAudioLangs)
 	case "subtitles":
-		if !seenSubLangs[props.Language] {
-			seenSubLangs[props.Language] = true
-			// Relaxation: if only one track in this language, it is fine to not set the default flag
-			if subCounts[props.Language] == 1 && !props.Default {
-				return false
-			}
+		return shouldTrackBeDefault(track, subCounts, seenSubLangs)
+	default:
+		return false
+	}
+}
 
-			return true
-		}
+func shouldTrackBeDefault(track matroska.EbmlTrack, counts map[string]int, seenLangs map[string]bool) bool {
+	props := track.Properties
+
+	shouldBeDefault := props.Default
+
+	// If this is the first track of this language we've encountered
+	if !seenLangs[props.Language] {
+		seenLangs[props.Language] = true
+		shouldBeDefault = true
 	}
 
-	return false
+	// For a single track, the default flag is optional (Relaxation).
+	if counts[props.Language] == 1 && !props.Default {
+		shouldBeDefault = false
+	}
+
+	return shouldBeDefault
 }
 
 func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 	codec := track.Codec
-	if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") {
+	if track.Type == "subtitles" && track.Properties.TextSubtitles && !strings.Contains(codec, "SRT") && !strings.Contains(codec, "SubStationAlpha") {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track isn't in SRT format", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should be in SRT or SubStationAlpha format (convert others to SRT)", "warning", &track, warning)
 	}
 
 	return nil
+}
+
+func checkSubtitleFonts(filePath string, track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
+	if track.Type != "subtitles" || (!strings.Contains(track.Codec, "ASS") && !strings.Contains(track.Codec, "SSA") && !strings.Contains(track.Codec, "SubStationAlpha")) {
+		return nil
+	}
+
+	content, err := matroska.ExtractTrack(filePath, track.ID)
+	if err != nil {
+		return nil
+	}
+
+	usedFonts := parseUsedFonts(content)
+	if len(usedFonts) == 0 {
+		return nil
+	}
+
+	missing := findMissingFonts(usedFonts, attachments)
+
+	if len(missing) > 0 {
+		warning := "missing fonts: " + strings.Join(missing, ", ")
+
+		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts not included as attachments", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAttachment) []string {
+	var missing []string
+
+	for font := range usedFonts {
+		found := false
+
+		for _, att := range attachments {
+			if strings.Contains(strings.ToLower(att.FileName), strings.ToLower(font)) {
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			missing = append(missing, font)
+		}
+	}
+
+	return missing
+}
+
+func parseUsedFonts(content []byte) map[string]bool {
+	fonts := make(map[string]bool)
+	contentStr := string(content)
+	lines := strings.Split(contentStr, "\n")
+
+	parseFontsFromStyles(lines, fonts)
+	parseFontsFromInlineTags(contentStr, fonts)
+
+	return fonts
+}
+
+func parseFontsFromStyles(lines []string, fonts map[string]bool) {
+	inStyles := false
+	formatFields := []string{}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "[V4+ Styles]" || line == "[V4 Styles]" {
+			inStyles = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") {
+			inStyles = false
+		}
+
+		if !inStyles {
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
+			formatFields = parseStyleFormat(rest)
+		} else if rest, ok := strings.CutPrefix(line, "Style:"); ok {
+			extractFontFromStyle(rest, formatFields, fonts)
+		}
+	}
+}
+
+func parseStyleFormat(rest string) []string {
+	fields := strings.Split(rest, ",")
+	for i := range fields {
+		fields[i] = strings.TrimSpace(fields[i])
+	}
+
+	return fields
+}
+
+func extractFontFromStyle(rest string, formatFields []string, fonts map[string]bool) {
+	values := strings.Split(rest, ",")
+
+	for i, field := range formatFields {
+		if i < len(values) && field == "Fontname" {
+			fonts[strings.TrimSpace(values[i])] = true
+		}
+	}
+}
+
+func parseFontsFromInlineTags(content string, fonts map[string]bool) {
+	re := regexp.MustCompile(`\\fn([^\\}]+)`)
+	matches := re.FindAllStringSubmatch(content, -1)
+
+	for _, match := range matches {
+		fonts[strings.TrimSpace(match[1])] = true
+	}
 }
 
 func checkZlibCompression(track matroska.EbmlTrack) *CheckResult {

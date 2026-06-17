@@ -173,8 +173,9 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 -   `matroska_name_redundant_lang`: Detect redundant language names (matching track tag).
 -   `matroska_name_keywords`: Ensure names match flags (SDH, Forced, AD, etc.).
 -   `matroska_duplicate_tracks`: Identify identical tracks.
--   `matroska_default_flags`: Verify first-standard-track default rules.
--   `matroska_subtitle_format`: Verify SRT-only requirement.
+-   `matroska_default_flags`: Ensure specialized tracks (Forced, SDH, etc.) are NOT default and standard tracks have correct default flags.
+-   `matroska_subtitle_format`: Verify SRT or ASS requirement for text subtitles.
+-   `matroska_subtitle_fonts`: Ensure all fonts used in SubStationAlpha subtitles are attached.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.
