@@ -121,6 +121,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata) []CheckResult 
 		"matroska_default_flags",
 		"matroska_subtitle_format",
 		"matroska_subtitle_fonts",
+		"matroska_subtitle_inline_fonts",
 		"matroska_zlib_compression",
 		"matroska_track_order",
 	}
@@ -154,7 +155,11 @@ func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHas
 	}
 
 	if config.IsCheckEnabled("matroska_subtitle_fonts") {
-		results = append(results, checkSubtitleFonts(filePath, track, attachments))
+		results = append(results, checkSubtitleFonts(track, attachments))
+	}
+
+	if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
+		results = append(results, checkSubtitleInlineFonts(filePath, track, attachments))
 	}
 
 	if config.IsCheckEnabled("matroska_zlib_compression") {

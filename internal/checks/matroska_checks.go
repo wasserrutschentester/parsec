@@ -262,14 +262,43 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should be in SRT or SubStationAlpha format (convert others to SRT)", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should converted to SRT", "warning", &track, warning)
 	}
 
 	return nil
 }
 
-func checkSubtitleFonts(filePath string, track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
-	if track.Type != "subtitles" || (!strings.Contains(track.Codec, "ASS") && !strings.Contains(track.Codec, "SSA") && !strings.Contains(track.Codec, "SubStationAlpha")) {
+func checkSubtitleFonts(track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
+	if !isASSSubtitles(track) {
+		return nil
+	}
+
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
+		return nil
+	}
+
+	usedFonts := make(map[string]bool)
+	lines := strings.Split(string(privateBytes), "\n")
+	parseFontsFromStyles(lines, usedFonts)
+
+	if len(usedFonts) == 0 {
+		return nil
+	}
+
+	missing := findMissingFonts(usedFonts, attachments)
+
+	if len(missing) > 0 {
+		warning := "missing fonts (Styles): " + strings.Join(missing, ", ")
+
+		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts in Styles not included as attachments", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func checkSubtitleInlineFonts(filePath string, track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
+	if !isASSSubtitles(track) {
 		return nil
 	}
 
@@ -278,7 +307,9 @@ func checkSubtitleFonts(filePath string, track matroska.EbmlTrack, attachments [
 		return nil
 	}
 
-	usedFonts := parseUsedFonts(content)
+	usedFonts := make(map[string]bool)
+	parseFontsFromInlineTags(string(content), usedFonts)
+
 	if len(usedFonts) == 0 {
 		return nil
 	}
@@ -286,12 +317,16 @@ func checkSubtitleFonts(filePath string, track matroska.EbmlTrack, attachments [
 	missing := findMissingFonts(usedFonts, attachments)
 
 	if len(missing) > 0 {
-		warning := "missing fonts: " + strings.Join(missing, ", ")
+		warning := "missing fonts (Inline): " + strings.Join(missing, ", ") + " (Extraction slow due to demuxing)"
 
-		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts not included as attachments", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_inline_fonts", "SSA/ASS subtitle track uses fonts in inline tags not included as attachments", "warning", &track, warning)
 	}
 
 	return nil
+}
+
+func isASSSubtitles(track matroska.EbmlTrack) bool {
+	return track.Type == "subtitles" && (strings.Contains(track.Codec, "ASS") || strings.Contains(track.Codec, "SSA") || strings.Contains(track.Codec, "SubStationAlpha"))
 }
 
 func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAttachment) []string {
@@ -314,17 +349,6 @@ func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAtta
 	}
 
 	return missing
-}
-
-func parseUsedFonts(content []byte) map[string]bool {
-	fonts := make(map[string]bool)
-	contentStr := string(content)
-	lines := strings.Split(contentStr, "\n")
-
-	parseFontsFromStyles(lines, fonts)
-	parseFontsFromInlineTags(contentStr, fonts)
-
-	return fonts
 }
 
 func parseFontsFromStyles(lines []string, fonts map[string]bool) {

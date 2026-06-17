@@ -26,6 +26,7 @@ func InitDefaults() {
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
+	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts"})
 }
 
 var (

@@ -4,6 +4,7 @@ package matroska
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -53,6 +54,21 @@ type EbmlTrackProperties struct {
 	TextDescriptions          bool   `json:"flag_text_descriptions,omitempty"`
 	TextSubtitles             bool   `json:"text_subtitles,omitempty"`
 	ContentEncodingAlgorithms string `json:"content_encoding_algorithms,omitempty"`
+	CodecPrivate              string `json:"codec_private_data,omitempty"`
+}
+
+// DecodeCodecPrivate decodes the base16/hex encoded CodecPrivate string.
+func (p EbmlTrackProperties) DecodeCodecPrivate() ([]byte, error) {
+	if p.CodecPrivate == "" {
+		return nil, nil
+	}
+
+	data, err := hex.DecodeString(p.CodecPrivate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode codec private data: %w", err)
+	}
+
+	return data, nil
 }
 
 // EbmlAttachment represents an attachment in a Matroska container.
@@ -159,10 +175,24 @@ func ExtractTrack(filePath string, trackID int) ([]byte, error) {
 		return nil, err
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tracks %d:-", ui.AnonymizePath(filePath), trackID))
-	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tracks", fmt.Sprintf("%d:-", trackID))
+	tmpFile, err := os.CreateTemp("", "parsec-extract-*.ass")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
 
-	output, err := cmd.Output()
+	tmpFilePath := tmpFile.Name()
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	defer func() {
+		_ = os.Remove(tmpFilePath)
+	}()
+
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tracks %d:%s", ui.AnonymizePath(filePath), trackID, tmpFilePath))
+	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tracks", fmt.Sprintf("%d:%s", trackID, tmpFilePath))
+
+	_, err = cmd.Output()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return nil, fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
@@ -171,7 +201,12 @@ func ExtractTrack(filePath string, trackID int) ([]byte, error) {
 		return nil, fmt.Errorf("failed to extract track %d: %w", trackID, err)
 	}
 
-	return output, nil
+	content, err := os.ReadFile(tmpFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read extracted track: %w", err)
+	}
+
+	return content, nil
 }
 
 func (metadata *EbmlMetadata) countTypes() {
