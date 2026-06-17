@@ -369,7 +369,7 @@ func formatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 		contentWidths = calculateTrackTableWidths(tracks)
 	}
 
-	nameWidth := calculateNameColumnWidth(headers, contentWidths)
+	flexWidths := calculateFlexibleColumnWidths(headers, contentWidths)
 
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
@@ -380,10 +380,8 @@ func formatTrackTable(tracks []types.TrackCheckResult, sharedWidths map[int]int)
 				style = style.Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
 
-			w := contentWidths[col]
-			if col == 5 { // Name column
-				w = nameWidth
-			}
+			w := flexWidths[col]
+
 			// Fixed width including padding (+2) to ensure alignment
 			return style.Width(w + 2)
 		}).
@@ -412,8 +410,8 @@ func getTrackRows(tracks []types.TrackCheckResult) [][]string {
 	return rows
 }
 
-func calculateNameColumnWidth(headers []string, contentWidths map[int]int) int {
-	// Calculate terminal width and available space for Name
+func calculateFlexibleColumnWidths(headers []string, contentWidths map[int]int) map[int]int {
+	// Determine available width
 	termWidth, _, _ := term.GetSize(os.Stdout.Fd())
 	if termWidth <= 0 {
 		termWidth = 120 // Default fallback
@@ -422,20 +420,45 @@ func calculateNameColumnWidth(headers []string, contentWidths map[int]int) int {
 	// Overhead: 6 spaces indentation + 1 border per column + 1 final border + 2 padding per column
 	overhead := 6 + len(headers) + 1 + (len(headers) * 2)
 
-	otherColsWidth := 0
+	availableWidth := termWidth - overhead
+
+	flexWidths := make(map[int]int)
+	fixedColsWidth := 0
+	flexIndices := map[int]bool{5: true, 7: true} // Name (5) and Warning (7) are flexible
 
 	for i := range headers {
-		if i == 5 { // Name column
-			continue
+		if !flexIndices[i] {
+			flexWidths[i] = contentWidths[i]
+			fixedColsWidth += contentWidths[i]
 		}
-
-		otherColsWidth += contentWidths[i]
 	}
 
-	maxNameContentWidth := contentWidths[5]
-	nameWidth := min(max(termWidth-overhead-otherColsWidth, 20), maxNameContentWidth)
+	remainingWidth := max(availableWidth-fixedColsWidth, 40) // Guarantee at least 40 chars for flex cols
 
-	return nameWidth
+	// Calculate total requested content width for flex columns
+	totalFlexContentWidth := contentWidths[5] + contentWidths[7]
+
+	if totalFlexContentWidth <= remainingWidth {
+		// Both fit within their content width
+		flexWidths[5] = contentWidths[5]
+		flexWidths[7] = contentWidths[7]
+	} else {
+		// Proportionally distribute remaining width, but guarantee minimums
+		minName := 15
+		minWarning := 20
+
+		if remainingWidth < minName+minWarning {
+			flexWidths[5] = minName
+			flexWidths[7] = minWarning
+		} else {
+			// Weighted distribution based on content length
+			ratio := float64(contentWidths[5]) / float64(totalFlexContentWidth)
+			flexWidths[5] = max(int(float64(remainingWidth)*ratio), minName)
+			flexWidths[7] = max(remainingWidth-flexWidths[5], minWarning)
+		}
+	}
+
+	return flexWidths
 }
 
 // ReportSection returns a header for a specific section in a check report.

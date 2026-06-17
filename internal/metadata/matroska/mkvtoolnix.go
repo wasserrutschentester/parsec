@@ -4,6 +4,7 @@ package matroska
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -16,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/image/font/sfnt"
+
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
@@ -25,9 +28,21 @@ var errNotMatroska = errors.New("file is not a Matroska file")
 // EbmlMetadata represents the JSON output from mkvmerge -J.
 type EbmlMetadata struct {
 	Attachments []EbmlAttachment `json:"attachments,omitempty"`
+	Container   EbmlContainer    `json:"container,omitzero"`
 	Errors      []string         `json:"errors,omitempty"`
 	FileName    string           `json:"file_name,omitempty"`
 	Tracks      []EbmlTrack      `json:"tracks,omitempty"`
+}
+
+// EbmlContainer represents the global container properties.
+type EbmlContainer struct {
+	Properties EbmlContainerProperties `json:"properties,omitzero"`
+}
+
+// EbmlContainerProperties contains global properties of a Matroska container.
+type EbmlContainerProperties struct {
+	Title              string `json:"title,omitempty"`
+	WritingApplication string `json:"writing_application,omitempty"`
 }
 
 // EbmlTrack represents a single track in a Matroska container.
@@ -57,6 +72,30 @@ type EbmlTrackProperties struct {
 	TextDescriptions          bool   `json:"flag_text_descriptions,omitempty"`
 	TextSubtitles             bool   `json:"text_subtitles,omitempty"`
 	ContentEncodingAlgorithms string `json:"content_encoding_algorithms,omitempty"`
+	CodecPrivate              string `json:"codec_private_data,omitempty"`
+	PixelWidth                int    `json:"pixel_width,omitempty"`
+	PixelHeight               int    `json:"pixel_height,omitempty"`
+	DisplayWidth              int    `json:"display_width,omitempty"`
+	DisplayHeight             int    `json:"display_height,omitempty"`
+	PixelCroppingLeft         int    `json:"pixel_cropping_left,omitempty"`
+	PixelCroppingTop          int    `json:"pixel_cropping_top,omitempty"`
+	PixelCroppingRight        int    `json:"pixel_cropping_right,omitempty"`
+	PixelCroppingBottom       int    `json:"pixel_cropping_bottom,omitempty"`
+	Delay                     int64  `json:"packet_delay,omitempty"`
+}
+
+// DecodeCodecPrivate decodes the base16/hex encoded CodecPrivate string.
+func (p EbmlTrackProperties) DecodeCodecPrivate() ([]byte, error) {
+	if p.CodecPrivate == "" {
+		return nil, nil
+	}
+
+	data, err := hex.DecodeString(p.CodecPrivate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode codec private data: %w", err)
+	}
+
+	return data, nil
 }
 
 // EbmlAttachment represents an attachment in a Matroska container.
@@ -163,10 +202,24 @@ func ExtractTrack(filePath string, trackID int) ([]byte, error) {
 		return nil, err
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tracks %d:-", ui.AnonymizePath(filePath), trackID))
-	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tracks", fmt.Sprintf("%d:-", trackID))
+	tmpFile, err := os.CreateTemp("", "parsec-extract-*.ass")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
 
-	output, err := cmd.Output()
+	tmpFilePath := tmpFile.Name()
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	defer func() {
+		_ = os.Remove(tmpFilePath)
+	}()
+
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tracks %d:%s", ui.AnonymizePath(filePath), trackID, tmpFilePath))
+	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tracks", fmt.Sprintf("%d:%s", trackID, tmpFilePath))
+
+	_, err = cmd.Output()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return nil, fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
@@ -175,7 +228,90 @@ func ExtractTrack(filePath string, trackID int) ([]byte, error) {
 		return nil, fmt.Errorf("failed to extract track %d: %w", trackID, err)
 	}
 
-	return output, nil
+	content, err := os.ReadFile(tmpFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read extracted track: %w", err)
+	}
+
+	return content, nil
+}
+
+// ExtractAttachments uses mkvextract to extract multiple attachments from a Matroska file in one command.
+// It returns a map where the key is the attachment ID and the value is the extracted content.
+func ExtractAttachments(filePath string, ids []int) (map[int][]byte, error) {
+	if len(ids) == 0 {
+		return make(map[int][]byte), nil
+	}
+
+	err := CheckForMatroska(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	tmpDir, err := os.MkdirTemp("", "parsec-attachments-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	args := []string{filePath, "attachments"}
+	idToPath := make(map[int]string)
+
+	for _, id := range ids {
+		tmpPath := filepath.Join(tmpDir, fmt.Sprintf("attachment-%d", id))
+		args = append(args, fmt.Sprintf("%d:%s", id, tmpPath))
+		idToPath[id] = tmpPath
+	}
+
+	ui.PrintDebug("Executing: mkvextract " + ui.AnonymizePath(filePath) + " attachments " + strings.Join(args[2:], " "))
+	cmd := exec.CommandContext(context.Background(), "mkvextract", args...)
+
+	_, err = cmd.Output()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
+		}
+
+		return nil, fmt.Errorf("failed to extract attachments: %w", err)
+	}
+
+	results := make(map[int][]byte)
+
+	for id, path := range idToPath {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read extracted attachment %d: %w", id, err)
+		}
+
+		results[id] = content
+	}
+
+	return results, nil
+}
+
+// GetFontNames extracts the internal Family and Full names from font data.
+func GetFontNames(data []byte) ([]string, error) {
+	f, err := sfnt.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse font: %w", err)
+	}
+
+	var names []string
+
+	var b sfnt.Buffer
+
+	// NameIDFamily (0) and NameIDFull (4) are the most common ways fonts are identified.
+	// NameIDTypographicFamily (15) is also important for some modern fonts.
+	for _, id := range []sfnt.NameID{sfnt.NameIDFamily, sfnt.NameIDFull, sfnt.NameIDTypographicFamily} {
+		name, err := f.Name(&b, id)
+		if err == nil && name != "" {
+			names = append(names, name)
+		}
+	}
+
+	return names, nil
 }
 
 func (metadata *EbmlMetadata) countTypes() {

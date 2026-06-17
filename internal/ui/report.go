@@ -60,8 +60,29 @@ func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
 			continue
 		}
 
+		if isASSValidation(res.Identifier) {
+			for _, t := range res.Tracks {
+				header := fmt.Sprintf("      Track %s (%s/%s)", t.ID, t.Type, t.Codec)
+				if t.Language != "" {
+					header += fmt.Sprintf(" [%s]", t.Language)
+				}
+
+				Println(Muted.Render(header + ":"))
+
+				for line := range strings.SplitSeq(t.Warning, "\n") {
+					Println("      - " + line)
+				}
+			}
+
+			continue
+		}
+
 		Println(formatTrackTable(res.Tracks, sharedWidths))
 	}
+}
+
+func isASSValidation(id string) bool {
+	return id == "matroska_ass_styles" || id == "matroska_ass_events" || id == "matroska_ass_script_info"
 }
 
 func printUnexpectedDiff(res types.CheckResult) {

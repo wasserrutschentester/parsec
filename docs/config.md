@@ -149,7 +149,7 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `enabled_checks` | array of strings | If set, only the listed checks will be performed. |
+| `enabled_checks` | array of strings | If set, only the listed checks will be performed. Use `["all"]` to enable all possible checks. |
 | `disabled_checks` | array of strings | Listed checks will be skipped. (Ignored if `enabled_checks` is set) |
 
 ##### Available Checks
@@ -176,6 +176,12 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 -   `matroska_default_flags`: Ensure specialized tracks (Forced, SDH, etc.) are NOT default and standard tracks have correct default flags.
 -   `matroska_subtitle_format`: Verify SRT or ASS requirement for text subtitles.
 -   `matroska_subtitle_fonts`: Ensure all fonts used in SubStationAlpha subtitles are attached.
+-   `matroska_subtitle_inline_fonts`: Verify fonts used in inline tags (slow).
+-   `matroska_unused_fonts`: Identifies font attachments that are not used by any subtitle track.
+-   `matroska_font_filename_compliance`: Verify that font attachment filenames match their internal names.
+-   `matroska_ass_script_info`: Verify ASS Script Info headers.
+-   `matroska_ass_styles`: Deep validation of ASS styles.
+-   `matroska_ass_events`: Validation of ASS event lines.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.

@@ -226,6 +226,70 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 	return nil
 }
 
+func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
+	if track.Type != "video" {
+		return nil
+	}
+
+	props := track.Properties
+	if props.PixelWidth == 0 || props.PixelHeight == 0 {
+		return nil
+	}
+
+	if hasAnyCropping(props) {
+		return nil
+	}
+
+	if props.DisplayWidth <= 0 || props.DisplayHeight <= 0 {
+		return nil
+	}
+
+	pixelAR := float64(props.PixelWidth) / float64(props.PixelHeight)
+	displayAR := float64(props.DisplayWidth) / float64(props.DisplayHeight)
+
+	// If display AR is wider than pixel AR, but no crop values are set,
+	// it might be a "fake" crop or black bars that should be cropped.
+	if displayAR > pixelAR+0.01 {
+		warning := fmt.Sprintf("resolution-based black bars detected but no MKV crop values set (AR %.2f vs Display AR %.2f)", pixelAR, displayAR)
+
+		return newFailedTrackResult("matroska_video_cropping", "Missing MKV Cropping", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func hasAnyCropping(props matroska.EbmlTrackProperties) bool {
+	return props.PixelCroppingLeft != 0 || props.PixelCroppingTop != 0 ||
+		props.PixelCroppingRight != 0 || props.PixelCroppingBottom != 0
+}
+
+func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
+	if track.Properties.Delay == 0 {
+		return nil
+	}
+
+	absDelay := track.Properties.Delay
+	if absDelay < 0 {
+		absDelay = -absDelay
+	}
+
+	// mkvmerge -J output packet_delay is in nanoseconds.
+	// 1001ms = 1,001,000,000 ns.
+	const maxDelayNs = 1001 * 1000 * 1000
+
+	if strings.Contains(strings.ToUpper(track.Codec), "A_TRUEHD") {
+		return nil
+	}
+
+	if absDelay > maxDelayNs {
+		warning := fmt.Sprintf("delay of %dms exceeds ±1001ms", track.Properties.Delay/1000000)
+
+		return newFailedTrackResult("matroska_track_delay", "Excessive Container Delay", "warning", &track, warning)
+	}
+
+	return nil
+}
+
 func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
 	switch track.Type {
 	case "audio":
@@ -262,53 +326,536 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should be in SRT or SubStationAlpha format (convert others to SRT)", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should converted to SRT", "warning", &track, warning)
 	}
 
 	return nil
 }
 
-func checkSubtitleFonts(filePath string, track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
-	if track.Type != "subtitles" || (!strings.Contains(track.Codec, "ASS") && !strings.Contains(track.Codec, "SSA") && !strings.Contains(track.Codec, "SubStationAlpha")) {
+func checkSubtitleFonts(track matroska.EbmlTrack, fontMap map[string]string, allUsedFonts map[string]bool) *CheckResult {
+	if !isASSSubtitles(track) {
 		return nil
 	}
 
-	content, err := matroska.ExtractTrack(filePath, track.ID)
-	if err != nil {
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
 		return nil
 	}
 
-	usedFonts := parseUsedFonts(content)
+	usedFonts := make(map[string]bool)
+	lines := strings.Split(string(privateBytes), "\n")
+	parseFontsFromStyles(lines, usedFonts)
+
 	if len(usedFonts) == 0 {
 		return nil
 	}
 
-	missing := findMissingFonts(usedFonts, attachments)
+	for font := range usedFonts {
+		allUsedFonts[font] = true
+	}
+
+	missing := findMissingFonts(usedFonts, fontMap)
 
 	if len(missing) > 0 {
-		warning := "missing fonts: " + strings.Join(missing, ", ")
+		warning := "missing fonts (Styles): " + strings.Join(missing, ", ")
 
-		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts not included as attachments", "warning", &track, warning)
+		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts in Styles not included as attachments", "warning", &track, warning)
 	}
 
 	return nil
 }
 
-func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAttachment) []string {
+func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, fontMap map[string]string, content []byte, allUsedFonts map[string]bool) *CheckResult {
+	usedFonts := make(map[string]bool)
+
+	parseFontsFromInlineTags(string(content), usedFonts)
+
+	if len(usedFonts) == 0 {
+		return nil
+	}
+
+	for font := range usedFonts {
+		allUsedFonts[font] = true
+	}
+
+	missing := findMissingFonts(usedFonts, fontMap)
+
+	if len(missing) > 0 {
+		warning := "missing fonts (Inline): " + strings.Join(missing, ", ")
+
+		return newFailedTrackResult("matroska_subtitle_inline_fonts", "SSA/ASS subtitle track uses fonts in inline tags not included as attachments", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func checkASSScriptInfo(track matroska.EbmlTrack, videoWidth, videoHeight int) *CheckResult {
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
+		return nil
+	}
+
+	info := parseScriptInfo(string(privateBytes))
+	errors := validateScriptInfo(info, videoWidth, videoHeight)
+
+	if len(errors) > 0 {
+		return newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, strings.Join(errors, "\n"))
+	}
+
+	return nil
+}
+
+func parseScriptInfo(content string) map[string]string {
+	info := make(map[string]string)
+	inScriptInfo := false
+
+	for line := range strings.SplitSeq(content, "\n") {
+		line = strings.TrimSpace(line)
+
+		if line == "[Script Info]" {
+			inScriptInfo = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") {
+			inScriptInfo = false
+		}
+
+		if inScriptInfo {
+			if key, value, ok := strings.Cut(line, ":"); ok {
+				info[strings.TrimSpace(key)] = strings.TrimSpace(value)
+			}
+		}
+	}
+
+	return info
+}
+
+func validateScriptInfo(info map[string]string, videoWidth, videoHeight int) []string {
+	errors := make([]string, 0, 10)
+
+	errors = append(errors, validateFunctionalHeaders(info)...)
+	errors = append(errors, validateResolutionHeaders(info, videoWidth, videoHeight)...)
+
+	return errors
+}
+
+func validateFunctionalHeaders(info map[string]string) []string {
+	errors := make([]string, 0, 3)
+
+	errors = append(errors, validateScriptType(info)...)
+	errors = append(errors, validateScaledBorderAndShadow(info)...)
+	errors = append(errors, validateYCbCrMatrix(info)...)
+
+	return errors
+}
+
+func validateScriptType(info map[string]string) []string {
+	val, ok := info["ScriptType"]
+	if !ok || (val != "v4.00+" && val != "v4.00" && val != "v4.00++") {
+		msg := "missing or invalid ScriptType"
+		if ok {
+			msg += " (Line: ScriptType: " + val + ")"
+		}
+
+		return []string{msg}
+	}
+
+	return nil
+}
+
+func validateScaledBorderAndShadow(info map[string]string) []string {
+	val, ok := info["ScaledBorderAndShadow"]
+	if !ok || strings.ToLower(val) != "yes" {
+		msg := "ScaledBorderAndShadow should be 'yes'"
+		if ok {
+			msg += " (Line: ScaledBorderAndShadow: " + val + ")"
+		}
+
+		return []string{msg}
+	}
+
+	return nil
+}
+
+func validateYCbCrMatrix(info map[string]string) []string {
+	val, ok := info["YCbCr Matrix"]
+	if !ok {
+		return []string{"missing YCbCr Matrix"}
+	}
+
+	if val == "" {
+		return []string{"empty YCbCr Matrix (Line: YCbCr Matrix: )"}
+	}
+
+	return nil
+}
+
+func validateResolutionHeaders(info map[string]string, videoWidth, videoHeight int) []string {
+	var errors []string
+
+	headers := []string{"PlayResX", "PlayResY", "LayoutResX", "LayoutResY"}
+
+	for _, key := range headers {
+		val, ok := info[key]
+		if !ok {
+			errors = append(errors, "missing "+key)
+
+			continue
+		}
+
+		target := videoWidth
+		if strings.HasSuffix(key, "Y") {
+			target = videoHeight
+		}
+
+		res := 0
+		if n, _ := fmt.Sscanf(val, "%d", &res); n == 1 {
+			if videoWidth > 0 && videoHeight > 0 && res != target {
+				errors = append(errors, fmt.Sprintf("%s should be %d, got %s", key, target, val))
+			}
+		}
+	}
+
+	return errors
+}
+
+func checkASSStyles(track matroska.EbmlTrack) *CheckResult {
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
+		return nil
+	}
+
+	lines := strings.Split(string(privateBytes), "\n")
+	errors := validateStyles(lines)
+
+	if len(errors) > 0 {
+		warning := strings.Join(errors, "\n")
+
+		return newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func validateStyles(lines []string) []string {
+	inStyles := false
+	formatFields := []string{}
+
+	var errors []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "[V4+ Styles]" {
+			inStyles = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") {
+			inStyles = false
+		}
+
+		if !inStyles {
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
+			formatFields = parseStyleFormat(rest)
+		} else if rest, ok := strings.CutPrefix(line, "Style:"); ok {
+			for _, err := range validateStyleLine(rest, formatFields) {
+				errors = append(errors, fmt.Sprintf("%s (Line: Style: %s)", err, rest))
+			}
+		}
+	}
+
+	return errors
+}
+
+func validateStyleLine(rest string, formatFields []string) []string {
+	values := strings.Split(rest, ",")
+
+	errors := make([]string, 0, len(formatFields))
+
+	for i, field := range formatFields {
+		if i >= len(values) {
+			break
+		}
+
+		val := strings.TrimSpace(values[i])
+		errors = append(errors, validateStyleField(field, val)...)
+	}
+
+	return errors
+}
+
+func validateStyleField(field, val string) []string {
+	switch field {
+	case "Name":
+		return validateStyleName(val)
+	case "Fontname":
+		return validateStyleFontname(val)
+	case "Fontsize":
+		return validateStyleFontsize(val)
+	case "BorderStyle":
+		return validateStyleBorderStyle(val)
+	case "Alignment":
+		return validateStyleAlignment(val)
+	case "Encoding":
+		return validateStyleEncoding(val)
+	}
+
+	return nil
+}
+
+func validateStyleName(val string) []string {
+	if val == "" {
+		return []string{"empty Style Name"}
+	}
+
+	if strings.TrimSpace(val) != val {
+		return []string{"Style Name has leading/trailing whitespace"}
+	}
+
+	return nil
+}
+
+func validateStyleFontname(val string) []string {
+	if len(val) > 31 {
+		return []string{"Fontname '" + val + "' too long (>31)"}
+	}
+
+	return nil
+}
+
+func validateStyleFontsize(val string) []string {
+	fs := 0.0
+	if n, _ := fmt.Sscanf(val, "%f", &fs); n == 1 {
+		if fs < 0 || fs > 511 {
+			return []string{"invalid Fontsize " + val}
+		}
+	}
+
+	return nil
+}
+
+func validateStyleBorderStyle(val string) []string {
+	if val != "1" && val != "3" {
+		return []string{"invalid BorderStyle " + val}
+	}
+
+	return nil
+}
+
+func validateStyleAlignment(val string) []string {
+	align := 0
+	if n, _ := fmt.Sscanf(val, "%d", &align); n == 1 {
+		if align < 1 || align > 9 {
+			return []string{"invalid Alignment " + val}
+		}
+	}
+
+	return nil
+}
+
+func validateStyleEncoding(val string) []string {
+	if val != "1" {
+		return []string{"Encoding should be 1, got " + val}
+	}
+
+	return nil
+}
+
+func checkASSEvents(track matroska.EbmlTrack, content []byte) *CheckResult {
+	lines := strings.Split(string(content), "\n")
+	definedStyles := parseDefinedStyles(lines)
+	errors := validateEvents(lines, definedStyles)
+
+	if len(errors) > 0 {
+		warning := strings.Join(errors, "\n")
+
+		return newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func parseDefinedStyles(lines []string) map[string]bool {
+	definedStyles := make(map[string]bool)
+	inStyles := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "[V4+ Styles]" {
+			inStyles = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") {
+			inStyles = false
+		}
+
+		if inStyles {
+			if rest, ok := strings.CutPrefix(line, "Style:"); ok {
+				fields := strings.Split(rest, ",")
+				if len(fields) > 0 {
+					definedStyles[strings.TrimSpace(fields[0])] = true
+				}
+			}
+		}
+	}
+
+	return definedStyles
+}
+
+func validateEvents(lines []string, definedStyles map[string]bool) []string {
+	inEvents := false
+	formatFields := []string{}
+
+	var errors []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "[Events]" {
+			inEvents = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") && line != "[Events]" {
+			inEvents = false
+		}
+
+		if !inEvents {
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
+			formatFields = parseStyleFormat(rest)
+		} else if rest, ok := strings.CutPrefix(line, "Dialogue:"); ok {
+			for _, err := range validateEventLine(rest, formatFields, definedStyles) {
+				errors = append(errors, fmt.Sprintf("%s (Line: Dialogue: %s)", err, rest))
+			}
+		}
+	}
+
+	return errors
+}
+
+func validateEventLine(rest string, formatFields []string, definedStyles map[string]bool) []string {
+	values := splitEventLine(rest, len(formatFields))
+
+	errors := make([]string, 0, len(formatFields))
+
+	for i, field := range formatFields {
+		if i >= len(values) {
+			break
+		}
+
+		val := strings.TrimSpace(values[i])
+		errors = append(errors, validateEventField(field, val, definedStyles)...)
+	}
+
+	return errors
+}
+
+func validateEventField(field, val string, definedStyles map[string]bool) []string {
+	var errors []string
+
+	timeRegex := regexp.MustCompile(`^\d:\d\d:\d\d\.\d\d$`)
+
+	switch field {
+	case "Start", "End":
+		if !timeRegex.MatchString(val) {
+			errors = append(errors, "invalid time format '"+val+"'")
+		}
+	case "Style":
+		if !definedStyles[val] {
+			errors = append(errors, "undefined style '"+val+"'")
+		}
+	case "Text":
+		errors = append(errors, validateEventText(val)...)
+	case "Effect":
+		if val != "" {
+			errors = append(errors, validateEffect(val)...)
+		}
+	}
+
+	return errors
+}
+
+func validateEventText(val string) []string {
+	var errors []string
+
+	if strings.Contains(val, "\\fe") {
+		errors = append(errors, "forbidden tag \\fe used")
+	}
+
+	if strings.Contains(val, "\\be") && !strings.Contains(val, "\\blur") {
+		errors = append(errors, "\\blur should be preferred over \\be")
+	}
+
+	return errors
+}
+
+func splitEventLine(line string, fieldCount int) []string {
+	if fieldCount <= 1 {
+		return []string{line}
+	}
+
+	parts := strings.SplitN(line, ",", fieldCount)
+
+	return parts
+}
+
+func validateEffect(effect string) []string {
+	parts := strings.Split(effect, ";")
+	name := strings.ToLower(strings.TrimSpace(parts[0]))
+
+	var errors []string
+
+	if name == "banner" || name == "scroll up" || name == "scroll down" {
+		errors = append(errors, validateStandardEffect(effect, parts)...)
+	}
+
+	return errors
+}
+
+func validateStandardEffect(effect string, parts []string) []string {
+	var errors []string
+
+	if len(parts) >= 2 {
+		delay := 0
+		if n, _ := fmt.Sscanf(parts[1], "%d", &delay); n == 1 {
+			if delay < 1 || delay > 100 {
+				errors = append(errors, "invalid delay "+parts[1]+" in effect")
+			}
+		}
+	}
+
+	if strings.Contains(strings.ToLower(effect), "fadeaway") {
+		errors = append(errors, "unsupported effect parameter 'fadeaway'")
+	}
+
+	return errors
+}
+
+func isASSSubtitles(track matroska.EbmlTrack) bool {
+	return track.Type == "subtitles" && (strings.Contains(track.Codec, "ASS") || strings.Contains(track.Codec, "SSA") || strings.Contains(track.Codec, "SubStationAlpha"))
+}
+
+// findMissingFonts checks if each used font has a matching attachment using robust internal name mapping.
+func findMissingFonts(usedFonts map[string]bool, fontMap map[string]string) []string {
 	var missing []string
 
 	for font := range usedFonts {
-		found := false
-
-		for _, att := range attachments {
-			if strings.Contains(strings.ToLower(att.FileName), strings.ToLower(font)) {
-				found = true
-
-				break
-			}
-		}
-
-		if !found {
+		normalizedFont := normalizeFontName(font)
+		if _, found := fontMap[normalizedFont]; !found {
 			missing = append(missing, font)
 		}
 	}
@@ -316,15 +863,113 @@ func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAtta
 	return missing
 }
 
-func parseUsedFonts(content []byte) map[string]bool {
-	fonts := make(map[string]bool)
-	contentStr := string(content)
-	lines := strings.Split(contentStr, "\n")
+func normalizeFontName(name string) string {
+	// Remove common separators and convert to lowercase for robust matching
+	r := strings.NewReplacer(" ", "", "-", "", "_", "")
 
-	parseFontsFromStyles(lines, fonts)
-	parseFontsFromInlineTags(contentStr, fonts)
+	return strings.ToLower(r.Replace(name))
+}
 
-	return fonts
+func isFontAttachment(att matroska.EbmlAttachment) bool {
+	lowerName := strings.ToLower(att.FileName)
+	if strings.HasSuffix(lowerName, ".ttf") || strings.HasSuffix(lowerName, ".otf") || strings.HasSuffix(lowerName, ".ttc") {
+		return true
+	}
+
+	lowerType := strings.ToLower(att.ContentType)
+
+	return strings.HasPrefix(lowerType, "font/") ||
+		strings.Contains(lowerType, "truetype") ||
+		strings.Contains(lowerType, "opentype") ||
+		strings.Contains(lowerType, "font-sfnt")
+}
+
+func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) *CheckResult {
+	var unused []string
+
+	normalizedUsedFonts := make(map[string]bool)
+	for f := range allUsedFonts {
+		normalizedUsedFonts[normalizeFontName(f)] = true
+	}
+
+	for _, att := range attachments {
+		if !isFontAttachment(att) {
+			continue
+		}
+
+		names := attachmentNames[att.ID]
+		found := false
+
+		for _, name := range names {
+			if normalizedUsedFonts[normalizeFontName(name)] {
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			unused = append(unused, att.FileName)
+		}
+	}
+
+	if len(unused) > 0 {
+		return &CheckResult{
+			Identifier: "matroska_unused_fonts",
+			Warning:    "Font attachments not used by any subtitle track: " + strings.Join(unused, ", "),
+			Passed:     false,
+			Severity:   "warning",
+		}
+	}
+
+	return nil
+}
+
+func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) *CheckResult {
+	var nonCompliant []string
+
+	for _, att := range attachments {
+		if !isFontAttachment(att) {
+			continue
+		}
+
+		names, ok := attachmentNames[att.ID]
+		if !ok || len(names) == 0 {
+			continue
+		}
+
+		// Get filename without extension
+		baseName := att.FileName
+		if idx := strings.LastIndex(baseName, "."); idx != -1 {
+			baseName = baseName[:idx]
+		}
+
+		normalizedFileName := normalizeFontName(baseName)
+		compliant := false
+
+		for _, internalName := range names {
+			if normalizeFontName(internalName) == normalizedFileName {
+				compliant = true
+
+				break
+			}
+		}
+
+		if !compliant {
+			nonCompliant = append(nonCompliant, fmt.Sprintf("%s (internal: %s)", att.FileName, strings.Join(names, ", ")))
+		}
+	}
+
+	if len(nonCompliant) > 0 {
+		return &CheckResult{
+			Identifier: "matroska_font_filename_compliance",
+			Warning:    "Font attachment filenames do not match internal font names:\n" + strings.Join(nonCompliant, "\n"),
+			Passed:     false,
+			Severity:   "info",
+		}
+	}
+
+	return nil
 }
 
 func parseFontsFromStyles(lines []string, fonts map[string]bool) {
@@ -586,4 +1231,69 @@ func calcScore(name string) int64 {
 	}
 
 	return s
+}
+
+func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *CheckResult {
+	title := ebml.Container.Properties.Title
+	if title == "" {
+		return nil
+	}
+
+	officialTitle := meta.Title
+	if officialTitle != "" {
+		if normalizeForComparison(title) == normalizeForComparison(officialTitle) {
+			return nil
+		}
+	}
+
+	junkPatterns := []string{
+		`\[.*\]`, // Bracketed info
+		`\(.*\)`, // Parenthesized info
+		`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
+		`\bWEB-DL\b`, `\bBlu-ray\b`, `\bBD\b`,
+		`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
+	}
+
+	for _, p := range junkPatterns {
+		re := regexp.MustCompile("(?i)" + p)
+		if re.MatchString(title) {
+			return &CheckResult{
+				Identifier: "matroska_title_hygiene",
+				Warning:    "Global Title contains technical metadata",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     title,
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
+	app := ebml.Container.Properties.WritingApplication
+	if app == "" {
+		return nil
+	}
+
+	junkPatterns := []string{
+		`[a-zA-Z]:\\`,            // Windows paths
+		`/(home|Users|var|tmp)/`, // Unix paths
+		`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
+	}
+
+	for _, p := range junkPatterns {
+		re := regexp.MustCompile("(?i)" + p)
+		if re.MatchString(app) {
+			return &CheckResult{
+				Identifier: "matroska_app_hygiene",
+				Warning:    "Writing Application metadata contains potentially identifiable information",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     app,
+			}
+		}
+	}
+
+	return nil
 }

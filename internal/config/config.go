@@ -26,6 +26,7 @@ func InitDefaults() {
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
+	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events"})
 }
 
 var (
@@ -205,6 +206,10 @@ func GetDisableUpdateCheck() bool {
 func IsCheckEnabled(checkName string) bool {
 	enabledChecks := getStringSlice("enabled_checks")
 	if len(enabledChecks) > 0 {
+		if slices.Contains(enabledChecks, "all") {
+			return true
+		}
+
 		return slices.Contains(enabledChecks, checkName)
 	}
 

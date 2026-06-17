@@ -99,8 +99,18 @@ Many of these issues can be repaired automatically with the [`fix`](fix.md) comm
 | Duplicate Tracks | `checkDuplicateTracks` | `matroska_duplicate_tracks` | Yes | Identifies identical tracks (same language, flags, and name). |
 | Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures specialized tracks (Forced, SDH, Commentary, etc.) are NOT marked as Default, and that the first standard track per language IS marked as Default. |
 | Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all text subtitle tracks are in SRT or ASS format. All other text formats should be converted to SRT. |
-| Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | Yes | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle tracks are included as attachments in the Matroska container. |
+| Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | Yes | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle track *Styles* are included as attachments. Matching is done using internal font names (via `sfnt`), making it independent of attachment filenames. |
+| Subtitle Inline Fonts | `checkSubtitleInlineFonts` | `matroska_subtitle_inline_fonts` | No | Verifies fonts used in *inline tags* within SSA/ASS subtitle tracks. Uses internal font names for matching. Requires demuxing the track, which makes this check significantly slower. Disabled by default. |
+| Unused Fonts | `checkUnusedFonts` | `matroska_unused_fonts` | Yes | Identifies font attachments that are not used by any subtitle track. Uses internal font names to ensure accuracy. |
+| Font Filename Compliance | `checkFontFilenameCompliance` | `matroska_font_filename_compliance` | Yes | Verifies that the filename of a font attachment matches its internal font name (Family or Full Name). |
+| ASS Script Info | `checkASSScriptInfo` | `matroska_ass_script_info` | Yes | Verifies that the `[Script Info]` section of an ASS subtitle track contains recommended headers like `ScaledBorderAndShadow` and `YCbCr Matrix`. |
+| ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | Yes | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
+| ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | Yes | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. |
 | Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
+| Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
+| Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
+| Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
+| Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
 
 ### Media Database (MDB) Consistency Checks
 
