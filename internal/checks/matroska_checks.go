@@ -268,7 +268,7 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func checkSubtitleFonts(track matroska.EbmlTrack, attachments []matroska.EbmlAttachment) *CheckResult {
+func checkSubtitleFonts(track matroska.EbmlTrack, attachments []matroska.EbmlAttachment, allUsedFonts map[string]bool) *CheckResult {
 	if !isASSSubtitles(track) {
 		return nil
 	}
@@ -286,6 +286,10 @@ func checkSubtitleFonts(track matroska.EbmlTrack, attachments []matroska.EbmlAtt
 		return nil
 	}
 
+	for font := range usedFonts {
+		allUsedFonts[font] = true
+	}
+
 	missing := findMissingFonts(usedFonts, attachments)
 
 	if len(missing) > 0 {
@@ -297,13 +301,17 @@ func checkSubtitleFonts(track matroska.EbmlTrack, attachments []matroska.EbmlAtt
 	return nil
 }
 
-func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, attachments []matroska.EbmlAttachment, content []byte) *CheckResult {
+func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, attachments []matroska.EbmlAttachment, content []byte, allUsedFonts map[string]bool) *CheckResult {
 	usedFonts := make(map[string]bool)
 
 	parseFontsFromInlineTags(string(content), usedFonts)
 
 	if len(usedFonts) == 0 {
 		return nil
+	}
+
+	for font := range usedFonts {
+		allUsedFonts[font] = true
 	}
 
 	missing := findMissingFonts(usedFonts, attachments)
@@ -777,6 +785,7 @@ func isASSSubtitles(track matroska.EbmlTrack) bool {
 	return track.Type == "subtitles" && (strings.Contains(track.Codec, "ASS") || strings.Contains(track.Codec, "SSA") || strings.Contains(track.Codec, "SubStationAlpha"))
 }
 
+// findMissingFonts checks if each used font has a matching attachment by filename.
 func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAttachment) []string {
 	var missing []string
 
@@ -797,6 +806,55 @@ func findMissingFonts(usedFonts map[string]bool, attachments []matroska.EbmlAtta
 	}
 
 	return missing
+}
+
+func isFontAttachment(att matroska.EbmlAttachment) bool {
+	lowerName := strings.ToLower(att.FileName)
+	if strings.HasSuffix(lowerName, ".ttf") || strings.HasSuffix(lowerName, ".otf") || strings.HasSuffix(lowerName, ".ttc") {
+		return true
+	}
+
+	lowerType := strings.ToLower(att.ContentType)
+
+	return strings.HasPrefix(lowerType, "font/") ||
+		strings.Contains(lowerType, "truetype") ||
+		strings.Contains(lowerType, "opentype") ||
+		strings.Contains(lowerType, "font-sfnt")
+}
+
+func checkUnusedFonts(attachments []matroska.EbmlAttachment, allUsedFonts map[string]bool) *CheckResult {
+	var unused []string
+
+	for _, att := range attachments {
+		if !isFontAttachment(att) {
+			continue
+		}
+
+		found := false
+
+		for usedFont := range allUsedFonts {
+			if strings.Contains(strings.ToLower(att.FileName), strings.ToLower(usedFont)) {
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			unused = append(unused, att.FileName)
+		}
+	}
+
+	if len(unused) > 0 {
+		return &CheckResult{
+			Identifier: "matroska_unused_fonts",
+			Warning:    "Font attachments not used by any subtitle track: " + strings.Join(unused, ", "),
+			Passed:     false,
+			Severity:   "warning",
+		}
+	}
+
+	return nil
 }
 
 func parseFontsFromStyles(lines []string, fonts map[string]bool) {

@@ -379,38 +379,82 @@ func TestGetTrackPriority(t *testing.T) {
 }
 
 //nolint:paralleltest // depends on shared global state
-func TestRunTrackChecksMultiTrack(t *testing.T) {
+func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 	config.InitDefaults()
 
-	t.Run("Duplicate tracks returns both original and duplicate", func(t *testing.T) {
-		tracks := []matroska.EbmlTrack{
-			{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
-			{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
-		}
+	tracks := []matroska.EbmlTrack{
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+	}
 
-		res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks})
-		found := false
+	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks})
+	found := false
 
-		for _, r := range res {
-			if r.Identifier == "matroska_duplicate_tracks" {
-				found = true
+	for _, r := range res {
+		if r.Identifier == "matroska_duplicate_tracks" {
+			found = true
 
-				if len(r.Tracks) != 2 {
-					t.Errorf("Expected 2 tracks for duplicate check, got %d", len(r.Tracks))
-				}
+			if len(r.Tracks) != 2 {
+				t.Errorf("Expected 2 tracks for duplicate check, got %d", len(r.Tracks))
+			}
 
-				if r.Tracks[0].Warning != "original track" {
-					t.Errorf("Expected first track warning to be 'original track', got '%s'", r.Tracks[0].Warning)
-				}
+			if r.Tracks[0].Warning != "original track" {
+				t.Errorf("Expected first track warning to be 'original track', got '%s'", r.Tracks[0].Warning)
+			}
 
-				if !strings.Contains(r.Tracks[1].Warning, "duplicate track") {
-					t.Errorf("Expected second track warning to contain 'duplicate track', got '%s'", r.Tracks[1].Warning)
-				}
+			if !strings.Contains(r.Tracks[1].Warning, "duplicate track") {
+				t.Errorf("Expected second track warning to contain 'duplicate track', got '%s'", r.Tracks[1].Warning)
 			}
 		}
+	}
 
-		if !found {
-			t.Error("Did not find duplicate tracks check result")
+	if !found {
+		t.Error("Did not find duplicate tracks check result")
+	}
+}
+
+//nolint:paralleltest // depends on shared global state
+func TestRunTrackChecksUnusedFonts(t *testing.T) {
+	config.InitDefaults()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{
+				ID:    1,
+				Type:  "subtitles",
+				Codec: "S_TEXT/ASS",
+				Properties: matroska.EbmlTrackProperties{
+					Language: "ger",
+					Number:   1,
+					// [V4+ Styles]\nFormat: Name, Fontname\nStyle: Default, Arial\n
+					CodecPrivate: "5b56342b205374796c65735d0a466f726d61743a204e616d652c20466f6e746e616d650a5374796c653a2044656661756c742c20417269616c0a",
+				},
+			},
+		},
+		Attachments: []matroska.EbmlAttachment{
+			{FileName: "Arial.ttf", ContentType: "font/ttf"},
+			{FileName: "UnusedFont.ttf", ContentType: "font/ttf"},
+		},
+	}
+
+	res := runTrackChecks("", ebml)
+	found := false
+
+	for _, r := range res {
+		if r.Identifier == "matroska_unused_fonts" {
+			found = true
+
+			if !strings.Contains(r.Warning, "UnusedFont.ttf") {
+				t.Errorf("Expected warning to contain UnusedFont.ttf, got '%s'", r.Warning)
+			}
+
+			if strings.Contains(r.Warning, "Arial.ttf") {
+				t.Errorf("Warning should not contain Arial.ttf, got '%s'", r.Warning)
+			}
 		}
-	})
+	}
+
+	if !found {
+		t.Error("Did not find unused fonts check result")
+	}
 }
