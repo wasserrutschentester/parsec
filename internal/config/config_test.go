@@ -118,3 +118,29 @@ func TestIsCheckEnabled(t *testing.T) {
 		t.Errorf("IsCheckEnabled(preset_disabled) = true, want false")
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestIsCheckEnabledSpecialValues(t *testing.T) {
+	viper.Reset()
+	InitDefaults()
+
+	// Test "all" in enabled_checks
+	viper.Set("enabled_checks", []string{"all"})
+
+	if !IsCheckEnabled("some_check") {
+		t.Errorf("IsCheckEnabled(some_check) with 'all' = false, want true")
+	}
+
+	if !IsCheckEnabled("matroska_subtitle_inline_fonts") {
+		t.Errorf("IsCheckEnabled(matroska_subtitle_inline_fonts) with 'all' = false, want true")
+	}
+
+	// Test empty disabled_checks (should also enable everything)
+	viper.Reset()
+	InitDefaults()
+	viper.Set("disabled_checks", []string{})
+
+	if !IsCheckEnabled("matroska_subtitle_inline_fonts") {
+		t.Errorf("IsCheckEnabled(matroska_subtitle_inline_fonts) with [] = false, want true")
+	}
+}

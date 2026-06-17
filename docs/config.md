@@ -147,7 +147,7 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `enabled_checks` | array of strings | If set, only the listed checks will be performed. |
+| `enabled_checks` | array of strings | If set, only the listed checks will be performed. Use `["all"]` to enable all possible checks. |
 | `disabled_checks` | array of strings | Listed checks will be skipped. (Ignored if `enabled_checks` is set) |
 
 ##### Available Checks

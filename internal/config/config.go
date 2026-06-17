@@ -206,6 +206,10 @@ func GetDisableUpdateCheck() bool {
 func IsCheckEnabled(checkName string) bool {
 	enabledChecks := getStringSlice("enabled_checks")
 	if len(enabledChecks) > 0 {
+		if slices.Contains(enabledChecks, "all") {
+			return true
+		}
+
 		return slices.Contains(enabledChecks, checkName)
 	}
 
