@@ -54,6 +54,7 @@ Some issues cannot be fixed automatically and are left for manual resolution:
 - **Bitstream metadata** — `mediainfo_dialogue_normalization` lives inside the audio stream, not the container.
 - **Missing source data** — `mdb_audio_language_preferred`, `mdb_subtitle_language_preferred`, `mdb_audio_language_original`, `mdb_subtitle_language_original` (a track that is not present cannot be added), `mdb_episode_existence`, `mdb_error`, `mdb_no_match`, `mdb_unknown_original_lang`.
 - **Same-language audio bloat** — `mediainfo_redundant_audio` is reported by `check` but **not** auto-removed. When one language has several audio tracks (e.g. a lossless track plus a lossy variant, or DTS-HD MA alongside DTS), `fix` keeps them all, because choosing which to drop needs codec/quality awareness that is not yet implemented. Only **unwanted-language** audio (anything other than the preferred or MDB original language) is pruned. Remove same-language duplicates manually for now.
+- **Missing subtitle fonts** — `matroska_subtitle_fonts` is reported by `check` but not auto-fixed. Embedding the missing fonts means locating the actual font files for the family names an ASS/SSA track references (and honouring their embedding licences), which is out of scope for now. Attach them manually with `mkvpropedit --add-attachment`.
 - **Other** — `matroska_ebml_error` (broken file), `matroska_subtitle_format` (subtitle conversion), `filename_streaming` (use `rename --service`).
 
 ## Prompts
