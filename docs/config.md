@@ -174,6 +174,10 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `matroska_default_flags`: Ensure specialized tracks (Forced, SDH, etc.) are NOT default and standard tracks have correct default flags.
 -   `matroska_subtitle_format`: Verify SRT or ASS requirement for text subtitles.
 -   `matroska_subtitle_fonts`: Ensure all fonts used in SubStationAlpha subtitles are attached.
+-   `matroska_subtitle_inline_fonts`: Verify fonts used in inline tags (slow).
+-   `matroska_ass_script_info`: Verify ASS Script Info headers.
+-   `matroska_ass_styles`: Deep validation of ASS styles.
+-   `matroska_ass_events`: Validation of ASS event lines.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.

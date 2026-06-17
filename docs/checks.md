@@ -99,6 +99,9 @@ This document lists all individual checks performed by the `parsec check` comman
 | Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all text subtitle tracks are in SRT or ASS format. All other text formats should be converted to SRT. |
 | Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | Yes | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle track *Styles* are included as attachments in the Matroska container. |
 | Subtitle Inline Fonts | `checkSubtitleInlineFonts` | `matroska_subtitle_inline_fonts` | No | Verifies fonts used in *inline tags* within SSA/ASS subtitle tracks. Requires demuxing the track, which makes this check significantly slower. Disabled by default. |
+| ASS Script Info | `checkASSScriptInfo` | `matroska_ass_script_info` | Yes | Verifies that the `[Script Info]` section of an ASS subtitle track contains recommended headers like `ScaledBorderAndShadow` and `YCbCr Matrix`. |
+| ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | Yes | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
+| ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | Yes | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. |
 | Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
 
 ### Media Database (MDB) Consistency Checks

@@ -93,6 +93,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata) []CheckResult 
 
 	audioCounts, subCounts := getTrackCounts(tracks)
 	langHasOriginalFlag := getOriginalLanguageMap(tracks)
+	videoWidth, videoHeight := getVideoDimensions(tracks)
 
 	for i := range tracks {
 		track := &tracks[i]
@@ -100,7 +101,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata) []CheckResult 
 			continue
 		}
 
-		agg.AddAll(runIndividualTrackChecks(filePath, *track, langHasOriginalFlag, ebml.Attachments))
+		agg.AddAll(runIndividualTrackChecks(filePath, *track, langHasOriginalFlag, ebml.Attachments, videoWidth, videoHeight))
 		agg.AddAll(runStatefulTrackChecks(track, audioCounts, subCounts, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs))
 
 		if config.IsCheckEnabled("matroska_track_order") {
@@ -122,6 +123,9 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata) []CheckResult 
 		"matroska_subtitle_format",
 		"matroska_subtitle_fonts",
 		"matroska_subtitle_inline_fonts",
+		"matroska_ass_script_info",
+		"matroska_ass_styles",
+		"matroska_ass_events",
 		"matroska_zlib_compression",
 		"matroska_track_order",
 	}
@@ -134,7 +138,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata) []CheckResult 
 	return results
 }
 
-func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHasOriginalFlag map[string]bool, attachments []matroska.EbmlAttachment) []*CheckResult {
+func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHasOriginalFlag map[string]bool, attachments []matroska.EbmlAttachment, videoWidth, videoHeight int) []*CheckResult {
 	var results []*CheckResult
 
 	// Basic checks
@@ -158,12 +162,45 @@ func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHas
 		results = append(results, checkSubtitleFonts(track, attachments))
 	}
 
-	if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
-		results = append(results, checkSubtitleInlineFonts(filePath, track, attachments))
+	// ASS specific checks
+	if isASSSubtitles(track) {
+		results = append(results, runASSSpecificChecks(filePath, track, attachments, videoWidth, videoHeight)...)
 	}
 
 	if config.IsCheckEnabled("matroska_zlib_compression") {
 		results = append(results, checkZlibCompression(track))
+	}
+
+	return results
+}
+
+func runASSSpecificChecks(filePath string, track matroska.EbmlTrack, attachments []matroska.EbmlAttachment, videoWidth, videoHeight int) []*CheckResult {
+	var results []*CheckResult
+
+	if config.IsCheckEnabled("matroska_ass_script_info") {
+		results = append(results, checkASSScriptInfo(track, videoWidth, videoHeight))
+	}
+
+	if config.IsCheckEnabled("matroska_ass_styles") {
+		results = append(results, checkASSStyles(track))
+	}
+
+	needsExtraction := config.IsCheckEnabled("matroska_subtitle_inline_fonts") || config.IsCheckEnabled("matroska_ass_events")
+	if !needsExtraction {
+		return results
+	}
+
+	content, err := matroska.ExtractTrack(filePath, track.ID)
+	if err != nil {
+		return results
+	}
+
+	if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
+		results = append(results, checkSubtitleInlineFontsWithContent(track, attachments, content))
+	}
+
+	if config.IsCheckEnabled("matroska_ass_events") {
+		results = append(results, checkASSEvents(track, content))
 	}
 
 	return results
@@ -294,4 +331,19 @@ func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 
 func isRelevantTrack(track matroska.EbmlTrack) bool {
 	return track.Type == "audio" || track.Type == "subtitles"
+}
+
+func getVideoDimensions(tracks []matroska.EbmlTrack) (int, int) {
+	for _, track := range tracks {
+		if track.Type == "video" {
+			props := track.Properties
+			if props.DisplayWidth > 0 && props.DisplayHeight > 0 {
+				return props.DisplayWidth, props.DisplayHeight
+			}
+
+			return props.PixelWidth, props.PixelHeight
+		}
+	}
+
+	return 0, 0
 }

@@ -241,6 +241,57 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "ASS Script Info missing headers",
+			tracks: []matroska.EbmlTrack{
+				{
+					ID:    1,
+					Type:  "subtitles",
+					Codec: "S_TEXT/ASS",
+					Properties: matroska.EbmlTrackProperties{
+						Language:     "ger",
+						Number:       1,
+						CodecPrivate: "5b53637269707420496e666f5d0a536372697074547970653a2076342e30302b0a", // [Script Info]\nScriptType: v4.00+\n
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "ASS Style validation failure (invalid Fontsize)",
+			tracks: []matroska.EbmlTrack{
+				{
+					ID:    1,
+					Type:  "subtitles",
+					Codec: "S_TEXT/ASS",
+					Properties: matroska.EbmlTrackProperties{
+						Language: "ger",
+						Number:   1,
+						// [V4+ Styles]\nFormat: Name, Fontname, Fontsize, ...\nStyle: Default, Arial, 600, ...
+						CodecPrivate: "5b56342b205374796c65735d0a466f726d61743a204e616d652c20466f6e746e616d652c20466f6e7473697a650a5374796c653a2044656661756c742c20417269616c2c203630300a",
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "ASS Script Info resolution mismatch",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080}},
+				{
+					ID:    2,
+					Type:  "subtitles",
+					Codec: "S_TEXT/ASS",
+					Properties: matroska.EbmlTrackProperties{
+						Language: "ger",
+						Number:   2,
+						// PlayResX: 640, PlayResY: 360 (Mismatch with 1920x1080)
+						CodecPrivate: "5b53637269707420496e666f5d0a536372697074547970653a2076342e30302b0a5363616c6564426f72646572416e64536861646f773a207965730a5943624372204d61747269783a204e6f6e650a506c6179526573583a203634300a506c6179526573593a203336300a4c61796f7574526573583a20313932300a4c61796f7574526573593a20313038300a",
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Audio tracks are ignored",
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},

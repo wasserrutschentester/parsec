@@ -55,6 +55,10 @@ type EbmlTrackProperties struct {
 	TextSubtitles             bool   `json:"text_subtitles,omitempty"`
 	ContentEncodingAlgorithms string `json:"content_encoding_algorithms,omitempty"`
 	CodecPrivate              string `json:"codec_private_data,omitempty"`
+	PixelWidth                int    `json:"pixel_width,omitempty"`
+	PixelHeight               int    `json:"pixel_height,omitempty"`
+	DisplayWidth              int    `json:"display_width,omitempty"`
+	DisplayHeight             int    `json:"display_height,omitempty"`
 }
 
 // DecodeCodecPrivate decodes the base16/hex encoded CodecPrivate string.
