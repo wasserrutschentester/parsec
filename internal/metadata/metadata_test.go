@@ -281,6 +281,69 @@ func TestMetadata_String(t *testing.T) {
 	}
 }
 
+func TestMetadata_GetSeasonPackName(t *testing.T) {
+	t.Parallel()
+
+	config.InitDefaults()
+
+	tests := []struct {
+		name string
+		meta Metadata
+		want string
+	}{
+		{
+			name: "Regular Episode",
+			meta: Metadata{
+				Title:         "The Mandalorian",
+				Year:          2019,
+				Season:        1,
+				Episode:       1,
+				EpisodeTitle:  "Chapter 1",
+				Date:          "2019-11-12",
+				Resolution:    "2160p",
+				Service:       "DSNP",
+				Source:        "WEB-DL",
+				AudioCodec:    "DDP",
+				AudioChannels: "5.1",
+				AudioMeta:     "Atmos",
+				HDR:           "DV.HDR",
+				VideoCodec:    "H.265",
+				Group:         "PAARSEX",
+				IsTV:          true,
+			},
+			want: "The Mandalorian.2019.S01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-PAARSEX",
+		},
+		{
+			name: "Season 0 Special",
+			meta: Metadata{
+				Title:        "The Mandalorian",
+				Year:         2019,
+				Season:       0,
+				Episode:      101,
+				EpisodeTitle: "The Director and the Jedi",
+				Date:         "2020-05-04",
+				Resolution:   "1080p",
+				Group:        "PAARSEX",
+				IsTV:         true,
+			},
+			want: "The Mandalorian.2019.S00.1080p-PAARSEX",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.meta.GetSeasonPackName(); got != tt.want {
+				t.Errorf("Metadata.GetSeasonPackName() = %v, want %v", got, tt.want)
+			}
+			// Verify that the original metadata was restored
+			if tt.meta.Episode == 0 && tt.name == "Regular Episode" {
+				t.Error("Metadata.GetSeasonPackName() failed to restore Episode")
+			}
+		})
+	}
+}
+
 func TestMetadata_Override(t *testing.T) {
 	t.Parallel()
 
