@@ -294,13 +294,19 @@ func checkOriginalLanguageConsistency(track matroska.EbmlTrack, langHasOriginalF
 	return nil
 }
 
-func checkDuplicateTracks(track *matroska.EbmlTrack, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool) *CheckResult {
+// trackDuplicateKey builds the identity used to detect duplicate tracks: two
+// tracks sharing this key are considered duplicates.
+func trackDuplicateKey(track matroska.EbmlTrack) string {
 	props := track.Properties
 
-	trackKey := fmt.Sprintf("%s-%s-%t-%t-%t-%t-%t-%t-%s",
+	return fmt.Sprintf("%s-%s-%t-%t-%t-%t-%t-%t-%s",
 		track.Type, props.Language, props.Default, props.Forced,
 		props.HearingImpaired, props.VisualImpaired,
 		props.Commentary, props.OriginalLanguage, props.Name)
+}
+
+func checkDuplicateTracks(track *matroska.EbmlTrack, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool) *CheckResult {
+	trackKey := trackDuplicateKey(*track)
 	if firstTrack, ok := seenTracks[trackKey]; ok {
 		res := &CheckResult{
 			Identifier: "matroska_duplicate_tracks",

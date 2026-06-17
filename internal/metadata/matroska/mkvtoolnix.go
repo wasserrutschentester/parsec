@@ -8,9 +8,13 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/ui"
@@ -208,6 +212,249 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	}
 
 	return nil
+}
+
+// TrackEdit describes a set of property changes for a single track, identified
+// by its track number (the "number" property reported by mkvmerge -J).
+type TrackEdit struct {
+	Number int
+	// Props maps an mkvpropedit property name (e.g. "flag-default", "name") to
+	// its new value. An empty value deletes the property instead of setting it.
+	Props map[string]string
+}
+
+// SetTrackProperties applies the given per-track property edits to a Matroska
+// file in place using mkvpropedit. It edits the existing container and does not
+// remux, so it is fast and lossless.
+func SetTrackProperties(filePath string, edits []TrackEdit) error {
+	if len(edits) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := buildPropeditArgs(filePath, edits)
+
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to set track properties: %w: %s", err, output)
+	}
+
+	return nil
+}
+
+// buildPropeditArgs builds the mkvpropedit argument list for the given edits.
+// Property keys are sorted so the resulting command is deterministic.
+func buildPropeditArgs(filePath string, edits []TrackEdit) []string {
+	args := []string{filePath}
+
+	for _, edit := range edits {
+		args = append(args, "--edit", "track:@"+strconv.Itoa(edit.Number))
+
+		for _, key := range slices.Sorted(maps.Keys(edit.Props)) {
+			if value := edit.Props[key]; value == "" {
+				args = append(args, "--delete", key)
+			} else {
+				args = append(args, "--set", key+"="+value)
+			}
+		}
+	}
+
+	return args
+}
+
+// RemuxOptions describes a lossless remux of a Matroska file via mkvmerge. All
+// track IDs are mkvmerge track IDs (the "id" field reported by mkvmerge -J).
+type RemuxOptions struct {
+	// TrackOrder is the desired output order of track IDs. Empty keeps the
+	// current order. IDs that are also removed are ignored.
+	TrackOrder []int
+	// RemoveTrackIDs lists track IDs to drop from the output.
+	RemoveTrackIDs []int
+	// StripCompressionIDs lists track IDs whose compression should be removed.
+	StripCompressionIDs []int
+	// DisableTrackCompression emits "none" compression for all kept tracks.
+	// This prevents mkvmerge from introducing zlib compression while performing
+	// another remux operation such as reordering or removing tracks.
+	DisableTrackCompression bool
+}
+
+// IsEmpty reports whether the options describe no work.
+func (o RemuxOptions) IsEmpty() bool {
+	return len(o.TrackOrder) == 0 && len(o.RemoveTrackIDs) == 0 && len(o.StripCompressionIDs) == 0
+}
+
+var errRemuxFailed = errors.New("mkvmerge remux failed")
+
+// RemuxTracks rewrites a Matroska file with mkvmerge to reorder tracks, strip
+// container compression and/or drop tracks. The remux is lossless (streams are
+// copied), but unlike SetTrackProperties it rewrites the whole file. The output
+// is written to a temporary file in the same directory and atomically swapped
+// in on success.
+func RemuxTracks(filePath string, opts RemuxOptions) error {
+	if opts.IsEmpty() {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	ebml, err := GetEbmlMetadata(filePath)
+	if err != nil {
+		return err
+	}
+
+	tmpPath := filepath.Join(filepath.Dir(filePath), "."+filepath.Base(filePath)+".parsec-remux.mkv")
+	args := buildRemuxArgs(tmpPath, filePath, opts, ebml.Tracks)
+
+	ui.PrintDebug("Executing: mkvmerge " + strings.Join(args, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvmerge", args...)
+	if output, runErr := cmd.CombinedOutput(); runErr != nil {
+		if err := interpretMkvmergeError(runErr, output); err != nil {
+			_ = os.Remove(tmpPath)
+
+			return err
+		}
+	}
+
+	return replaceFile(filePath, tmpPath)
+}
+
+// interpretMkvmergeError maps an mkvmerge exit status to an error. mkvmerge
+// returns exit code 1 for warnings (the output is still produced) and 2 for
+// fatal errors; only the latter is treated as a failure.
+func interpretMkvmergeError(runErr error, output []byte) error {
+	if errors.Is(runErr, exec.ErrNotFound) {
+		return fmt.Errorf("mkvmerge is not installed or not available in PATH: %w", runErr)
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) && exitErr.ExitCode() == 1 {
+		// Warnings only; the output file was written successfully.
+		return nil
+	}
+
+	return fmt.Errorf("%w: %w: %s", errRemuxFailed, runErr, output)
+}
+
+// replaceFile swaps tmpPath in for filePath, preserving the original file mode.
+func replaceFile(filePath, tmpPath string) error {
+	if info, statErr := os.Stat(filePath); statErr == nil {
+		_ = os.Chmod(tmpPath, info.Mode())
+	}
+
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("failed to replace original after remux: %w", err)
+	}
+
+	return nil
+}
+
+// buildRemuxArgs builds the mkvmerge argument list for the given remux options.
+func buildRemuxArgs(outPath, inPath string, opts RemuxOptions, tracks []EbmlTrack) []string {
+	args := []string{"-o", outPath}
+
+	removed := make(map[int]bool, len(opts.RemoveTrackIDs))
+	for _, id := range opts.RemoveTrackIDs {
+		removed[id] = true
+	}
+
+	args = append(args, buildRemovalArgs(opts.RemoveTrackIDs, tracks)...)
+
+	args = append(args, buildCompressionArgs(opts, tracks, removed)...)
+
+	if order := buildTrackOrder(opts.TrackOrder, removed); order != "" {
+		args = append(args, "--track-order", order)
+	}
+
+	return append(args, inPath)
+}
+
+func buildCompressionArgs(opts RemuxOptions, tracks []EbmlTrack, removed map[int]bool) []string {
+	if opts.DisableTrackCompression {
+		args := make([]string, 0, len(tracks)*2)
+
+		for _, track := range tracks {
+			if !removed[track.ID] {
+				args = append(args, "--compression", strconv.Itoa(track.ID)+":none")
+			}
+		}
+
+		return args
+	}
+
+	args := make([]string, 0, len(opts.StripCompressionIDs)*2)
+
+	for _, id := range opts.StripCompressionIDs {
+		if !removed[id] {
+			args = append(args, "--compression", strconv.Itoa(id)+":none")
+		}
+	}
+
+	return args
+}
+
+// buildRemovalArgs groups removed track IDs by type and emits the matching
+// mkvmerge keep/remove flags (e.g. "--audio-tracks !2,3").
+func buildRemovalArgs(removeIDs []int, tracks []EbmlTrack) []string {
+	if len(removeIDs) == 0 {
+		return nil
+	}
+
+	typeByID := make(map[int]string, len(tracks))
+	for _, track := range tracks {
+		typeByID[track.ID] = track.Type
+	}
+
+	byType := make(map[string][]string)
+	for _, id := range removeIDs {
+		byType[typeByID[id]] = append(byType[typeByID[id]], strconv.Itoa(id))
+	}
+
+	flagByType := map[string]string{
+		"video":     "--video-tracks",
+		"audio":     "--audio-tracks",
+		"subtitles": "--subtitle-tracks",
+	}
+
+	var args []string
+	// Iterate in a fixed order for deterministic output.
+	for _, typ := range []string{"video", "audio", "subtitles"} {
+		if ids := byType[typ]; len(ids) > 0 {
+			args = append(args, flagByType[typ], "!"+strings.Join(ids, ","))
+		}
+	}
+
+	return args
+}
+
+// buildTrackOrder renders the mkvmerge --track-order value for the kept tracks.
+func buildTrackOrder(trackOrder []int, removed map[int]bool) string {
+	var entries []string
+
+	for _, id := range trackOrder {
+		if !removed[id] {
+			entries = append(entries, "0:"+strconv.Itoa(id))
+		}
+	}
+
+	return strings.Join(entries, ",")
 }
 
 func createTagsXML(tags mdb.MatroskaTags) (string, error) {

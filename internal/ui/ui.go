@@ -581,6 +581,18 @@ func Println(a ...any) {
 	}
 }
 
+// Prompt displays msg and returns a single trimmed line of user input.
+func Prompt(msg string) string {
+	fmt.Print(msg)
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return strings.TrimSpace(scanner.Text())
+	}
+
+	return ""
+}
+
 // ConfirmContinue prompts the user to continue with a [Y/n] prompt.
 // Empty input returns true, "no" or "n" returns false.
 func ConfirmContinue(msg string) bool {

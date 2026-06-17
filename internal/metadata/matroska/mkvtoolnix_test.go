@@ -87,3 +87,67 @@ func TestCountTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildPropeditArgs(t *testing.T) {
+	t.Parallel()
+
+	edits := []TrackEdit{
+		{Number: 2, Props: map[string]string{"name": "German", "flag-default": "1"}},
+		{Number: 3, Props: map[string]string{"name": ""}},
+	}
+
+	got := buildPropeditArgs("movie.mkv", edits)
+
+	want := []string{
+		"movie.mkv",
+		"--edit", "track:@2", "--set", "flag-default=1", "--set", "name=German",
+		"--edit", "track:@3", "--delete", "name",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(got), got)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("arg %d: expected %q, got %q", i, want[i], got[i])
+		}
+	}
+}
+
+func TestBuildRemuxArgs(t *testing.T) {
+	t.Parallel()
+
+	tracks := []EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio"},
+		{ID: 2, Type: "audio"},
+	}
+
+	opts := RemuxOptions{
+		TrackOrder:              []int{0, 2, 1},
+		RemoveTrackIDs:          []int{1},
+		DisableTrackCompression: true,
+	}
+
+	got := buildRemuxArgs("out.mkv", "in.mkv", opts, tracks)
+
+	want := []string{
+		"-o", "out.mkv",
+		"--audio-tracks", "!1",
+		"--compression", "0:none",
+		"--compression", "2:none",
+		"--track-order", "0:0,0:2",
+		"in.mkv",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(got), got)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("arg %d: expected %q, got %q", i, want[i], got[i])
+		}
+	}
+}

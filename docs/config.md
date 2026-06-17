@@ -145,6 +145,8 @@ Provide specific IDs to ensure the correct metadata is fetched from databases.
 You can enable or disable specific quality checks on a per-preset basis.
 See [Validation Checks](checks.md) for more details about what checks are availible
 
+This setting is also respected by the [`fix`](fix.md) command: a disabled check is neither reported nor auto-fixed.
+
 | Key | Type | Description |
 |-----|------|-------------|
 | `enabled_checks` | array of strings | If set, only the listed checks will be performed. |

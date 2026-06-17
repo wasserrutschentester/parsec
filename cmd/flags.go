@@ -41,6 +41,8 @@ var (
 	noCacheFlag    bool
 	releasesFlag   bool
 	bestFlag       bool
+	remuxFlag      bool
+	ovFlag         string
 )
 
 //nolint:funlen,cyclop // many flags to apply, logic is repetitive but necessary

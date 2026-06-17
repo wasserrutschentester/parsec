@@ -1,0 +1,248 @@
+package checks
+
+import (
+	"slices"
+	"testing"
+
+	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+)
+
+func findEdit(edits []matroska.TrackEdit, number int) (matroska.TrackEdit, bool) {
+	for _, edit := range edits {
+		if edit.Number == number {
+			return edit, true
+		}
+	}
+
+	return matroska.TrackEdit{}, false
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestNeedsMultiLangName(t *testing.T) {
+	config.InitDefaults()
+
+	tests := []struct {
+		name      string
+		trackType string
+		lang      string
+		trackName string
+		want      bool
+	}{
+		{"mul without name", "audio", "mul", "", true},
+		{"mul with single language", "audio", "mul", "English", true},
+		{"mul with two languages", "audio", "mul", "English German", false},
+		{"non-mul empty name", "audio", "ger", "", false},
+		{"mul on irrelevant track", "video", "mul", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			track := matroska.EbmlTrack{
+				Type:       tt.trackType,
+				Properties: matroska.EbmlTrackProperties{Language: tt.lang, Name: tt.trackName},
+			}
+			if got := NeedsMultiLangName(track); got != tt.want {
+				t.Errorf("NeedsMultiLangName(%q, %q) = %v, want %v", tt.lang, tt.trackName, got, tt.want)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestFixedTrackName(t *testing.T) {
+	config.InitDefaults()
+
+	tests := []struct {
+		name  string
+		track matroska.EbmlTrack
+		want  string
+	}{
+		{
+			name:  "removes simple codec keeps channel notation",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "AC3 5.1"}},
+			want:  "5.1",
+		},
+		{
+			name:  "removes junk keyword and redundant language",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "German STEREO"}},
+			want:  "",
+		},
+		{
+			name:  "preserves DTS-HD compound token",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "DTS-HD MA"}},
+			want:  "DTS-HD MA",
+		},
+		{
+			name:  "removes standalone DTS only",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "Commentary DTS"}},
+			want:  "Commentary",
+		},
+		{
+			name:  "appends SDH keyword for hearing impaired flag",
+			track: matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "Subtitles", HearingImpaired: true}},
+			want:  "Subtitles SDH",
+		},
+		{
+			name:  "leaves a clean name untouched",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "Director Commentary", Commentary: true}},
+			want:  "Director Commentary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fixedTrackName(tt.track); got != tt.want {
+				t.Errorf("fixedTrackName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaFixesDefaultFlag(t *testing.T) {
+	config.InitDefaults()
+
+	tracks := []matroska.EbmlTrack{
+		// First of two German audio tracks lacks the default flag -> should be set.
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
+		// Specialized forced subtitle wrongly marked default -> should be cleared.
+		{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Forced: true, Name: "Forced", Default: true, Number: 3}},
+	}
+
+	edits := ComputeMatroskaFixes(tracks)
+
+	first, ok := findEdit(edits, 1)
+	if !ok || first.Props["flag-default"] != "1" {
+		t.Errorf("expected track 1 to gain flag-default=1, got %+v", edits)
+	}
+
+	third, ok := findEdit(edits, 3)
+	if !ok || third.Props["flag-default"] != "0" {
+		t.Errorf("expected track 3 to lose default flag (flag-default=0), got %+v", edits)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaFixesOriginalFlag(t *testing.T) {
+	config.InitDefaults()
+
+	tracks := []matroska.EbmlTrack{
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", OriginalLanguage: true, Default: true, Number: 1}},
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+	}
+
+	edits := ComputeMatroskaFixes(tracks)
+
+	second, ok := findEdit(edits, 2)
+	if !ok || second.Props["flag-original"] != "1" {
+		t.Errorf("expected track 2 to gain flag-original=1, got %+v", edits)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxTrackOrder(t *testing.T) {
+	config.InitDefaults() // preferred language is "de"
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true}},
+	}
+
+	plan := ComputeMatroskaRemux(tracks, "")
+
+	// German (preferred) audio should sort ahead of English.
+	want := []int{0, 2, 1}
+	if !slices.Equal(plan.TrackOrder, want) {
+		t.Errorf("expected track order %v, got %v", want, plan.TrackOrder)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxCompressionAndDuplicates(t *testing.T) {
+	config.InitDefaults()
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, ContentEncodingAlgorithms: "0"}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true}},
+	}
+
+	plan := ComputeMatroskaRemux(tracks, "")
+
+	if !slices.Equal(plan.StripCompressionIDs, []int{1}) {
+		t.Errorf("expected compression strip on track 1, got %v", plan.StripCompressionIDs)
+	}
+
+	if len(plan.RemovalCandidates) != 1 || plan.RemovalCandidates[0].TrackID != 2 {
+		t.Errorf("expected track 2 flagged as duplicate, got %+v", plan.RemovalCandidates)
+	}
+}
+
+// Same-language audio bloat (several tracks of one language, e.g. a lossless
+// track plus a lossy variant) is intentionally NOT auto-removed for now; only
+// unwanted-language audio is pruned. See the limitation noted in docs/fix.md.
+//
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxKeepsSameLanguageAudio(t *testing.T) {
+	config.InitDefaults() // preferred language is "de"
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "TrueHD"}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "AC-3"}},
+	}
+
+	if got := ComputeMatroskaRemux(tracks, "").RemovalCandidates; len(got) != 0 {
+		t.Errorf("expected no removals for same-language audio, got %+v", got)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxUnwantedLanguage(t *testing.T) {
+	config.InitDefaults() // preferred language is "de"
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true}}, // preferred
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "jpn"}},                // original
+		{ID: 3, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fra"}},                // unwanted
+		{ID: 4, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "zxx"}},                // no dialogue: kept
+	}
+
+	// Without the original language, nothing is pruned (safe default).
+	if got := ComputeMatroskaRemux(tracks, "").RemovalCandidates; len(got) != 0 {
+		t.Errorf("expected no removals without original language, got %+v", got)
+	}
+
+	// With Japanese as the original language, only French is unwanted; the
+	// 'zxx' (no linguistic content) track must never be flagged for removal.
+	plan := ComputeMatroskaRemux(tracks, "jpn")
+	if len(plan.RemovalCandidates) != 1 || plan.RemovalCandidates[0].TrackID != 3 {
+		t.Errorf("expected only track 3 (fra) flagged as unwanted, got %+v", plan.RemovalCandidates)
+	}
+
+	if plan.RemovalCandidates[0].Kind != RemovalUnwantedAudioLang {
+		t.Errorf("expected unwanted audio language removal kind, got %q", plan.RemovalCandidates[0].Kind)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestReverseKeywordFlagFixes(t *testing.T) {
+	config.InitDefaults()
+
+	track := matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng", Name: "English SDH"}}
+
+	fixes := ReverseKeywordFlagFixes(track)
+	if len(fixes) != 1 || fixes[0].Property != "flag-hearing-impaired" {
+		t.Errorf("expected flag-hearing-impaired fix for 'SDH' in name, got %+v", fixes)
+	}
+
+	// When the flag is already set, there is no mismatch.
+	track.Properties.HearingImpaired = true
+	if fixes := ReverseKeywordFlagFixes(track); len(fixes) != 0 {
+		t.Errorf("expected no fixes when flag already set, got %+v", fixes)
+	}
+}

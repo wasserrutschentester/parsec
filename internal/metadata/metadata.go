@@ -357,6 +357,33 @@ func (meta *Metadata) GetReleaseName() string {
 	return meta.render(template)
 }
 
+// addNumberReplacements adds the numeric template fields (bit depth, year,
+// season and episode) to the replacements map.
+func (meta *Metadata) addNumberReplacements(replacements map[string]string) {
+	if meta.BitDepth > 8 {
+		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
+	}
+
+	// Omit the year when the season already encodes it (daily/dated series),
+	// otherwise it is redundant (see the filename_year_redundant check).
+	if meta.Year > 0 && meta.Season <= 1900 {
+		replacements["{year}"] = strconv.Itoa(meta.Year)
+	}
+
+	if meta.Season > 0 || meta.IsTV {
+		replacements["{season_raw}"] = strconv.Itoa(meta.Season)
+		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
+		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
+	}
+
+	if meta.Episode > 0 {
+		replacements["{episode_raw}"] = strconv.Itoa(meta.Episode)
+		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
+		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
+		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)
+	}
+}
+
 func (meta *Metadata) render(template string) string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
@@ -377,26 +404,7 @@ func (meta *Metadata) render(template string) string {
 		"{group}":          meta.Group,
 	}
 
-	if meta.BitDepth > 8 {
-		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
-	}
-
-	if meta.Year > 0 {
-		replacements["{year}"] = strconv.Itoa(meta.Year)
-	}
-
-	if meta.Season > 0 || meta.IsTV {
-		replacements["{season_raw}"] = strconv.Itoa(meta.Season)
-		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
-		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
-	}
-
-	if meta.Episode > 0 {
-		replacements["{episode_raw}"] = strconv.Itoa(meta.Episode)
-		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
-		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
-		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)
-	}
+	meta.addNumberReplacements(replacements)
 
 	if meta.Repack {
 		replacements["{repack}"] = "REPACK"

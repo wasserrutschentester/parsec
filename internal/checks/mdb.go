@@ -166,6 +166,7 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 		language.Make(origLang): true,
 		language.Und:            true,
 		language.Make("mul"):    true,
+		language.Make("zxx"):    true, // no linguistic content (e.g. music-only); never unwanted
 	}
 
 	unwantedLangs := []language.Tag{}
