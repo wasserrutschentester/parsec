@@ -303,7 +303,7 @@ func TestRunTrackChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks})
+			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks}, nil, nil)
 
 			hasFailure := false
 
@@ -387,7 +387,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 	}
 
-	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks})
+	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil)
 	found := false
 
 	for _, r := range res {
@@ -432,12 +432,20 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 			},
 		},
 		Attachments: []matroska.EbmlAttachment{
-			{FileName: "Arial.ttf", ContentType: "font/ttf"},
-			{FileName: "UnusedFont.ttf", ContentType: "font/ttf"},
+			{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"},
+			{ID: 2, FileName: "UnusedFont.ttf", ContentType: "font/ttf"},
 		},
 	}
 
-	res := runTrackChecks("", ebml)
+	fontMap := map[string]string{
+		"arial": "Arial",
+	}
+	attachmentNames := map[int][]string{
+		1: {"Arial"},
+		2: {"UnusedFont"},
+	}
+
+	res := runTrackChecks("", ebml, fontMap, attachmentNames)
 	found := false
 
 	for _, r := range res {
