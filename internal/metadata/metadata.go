@@ -357,6 +357,17 @@ func (meta *Metadata) GetReleaseName() string {
 	return meta.render(template)
 }
 
+// GetSeasonPackName returns a folder name for a season pack, omitting episode-specific details.
+func (meta *Metadata) GetSeasonPackName() string {
+	// Operate on a copy to avoid mutating the original metadata
+	metaCopy := *meta
+	metaCopy.Episode = 0
+	metaCopy.EpisodeTitle = ""
+	metaCopy.Date = ""
+
+	return metaCopy.GetReleaseName()
+}
+
 func (meta *Metadata) render(template string) string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,

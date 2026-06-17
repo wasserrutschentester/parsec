@@ -22,6 +22,7 @@ import (
 var (
 	errRename           = errors.New("rename failed")
 	errMediaInfoParsing = errors.New("mediainfo parsing failed")
+	seasonPackFlag      bool
 )
 
 // renameCmd represents the rename command
@@ -87,10 +88,21 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	// 8. Generate new name
 	newName := meta.GetReleaseName() + ext
-	newPath := filepath.Join(filepath.Dir(filePath), newName)
+	destDir := filepath.Dir(filePath)
 
-	if filepath.Base(filePath) == newName {
-		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' already has the correct name.", filepath.Base(filePath))))
+	if seasonPackFlag && meta.IsTV && meta.Season >= 0 {
+		seasonPackName := meta.GetSeasonPackName()
+
+		absDestDir, _ := filepath.Abs(destDir)
+		if filepath.Base(absDestDir) != seasonPackName {
+			destDir = filepath.Join(destDir, seasonPackName)
+		}
+	}
+
+	newPath := filepath.Join(destDir, newName)
+
+	if filePath == newPath {
+		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' is already has the correct name.", filepath.Base(filePath))))
 
 		return nil
 	}
@@ -100,7 +112,15 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 func renameCommit(filePath, newPath, newName string) error {
 	ui.Println()
-	ui.Println(ui.FormatStringDiffAligned("Current Heading", filepath.Base(filePath), "Proposed Vector", newName))
+
+	oldDir := filepath.Dir(filePath)
+	newDir := filepath.Dir(newPath)
+
+	if oldDir != newDir {
+		ui.Println(ui.FormatStringDiffAligned("Current Path", ui.AnonymizePath(oldDir), "Target Folder", ui.AnonymizePath(newDir)))
+	}
+
+	ui.Println(ui.FormatStringDiffAligned("Current Name", filepath.Base(filePath), "Proposed Name", newName))
 	ui.Println()
 
 	if dryRunFlag {
@@ -120,6 +140,13 @@ func renameCommit(filePath, newPath, newName string) error {
 
 			return nil
 		}
+	}
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(newDir, 0o755); err != nil {
+		ui.PrintError(fmt.Sprintf("Error creating directory %s: %v", ui.AnonymizePath(newDir), err))
+
+		return errRename
 	}
 
 	renameErr := os.Rename(filePath, newPath)
@@ -249,6 +276,7 @@ func init() {
 	// Other
 	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
 	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
+	renameCmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
 
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
