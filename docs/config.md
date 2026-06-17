@@ -175,6 +175,8 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `matroska_subtitle_format`: Verify SRT or ASS requirement for text subtitles.
 -   `matroska_subtitle_fonts`: Ensure all fonts used in SubStationAlpha subtitles are attached.
 -   `matroska_subtitle_inline_fonts`: Verify fonts used in inline tags (slow).
+-   `matroska_unused_fonts`: Identifies font attachments that are not used by any subtitle track.
+-   `matroska_font_filename_compliance`: Verify that font attachment filenames match their internal names.
 -   `matroska_ass_script_info`: Verify ASS Script Info headers.
 -   `matroska_ass_styles`: Deep validation of ASS styles.
 -   `matroska_ass_events`: Validation of ASS event lines.

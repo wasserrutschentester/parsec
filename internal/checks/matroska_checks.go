@@ -861,6 +861,53 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map
 	return nil
 }
 
+func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) *CheckResult {
+	var nonCompliant []string
+
+	for _, att := range attachments {
+		if !isFontAttachment(att) {
+			continue
+		}
+
+		names, ok := attachmentNames[att.ID]
+		if !ok || len(names) == 0 {
+			continue
+		}
+
+		// Get filename without extension
+		baseName := att.FileName
+		if idx := strings.LastIndex(baseName, "."); idx != -1 {
+			baseName = baseName[:idx]
+		}
+
+		normalizedFileName := normalizeFontName(baseName)
+		compliant := false
+
+		for _, internalName := range names {
+			if normalizeFontName(internalName) == normalizedFileName {
+				compliant = true
+
+				break
+			}
+		}
+
+		if !compliant {
+			nonCompliant = append(nonCompliant, fmt.Sprintf("%s (internal: %s)", att.FileName, strings.Join(names, ", ")))
+		}
+	}
+
+	if len(nonCompliant) > 0 {
+		return &CheckResult{
+			Identifier: "matroska_font_filename_compliance",
+			Warning:    "Font attachment filenames do not match internal font names:\n" + strings.Join(nonCompliant, "\n"),
+			Passed:     false,
+			Severity:   "info",
+		}
+	}
+
+	return nil
+}
+
 func parseFontsFromStyles(lines []string, fonts map[string]bool) {
 	inStyles := false
 	formatFields := []string{}

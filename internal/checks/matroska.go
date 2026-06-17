@@ -69,10 +69,11 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_ass_events",
 		"matroska_zlib_compression",
 		"matroska_track_order",
+		"matroska_font_filename_compliance",
 	}
 
 	for _, id := range ids {
-		if res, ok := a.aggregated[id]; ok && !res.Passed {
+		if res, ok := a.aggregated[id]; ok {
 			results = append(results, *res)
 		}
 	}
@@ -148,6 +149,10 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 
 	if config.IsCheckEnabled("matroska_unused_fonts") {
 		agg.Add(checkUnusedFonts(ebml.Attachments, attachmentNames, allUsedFonts))
+	}
+
+	if config.IsCheckEnabled("matroska_font_filename_compliance") {
+		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentNames))
 	}
 
 	return agg.ToSlice()

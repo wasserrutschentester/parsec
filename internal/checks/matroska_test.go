@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
@@ -464,5 +466,49 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 
 	if !found {
 		t.Error("Did not find unused fonts check result")
+	}
+}
+
+//nolint:paralleltest // depends on shared global state
+func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"all"})
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{},
+		Attachments: []matroska.EbmlAttachment{
+			{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"},
+			{ID: 2, FileName: "WrongName.ttf", ContentType: "font/ttf"},
+		},
+	}
+
+	attachmentNames := map[int][]string{
+		1: {"Arial"},
+		2: {"CorrectName"},
+	}
+
+	res := runTrackChecks("", ebml, nil, attachmentNames)
+	found := false
+
+	for _, r := range res {
+		if r.Identifier == "matroska_font_filename_compliance" {
+			found = true
+
+			if r.Severity != "info" {
+				t.Errorf("Expected severity to be info, got '%s'", r.Severity)
+			}
+
+			if !strings.Contains(r.Warning, "WrongName.ttf") {
+				t.Errorf("Expected warning to contain WrongName.ttf, got '%s'", r.Warning)
+			}
+
+			if strings.Contains(r.Warning, "Arial.ttf") {
+				t.Errorf("Warning should not contain Arial.ttf, got '%s'", r.Warning)
+			}
+		}
+	}
+
+	if !found {
+		t.Error("Did not find font filename compliance check result")
 	}
 }
