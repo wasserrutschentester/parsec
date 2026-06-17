@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"codeberg.org/upPollo/parsec/internal/checks"
+	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -19,6 +20,12 @@ import (
 )
 
 var jsonOutputFlag bool
+
+type seasonKey struct {
+	tvdbID int
+	tmdbID int
+	season int
+}
 
 var errCheckDataCollection = errors.New("collecting check data failed")
 
@@ -43,15 +50,22 @@ You can also pass a JSON check report file to render it.`),
 
 		expandedArgs := expandArgs(args)
 
+		seasonEpisodes := make(map[seasonKey][]int)
+		seasonMetas := make(map[seasonKey]*metadata.Metadata)
+
 		for _, filePath := range expandedArgs {
-			var currentReports []types.CheckReport
+			var (
+				currentReports []types.CheckReport
+				meta           *metadata.Metadata
+			)
 
 			isJSON, jsonReports := loadJSONReport(filePath)
 
 			if isJSON {
 				currentReports = jsonReports
+				// We might not have metadata here if loading from JSON, but for now we focus on fresh checks
 			} else {
-				report, err := collectCheckData(cmd, filePath)
+				report, m, err := collectCheckData(cmd, filePath)
 				if err != nil {
 					ui.PrintError(err.Error())
 
@@ -59,9 +73,16 @@ You can also pass a JSON check report file to render it.`),
 				}
 
 				currentReports = []types.CheckReport{report}
+				meta = m
 			}
 
 			allReports = append(allReports, currentReports...)
+
+			if meta != nil && meta.IsTV && (meta.TvdbID > 0 || meta.TmdbID > 0) && meta.Season > 0 {
+				key := seasonKey{tvdbID: meta.TvdbID, tmdbID: meta.TmdbID, season: meta.Season}
+				seasonEpisodes[key] = append(seasonEpisodes[key], meta.Episode)
+				seasonMetas[key] = meta
+			}
 
 			if !jsonOutputFlag {
 				for _, r := range currentReports {
@@ -70,12 +91,47 @@ You can also pass a JSON check report file to render it.`),
 			}
 		}
 
+		// Run aggregate season checks
+		if !jsonOutputFlag {
+			runSeasonCompletenessChecks(seasonEpisodes, seasonMetas)
+		}
+
 		if jsonOutputFlag {
 			printJSONReports(allReports)
 		}
 
 		return nil
 	},
+}
+
+func runSeasonCompletenessChecks(seasonEpisodes map[seasonKey][]int, seasonMetas map[seasonKey]*metadata.Metadata) {
+	for key, episodes := range seasonEpisodes {
+		// 1. Skip Season 0 (Specials)
+		if key.season == 0 {
+			continue
+		}
+
+		// 2. Skip if only one episode was provided
+		if len(episodes) <= 1 {
+			continue
+		}
+
+		meta := seasonMetas[key]
+		res, err := mdbSearch.InteractiveSearch(meta, true)
+
+		if err == nil && res != nil {
+			completenessResults := checks.RunSeasonCompletenessCheck(res, key.season, episodes)
+			for _, r := range completenessResults {
+				ui.Println("\n" + ui.Header.Render("AGGREGATE CHECK: SEASON COMPLETENESS"))
+
+				if !r.Passed {
+					ui.Println(ui.FormatWarning(r.Warning))
+				} else {
+					ui.Println(ui.Success.Render(fmt.Sprintf("Season %d is complete (%d episodes).", key.season, len(episodes))))
+				}
+			}
+		}
+	}
 }
 
 func loadJSONReport(filePath string) (bool, []types.CheckReport) {
@@ -127,7 +183,7 @@ func parseReports(data []byte) ([]types.CheckReport, error) {
 	return reports, nil
 }
 
-func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, error) {
+func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, *metadata.Metadata, error) {
 	filenameNoExt := filename.GetBaseName(filePath)
 
 	ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
@@ -137,7 +193,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, e
 
 	mi, err := mediainfo.Get(filePath)
 	if err != nil {
-		return types.CheckReport{}, fmt.Errorf("error getting mediainfo: %w", err)
+		return types.CheckReport{}, nil, fmt.Errorf("error getting mediainfo: %w", err)
 	}
 
 	mediaMeta := mi.GetMetadata()
@@ -166,7 +222,7 @@ func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, e
 		GeneratedName: match.GetReleaseName(),
 		Version:       Version,
 		Issues:        allIssues,
-	}, nil
+	}, match, nil
 }
 
 func appendFailed(allIssues *[]types.IssueGroup, category string, results []checks.CheckResult) {

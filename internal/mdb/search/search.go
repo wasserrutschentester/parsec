@@ -555,3 +555,46 @@ func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials
 
 	return mdb.EpisodeResult{}
 }
+
+// GetSeasonEpisodes retrieves all episodes for a specific season from TVDB or TMDB.
+func GetSeasonEpisodes(result mdb.SearchResult, season int) ([]mdb.EpisodeResult, error) {
+	if result.TvdbID > 0 {
+		if res, err := getSeasonEpisodesFromTvdb(result.TvdbID, season); err == nil {
+			return res, nil
+		}
+	}
+
+	// Fallback to TMDB
+	if result.TmdbID > 0 {
+		ui.PrintDebug(fmt.Sprintf("Fetching season episodes from TMDB: ID=%d, S%02d", result.TmdbID, season))
+
+		prefLang := config.GetPreferredLanguage()
+
+		return tmdb.GetSeasonMetadata(result.TmdbID, season, prefLang)
+	}
+
+	return nil, mdb.ErrNotFound
+}
+
+func getSeasonEpisodesFromTvdb(tvdbID, season int) ([]mdb.EpisodeResult, error) {
+	ui.PrintDebug(fmt.Sprintf("Fetching season episodes from TVDB: ID=%d, S%02d", tvdbID, season))
+
+	allEpisodes, err := tvdb.GetAllEpisodes(tvdbID, config.GetPreferredLanguage())
+	if err != nil {
+		return nil, err
+	}
+
+	var results []mdb.EpisodeResult
+
+	for _, ep := range allEpisodes {
+		if ep.SeasonNumber == season {
+			results = append(results, ep.ToEpisodeResult())
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, mdb.ErrNotFound
+	}
+
+	return results, nil
+}

@@ -325,3 +325,47 @@ func checkSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Che
 
 	return []CheckResult{res}
 }
+
+// RunSeasonCompletenessCheck checks if all episodes listed on TVDB/TMDB for a given season are present.
+func RunSeasonCompletenessCheck(result *mdb.SearchResult, season int, presentEpisodes []int) []CheckResult {
+	if result == nil || season <= 0 {
+		return nil
+	}
+
+	officialEpisodes, err := mdbSearch.GetSeasonEpisodes(*result, season)
+	if err != nil {
+		return []CheckResult{{
+			Identifier: "mdb_season_completeness_error",
+			Passed:     false,
+			Severity:   "warning",
+			Warning:    fmt.Sprintf("Could not fetch official episode list for Season %d: %v", season, err),
+		}}
+	}
+
+	presentMap := make(map[int]bool)
+	for _, e := range presentEpisodes {
+		presentMap[e] = true
+	}
+
+	var missing []int
+
+	for _, ep := range officialEpisodes {
+		if !presentMap[ep.Episode] {
+			missing = append(missing, ep.Episode)
+		}
+	}
+
+	res := CheckResult{
+		Identifier: "mdb_season_completeness",
+		Passed:     len(missing) == 0,
+		Expected:   strconv.Itoa(len(officialEpisodes)),
+		Actual:     strconv.Itoa(len(presentEpisodes)),
+	}
+
+	if !res.Passed {
+		res.Severity = "warning"
+		res.Warning = fmt.Sprintf("Season %d is incomplete. Missing episodes: %v", season, missing)
+	}
+
+	return []CheckResult{res}
+}
