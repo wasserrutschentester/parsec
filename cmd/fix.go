@@ -18,6 +18,7 @@ var fixCmd = &cobra.Command{
   1. Track flags (default and original-language)
   2. Track names (removing codecs, junk and redundant language tags)
   3. Missing language tags, multi-language names and keyword/flag mismatches (prompted)
+  4. Container metadata (junk title/writing-application) and unused font attachments (prompted)
 
 With --remux, also applies fixes that require rewriting the container: track
 order, container compression and (with confirmation) removal of duplicate or

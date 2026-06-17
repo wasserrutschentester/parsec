@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
@@ -138,6 +140,96 @@ func TestComputeMatroskaFixesOriginalFlag(t *testing.T) {
 	second, ok := findEdit(edits, 2)
 	if !ok || second.Props["flag-original"] != "1" {
 		t.Errorf("expected track 2 to gain flag-original=1, got %+v", edits)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeContainerFixes(t *testing.T) {
+	config.InitDefaults()
+
+	tests := []struct {
+		name  string
+		ebml  *matroska.EbmlMetadata
+		props map[string]string
+	}{
+		{
+			name: "junk title cleared",
+			ebml: &matroska.EbmlMetadata{Container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Title: "Movie [1080p] x265"},
+			}},
+			props: map[string]string{"title": ""},
+		},
+		{
+			name: "clean title untouched",
+			ebml: &matroska.EbmlMetadata{Container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Title: "Movie"},
+			}},
+			props: map[string]string{},
+		},
+		{
+			name: "writing application path cleared",
+			ebml: &matroska.EbmlMetadata{Container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{WritingApplication: `C:\Users\someone\tool.exe`},
+			}},
+			props: map[string]string{"writing-application": ""},
+		},
+		{
+			name: "writing application without identifiable info untouched",
+			ebml: &matroska.EbmlMetadata{Container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{WritingApplication: "mkvmerge v80.0"},
+			}},
+			props: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ComputeContainerFixes(tt.ebml)
+			if len(got) != len(tt.props) {
+				t.Fatalf("ComputeContainerFixes() = %+v, want %+v", got, tt.props)
+			}
+
+			for k, v := range tt.props {
+				if got[k] != v {
+					t.Errorf("ComputeContainerFixes()[%q] = %q, want %q", k, got[k], v)
+				}
+			}
+		})
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestUnusedFontAttachments(t *testing.T) {
+	config.InitDefaults()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"},
+		{ID: 2, FileName: "Unused.ttf", ContentType: "font/ttf"},
+		{ID: 3, FileName: "cover.jpg", ContentType: "image/jpeg"},
+	}
+	attachmentNames := map[int][]string{
+		1: {"Arial"},
+		2: {"Unused"},
+	}
+	allUsedFonts := map[string]bool{"Arial": true}
+
+	got := unusedFontAttachments(attachments, attachmentNames, allUsedFonts)
+	if len(got) != 1 || got[0].ID != 2 {
+		t.Fatalf("unusedFontAttachments() = %+v, want only attachment 2", got)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeUnusedFontAttachmentsDisabled(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("disabled_checks", []string{"matroska_unused_fonts"})
+
+	ebml := &matroska.EbmlMetadata{
+		Attachments: []matroska.EbmlAttachment{{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"}},
+	}
+
+	if got := ComputeUnusedFontAttachments("", ebml); got != nil {
+		t.Errorf("expected nil when matroska_unused_fonts is disabled, got %+v", got)
 	}
 }
 

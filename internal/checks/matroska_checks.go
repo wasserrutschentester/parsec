@@ -884,13 +884,16 @@ func isFontAttachment(att matroska.EbmlAttachment) bool {
 		strings.Contains(lowerType, "font-sfnt")
 }
 
-func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) *CheckResult {
-	var unused []string
-
+// unusedFontAttachments returns the font attachments not referenced by any
+// subtitle track. Shared by checkUnusedFonts and the fix policy in
+// fix_matroska.go so both agree on what counts as unused.
+func unusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) []matroska.EbmlAttachment {
 	normalizedUsedFonts := make(map[string]bool)
 	for f := range allUsedFonts {
 		normalizedUsedFonts[normalizeFontName(f)] = true
 	}
+
+	var unused []matroska.EbmlAttachment
 
 	for _, att := range attachments {
 		if !isFontAttachment(att) {
@@ -909,20 +912,30 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map
 		}
 
 		if !found {
-			unused = append(unused, att.FileName)
+			unused = append(unused, att)
 		}
 	}
 
-	if len(unused) > 0 {
-		return &CheckResult{
-			Identifier: "matroska_unused_fonts",
-			Warning:    "Font attachments not used by any subtitle track: " + strings.Join(unused, ", "),
-			Passed:     false,
-			Severity:   "warning",
-		}
+	return unused
+}
+
+func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) *CheckResult {
+	unused := unusedFontAttachments(attachments, attachmentNames, allUsedFonts)
+	if len(unused) == 0 {
+		return nil
 	}
 
-	return nil
+	names := make([]string, 0, len(unused))
+	for _, att := range unused {
+		names = append(names, att.FileName)
+	}
+
+	return &CheckResult{
+		Identifier: "matroska_unused_fonts",
+		Warning:    "Font attachments not used by any subtitle track: " + strings.Join(names, ", "),
+		Passed:     false,
+		Severity:   "warning",
+	}
 }
 
 func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) *CheckResult {
@@ -1233,6 +1246,36 @@ func calcScore(name string) int64 {
 	return s
 }
 
+// titleJunkPatterns flags technical/release metadata noise in the global
+// container title. Shared between checkTitleHygiene and the fix policy in
+// fix_matroska.go so both agree on what counts as junk.
+var titleJunkPatterns = []string{
+	`\[.*\]`, // Bracketed info
+	`\(.*\)`, // Parenthesized info
+	`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
+	`\bWEB-DL\b`, `\bBlu-ray\b`, `\bBD\b`,
+	`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
+}
+
+// appJunkPatterns flags identifiable information (local paths, UUIDs) leaked
+// into the WritingApplication field. Shared between checkAppHygiene and the
+// fix policy in fix_matroska.go.
+var appJunkPatterns = []string{
+	`[a-zA-Z]:\\`,            // Windows paths
+	`/(home|Users|var|tmp)/`, // Unix paths
+	`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
+}
+
+func matchesAnyPattern(value string, patterns []string) bool {
+	for _, p := range patterns {
+		if regexp.MustCompile("(?i)" + p).MatchString(value) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *CheckResult {
 	title := ebml.Container.Properties.Title
 	if title == "" {
@@ -1246,24 +1289,13 @@ func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *Ch
 		}
 	}
 
-	junkPatterns := []string{
-		`\[.*\]`, // Bracketed info
-		`\(.*\)`, // Parenthesized info
-		`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
-		`\bWEB-DL\b`, `\bBlu-ray\b`, `\bBD\b`,
-		`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
-	}
-
-	for _, p := range junkPatterns {
-		re := regexp.MustCompile("(?i)" + p)
-		if re.MatchString(title) {
-			return &CheckResult{
-				Identifier: "matroska_title_hygiene",
-				Warning:    "Global Title contains technical metadata",
-				Passed:     false,
-				Severity:   "warning",
-				Actual:     title,
-			}
+	if matchesAnyPattern(title, titleJunkPatterns) {
+		return &CheckResult{
+			Identifier: "matroska_title_hygiene",
+			Warning:    "Global Title contains technical metadata",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     title,
 		}
 	}
 
@@ -1276,22 +1308,13 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 		return nil
 	}
 
-	junkPatterns := []string{
-		`[a-zA-Z]:\\`,            // Windows paths
-		`/(home|Users|var|tmp)/`, // Unix paths
-		`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
-	}
-
-	for _, p := range junkPatterns {
-		re := regexp.MustCompile("(?i)" + p)
-		if re.MatchString(app) {
-			return &CheckResult{
-				Identifier: "matroska_app_hygiene",
-				Warning:    "Writing Application metadata contains potentially identifiable information",
-				Passed:     false,
-				Severity:   "warning",
-				Actual:     app,
-			}
+	if matchesAnyPattern(app, appJunkPatterns) {
+		return &CheckResult{
+			Identifier: "matroska_app_hygiene",
+			Warning:    "Writing Application metadata contains potentially identifiable information",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     app,
 		}
 	}
 

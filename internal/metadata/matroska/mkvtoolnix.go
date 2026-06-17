@@ -433,6 +433,79 @@ func buildPropeditArgs(filePath string, edits []TrackEdit) []string {
 	return args
 }
 
+// SetContainerProperties applies the given segment-level ("info") property
+// edits to a Matroska file in place using mkvpropedit. An empty value deletes
+// the property instead of setting it.
+func SetContainerProperties(filePath string, props map[string]string) error {
+	if len(props) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	// Some info properties (e.g. writing-application) are mandatory and reject
+	// --delete, but --set with an empty value clears them just as well, so
+	// container edits always use --set, unlike the per-track edits above.
+	args := []string{filePath, "--edit", "info"}
+
+	for _, key := range slices.Sorted(maps.Keys(props)) {
+		args = append(args, "--set", key+"="+props[key])
+	}
+
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to set container properties: %w: %s", err, output)
+	}
+
+	return nil
+}
+
+// DeleteAttachments removes the attachments with the given mkvmerge attachment
+// IDs from a Matroska file in place using mkvpropedit.
+func DeleteAttachments(filePath string, ids []int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath}
+	for _, id := range ids {
+		args = append(args, "--delete-attachment", strconv.Itoa(id))
+	}
+
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to delete attachments: %w: %s", err, output)
+	}
+
+	return nil
+}
+
 // RemuxOptions describes a lossless remux of a Matroska file via mkvmerge. All
 // track IDs are mkvmerge track IDs (the "id" field reported by mkvmerge -J).
 type RemuxOptions struct {

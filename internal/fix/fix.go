@@ -46,9 +46,132 @@ func ApplyFile(filePath string, opts Options) error {
 		return err
 	}
 
+	if err := fixContainerMetadata(filePath, opts); err != nil {
+		return err
+	}
+
 	if opts.Remux {
 		return remuxMatroska(filePath, opts)
 	}
+
+	return nil
+}
+
+// fixContainerMetadata applies the in-place, mkvpropedit-based container fixes
+// that don't touch individual tracks: clearing junk title/writing-application
+// fields and removing font attachments unused by any subtitle track. Unlike
+// the --remux fixes, these never rewrite the container, but attachment
+// removal is destructive, so it is always prompted and skipped unattended.
+func fixContainerMetadata(filePath string, opts Options) error {
+	ebml, err := matroska.GetEbmlMetadata(filePath)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("skipping container fixes for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return nil
+	}
+
+	if err := fixContainerProperties(filePath, ebml, opts); err != nil {
+		return err
+	}
+
+	return removeUnusedFonts(filePath, ebml, opts)
+}
+
+func fixContainerProperties(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
+	props := checks.ComputeContainerFixes(ebml)
+	if len(props) == 0 {
+		return nil
+	}
+
+	previewContainerProperties(ebml, props)
+
+	if opts.DryRun {
+		ui.Println(ui.Muted.Render("Dry run: no changes made."))
+
+		return nil
+	}
+
+	if !opts.Unattended && !ui.ConfirmContinue("Apply these container fixes?") {
+		ui.Println(ui.Muted.Render("Skipping container fixes..."))
+
+		return nil
+	}
+
+	if err := matroska.SetContainerProperties(filePath, props); err != nil {
+		ui.PrintError(fmt.Sprintf("Error fixing container properties for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Container metadata cleaned up.")
+
+	return nil
+}
+
+func previewContainerProperties(ebml *matroska.EbmlMetadata, props map[string]string) {
+	ui.Println(ui.ReportSection("Container Metadata"))
+
+	for _, key := range slices.Sorted(maps.Keys(props)) {
+		old := ""
+
+		switch key {
+		case "title":
+			old = ebml.Container.Properties.Title
+		case "writing-application":
+			old = ebml.Container.Properties.WritingApplication
+		}
+
+		ui.Println("  " + formatEditChange(key, props[key], nil) + " " + ui.Muted.Render("(was "+quoteOrNone(old)+")"))
+	}
+
+	ui.Println()
+}
+
+// removeUnusedFonts prompts to delete font attachments unused by any
+// subtitle track. It is skipped in dry-run, unattended, or non-interactive
+// runs since attachment removal is destructive and requires confirmation.
+func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
+	unused := checks.ComputeUnusedFontAttachments(filePath, ebml)
+	if len(unused) == 0 {
+		return nil
+	}
+
+	ui.Println(ui.ReportSection("Unused Font Attachments"))
+
+	for _, att := range unused {
+		ui.Println("  " + att.FileName)
+	}
+
+	if opts.DryRun {
+		ui.Println(ui.Muted.Render("Dry run: no changes made."))
+
+		return nil
+	}
+
+	if opts.Unattended || !ui.IsTerminal() {
+		ui.PrintWarning("Skipping unused font removal (destructive; requires confirmation).")
+
+		return nil
+	}
+
+	if !confirmPrompt("  Delete these unused font attachments?") {
+		ui.Println(ui.Muted.Render("Skipping unused font removal..."))
+
+		return nil
+	}
+
+	ids := make([]int, 0, len(unused))
+	for _, att := range unused {
+		ids = append(ids, att.ID)
+	}
+
+	if err := matroska.DeleteAttachments(filePath, ids); err != nil {
+		ui.PrintError(fmt.Sprintf("Error removing unused fonts for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Unused font attachments removed.")
 
 	return nil
 }

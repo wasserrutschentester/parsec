@@ -190,6 +190,33 @@ func runSingleIterationChecks(
 	}
 }
 
+// computeUsedFonts gathers the set of font names referenced by ASS/SSA
+// subtitle tracks, mirroring the allUsedFonts side effects that
+// checkSubtitleFonts and checkSubtitleInlineFontsWithContent produce during a
+// normal check run so fix policy stays consistent with what check reports.
+func computeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) map[string]bool {
+	allUsedFonts := make(map[string]bool)
+
+	for i := range tracks {
+		track := tracks[i]
+		if !isASSSubtitles(track) {
+			continue
+		}
+
+		if config.IsCheckEnabled("matroska_subtitle_fonts") {
+			checkSubtitleFonts(track, fontMap, allUsedFonts)
+		}
+
+		if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
+			if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
+				checkSubtitleInlineFontsWithContent(track, fontMap, content, allUsedFonts)
+			}
+		}
+	}
+
+	return allUsedFonts
+}
+
 func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
 	fontMap := make(map[string]string)
 	attachmentNames := make(map[int][]string)

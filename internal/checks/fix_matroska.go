@@ -29,6 +29,40 @@ func ComputeMatroskaFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit {
 	return builder.edits()
 }
 
+// ComputeContainerFixes returns the segment-level ("info") property edits
+// needed to satisfy the title- and writing-application-hygiene checks. A
+// matching property is cleared rather than rewritten with a guessed
+// replacement, mirroring the conservative junk-removal approach used for
+// track names. Checks that are disabled in the configuration are skipped.
+func ComputeContainerFixes(ebml *matroska.EbmlMetadata) map[string]string {
+	props := make(map[string]string)
+
+	if config.IsCheckEnabled("matroska_title_hygiene") && matchesAnyPattern(ebml.Container.Properties.Title, titleJunkPatterns) {
+		props["title"] = ""
+	}
+
+	if config.IsCheckEnabled("matroska_app_hygiene") && matchesAnyPattern(ebml.Container.Properties.WritingApplication, appJunkPatterns) {
+		props["writing-application"] = ""
+	}
+
+	return props
+}
+
+// ComputeUnusedFontAttachments returns the font attachments that satisfy the
+// matroska_unused_fonts check's removal criteria: not referenced by any
+// subtitle track's Styles or inline tags. Returns nil when the check is
+// disabled in the configuration.
+func ComputeUnusedFontAttachments(filePath string, ebml *matroska.EbmlMetadata) []matroska.EbmlAttachment {
+	if !config.IsCheckEnabled("matroska_unused_fonts") {
+		return nil
+	}
+
+	fontMap, attachmentNames := getFontMapping(filePath, ebml.Attachments)
+	allUsedFonts := computeUsedFonts(filePath, ebml.Tracks, fontMap)
+
+	return unusedFontAttachments(ebml.Attachments, attachmentNames, allUsedFonts)
+}
+
 // fixBuilder accumulates property edits per track while preserving the order in
 // which tracks are first touched, so the resulting edit list is deterministic.
 type fixBuilder struct {
