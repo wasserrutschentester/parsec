@@ -226,6 +226,70 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 	return nil
 }
 
+func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
+	if track.Type != "video" {
+		return nil
+	}
+
+	props := track.Properties
+	if props.PixelWidth == 0 || props.PixelHeight == 0 {
+		return nil
+	}
+
+	if hasAnyCropping(props) {
+		return nil
+	}
+
+	if props.DisplayWidth <= 0 || props.DisplayHeight <= 0 {
+		return nil
+	}
+
+	pixelAR := float64(props.PixelWidth) / float64(props.PixelHeight)
+	displayAR := float64(props.DisplayWidth) / float64(props.DisplayHeight)
+
+	// If display AR is wider than pixel AR, but no crop values are set,
+	// it might be a "fake" crop or black bars that should be cropped.
+	if displayAR > pixelAR+0.01 {
+		warning := fmt.Sprintf("resolution-based black bars detected but no MKV crop values set (AR %.2f vs Display AR %.2f)", pixelAR, displayAR)
+
+		return newFailedTrackResult("matroska_video_cropping", "Missing MKV Cropping", "warning", &track, warning)
+	}
+
+	return nil
+}
+
+func hasAnyCropping(props matroska.EbmlTrackProperties) bool {
+	return props.PixelCroppingLeft != 0 || props.PixelCroppingTop != 0 ||
+		props.PixelCroppingRight != 0 || props.PixelCroppingBottom != 0
+}
+
+func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
+	if track.Properties.Delay == 0 {
+		return nil
+	}
+
+	absDelay := track.Properties.Delay
+	if absDelay < 0 {
+		absDelay = -absDelay
+	}
+
+	// mkvmerge -J output packet_delay is in nanoseconds.
+	// 1001ms = 1,001,000,000 ns.
+	const maxDelayNs = 1001 * 1000 * 1000
+
+	if strings.Contains(strings.ToUpper(track.Codec), "A_TRUEHD") {
+		return nil
+	}
+
+	if absDelay > maxDelayNs {
+		warning := fmt.Sprintf("delay of %dms exceeds ±1001ms", track.Properties.Delay/1000000)
+
+		return newFailedTrackResult("matroska_track_delay", "Excessive Container Delay", "warning", &track, warning)
+	}
+
+	return nil
+}
+
 func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
 	switch track.Type {
 	case "audio":
@@ -1161,4 +1225,69 @@ func calcScore(name string) int64 {
 	}
 
 	return s
+}
+
+func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *CheckResult {
+	title := ebml.Container.Properties.Title
+	if title == "" {
+		return nil
+	}
+
+	officialTitle := meta.Title
+	if officialTitle != "" {
+		if normalizeForComparison(title) == normalizeForComparison(officialTitle) {
+			return nil
+		}
+	}
+
+	junkPatterns := []string{
+		`\[.*\]`, // Bracketed info
+		`\(.*\)`, // Parenthesized info
+		`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
+		`\bWEB-DL\b`, `\bBlu-ray\b`, `\bBD\b`,
+		`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
+	}
+
+	for _, p := range junkPatterns {
+		re := regexp.MustCompile("(?i)" + p)
+		if re.MatchString(title) {
+			return &CheckResult{
+				Identifier: "matroska_title_hygiene",
+				Warning:    "Global Title contains technical metadata",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     title,
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
+	app := ebml.Container.Properties.WritingApplication
+	if app == "" {
+		return nil
+	}
+
+	junkPatterns := []string{
+		`[a-zA-Z]:\\`,            // Windows paths
+		`/(home|Users|var|tmp)/`, // Unix paths
+		`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
+	}
+
+	for _, p := range junkPatterns {
+		re := regexp.MustCompile("(?i)" + p)
+		if re.MatchString(app) {
+			return &CheckResult{
+				Identifier: "matroska_app_hygiene",
+				Warning:    "Writing Application metadata contains potentially identifiable information",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     app,
+			}
+		}
+	}
+
+	return nil
 }

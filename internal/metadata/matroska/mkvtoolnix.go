@@ -26,9 +26,21 @@ var errNotMatroska = errors.New("file is not a Matroska file")
 // EbmlMetadata represents the JSON output from mkvmerge -J.
 type EbmlMetadata struct {
 	Attachments []EbmlAttachment `json:"attachments,omitempty"`
+	Container   EbmlContainer    `json:"container,omitzero"`
 	Errors      []string         `json:"errors,omitempty"`
 	FileName    string           `json:"file_name,omitempty"`
 	Tracks      []EbmlTrack      `json:"tracks,omitempty"`
+}
+
+// EbmlContainer represents the global container properties.
+type EbmlContainer struct {
+	Properties EbmlContainerProperties `json:"properties,omitzero"`
+}
+
+// EbmlContainerProperties contains global properties of a Matroska container.
+type EbmlContainerProperties struct {
+	Title              string `json:"title,omitempty"`
+	WritingApplication string `json:"writing_application,omitempty"`
 }
 
 // EbmlTrack represents a single track in a Matroska container.
@@ -63,6 +75,11 @@ type EbmlTrackProperties struct {
 	PixelHeight               int    `json:"pixel_height,omitempty"`
 	DisplayWidth              int    `json:"display_width,omitempty"`
 	DisplayHeight             int    `json:"display_height,omitempty"`
+	PixelCroppingLeft         int    `json:"pixel_cropping_left,omitempty"`
+	PixelCroppingTop          int    `json:"pixel_cropping_top,omitempty"`
+	PixelCroppingRight        int    `json:"pixel_cropping_right,omitempty"`
+	PixelCroppingBottom       int    `json:"pixel_cropping_bottom,omitempty"`
+	Delay                     int64  `json:"packet_delay,omitempty"`
 }
 
 // DecodeCodecPrivate decodes the base16/hex encoded CodecPrivate string.

@@ -105,6 +105,10 @@ This document lists all individual checks performed by the `parsec check` comman
 | ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | Yes | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
 | ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | Yes | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. |
 | Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
+| Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
+| Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
+| Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
+| Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
 
 ### Media Database (MDB) Consistency Checks
 

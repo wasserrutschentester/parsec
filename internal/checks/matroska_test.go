@@ -7,12 +7,21 @@ import (
 	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
 //nolint:funlen,paralleltest // comprehensive test cases for diverse matroska track configurations; depends on shared global state
 func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
+	viper.Set("disabled_checks", []string{
+		"matroska_subtitle_inline_fonts",
+		"matroska_ass_events",
+		"matroska_video_cropping",
+		"matroska_title_hygiene",
+		"matroska_app_hygiene",
+		"matroska_track_delay",
+	})
 
 	tests := []struct {
 		name    string
@@ -305,7 +314,7 @@ func TestRunTrackChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks}, nil, nil)
+			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks}, nil, nil, nil)
 
 			hasFailure := false
 
@@ -389,7 +398,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 	}
 
-	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil)
+	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil, nil)
 	found := false
 
 	for _, r := range res {
@@ -447,7 +456,7 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 		2: {"UnusedFont"},
 	}
 
-	res := runTrackChecks("", ebml, fontMap, attachmentNames)
+	res := runTrackChecks("", ebml, fontMap, attachmentNames, nil)
 	found := false
 
 	for _, r := range res {
@@ -487,7 +496,7 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 		2: {"CorrectName"},
 	}
 
-	res := runTrackChecks("", ebml, nil, attachmentNames)
+	res := runTrackChecks("", ebml, nil, attachmentNames, nil)
 	found := false
 
 	for _, r := range res {
@@ -511,4 +520,154 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 	if !found {
 		t.Error("Did not find font filename compliance check result")
 	}
+}
+
+func runHygieneTest(t *testing.T, name string, ebml *matroska.EbmlMetadata, meta *metadata.Metadata, identifier string, wantErr bool) {
+	t.Helper()
+
+	t.Run(name, func(t *testing.T) {
+		res := runTrackChecks("", ebml, nil, nil, meta)
+		found := false
+
+		for _, r := range res {
+			if r.Identifier == identifier {
+				found = true
+
+				if !r.Passed != wantErr {
+					t.Errorf("check %s failed, got %v, want error %v", identifier, !r.Passed, wantErr)
+				}
+			}
+		}
+
+		if !found && wantErr {
+			t.Errorf("check %s not found but wanted error", identifier)
+		}
+	})
+}
+
+//nolint:paralleltest // depends on shared global state
+func TestRunTrackChecksContainerHygiene(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"matroska_title_hygiene", "matroska_app_hygiene"})
+
+	tests := []struct {
+		name       string
+		ebml       *matroska.EbmlMetadata
+		meta       *metadata.Metadata
+		identifier string
+		wantErr    bool
+	}{
+		{
+			name: "Clean title",
+			ebml: &matroska.EbmlMetadata{
+				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{Title: "Frieren"}},
+			},
+			meta:       &metadata.Metadata{Title: "Frieren"},
+			identifier: "matroska_title_hygiene",
+			wantErr:    false,
+		},
+		{
+			name: "Dirty title with technical info",
+			ebml: &matroska.EbmlMetadata{
+				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{Title: "Frieren [1080p]"}},
+			},
+			meta:       &metadata.Metadata{Title: "Frieren"},
+			identifier: "matroska_title_hygiene",
+			wantErr:    true,
+		},
+		{
+			name: "Clean WritingApplication",
+			ebml: &matroska.EbmlMetadata{
+				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{WritingApplication: "mkvmerge v85.0"}},
+			},
+			identifier: "matroska_app_hygiene",
+			wantErr:    false,
+		},
+		{
+			name: "Dirty WritingApplication with path",
+			ebml: &matroska.EbmlMetadata{
+				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{WritingApplication: "mkvmerge /home/user/test.mkv"}},
+			},
+			identifier: "matroska_app_hygiene",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		runHygieneTest(t, tt.name, tt.ebml, tt.meta, tt.identifier, tt.wantErr)
+	}
+}
+
+//nolint:paralleltest,funlen // depends on shared global state; comprehensive metrics tests
+func TestRunTrackChecksTrackMetrics(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"matroska_track_delay", "matroska_video_cropping"})
+
+	t.Run("Track Delays", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			ebml       *matroska.EbmlMetadata
+			identifier string
+			wantErr    bool
+		}{
+			{
+				name: "Track with reasonable delay",
+				ebml: &matroska.EbmlMetadata{
+					Tracks: []matroska.EbmlTrack{
+						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Delay: 5000000, Language: "ger", Number: 1}},
+					},
+				},
+				identifier: "matroska_track_delay",
+				wantErr:    false,
+			},
+			{
+				name: "Track with excessive delay",
+				ebml: &matroska.EbmlMetadata{
+					Tracks: []matroska.EbmlTrack{
+						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Delay: 2000000000, Language: "ger", Number: 1}},
+					},
+				},
+				identifier: "matroska_track_delay",
+				wantErr:    true,
+			},
+		}
+
+		for _, tt := range tests {
+			runHygieneTest(t, tt.name, tt.ebml, nil, tt.identifier, tt.wantErr)
+		}
+	})
+
+	t.Run("Video Cropping", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			ebml       *matroska.EbmlMetadata
+			identifier string
+			wantErr    bool
+		}{
+			{
+				name: "Video with proper cropping",
+				ebml: &matroska.EbmlMetadata{
+					Tracks: []matroska.EbmlTrack{
+						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080, PixelCroppingTop: 140, PixelCroppingBottom: 140}},
+					},
+				},
+				identifier: "matroska_video_cropping",
+				wantErr:    false,
+			},
+			{
+				name: "Video with resolution-based black bars but no MKV crop",
+				ebml: &matroska.EbmlMetadata{
+					Tracks: []matroska.EbmlTrack{
+						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080, DisplayWidth: 1920, DisplayHeight: 800}},
+					},
+				},
+				identifier: "matroska_video_cropping",
+				wantErr:    true,
+			},
+		}
+
+		for _, tt := range tests {
+			runHygieneTest(t, tt.name, tt.ebml, nil, tt.identifier, tt.wantErr)
+		}
+	})
 }
