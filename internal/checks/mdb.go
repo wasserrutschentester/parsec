@@ -275,7 +275,7 @@ func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 		res.Actual = meta.EpisodeTitle
 		normParsed := normalizeForComparison(filename.DeobfuscateTitle(meta.EpisodeTitle))
 
-		normOfficial := normalizeForComparison(filename.ApplyTitleCleanRegex(epResult.Name))
+		normOfficial := normalizeForComparison(filename.ApplyTitleReplacements(epResult.Name))
 		if normParsed != normOfficial {
 			res.Passed = false
 			res.Severity = "warning"
@@ -296,7 +296,7 @@ func checkTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 		res.Actual = meta.Title
 		normParsed := normalizeForComparison(filename.DeobfuscateTitle(meta.Title))
 
-		normOfficial := normalizeForComparison(filename.ApplyTitleCleanRegex(result.Title))
+		normOfficial := normalizeForComparison(filename.ApplyTitleReplacements(result.Title))
 		if normParsed != normOfficial {
 			res.Passed = false
 			res.Severity = "warning"

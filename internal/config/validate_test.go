@@ -55,6 +55,10 @@ is_tv = "yes"
 tmdb_id = "abc"
 template = "{year}{bad_token}"
 enabled_checks = ["mediainfo_bitrate", "unknown_identifier"]
+
+[[replacements.input]]
+pattern = "[invalid_regex("
+replacement = ""
 `
 
 		var configMap map[string]any
@@ -71,12 +75,13 @@ enabled_checks = ["mediainfo_bitrate", "unknown_identifier"]
 
 			"Unknown configuration key: 'unknown_key'": true,
 
-			"Invalid type for 'api_keys.tmdb': expected string, got int64":                true,
-			"Unknown configuration key: 'api_keys.unknown_api'":                           true,
-			"Invalid type for 'preset.bad.is_tv': expected bool, got string":              true,
-			"Invalid type for 'preset.bad.tmdb_id': expected int64, got string":           true,
-			"Invalid template key in 'preset.bad.template': {bad_token}":                  true,
-			"Invalid check identifier in 'preset.bad.enabled_checks': unknown_identifier": true,
+			"Invalid type for 'api_keys.tmdb': expected string, got int64":                                                 true,
+			"Unknown configuration key: 'api_keys.unknown_api'":                                                            true,
+			"Invalid type for 'preset.bad.is_tv': expected bool, got string":                                               true,
+			"Invalid type for 'preset.bad.tmdb_id': expected int64, got string":                                            true,
+			"Invalid template key in 'preset.bad.template': {bad_token}":                                                   true,
+			"Invalid check identifier in 'preset.bad.enabled_checks': unknown_identifier":                                  true,
+			"Invalid regex pattern in 'replacements.input[0]': error parsing regexp: missing closing ]: `[invalid_regex(`": true,
 		}
 
 		for _, err := range errors {

@@ -25,6 +25,17 @@ func InitDefaults() {
 	viper.SetDefault("disable_update_check", false)
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("word_separator", ".")
+	viper.SetDefault("normalize_diacritics", true)
+	viper.SetDefault("replacements.title", []map[string]any{
+		{
+			"pattern":     `(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))`,
+			"replacement": "",
+		},
+		{
+			"pattern":     `&`,
+			"replacement": "und",
+		},
+	})
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
 	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events"})
@@ -203,9 +214,47 @@ func GetVideoCodecHEVC() string {
 	return getString("video_codec_hevc")
 }
 
+// Replacement represents a regex pattern and its replacement string.
+type Replacement struct {
+	Pattern     string `mapstructure:"pattern" toml:"pattern"`
+	Replacement string `mapstructure:"replacement" toml:"replacement"`
+}
+
+// GetInputReplacements returns the input filename regex replacements.
+func GetInputReplacements() []Replacement {
+	var replacements []Replacement
+
+	_ = viper.UnmarshalKey(getPresetKey("replacements.input"), &replacements)
+
+	return replacements
+}
+
+// GetOutputReplacements returns the output filename regex replacements.
+func GetOutputReplacements() []Replacement {
+	var replacements []Replacement
+
+	_ = viper.UnmarshalKey(getPresetKey("replacements.output"), &replacements)
+
+	return replacements
+}
+
+// GetTitleReplacements returns the title cleaning regex replacements.
+func GetTitleReplacements() []Replacement {
+	var replacements []Replacement
+
+	_ = viper.UnmarshalKey(getPresetKey("replacements.title"), &replacements)
+
+	return replacements
+}
+
 // GetDisableUpdateCheck returns true if background update checks are disabled.
 func GetDisableUpdateCheck() bool {
 	return getBool("disable_update_check")
+}
+
+// GetNormalizeDiacritics returns true if diacritics should be normalized.
+func GetNormalizeDiacritics() bool {
+	return getBool("normalize_diacritics")
 }
 
 // IsCheckEnabled returns true if the given check is enabled in the configuration.

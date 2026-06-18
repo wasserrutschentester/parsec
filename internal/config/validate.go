@@ -75,6 +75,7 @@ var expectedTypes = map[string]string{
 	"video_codec_avc":       "string",
 	"video_codec_hevc":      "string",
 	"word_separator":        "string",
+	"normalize_diacritics":  "bool",
 	"title":                 "string",
 	"year":                  "int64",
 	"season":                "int64",
@@ -273,20 +274,68 @@ func validateStructuralSections(k string, v any, prefix, fullKey string) ([]stri
 			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
 		}
 	case "preset":
-		if subMap, ok := v.(map[string]any); ok {
-			var errors []string
-
-			for presetName, presetContent := range subMap {
-				if pcMap, ok := presetContent.(map[string]any); ok {
-					errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
-				}
-			}
-
-			return errors, true
-		}
+		return validatePresetConfig(v), true
+	case "replacements":
+		return validateReplacementsConfig(v, fullKey), true
 	}
 
 	return nil, false
+}
+
+func validatePresetConfig(v any) []string {
+	var errors []string
+
+	subMap, ok := v.(map[string]any)
+	if !ok {
+		return errors
+	}
+
+	for presetName, presetContent := range subMap {
+		if pcMap, ok := presetContent.(map[string]any); ok {
+			errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
+		}
+	}
+
+	return errors
+}
+
+func validateReplacementsConfig(v any, fullKey string) []string {
+	var errors []string
+
+	subMap, ok := v.(map[string]any)
+	if !ok {
+		return errors
+	}
+
+	for category, rulesAny := range subMap {
+		rulesArray, ok := rulesAny.([]any)
+		if !ok {
+			continue
+		}
+
+		for i, ruleAny := range rulesArray {
+			ruleMap, ok := ruleAny.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			patternAny, ok := ruleMap["pattern"]
+			if !ok {
+				continue
+			}
+
+			pattern, ok := patternAny.(string)
+			if !ok {
+				continue
+			}
+
+			if _, err := regexp.Compile(pattern); err != nil {
+				errors = append(errors, fmt.Sprintf("Invalid regex pattern in '%s.%s[%d]': %v", fullKey, category, i, err))
+			}
+		}
+	}
+
+	return errors
 }
 
 func validateSpecificKeys(k string, v any, fullKey string) []string {

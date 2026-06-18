@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
@@ -26,6 +27,38 @@ func compareMetadata(got, want metadata.Metadata) string {
 	}
 
 	return strings.Join(diffs, "\n")
+}
+
+func TestApplyReplacements(t *testing.T) {
+	t.Parallel()
+
+	rules := []config.Replacement{
+		{Pattern: `(?i)(\d{4})_(\d{2})`, Replacement: "$1-$2"},
+		{Pattern: "_", Replacement: "."},
+		{Pattern: `(?i)web-rip`, Replacement: "WEBRip"},
+		{Pattern: `\[invalid_regex(`, Replacement: "should not crash"}, // invalid regex
+	}
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"my_file_name_is_cool", "my.file.name.is.cool"},
+		{"movie.2023.web-rip", "movie.2023.WEBRip"},
+		{"show.2023_01_02", "show.2023-01.02"},
+		{"nothing to change", "nothing to change"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := ApplyReplacements(tt.input, rules)
+			if got != tt.expected {
+				t.Errorf("ApplyReplacements(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
 }
 
 func runTableTest[T any](t *testing.T, tests []struct {
@@ -561,8 +594,9 @@ func TestDeobfuscateTitle(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // mutates global state via config.InitDefaults()
 func TestNormalizeTitle(t *testing.T) {
-	t.Parallel()
+	config.InitDefaults()
 
 	tests := []struct {
 		input    string
@@ -571,9 +605,6 @@ func TestNormalizeTitle(t *testing.T) {
 		{"München", "Muenchen"},
 		{"Blöde Bühnendüsen", "Bloede Buehnenduesen"},
 		{"Film & Dokumentation", "Film und Dokumentation"},
-		{"Das.Traumschiff.(S01_E01)", "Das.Traumschiff"},
-		{"Bam.Fernsehfilm.Deutschland.2023", "Bam 2023"},
-		{"FooMärchenfilm.Österreich.1990", "Foo.1990"},
 		{"Test...Sequence.-..Fix", "Test Sequence Fix"},
 		{"Café.Smørebrød", "Cafe.Smoerebroed"},
 		{"Title with (parentheses) and \"quotes\"", "Title with parentheses and quotes"},

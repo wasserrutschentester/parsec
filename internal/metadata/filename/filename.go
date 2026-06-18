@@ -23,23 +23,46 @@ func GetBaseName(filePath string) string {
 	return name
 }
 
-// ApplyTitleCleanRegex applies the title cleaning regex from the configuration.
-func ApplyTitleCleanRegex(title string) string {
-	regexStr := config.GetTitleCleaningRegex()
-	if regexStr == "" {
-		return title
+// ApplyReplacements applies a slice of regex replacement rules to the input string.
+func ApplyReplacements(input string, rules []config.Replacement) string {
+	result := input
+
+	for _, rule := range rules {
+		if rule.Pattern == "" {
+			continue
+		}
+
+		re, err := regexp.Compile(rule.Pattern)
+		if err != nil {
+			ui.PrintDebug(fmt.Sprintf("Invalid regex pattern in replacements: %s", err))
+
+			continue
+		}
+
+		result = re.ReplaceAllString(result, rule.Replacement)
 	}
 
-	re, err := regexp.Compile(regexStr)
-	if err != nil {
-		return title
+	return result
+}
+
+// ApplyTitleReplacements applies the title cleaning regex replacements from the configuration.
+func ApplyTitleReplacements(title string) string {
+	rules := config.GetTitleReplacements()
+
+	// For backwards compatibility, if GetTitleCleaningRegex() is set, use it as a rule
+	oldRegex := config.GetTitleCleaningRegex()
+	if oldRegex != "" {
+		rules = append([]config.Replacement{{Pattern: oldRegex, Replacement: ""}}, rules...)
 	}
 
-	return strings.TrimSpace(re.ReplaceAllString(title, ""))
+	return strings.TrimSpace(ApplyReplacements(title, rules))
 }
 
 // Parse parses a filename to extract metadata.
 func Parse(filename string) *metadata.Metadata {
+	// 0. Apply input replacements
+	filename = ApplyReplacements(filename, config.GetInputReplacements())
+
 	meta := &metadata.Metadata{}
 
 	// match Title, Year, SeasonID, EpisodeID, and EpisodeTitle if available
@@ -366,22 +389,12 @@ func isEnglishUmlautException(lowerUmlaut, suffix string) bool {
 // NormalizeTitle normalizes a title for use in filenames.
 func NormalizeTitle(title string) string {
 	// 0. Apply custom cleaning regex from config
-	title = ApplyTitleCleanRegex(title)
+	title = ApplyTitleReplacements(title)
 
-	// replace umlauts and similar characters
-	title = RemoveDiacritics(title)
-
-	// replace ampersand
-	title = strings.ReplaceAll(title, "&", "und")
-
-	// remove extra (S0x_E0x) info from title
-	reExtra := regexp.MustCompile(`\(S[0-9]+[_]E[0-9]+\)`)
-	title = reExtra.ReplaceAllString(title, "")
-
-	// remove extra description
-	originExp := `(Fernseh|Dokumentar|Spiel|Kurz|Animations|Maerchen|Märchen)film.*(Deutschland|Oesterreich|Österreich|Schweiz|DDR)`
-	reOrigin := regexp.MustCompile(originExp)
-	title = reOrigin.ReplaceAllString(title, "")
+	// replace umlauts and similar characters if enabled
+	if config.GetNormalizeDiacritics() {
+		title = RemoveDiacritics(title)
+	}
 
 	// remove unnecessary characters: [(),?!"_|\:] and '
 	reUnwanted := regexp.MustCompile(`[(),?!"_|'\:]`)

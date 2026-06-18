@@ -87,7 +87,10 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	meta.SetDefaults()
 
 	// 8. Generate new name
-	newName := meta.GetReleaseName() + ext
+	newNameBase := meta.GetReleaseName()
+	newNameBase = filename.ApplyReplacements(newNameBase, config.GetOutputReplacements())
+	newName := newNameBase + ext
+
 	destDir := filepath.Dir(filePath)
 
 	if seasonPackFlag && meta.IsTV && meta.Season >= 0 {

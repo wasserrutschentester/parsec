@@ -34,10 +34,34 @@ video_codec_hevc = "H.265"
 # Character used to replace spaces in titles, episode titles, and codecs.
 word_separator = "."
 
-# Custom regular expression to clean titles before normalization.
-# It will remove any matches of this regex from the Title and Episode Title.
-# e.g. '(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))' to remove anything after | and Part indicators.
-title_cleaning_regex = ""
+# Replace diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss)
+normalize_diacritics = true
+
+# Custom regex replacements applied to the Title and Episode Title before normalization.
+# Replaces `title_cleaning_regex`.
+[[replacements.title]]
+pattern = '(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))'
+replacement = ''
+
+[[replacements.title]]
+pattern = '&'
+replacement = 'und'
+
+[[replacements.input]]
+pattern = '(?i)(Fernseh|Dokumentar|Spiel|Kurz|Animations|Maerchen|Märchen)film.*(Deutschland|Oesterreich|Österreich|Schweiz|DDR)'
+replacement = ''
+
+# Regex replacements applied to the raw filename before parsing.
+# They are processed in the order they appear.
+[[replacements.input]]
+pattern = '(?i)(Fernseh|Dokumentar|Spiel|Kurz|Animations|Maerchen|Märchen)film.*(Deutschland|Oesterreich|Österreich|Schweiz|DDR)'
+replacement = ''
+
+
+# Regex replacements applied to the final generated filename string.
+# [[replacements.output]]
+# pattern = 'BluRay'
+# replacement = 'Blu-Ray'
 
 # Api keys for Media Databases (required for most features)
 [api_keys]

@@ -19,6 +19,7 @@ You can provide one or more files or directories to be processed. Directories wi
 -   **External Metadata**: Fetches "official" titles and episode names from TMDB, TVDB, and IMDb.
 -   **Interactive Preview**: Shows a comparison between the current and proposed filename before applying changes.
 -   **Metadata Overrides**: Manually specify details using flags to correct misparsed information.
+-   **Regex Replacements**: Define custom input, title, and output regex replacements to handle edge cases and enforce precise naming formats. See [Regex Replacements Documentation](replacements.md) for details.
 -   **Normalization**: Automatically normalizes titles and service names according to common standards.
 
 ## Flags
