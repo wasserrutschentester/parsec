@@ -228,7 +228,7 @@ func collectMismatches(tagImdb, resImdb string, tagTmdb, resTmdb, tagTvdb, resTv
 func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
 	var episodeResult mdb.EpisodeResult
 
-	if meta.Season > 0 && meta.Episode > 0 || meta.EpisodeTitle != "" || meta.Date != "" {
+	if (meta.Season >= 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
 		ui.Println(ui.Info.Render("Identifying episode..."))
 
 		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
@@ -240,7 +240,7 @@ func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.Epi
 		meta.Season = episodeResult.Season
 		meta.Episode = episodeResult.Episode
 		meta.EpisodeTitle = episodeResult.Name
-	} else if meta.Season > 0 || meta.Episode > 0 || meta.EpisodeTitle != "" || meta.Date != "" {
+	} else if (meta.Season >= 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
 		ui.Println(ui.FormatWarning("Could not identify episode metadata"))
 	}
 

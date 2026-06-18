@@ -126,3 +126,50 @@ func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 		t.Errorf("Expected TvdbID 100 (Special), got %d", result2.TvdbID)
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestIdentifyEpisodeSeason0(t *testing.T) {
+	config.InitDefaults()
+
+	config.NoCache = true
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [
+				{"id": 100, "number": 1, "seasonNumber": 0, "aired": "2023-01-01", "name": "Special Episode 1"}
+			]}, "links": {"next": ""}}`))
+		case "/episodes/100/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Special Episode 1", "overview": "Special Overview"}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	// Test Case: Explicit Season 0, Episode 1.
+	// allowSpecials is false, but it SHOULD work because it's an explicit match.
+	meta := &metadata.Metadata{
+		Season:  0,
+		Episode: 1,
+		IsTV:    true,
+	}
+
+	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	if err != nil {
+		t.Fatalf("IdentifyEpisode failed: %v", err)
+	}
+
+	if result.TvdbID != 100 {
+		t.Errorf("Expected TvdbID 100, got %d", result.TvdbID)
+	}
+}

@@ -236,7 +236,7 @@ func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainf
 
 func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
 	var episodeResult mdb.EpisodeResult
-	if (meta.Season > 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
+	if (meta.Season >= 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
 		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
 	}
 
