@@ -31,6 +31,9 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode
 video_codec_avc = "H.264"
 video_codec_hevc = "H.265"
 
+# Character used to replace spaces in titles, episode titles, and codecs.
+word_separator = "."
+
 # Custom regular expression to clean titles before normalization.
 # It will remove any matches of this regex from the Title and Episode Title.
 # e.g. '(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))' to remove anything after | and Part indicators.
@@ -121,4 +124,5 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resol
 # ------------------------------------------------------------------------------
 [preset.anime]
 is_tv = true
+word_separator = ""
 template = "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]"

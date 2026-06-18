@@ -74,6 +74,7 @@ var expectedTypes = map[string]string{
 	"template":              "string",
 	"video_codec_avc":       "string",
 	"video_codec_hevc":      "string",
+	"word_separator":        "string",
 	"title":                 "string",
 	"year":                  "int64",
 	"season":                "int64",

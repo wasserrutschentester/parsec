@@ -374,9 +374,6 @@ func NormalizeTitle(title string) string {
 	// replace ampersand
 	title = strings.ReplaceAll(title, "&", "und")
 
-	// replace spaces with dots
-	title = strings.ReplaceAll(title, " ", ".")
-
 	// remove extra (S0x_E0x) info from title
 	reExtra := regexp.MustCompile(`\(S[0-9]+[_]E[0-9]+\)`)
 	title = reExtra.ReplaceAllString(title, "")
@@ -390,15 +387,19 @@ func NormalizeTitle(title string) string {
 	reUnwanted := regexp.MustCompile(`[(),?!"_|'\:]`)
 	title = reUnwanted.ReplaceAllString(title, "")
 
-	// remove .-. or .. like stuff
-	reSequences := regexp.MustCompile(`\.(-|–|·)?\.+`)
-	title = reSequences.ReplaceAllString(title, ".")
+	// remove .-. or .. like stuff (including spaces)
+	reSequences := regexp.MustCompile(`[\. ](-|–|·)?[\. ]+`)
+	title = reSequences.ReplaceAllString(title, " ")
 
-	// remove all remaining unwanted characters
-	reRemaining := regexp.MustCompile(`[^a-zA-Z0-9\-\.]`)
+	// remove all remaining unwanted characters (preserving spaces)
+	reRemaining := regexp.MustCompile(`[^a-zA-Z0-9\-\. ]`)
 	title = reRemaining.ReplaceAllString(title, "")
 
-	return strings.Trim(title, ".")
+	// collapse multiple spaces
+	reSpaces := regexp.MustCompile(`\s+`)
+	title = reSpaces.ReplaceAllString(title, " ")
+
+	return strings.Trim(title, ". ")
 }
 
 // RemoveDiacritics replaces diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss).

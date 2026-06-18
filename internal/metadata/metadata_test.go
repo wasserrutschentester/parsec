@@ -3,6 +3,8 @@ package metadata
 import (
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 )
 
@@ -97,12 +99,12 @@ func TestAudioCodecName(t *testing.T) {
 		{"AC-3", "", "Dep", "DDP"},
 		{"E-AC-3", "", "", "DDP"},
 		{"MLP FBA", "", "", "TrueHD"},
-		{"DTS", "MA", "", "DTS-HD.MA"},
-		{"DTS", "XLL", "", "DTS-HD.MA"},
-		{"DTS", "MA / XLL", "", "DTS-HD.MA"},
-		{"DTS", "HRA", "", "DTS-HD.HRA"},
-		{"DTS", "XBR", "", "DTS-HD.HRA"},
-		{"DTS", "XXCH", "", "DTS-HD.HRA"},
+		{"DTS", "MA", "", "DTS-HD MA"},
+		{"DTS", "XLL", "", "DTS-HD MA"},
+		{"DTS", "MA / XLL", "", "DTS-HD MA"},
+		{"DTS", "HRA", "", "DTS-HD HRA"},
+		{"DTS", "XBR", "", "DTS-HD HRA"},
+		{"DTS", "XXCH", "", "DTS-HD HRA"},
 		{"DTS", "XLL X", "", "DTS-X"},
 		{"DTS", "XLL", "X", "DTS-X"},
 		{"DTS", "ES", "", "DTS-ES"},
@@ -311,7 +313,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Group:         "PAARSEX",
 				IsTV:          true,
 			},
-			want: "The Mandalorian.2019.S01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-PAARSEX",
+			want: "The.Mandalorian.2019.S01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-PAARSEX",
 		},
 		{
 			name: "Season 0 Special",
@@ -326,7 +328,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Group:        "PAARSEX",
 				IsTV:         true,
 			},
-			want: "The Mandalorian.2019.S00.1080p-PAARSEX",
+			want: "The.Mandalorian.2019.S00.1080p-PAARSEX",
 		},
 	}
 	for _, tt := range tests {
@@ -380,10 +382,17 @@ func TestMetadata_Override(t *testing.T) {
 	}
 }
 
+//nolint:funlen,paralleltest // depends on shared global state (viper config); comprehensive test cases
 func TestAnimeRendering(t *testing.T) {
-	t.Parallel()
-
+	// Not running in parallel since we mutate global state
 	config.InitDefaults()
+
+	originalWordSeparator := viper.GetString("word_separator")
+
+	viper.Set("word_separator", " ")
+	t.Cleanup(func() {
+		viper.Set("word_separator", originalWordSeparator)
+	})
 
 	tests := []struct {
 		name     string
@@ -447,10 +456,7 @@ func TestAnimeRendering(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			if got := tt.meta.render(tt.template); got != tt.want {
 				t.Errorf("Metadata.render() = %v, want %v", got, tt.want)
 			}

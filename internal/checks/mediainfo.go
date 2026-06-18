@@ -85,7 +85,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 			isLosslessOrHRA := false
 
 			switch codec {
-			case "TrueHD", "DTS-HD.MA", "DTS-HD.HRA":
+			case "TrueHD", "DTS-HD MA", "DTS-HD HRA":
 				isLosslessOrHRA = true
 			}
 

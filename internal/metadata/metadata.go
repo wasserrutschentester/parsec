@@ -151,11 +151,11 @@ func detectDTS(uProfile, uFeatures string) string {
 	}
 
 	if isXLL || strings.Contains(combined, "MA") {
-		return "DTS-HD.MA"
+		return "DTS-HD MA"
 	}
 
 	if strings.Contains(combined, "XBR") || strings.Contains(combined, "XXCH") || strings.Contains(combined, "HRA") {
-		return "DTS-HD.HRA"
+		return "DTS-HD HRA"
 	}
 
 	if strings.Contains(combined, "ES") {
@@ -378,9 +378,17 @@ func (meta *Metadata) render(template string) string {
 		result = strings.ReplaceAll(result, tag, val)
 	}
 
-	return cleanName(result)
+	finalName := cleanName(result)
+	sep := config.GetWordSeparator()
+
+	if sep != " " {
+		finalName = strings.ReplaceAll(finalName, " ", sep)
+	}
+
+	return finalName
 }
 
+//nolint:cyclop // mapping logic is straightforward despite the number of conditions
 func (meta *Metadata) getReplacements() map[string]string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,

@@ -24,6 +24,7 @@ func InitDefaults() {
 	viper.SetDefault("video_codec_hevc", "H.265")
 	viper.SetDefault("disable_update_check", false)
 	viper.SetDefault("title_cleaning_regex", "")
+	viper.SetDefault("word_separator", ".")
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
 	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events"})
@@ -185,6 +186,11 @@ func GetAllowSpecials() bool {
 // GetTitleCleaningRegex returns the regex used for title cleaning.
 func GetTitleCleaningRegex() string {
 	return getString("title_cleaning_regex")
+}
+
+// GetWordSeparator returns the character used to replace spaces in titles and codecs.
+func GetWordSeparator() string {
+	return getString("word_separator")
 }
 
 // GetVideoCodecAVC returns the AVC video codec name.

@@ -569,14 +569,14 @@ func TestNormalizeTitle(t *testing.T) {
 		expected string
 	}{
 		{"München", "Muenchen"},
-		{"Blöde Bühnendüsen", "Bloede.Buehnenduesen"},
-		{"Film & Dokumentation", "Film.und.Dokumentation"},
+		{"Blöde Bühnendüsen", "Bloede Buehnenduesen"},
+		{"Film & Dokumentation", "Film und Dokumentation"},
 		{"Das.Traumschiff.(S01_E01)", "Das.Traumschiff"},
-		{"Bam.Fernsehfilm.Deutschland.2023", "Bam.2023"},
+		{"Bam.Fernsehfilm.Deutschland.2023", "Bam 2023"},
 		{"FooMärchenfilm.Österreich.1990", "Foo.1990"},
-		{"Test...Sequence.-..Fix", "Test.Sequence.Fix"},
+		{"Test...Sequence.-..Fix", "Test Sequence Fix"},
 		{"Café.Smørebrød", "Cafe.Smoerebroed"},
-		{"Title with (parentheses) and \"quotes\"", "Title.with.parentheses.and.quotes"},
+		{"Title with (parentheses) and \"quotes\"", "Title with parentheses and quotes"},
 	}
 
 	runTableTest(t, tests, NormalizeTitle, func(got, want string) string {

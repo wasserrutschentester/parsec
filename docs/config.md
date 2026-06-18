@@ -106,7 +106,8 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `disable_update_check` | boolean | Disable automatic update checks in the background and the warning notice if the version is outdated |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
-| `allow_special_matches` | boolean | Allow matching episodes against Specials (Season 0) (default: `false`). |
+| `word_separator` | string | The character used to replace spaces in the generated filename, such as in the Title, Episode Title, and Audio Codec names. Use `" "` to preserve spaces (default: `.` ). |
+| `allow_special_matches` | boolean | Allow fallback matching of episodes by Air Date or Episode Title against Specials (Season 0). Prevents incorrectly matching a regular episode without season/episode numbers to a TV special (default: `false`). |
 | `title_cleaning_regex` | string | Optional custom regex to strip unwanted parts from titles (e.g. `(?i)(\s*\|.*)` to remove everything after a pipe) |
 
 #### Metadata Overrides
