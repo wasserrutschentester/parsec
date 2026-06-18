@@ -229,7 +229,7 @@ func checkSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckR
 }
 
 func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
-	if meta.Season == 0 && meta.Episode == 0 {
+	if meta.Season == 0 && len(meta.Episodes) == 0 {
 		return nil
 	}
 
@@ -246,7 +246,7 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 		if config.IsCheckEnabled("mdb_episode_existence") {
 			existenceCheck.Passed = false
 			existenceCheck.Severity = "warning"
-			existenceCheck.Warning = fmt.Sprintf("Episode S%02dE%02d not found on TVDB/TMDB.", meta.Season, meta.Episode)
+			existenceCheck.Warning = fmt.Sprintf("Episode S%02dE%v not found on TVDB/TMDB.", meta.Season, meta.Episodes)
 			results = append(results, existenceCheck)
 		}
 

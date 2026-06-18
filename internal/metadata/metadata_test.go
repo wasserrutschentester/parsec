@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -212,7 +213,7 @@ func TestMetadata_String(t *testing.T) {
 				Title:         "Movie",
 				Year:          2024,
 				Season:        1,
-				Episode:       2,
+				Episodes:      []int{2},
 				Language:      "de",
 				Resolution:    "1080p",
 				Service:       "Netflix",
@@ -264,6 +265,17 @@ func TestMetadata_String(t *testing.T) {
 			},
 			want: "Movie.[Netflix]-GRP",
 		},
+		{
+			name: "Truncate Long Filename",
+			meta: Metadata{
+				Title:        "Movie",
+				Season:       1,
+				Episodes:     []int{1},
+				EpisodeTitle: strings.Repeat("AVeryLongEpisodeTitle", 15), // > 245 chars
+				Resolution:   "1080p",
+			},
+			want: "Movie.S01E01.1080p",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -299,7 +311,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Title:         "The Mandalorian",
 				Year:          2019,
 				Season:        1,
-				Episode:       1,
+				Episodes:      []int{1},
 				EpisodeTitle:  "Chapter 1",
 				Date:          "2019-11-12",
 				Resolution:    "2160p",
@@ -321,7 +333,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Title:        "The Mandalorian",
 				Year:         2019,
 				Season:       0,
-				Episode:      101,
+				Episodes:     []int{101},
 				EpisodeTitle: "The Director and the Jedi",
 				Date:         "2020-05-04",
 				Resolution:   "1080p",
@@ -339,7 +351,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				t.Errorf("Metadata.GetSeasonPackName() = %v, want %v", got, tt.want)
 			}
 			// Verify that the original metadata was restored
-			if tt.meta.Episode == 0 && tt.name == "Regular Episode" {
+			if len(tt.meta.Episodes) == 0 && tt.name == "Regular Episode" {
 				t.Error("Metadata.GetSeasonPackName() failed to restore Episode")
 			}
 		})
@@ -405,7 +417,7 @@ func TestAnimeRendering(t *testing.T) {
 			meta: Metadata{
 				Title:      "Anime Name",
 				Season:     1,
-				Episode:    1,
+				Episodes:   []int{1},
 				Source:     "BD",
 				Resolution: "1080p",
 				VideoCodec: "HEVC",
@@ -423,7 +435,7 @@ func TestAnimeRendering(t *testing.T) {
 			meta: Metadata{
 				Title:      "Anime Name",
 				Season:     1,
-				Episode:    2,
+				Episodes:   []int{2},
 				Source:     "BD",
 				Resolution: "1080p",
 				VideoCodec: "HEVC",
@@ -440,7 +452,7 @@ func TestAnimeRendering(t *testing.T) {
 			meta: Metadata{
 				Title:        "Anime Name",
 				Season:       0,
-				Episode:      5,
+				Episodes:     []int{5},
 				EpisodeTitle: "Title of the Episode",
 				Source:       "BD",
 				Resolution:   "1080p",

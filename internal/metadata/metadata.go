@@ -17,10 +17,10 @@ import (
 
 // Metadata represents the metadata for a media file.
 type Metadata struct {
-	Title   string
-	Year    int
-	Season  int
-	Episode int
+	Title    string
+	Year     int
+	Season   int
+	Episodes []int
 
 	Date          string
 	EpisodeTitle  string
@@ -286,8 +286,10 @@ func (meta *Metadata) setBasicDefaults() {
 		meta.Season = config.GetSeason()
 	}
 
-	if meta.Episode == 0 {
-		meta.Episode = config.GetEpisode()
+	if len(meta.Episodes) == 0 {
+		if ep := config.GetEpisode(); ep > 0 {
+			meta.Episodes = []int{ep}
+		}
 	}
 
 	if meta.Date == "" {
@@ -363,7 +365,7 @@ func (meta *Metadata) GetReleaseName() string {
 func (meta *Metadata) GetSeasonPackName() string {
 	// Operate on a copy to avoid mutating the original metadata
 	metaCopy := *meta
-	metaCopy.Episode = 0
+	metaCopy.Episodes = nil
 	metaCopy.EpisodeTitle = ""
 	metaCopy.Date = ""
 
@@ -385,10 +387,40 @@ func (meta *Metadata) render(template string) string {
 		finalName = strings.ReplaceAll(finalName, " ", sep)
 	}
 
+	// Filename length safeguard
+	finalName = meta.truncateIfTooLong(finalName, template)
+
 	return finalName
 }
 
-//nolint:cyclop // mapping logic is straightforward despite the number of conditions
+func (meta *Metadata) truncateIfTooLong(finalName, template string) string {
+	if len(finalName) <= 245 {
+		return finalName
+	}
+
+	ui.PrintWarning(fmt.Sprintf("Generated filename exceeds 245 bytes (%d bytes). Attempting to truncate.", len(finalName)))
+
+	if meta.EpisodeTitle == "" {
+		ui.PrintError("Cannot truncate: no episode title to remove. This might cause filesystem errors.")
+
+		return finalName
+	}
+
+	metaCopy := *meta
+	metaCopy.EpisodeTitle = ""
+
+	// Recursively render without episode title
+	truncatedName := metaCopy.render(template)
+
+	if len(truncatedName) <= 245 {
+		ui.PrintInfo("Successfully truncated by removing the episode title.")
+	} else {
+		ui.PrintError(fmt.Sprintf("Even without the episode title, the filename is still too long (%d bytes). This might cause filesystem errors.", len(truncatedName)))
+	}
+
+	return truncatedName
+}
+
 func (meta *Metadata) getReplacements() map[string]string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
@@ -431,12 +463,7 @@ func (meta *Metadata) getReplacements() map[string]string {
 		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
 	}
 
-	if meta.Episode > 0 {
-		replacements["{episode_raw}"] = strconv.Itoa(meta.Episode)
-		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
-		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
-		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)
-	}
+	meta.setEpisodeReplacements(replacements)
 
 	if meta.Repack {
 		replacements["{repack}"] = "REPACK"
@@ -447,6 +474,40 @@ func (meta *Metadata) getReplacements() map[string]string {
 	}
 
 	return replacements
+}
+
+func (meta *Metadata) setEpisodeReplacements(replacements map[string]string) {
+	if len(meta.Episodes) == 0 {
+		return
+	}
+
+	eps := make([]int, len(meta.Episodes))
+	copy(eps, meta.Episodes)
+
+	first := eps[0]
+
+	last := eps[0]
+	for _, e := range eps {
+		if e < first {
+			first = e
+		}
+
+		if e > last {
+			last = e
+		}
+	}
+
+	if len(eps) == 1 || first == last {
+		replacements["{episode_raw}"] = strconv.Itoa(first)
+		replacements["{episode_02}"] = fmt.Sprintf("%02d", first)
+		replacements["{episode_03}"] = fmt.Sprintf("%03d", first)
+		replacements["{episode_id}"] = fmt.Sprintf("E%02d", first)
+	} else {
+		replacements["{episode_raw}"] = fmt.Sprintf("%d-%d", first, last)
+		replacements["{episode_02}"] = fmt.Sprintf("%02d-%02d", first, last)
+		replacements["{episode_03}"] = fmt.Sprintf("%03d-%03d", first, last)
+		replacements["{episode_id}"] = fmt.Sprintf("E%02d-E%02d", first, last)
+	}
 }
 
 func cleanName(name string) string {
@@ -511,26 +572,42 @@ func (meta *Metadata) Override(newMeta *Metadata) bool {
 	for i := 0; i < mVal.NumField(); i++ {
 		mField := mVal.Field(i)
 		nField := nVal.Field(i)
+
 		f := typ.Field(i)
-
-		if f.Type.Kind() == reflect.Bool {
-			if mField.Bool() != nField.Bool() && nField.Bool() {
-				ui.PrintDebug(fmt.Sprintf("%s: %t %s %t", f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
-				mField.SetBool(nField.Bool())
-
-				updated = true
-			}
-		} else {
-			if !nField.IsZero() && mField.Interface() != nField.Interface() {
-				ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
-				mField.Set(nField)
-
-				updated = true
-			}
+		if applyOverride(f, nField, mField) {
+			updated = true
 		}
 	}
 
 	return updated
+}
+
+func applyOverride(f reflect.StructField, nField, mField reflect.Value) bool {
+	switch f.Type.Kind() {
+	case reflect.Bool:
+		if mField.Bool() != nField.Bool() && nField.Bool() {
+			ui.PrintDebug(fmt.Sprintf("%s: %t %s %t", f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
+			mField.SetBool(nField.Bool())
+
+			return true
+		}
+	case reflect.Slice:
+		if !nField.IsZero() && !reflect.DeepEqual(mField.Interface(), nField.Interface()) {
+			ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
+			mField.Set(nField)
+
+			return true
+		}
+	default:
+		if !nField.IsZero() && mField.Interface() != nField.Interface() {
+			ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
+			mField.Set(nField)
+
+			return true
+		}
+	}
+
+	return false
 }
 
 // RemoveDuplicates removes duplicate elements from a slice.

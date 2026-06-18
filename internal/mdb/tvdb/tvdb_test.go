@@ -159,9 +159,9 @@ func TestIdentifyEpisodeSeason0(t *testing.T) {
 	// Test Case: Explicit Season 0, Episode 1.
 	// allowSpecials is false, but it SHOULD work because it's an explicit match.
 	meta := &metadata.Metadata{
-		Season:  0,
-		Episode: 1,
-		IsTV:    true,
+		Season:   0,
+		Episodes: []int{1},
+		IsTV:     true,
 	}
 
 	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)

@@ -109,7 +109,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Das.Traumschiff",
 				Season:        2026,
-				Episode:       3,
+				Episodes:      []int{3},
 				EpisodeTitle:  "Honululu",
 				Language:      "GERMAN",
 				Resolution:    "1080p",
@@ -190,7 +190,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:      "Show",
 				Season:     1,
-				Episode:    1,
+				Episodes:   []int{1},
 				Resolution: "1080p",
 				CutEdition: "Open.Matte",
 				IsTV:       true,
@@ -234,7 +234,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Series",
 				Season:        1,
-				Episode:       2,
+				Episodes:      []int{2},
 				Language:      "Multi",
 				Resolution:    "1080p",
 				Service:       "Netflix",
@@ -288,7 +288,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:        "ZDF.Magazin.Royale",
 				Season:       0,
-				Episode:      166,
+				Episodes:     []int{166},
 				Date:         "2026-05-29",
 				EpisodeTitle: "Die.Colonius-Sprengung.ZMR.vor.Ort",
 				Language:     "GERMAN",
@@ -305,7 +305,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:        "ZDF.Magazin.Royale",
 				Season:       2026,
-				Episode:      166,
+				Episodes:     []int{166},
 				Date:         "2026-05-29",
 				EpisodeTitle: "Die.Colonius-Sprengung.ZMR.vor.Ort",
 				Language:     "GERMAN",
@@ -396,7 +396,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:      "Show",
 				Season:     1,
-				Episode:    1,
+				Episodes:   []int{1},
 				Resolution: "720p",
 				VideoCodec: "HEVC",
 				AudioCodec: "Opus",
@@ -516,7 +516,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:        "Anime Name",
 				Season:       1,
-				Episode:      1,
+				Episodes:     []int{1},
 				EpisodeTitle: "- (BD",
 				Resolution:   "1080p",
 				Source:       "BD",
@@ -533,7 +533,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:        "Anime Name",
 				Season:       1,
-				Episode:      1,
+				Episodes:     []int{1},
 				EpisodeTitle: "- (BD",
 				Resolution:   "1080p",
 				Source:       "BD",
@@ -550,7 +550,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Anime.Name",
 				Season:        1,
-				Episode:       1,
+				Episodes:      []int{1},
 				Resolution:    "1080p",
 				Source:        "BluRay",
 				AudioCodec:    "Opus",
@@ -558,6 +558,37 @@ func TestParse(t *testing.T) {
 				VideoCodec:    "x264",
 				Group:         "Group.mkv",
 				IsTV:          true,
+			},
+		},
+		{
+			input: "Kaeptn.Blaubaers.Seemannsgarn.S01E01-E06.Wie.das.Schiff.zur.Klippe.kam.uvm.GERMAN.1080p.ATV.WEB-DL.h264-SLiDE",
+			expected: metadata.Metadata{
+				Title:        "Kaeptn.Blaubaers.Seemannsgarn",
+				Season:       1,
+				Episodes:     []int{1, 2, 3, 4, 5, 6},
+				EpisodeTitle: "Wie.das.Schiff.zur.Klippe.kam.uvm",
+				Language:     "GERMAN",
+				Resolution:   "1080p",
+				Service:      "ATV",
+				Source:       "WEB-DL",
+				VideoCodec:   "h264",
+				Group:        "SLiDE",
+				IsTV:         true,
+			},
+		},
+		{
+			input: "ShowName.S02E01-E03.Episode.Title.Here.ENGLISH.720p.WEB-DL.x264-Group",
+			expected: metadata.Metadata{
+				Title:        "ShowName",
+				Season:       2,
+				Episodes:     []int{1, 2, 3},
+				EpisodeTitle: "Episode.Title.Here",
+				Language:     "ENGLISH",
+				Resolution:   "720p",
+				Source:       "WEB-DL",
+				VideoCodec:   "x264",
+				Group:        "Group",
+				IsTV:         true,
 			},
 		},
 	}

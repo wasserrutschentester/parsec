@@ -313,7 +313,12 @@ func isMatch(r ReleaseResource, imdbInt int64, tmdbID, tvdbID int) bool {
 func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter bool) {
 	ui.Println("\n" + ui.Header.Render("PROWLARR RELEASES:"))
 
-	pResults, err := Search(result.ImdbID, result.TmdbID, result.TvdbID, meta.Season, meta.Episode, result.IsTV)
+	epNum := 0
+	if len(meta.Episodes) > 0 {
+		epNum = meta.Episodes[0]
+	}
+
+	pResults, err := Search(result.ImdbID, result.TmdbID, result.TvdbID, meta.Season, epNum, result.IsTV)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Prowlarr search failed: %v", err))
 

@@ -248,14 +248,22 @@ func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainf
 
 func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
 	var episodeResult mdb.EpisodeResult
-	if (meta.Season >= 0 && meta.Episode > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
+	if (meta.Season >= 0 && len(meta.Episodes) > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
 		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
-	}
 
-	if episodeResult.Name != "" {
-		meta.EpisodeTitle = episodeResult.Name
-		meta.Season = episodeResult.Season
-		meta.Episode = episodeResult.Episode
+		if episodeResult.Name != "" {
+			meta.EpisodeTitle = episodeResult.Name
+			meta.Season = episodeResult.Season
+			// Note: this overrides episodes with just the FIRST found episode's ID if we only found one,
+			// wait, mdbSearch.FindEpisode should probably return all episodes if there are multiple.
+			// I'll fix this in the next replacement. Let's just leave it for a sec.
+			// Actually we will handle this in FindEpisode by returning a combined EpisodeResult.
+			// For now, assume it returns the unified object.
+			// However, since we matched them, we should probably just keep meta.Episodes intact unless we only searched by title/date.
+			if len(meta.Episodes) == 0 {
+				meta.Episodes = []int{episodeResult.Episode}
+			}
+		}
 	}
 
 	return episodeResult

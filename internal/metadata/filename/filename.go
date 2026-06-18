@@ -71,13 +71,13 @@ func Parse(filename string) *metadata.Metadata {
 	meta.Year = year
 
 	// Season/Episode ID
-	meta.Season, meta.Episode = matchSeasonEpisode(filename)
+	meta.Season, meta.Episodes = matchSeasonEpisode(filename)
 
 	// Date (YYYY-MM-DD)
 	matchDate(filename, meta)
 
 	// TV Show
-	if meta.Season > 0 || meta.Episode > 0 || meta.Date != "" {
+	if meta.Season > 0 || len(meta.Episodes) > 0 || meta.Date != "" {
 		meta.IsTV = true
 	}
 
@@ -206,13 +206,53 @@ func matchEpisodeTitle(filename string, meta *metadata.Metadata) string {
 	return strings.Trim(sub[:end], ". ")
 }
 
+func skipMultiEpisodeSpecification(filename string, startPos int, episodes []int) int {
+	if len(episodes) <= 1 {
+		return startPos
+	}
+
+	rest := filename[startPos:]
+	multiEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,3})`)
+
+	pos := startPos
+
+	for {
+		match := multiEpRegex.FindStringSubmatchIndex(rest)
+		if match == nil {
+			break
+		}
+
+		separator := rest[match[2]:match[3]]
+		matchedText := rest[match[0]:match[1]]
+		hasE := strings.Contains(strings.ToLower(matchedText), "e")
+
+		isRange := strings.Contains(separator, "-")
+		isList := strings.Contains(separator, "&") || hasE
+
+		if !isRange && !isList {
+			break
+		}
+
+		pos += match[1]
+		rest = rest[match[1]:]
+	}
+
+	return pos
+}
+
 func findEpisodeTitleStart(filename string, meta *metadata.Metadata) int {
 	start := 0
 
-	if meta.Season != 0 || meta.Episode != 0 {
-		tag := fmt.Sprintf("S%02dE%02d", meta.Season, meta.Episode)
+	if meta.Season != 0 || len(meta.Episodes) != 0 {
+		ep := 0
+		if len(meta.Episodes) > 0 {
+			ep = meta.Episodes[0]
+		}
+
+		tag := fmt.Sprintf("S%02dE%02d", meta.Season, ep)
 		if loc := strings.Index(strings.ToUpper(filename), tag); loc != -1 {
 			start = loc + len(tag)
+			start = skipMultiEpisodeSpecification(filename, start, meta.Episodes)
 		}
 	}
 
@@ -246,7 +286,7 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 }
 
 func matchTitleYear(filename string) (string, int) {
-	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
+	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3}(?:(?:[ .\&-]E?\d{1,3})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
 
 	match := re.FindStringSubmatchIndex(filename)
 	if match != nil {
@@ -264,20 +304,72 @@ func matchTitleYear(filename string) (string, int) {
 	return "", 0
 }
 
-func matchSeasonEpisode(filename string) (int, int) {
-	re := regexp.MustCompile(`(?i)S(\d{1,4})(?:E(\d{1,3}))?`)
+func matchSeasonEpisode(filenameStr string) (int, []int) {
+	// First, find S\d{1,4}
+	sRegex := regexp.MustCompile(`(?i)S(\d{1,4})`)
 
-	match := re.FindStringSubmatch(filename)
-	if match != nil {
-		season, seasonErr := strconv.Atoi(match[1])
-
-		episode, episodeErr := strconv.Atoi(match[2])
-		if episodeErr == nil && seasonErr == nil {
-			return season, episode
-		}
+	sMatch := sRegex.FindStringSubmatchIndex(filenameStr)
+	if sMatch == nil {
+		return 0, nil
 	}
 
-	return 0, 0
+	season, _ := strconv.Atoi(filenameStr[sMatch[2]:sMatch[3]])
+
+	// Now look at the rest of the string
+	rest := filenameStr[sMatch[3]:]
+
+	var episodes []int
+
+	// We want to match an initial episode, e.g. E01, E01, -E01, etc.
+	firstEpRegex := regexp.MustCompile(`(?i)^[ .&-]*E(\d{1,3})`)
+	epMatch := firstEpRegex.FindStringSubmatchIndex(rest)
+
+	if epMatch == nil {
+		return season, nil
+	}
+
+	epStr := rest[epMatch[2]:epMatch[3]]
+	ep, _ := strconv.Atoi(epStr)
+	episodes = append(episodes, ep)
+
+	rest = rest[epMatch[1]:]
+
+	// Now iteratively look for subsequent episodes
+	nextEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,3})`)
+
+	for {
+		nextMatch := nextEpRegex.FindStringSubmatchIndex(rest)
+		if nextMatch == nil {
+			break
+		}
+
+		sep := rest[nextMatch[2]:nextMatch[3]]
+		nextEpStr := rest[nextMatch[4]:nextMatch[5]]
+
+		matchedText := rest[nextMatch[0]:nextMatch[1]]
+		hasE := strings.Contains(strings.ToLower(matchedText), "e")
+
+		isRange := strings.Contains(sep, "-")
+		isList := strings.Contains(sep, "&") || hasE
+
+		if !isRange && !isList {
+			break // It's just a number like 1080p or year
+		}
+
+		nextEp, _ := strconv.Atoi(nextEpStr)
+
+		if isRange {
+			for j := episodes[len(episodes)-1] + 1; j < nextEp; j++ {
+				episodes = append(episodes, j)
+			}
+		}
+
+		episodes = append(episodes, nextEp)
+
+		rest = rest[nextMatch[1]:]
+	}
+
+	return season, episodes
 }
 
 func matchLanguage(filename string, meta *metadata.Metadata) {

@@ -59,7 +59,7 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	}
 
 	if episodeFlag != 0 {
-		meta.Episode = episodeFlag
+		meta.Episodes = []int{episodeFlag}
 	}
 
 	if dateFlag != "" {

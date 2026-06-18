@@ -528,8 +528,46 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 
 // FindEpisode attempts to identify an episode on TVDB or TMDB based on search results and metadata.
 func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
+	if len(meta.Episodes) == 0 {
+		return findSingleEpisode(result, meta, allowSpecials)
+	}
+
+	var (
+		combined mdb.EpisodeResult
+		titles   []string
+	)
+
+	for i, epNum := range meta.Episodes {
+		// Create a copy of meta for the single episode search
+		singleMeta := *meta
+		singleMeta.Episodes = []int{epNum}
+
+		epRes := findSingleEpisode(result, &singleMeta, allowSpecials)
+		if epRes.Name != "" {
+			titles = append(titles, epRes.Name)
+			if i == 0 {
+				combined = epRes
+			}
+		}
+	}
+
+	if len(titles) > 0 {
+		combined.Name = strings.Join(titles, " / ")
+
+		return combined
+	}
+
+	return mdb.EpisodeResult{}
+}
+
+func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
+	epNum := 0
+	if len(meta.Episodes) > 0 {
+		epNum = meta.Episodes[0]
+	}
+
 	if result.TvdbID > 0 {
-		ui.PrintDebug(fmt.Sprintf("Searching for episode on TVDB: ID=%d, S%02dE%02d", result.TvdbID, meta.Season, meta.Episode))
+		ui.PrintDebug(fmt.Sprintf("Searching for episode on TVDB: ID=%d, S%02dE%02d", result.TvdbID, meta.Season, epNum))
 
 		data, err := tvdb.IdentifyEpisode(result, meta, allowSpecials)
 		if err == nil && data.Name != "" {
@@ -543,10 +581,10 @@ func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials
 	uniqueLangs := metadata.RemoveDuplicates(langs)
 
 	if result.TmdbID > 0 {
-		ui.PrintDebug(fmt.Sprintf("Searching for episode on TMDB: ID=%d, S%02dE%02d", result.TmdbID, meta.Season, meta.Episode))
+		ui.PrintDebug(fmt.Sprintf("Searching for episode on TMDB: ID=%d, S%02dE%02d", result.TmdbID, meta.Season, epNum))
 
 		for _, lang := range uniqueLangs {
-			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, meta.Season, meta.Episode, lang)
+			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, meta.Season, epNum, lang)
 			if err == nil && data.Name != "" {
 				return data
 			}
