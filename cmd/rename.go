@@ -93,6 +93,15 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	destDir := filepath.Dir(filePath)
 
+	outputPath := outputPathFlag
+	if outputPath == "" {
+		outputPath = config.GetOutputPath()
+	}
+
+	if outputPath != "" {
+		destDir = outputPath
+	}
+
 	if seasonPackFlag && meta.IsTV && meta.Season >= 0 {
 		seasonPackName := meta.GetSeasonPackName()
 
@@ -280,6 +289,7 @@ func init() {
 	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
 	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
 	renameCmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
+	renameCmd.Flags().StringVarP(&outputPathFlag, "output", "O", "", "output path where to move the files after renaming")
 
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}

@@ -26,6 +26,7 @@ func InitDefaults() {
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("word_separator", ".")
 	viper.SetDefault("normalize_diacritics", true)
+	viper.SetDefault("output_path", "")
 	viper.SetDefault("replacements.title", []map[string]any{
 		{
 			"pattern":     `(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))`,
@@ -92,6 +93,11 @@ func GetTemplate() string {
 // GetPreferredLanguage returns the preferred language code from the configuration.
 func GetPreferredLanguage() string {
 	return getString("preferred_language")
+}
+
+// GetOutputPath returns the output path from the configuration.
+func GetOutputPath() string {
+	return getString("output_path")
 }
 
 // GetSubbedTagging returns true if subbed tagging is enabled.

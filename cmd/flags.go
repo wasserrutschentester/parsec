@@ -41,6 +41,7 @@ var (
 	noCacheFlag    bool
 	releasesFlag   bool
 	bestFlag       bool
+	outputPathFlag string
 )
 
 //nolint:funlen,cyclop // many flags to apply, logic is repetitive but necessary

@@ -65,6 +65,7 @@ You can provide one or more files or directories to be processed. Directories wi
 | `--unattended`| `-u` | boolean | Do not prompt for confirmation before renaming. |
 | `--dry-run` | `-d` | boolean | Print the proposed new filename but do not perform the actual rename. |
 | `--season-pack`| `-P` | boolean | Move episodes into a correctly named season pack folder (omitting episode-specific info). |
+| `--output` | `-O` | string | Output path where to move the files after renaming (absolute or relative to current working directory). |
 
 ## Examples
 

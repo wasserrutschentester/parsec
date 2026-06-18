@@ -37,6 +37,9 @@ word_separator = "."
 # Replace diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss)
 normalize_diacritics = true
 
+# Path where to move files after renaming (absolute or relative to cwd)
+# output_path = ""
+
 # Custom regex replacements applied to the Title and Episode Title before normalization.
 # Replaces `title_cleaning_regex`.
 [[replacements.title]]

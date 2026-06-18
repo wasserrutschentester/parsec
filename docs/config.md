@@ -109,6 +109,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `word_separator` | string | The character used to replace spaces in the generated filename, such as in the Title, Episode Title, and Audio Codec names. Use `" "` to preserve spaces (default: `.` ). |
 | `allow_special_matches` | boolean | Allow fallback matching of episodes by Air Date or Episode Title against Specials (Season 0). Prevents incorrectly matching a regular episode without season/episode numbers to a TV special (default: `false`). |
 | `normalize_diacritics` | boolean | Replace diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss) (default: `true`). |
+| `output_path` | string | Output path where files should be moved after renaming. Can be absolute or relative to the current working directory. |
 
 #### Regex Replacements
 
