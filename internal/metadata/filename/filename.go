@@ -61,6 +61,12 @@ func Parse(filename string) *metadata.Metadata {
 	// Language
 	matchLanguage(filename, meta)
 
+	// Dual Audio
+	matchDualAudio(filename, meta)
+
+	// CRC32
+	matchCRC32(filename, meta)
+
 	// match REPACK
 	matchRepack(filename, meta)
 
@@ -88,6 +94,13 @@ func Parse(filename string) *metadata.Metadata {
 	if meta.Title == "" {
 		meta.Title = extractTitleFallback(filename, meta)
 	}
+
+	// Clean title if it contains the leading group or has trailing junk
+	if meta.Group != "" {
+		meta.Title = strings.TrimPrefix(meta.Title, "["+meta.Group+"]")
+	}
+
+	meta.Title = strings.Trim(meta.Title, ". -")
 
 	// Episode title
 	meta.EpisodeTitle = matchEpisodeTitle(filename, meta)
@@ -195,12 +208,12 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 	end := len(sub)
 
 	if meta.Language != "" {
-		re := regexp.MustCompile("(?i)[ .]" + regexp.QuoteMeta(meta.Language))
+		re := regexp.MustCompile("(?i)[ .\\(\\[]" + regexp.QuoteMeta(meta.Language))
 		if loc := re.FindStringIndex(sub); loc != nil {
 			end = loc[0]
 		}
 	} else if meta.Resolution != "" {
-		re := regexp.MustCompile("(?i)[ .]" + regexp.QuoteMeta(meta.Resolution))
+		re := regexp.MustCompile("(?i)[ .\\(\\[]" + regexp.QuoteMeta(meta.Resolution))
 		if loc := re.FindStringIndex(sub); loc != nil {
 			end = loc[0]
 		}
@@ -210,7 +223,7 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 }
 
 func matchTitleYear(filename string) (string, int) {
-	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))[ .]`)
+	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3})?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
 
 	match := re.FindStringSubmatchIndex(filename)
 	if match != nil {
@@ -245,7 +258,7 @@ func matchSeasonEpisode(filename string) (int, int) {
 }
 
 func matchLanguage(filename string, meta *metadata.Metadata) {
-	re := regexp.MustCompile(`(?i)[ .](GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:[ .](DL|ML|SUBBED))?([ .]|$)`)
+	re := regexp.MustCompile(`(?i)[ .\[\(](GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:[ .](DL|ML|SUBBED))?([ .\]\)]|$)`)
 
 	if match := re.FindStringSubmatch(filename); len(match) > 0 {
 		meta.Language = match[1]
@@ -257,7 +270,7 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 		}
 	}
 
-	audioDescriptionRegex := regexp.MustCompile(`(?i)[ .](WiTH\.AD|with\.Audio\.Description)([ .]|$)`)
+	audioDescriptionRegex := regexp.MustCompile(`(?i)[ .\[\(](WiTH\.AD|with\.Audio\.Description)([ .\]\)]|$)`)
 	if match := audioDescriptionRegex.FindStringSubmatch(filename); len(match) > 0 {
 		meta.Accessibility = match[1]
 		meta.HasAudioDesc = true
@@ -266,13 +279,13 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 
 func matchEdition(filename string, meta *metadata.Metadata) {
 	// Regex for Editions
-	editionRegex := regexp.MustCompile(`(?i)[ .](Open[ .]Matte|((4K|8K)[ .]?)?REMASTERED|IMAX(?:[ .]Enhanced)?|DIRECTOR'?S[ .]CUT|DC|EXTENDED|THEATRICAL|CRITERION|UNCENSORED|SPECIAL[ .]EDITION)([ .]|$)`)
+	editionRegex := regexp.MustCompile(`(?i)[ .\[\(](Open[ .]Matte|((4K|8K)[ .]?)?REMASTERED|IMAX(?:[ .]Enhanced)?|DIRECTOR'?S[ .]CUT|DC|EXTENDED|THEATRICAL|CRITERION|UNCENSORED|SPECIAL[ .]EDITION)([ .\]\)]|$)`)
 	if match := editionRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.CutEdition = match[1]
 	}
 
 	// Regex for 3D
-	threeDRegex := regexp.MustCompile(`(?i)[ .](3D(?:[ .](?:HSBS|SBS|HOU))?)([ .]|$)`)
+	threeDRegex := regexp.MustCompile(`(?i)[ .\[\(](3D(?:[ .](?:HSBS|SBS|HOU))?)([ .\]\)]|$)`)
 	if match := threeDRegex.FindStringSubmatch(filename); len(match) > 1 {
 		tag := match[1]
 		if meta.CutEdition != "" {
@@ -466,28 +479,42 @@ func NormalizeService(service string) string {
 }
 
 func matchDate(filename string, meta *metadata.Metadata) {
-	dataRegex := regexp.MustCompile(`[ .](\d{4}-\d{2}-\d{2})([ .]|$)`)
+	dataRegex := regexp.MustCompile(`[ .\[\(](\d{4}-\d{2}-\d{2})([ .\]\)]|$)`)
 	if match := dataRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Date = match[1]
 	}
 }
 
 func matchRepack(filename string, meta *metadata.Metadata) {
-	repackRegex := regexp.MustCompile(`[ .]REPACK([ .-]|$|\d)`)
+	repackRegex := regexp.MustCompile(`[ .\[\(]REPACK([ .\]\)-]|$|\d)`)
 	if repackRegex.MatchString(filename) {
 		meta.Repack = true
 	}
 }
 
+func matchCRC32(filename string, meta *metadata.Metadata) {
+	crcRegex := regexp.MustCompile(`[\[\(]([A-Fa-f0-9]{8})[\]\)]`)
+	if match := crcRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.CRC32 = match[1]
+	}
+}
+
+func matchDualAudio(filename string, meta *metadata.Metadata) {
+	dualAudioRegex := regexp.MustCompile(`(?i)[ .\[\(]Dual[ -]Audio[ .\]\)]`)
+	if dualAudioRegex.MatchString(filename) {
+		meta.DualAudio = true
+	}
+}
+
 func matchResolution(filename string, meta *metadata.Metadata) {
-	resRegex := regexp.MustCompile(`[ .](\d{3,4}[p|i])([ .-]|$| )`)
+	resRegex := regexp.MustCompile(`[ .\[\(](\d{3,4}[p|i])([ .\]\)-]|$| )`)
 	if match := resRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Resolution = match[1]
 	}
 }
 
 func matchAudio(filename string, meta *metadata.Metadata) {
-	audioRegex := regexp.MustCompile(`[ .](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .-]|$| )`)
+	audioRegex := regexp.MustCompile(`[ .\[\(](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .\]\)-]|$| )`)
 	if match := audioRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.AudioCodec = match[1]
 		if len(match) > 2 && match[2] != "" {
@@ -510,20 +537,29 @@ func matchAudio(filename string, meta *metadata.Metadata) {
 }
 
 func matchVideo(filename string, meta *metadata.Metadata) {
-	videoRegex := regexp.MustCompile(`[ .]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .-]|$| )`)
+	videoRegex := regexp.MustCompile(`[ .\[\(]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .\]\)-]|$| )`)
 	if match := videoRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.VideoCodec = match[1]
 	}
 }
 
 func matchSource(filename string, meta *metadata.Metadata) {
-	sourceRegex := regexp.MustCompile(`(?i)[ .](WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .-]|$| )`)
+	sourceRegex := regexp.MustCompile(`(?i)[ .\[\(](BD|WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .\]\)-]|$| )`)
 	if match := sourceRegex.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Source = match[1]
 	}
 }
 
 func matchGroup(filename string, meta *metadata.Metadata) {
+	// 1. match leading [Group]
+	leadingGroupRegex := regexp.MustCompile(`^\[([^\]]+)\]`)
+	if match := leadingGroupRegex.FindStringSubmatch(filename); len(match) > 1 {
+		meta.Group = match[1]
+
+		return
+	}
+
+	// 2. match trailing -Group
 	groupRegex := regexp.MustCompile(`\-([^-]+)$`)
 	if match := groupRegex.FindStringSubmatch(filename); len(match) > 1 {
 		group := match[1]

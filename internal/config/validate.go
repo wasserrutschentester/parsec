@@ -135,6 +135,8 @@ var validTemplateKeys = map[string]bool{
 	"episode_02":     true,
 	"episode_03":     true,
 	"episode_id":     true,
+	"dual_audio":     true,
+	"crc32":          true,
 	"repack":         true,
 }
 

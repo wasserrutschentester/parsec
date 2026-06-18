@@ -40,6 +40,8 @@ type Metadata struct {
 	AudioChannels string
 	AudioMeta     string
 	VideoCodec    string
+	DualAudio     bool
+	CRC32         string
 	Group         string
 	ImdbID        string
 	TmdbID        int
@@ -369,6 +371,17 @@ func (meta *Metadata) GetSeasonPackName() string {
 }
 
 func (meta *Metadata) render(template string) string {
+	replacements := meta.getReplacements()
+
+	result := template
+	for tag, val := range replacements {
+		result = strings.ReplaceAll(result, tag, val)
+	}
+
+	return cleanName(result)
+}
+
+func (meta *Metadata) getReplacements() map[string]string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
 		"{date}":           meta.Date,
@@ -386,6 +399,14 @@ func (meta *Metadata) render(template string) string {
 		"{audio_meta}":     meta.AudioMeta,
 		"{video_codec}":    meta.VideoCodec,
 		"{group}":          meta.Group,
+	}
+
+	if meta.DualAudio {
+		replacements["{dual_audio}"] = "Dual-Audio"
+	}
+
+	if meta.CRC32 != "" {
+		replacements["{crc32}"] = strings.ToUpper(strings.Trim(meta.CRC32, "[]"))
 	}
 
 	if meta.BitDepth > 8 {
@@ -417,12 +438,7 @@ func (meta *Metadata) render(template string) string {
 		replacements["{accessibility}"] = "with.Audio.Description"
 	}
 
-	result := template
-	for tag, val := range replacements {
-		result = strings.ReplaceAll(result, tag, val)
-	}
-
-	return cleanName(result)
+	return replacements
 }
 
 func cleanName(name string) string {

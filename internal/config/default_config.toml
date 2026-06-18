@@ -114,3 +114,11 @@ allow_special_matches = true
 season = 0
 is_tv = true
 template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resolution}.{service}.{source}.{video_codec}-{group}"
+
+# ------------------------------------------------------------------------------
+# PRESET: anime
+# Use case: Naming scheme following the parsec naming guide for anime.
+# ------------------------------------------------------------------------------
+[preset.anime]
+is_tv = true
+template = "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]"

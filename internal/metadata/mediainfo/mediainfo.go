@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -344,9 +346,33 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	}
 
 	mi.SetLanguageTag(meta)
+
+	if strings.Contains(config.GetTemplate(), "{crc32}") {
+		meta.CRC32 = calculateCRC32(mi.Media.Ref)
+	}
+
 	ui.PrintDebug(fmt.Sprintf("Mediainfo meta: %+v", meta))
 
 	return meta
+}
+
+func calculateCRC32(filePath string) string {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return ""
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	ui.PrintInfo("Calculating CRC32 for " + ui.AnonymizePath(filePath) + "...")
+
+	h := crc32.NewIEEE()
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%08X", h.Sum32())
 }
 
 func (t *Track) detectHDR() string {
@@ -443,8 +469,10 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	case 1:
 	case 2:
 		meta.LanguageExt = "DL"
+		meta.DualAudio = true
 	default:
 		meta.LanguageExt = "ML"
+		meta.DualAudio = true
 	}
 }
 

@@ -379,3 +379,81 @@ func TestMetadata_Override(t *testing.T) {
 		t.Errorf("Override() should return false when nothing changed")
 	}
 }
+
+func TestAnimeRendering(t *testing.T) {
+	t.Parallel()
+
+	config.InitDefaults()
+
+	tests := []struct {
+		name     string
+		meta     Metadata
+		template string
+		want     string
+	}{
+		{
+			name: "Standard Anime Template",
+			meta: Metadata{
+				Title:      "Anime Name",
+				Season:     1,
+				Episode:    1,
+				Source:     "BD",
+				Resolution: "1080p",
+				VideoCodec: "HEVC",
+				AudioCodec: "FLAC",
+				DualAudio:  true,
+				CRC32:      "48F1910E",
+				Group:      "Group",
+				IsTV:       true,
+			},
+			template: "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]",
+			want:     "[Group] Anime Name - S01E01 - (BD 1080p HEVC FLAC) Dual-Audio [48F1910E]",
+		},
+		{
+			name: "Anime Template without CRC",
+			meta: Metadata{
+				Title:      "Anime Name",
+				Season:     1,
+				Episode:    2,
+				Source:     "BD",
+				Resolution: "1080p",
+				VideoCodec: "HEVC",
+				AudioCodec: "FLAC",
+				DualAudio:  false,
+				Group:      "Group",
+				IsTV:       true,
+			},
+			template: "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]",
+			want:     "[Group] Anime Name - S01E02 - (BD 1080p HEVC FLAC)",
+		},
+		{
+			name: "Special Episode",
+			meta: Metadata{
+				Title:        "Anime Name",
+				Season:       0,
+				Episode:      5,
+				EpisodeTitle: "Title of the Episode",
+				Source:       "BD",
+				Resolution:   "1080p",
+				VideoCodec:   "HEVC",
+				AudioCodec:   "FLAC",
+				DualAudio:    true,
+				Group:        "Group",
+				IsTV:         true,
+			},
+			template: "{title} - {season_id}{episode_id} - {episode_title} ({source} {resolution} {video_codec} {audio_codec}) {dual_audio}-[{group}]",
+			want:     "Anime Name - S00E05 - Title of the Episode (BD 1080p HEVC FLAC) Dual-Audio-[Group]",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.meta.render(tt.template); got != tt.want {
+				t.Errorf("Metadata.render() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
