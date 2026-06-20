@@ -544,7 +544,9 @@ func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials
 
 		epRes := findSingleEpisode(result, &singleMeta, allowSpecials)
 		if epRes.Name != "" {
-			titles = append(titles, epRes.Name)
+			name := strings.TrimSpace(epRes.Name)
+			titles = append(titles, name)
+
 			if i == 0 {
 				combined = epRes
 			}

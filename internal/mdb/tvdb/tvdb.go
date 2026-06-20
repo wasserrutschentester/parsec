@@ -106,7 +106,7 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		TvdbID:           tvdbID,
 		TvdbSlug:         m.Slug,
 		TvdbType:         m.Type,
-		Title:            title,
+		Title:            strings.TrimSpace(title),
 		Year:             resYear,
 		IsTV:             m.Type == "series",
 		Overview:         overview,

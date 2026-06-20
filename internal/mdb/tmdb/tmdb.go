@@ -40,13 +40,13 @@ type tmdbMedia struct {
 }
 
 func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
-	title := m.Title
-	originalTitle := m.OriginalTitle
+	title := strings.TrimSpace(m.Title)
+	originalTitle := strings.TrimSpace(m.OriginalTitle)
 	date := m.ReleaseDate
 
 	if mediaType == "tv" {
-		title = m.Name
-		originalTitle = m.OriginalName
+		title = strings.TrimSpace(m.Name)
+		originalTitle = strings.TrimSpace(m.OriginalName)
 		date = m.FirstAirDate
 	}
 
