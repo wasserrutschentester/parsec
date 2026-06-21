@@ -169,6 +169,7 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `mediainfo_resolution`: Check for non-standard resolutions.
 -   `mediainfo_dialogue_normalization`: Check for dialogue normalization in lossless audio tracks.
 -   `mediainfo_stereo_lossless`: Warn if an audio track with 2 or less channels uses a different lossless codec than FLAC.
+-   `mediainfo_empty_tracks`: Warn (with error severity) if an audio track has zero channels or a subtitle track has zero elements.
 -   `matroska_track_order`: Verify track ordering rules.
 -   `matroska_language_tag`: Verify valid ISO language tags on tracks.
 -   `matroska_multi_lang`: Ensure 'mul' tracks have at least two full language names.

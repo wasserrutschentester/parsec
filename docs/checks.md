@@ -81,6 +81,7 @@ This document lists all individual checks performed by the `parsec check` comman
 | Resolution | `checkResolution` | `mediainfo_resolution` | Yes | Checks for odd resolution, standard widths, and sane aspect ratios. |
 | Dialogue Normalization | `checkDialogueNormalization` | `mediainfo_dialogue_normalization` | Yes | Verifies that dialogue normalization is removed for lossless (TrueHD, DTS-HD MA) and DTS-HD HRA tracks. |
 | Stereo/Mono Lossless Codec | `checkStereoLossless` | `mediainfo_stereo_lossless` | Yes | Warns if an audio track with 2 or less channels uses a different lossless codec than FLAC (e.g., TrueHD, DTS-HD MA, or PCM). |
+| Empty Tracks | `checkEmptyTracks` | `mediainfo_empty_tracks` | Yes | Issues an error if an audio track has zero channels or a subtitle track has zero elements. |
 
 ### Matroska / EBML Checks
 

@@ -72,6 +72,11 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		results = append(results, checkStereoLossless(mi)...)
 	}
 
+	// 9. Empty Tracks Check
+	if config.IsCheckEnabled("mediainfo_empty_tracks") {
+		results = append(results, checkEmptyTracks(mi)...)
+	}
+
 	return results
 }
 
@@ -396,6 +401,35 @@ func checkStereoLossless(mi *mediainfo.MediaInfo) []CheckResult {
 				res.Severity = "warning"
 				res.Warning = "Audio track with 2 or less channels should use FLAC for lossless audio"
 				res.Tracks = append(res.Tracks, miTrackToResult(track, fmt.Sprintf("uses %s with %d channels (should be FLAC)", codec, track.Channels)))
+			}
+		}
+	}
+
+	return []CheckResult{res}
+}
+
+func checkEmptyTracks(mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_empty_tracks",
+		Passed:     true,
+	}
+
+	for i := range mi.Media.Tracks {
+		track := &mi.Media.Tracks[i]
+		switch track.Type {
+		case "Audio":
+			if track.Channels <= 0 {
+				res.Passed = false
+				res.Severity = "error"
+				res.Warning = "Audio track has zero channels"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, "audio track has 0 channels"))
+			}
+		case "Text":
+			if track.GetElementCount() <= 0 {
+				res.Passed = false
+				res.Severity = "error"
+				res.Warning = "Subtitle track has zero elements"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, "subtitle track has 0 elements"))
 			}
 		}
 	}

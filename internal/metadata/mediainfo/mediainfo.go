@@ -156,6 +156,7 @@ type Track struct {
 	ScanType                 string    `json:"ScanType,omitempty"`
 	FrameRate                float64   `json:"FrameRate,string,omitempty"`
 	FrameCount               int       `json:"FrameCount,string,omitempty"`
+	ElementCount             int       `json:"ElementCount,string,omitempty"`
 	BitDepth                 int       `json:"BitDepth,string,omitempty"`
 	ChromaSubsampling        string    `json:"ChromaSubsampling,omitempty"`
 	SamplingRate             int       `json:"SamplingRate,string,omitempty"`
@@ -196,6 +197,31 @@ func (t *Track) GetDialNorm() string {
 
 	// Strip " dB" suffix if present
 	return strings.TrimSuffix(val, " dB")
+}
+
+// GetElementCount returns the count of elements (subtitle lines) in the track.
+func (t *Track) GetElementCount() int {
+	if t.ElementCount > 0 {
+		return t.ElementCount
+	}
+
+	if t.FrameCount > 0 && t.Type == "Text" {
+		return t.FrameCount
+	}
+
+	if val := t.Extra.GetString("ElementCount"); val != "" {
+		if count, err := strconv.Atoi(val); err == nil {
+			return count
+		}
+	}
+
+	if val := t.Extra.GetString("Element_Count"); val != "" {
+		if count, err := strconv.Atoi(val); err == nil {
+			return count
+		}
+	}
+
+	return 0
 }
 
 // Get runs mediainfo on the given file path and returns a MediaInfo struct.
