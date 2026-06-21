@@ -1352,3 +1352,147 @@ func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 
 	return nil
 }
+
+func getChapters(ebml *matroska.EbmlMetadata) []matroska.EbmlChapterAtom {
+	if len(ebml.Chapters) == 0 || len(ebml.Chapters[0].Editions) == 0 {
+		return nil
+	}
+
+	return ebml.Chapters[0].Editions[0].Chapters
+}
+
+func formatNsToTime(ns int64) string {
+	ms := ns / 1000000
+	hours := ms / 3600000
+	ms %= 3600000
+	minutes := ms / 60000
+	ms %= 60000
+	seconds := ms / 1000
+	ms %= 1000
+
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms)
+}
+
+func checkChaptersStartNonZero(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	firstChapter := chapters[0]
+	if firstChapter.TimeStart != 0 {
+		timeStr := formatNsToTime(firstChapter.TimeStart)
+
+		return &CheckResult{
+			Identifier: "matroska_chapters_start_non_zero",
+			Warning:    "First chapter does not start at 00:00:00",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     timeStr,
+			Expected:   "00:00:00.000",
+		}
+	}
+
+	return nil
+}
+
+func checkChaptersNonMonotonic(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	var lastTime int64 = -1
+	for _, ch := range chapters {
+		if lastTime >= 0 && ch.TimeStart < lastTime {
+			return &CheckResult{
+				Identifier: "matroska_chapters_non_monotonic",
+				Warning:    "Chapter times are not strictly increasing",
+				Passed:     false,
+				Severity:   "error",
+				Actual:     fmt.Sprintf("chapter starts at %s after %s", formatNsToTime(ch.TimeStart), formatNsToTime(lastTime)),
+			}
+		}
+
+		lastTime = ch.TimeStart
+	}
+
+	return nil
+}
+
+func checkChaptersDuplicate(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	seenTimes := make(map[int64]bool)
+	for _, ch := range chapters {
+		if seenTimes[ch.TimeStart] {
+			return &CheckResult{
+				Identifier: "matroska_chapters_duplicate",
+				Warning:    "Duplicate chapter timestamps found",
+				Passed:     false,
+				Severity:   "error",
+				Actual:     "duplicate timestamp at " + formatNsToTime(ch.TimeStart),
+			}
+		}
+
+		seenTimes[ch.TimeStart] = true
+	}
+
+	return nil
+}
+
+func checkChaptersTooClose(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	var lastTime int64 = -1
+	for _, ch := range chapters {
+		if lastTime >= 0 {
+			diff := ch.TimeStart - lastTime
+			if diff < 10000000000 {
+				return &CheckResult{
+					Identifier: "matroska_chapters_too_close",
+					Warning:    "Chapter interval is too short (< 10 seconds)",
+					Passed:     false,
+					Severity:   "warning",
+					Actual:     fmt.Sprintf("interval is %.1fs between %s and %s", float64(diff)/1000000000.0, formatNsToTime(lastTime), formatNsToTime(ch.TimeStart)),
+				}
+			}
+		}
+
+		lastTime = ch.TimeStart
+	}
+
+	return nil
+}
+
+func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	duration := ebml.Container.Properties.Duration
+	if duration <= 0 {
+		return nil
+	}
+
+	for _, ch := range chapters {
+		if ch.TimeStart > duration {
+			return &CheckResult{
+				Identifier: "matroska_chapters_exceed_duration",
+				Warning:    "Chapter timestamp exceeds video duration",
+				Passed:     false,
+				Severity:   "error",
+				Actual:     fmt.Sprintf("chapter at %s (video duration is %s)", formatNsToTime(ch.TimeStart), formatNsToTime(duration)),
+			}
+		}
+	}
+
+	return nil
+}

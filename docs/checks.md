@@ -111,6 +111,11 @@ This document lists all individual checks performed by the `parsec check` comman
 | Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
 | Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
 | TrueHD Compatibility | `checkTrueHDCompatibility` | `matroska_truehd_compatibility` | Yes | Verifies that any Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/E-AC3) of the same language. |
+| Chapter Non-Zero Start | `checkChaptersStartNonZero` | `matroska_chapters_start_non_zero` | Yes | Verifies that the first chapter starts at exactly `00:00:00.000`. |
+| Chapter Non-Monotonic Order | `checkChaptersNonMonotonic` | `matroska_chapters_non_monotonic` | Yes | Verifies that chapter start times are strictly increasing. |
+| Chapter Duplicate Timestamps | `checkChaptersDuplicate` | `matroska_chapters_duplicate` | Yes | Flags cases where multiple chapters share the exact same timestamp. |
+| Chapter Interval Too Short | `checkChaptersTooClose` | `matroska_chapters_too_close` | Yes | Flags consecutive chapters that are less than 10 seconds apart. |
+| Chapter Exceeds Duration | `checkChaptersExceedDuration` | `matroska_chapters_exceed_duration` | Yes | Ensures no chapter starts after the total duration of the video. |
 | Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
 
 ### Media Database (MDB) Consistency Checks

@@ -194,6 +194,11 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `matroska_title_hygiene`: Verify container title doesn't contain technical metadata noise.
 -   `matroska_app_hygiene`: Verify writing application metadata is clean of local paths/UUIDs.
 -   `matroska_truehd_compatibility`: Verify Dolby TrueHD tracks are followed by a lossy compatibility track (AC3/E-AC3) in the same language.
+-   `matroska_chapters_start_non_zero`: Verify that the first chapter starts at exactly 00:00:00.000.
+-   `matroska_chapters_non_monotonic`: Verify that chapter start times are strictly increasing.
+-   `matroska_chapters_duplicate`: Check for duplicate chapter timestamps.
+-   `matroska_chapters_too_close`: Warn if consecutive chapters are less than 10 seconds apart.
+-   `matroska_chapters_exceed_duration`: Verify that no chapter start time exceeds the total video duration.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.
 -   `filename_streaming`: Check for service tags on WEB sources.

@@ -24,9 +24,11 @@ func TestRunTrackChecks(t *testing.T) {
 	})
 
 	tests := []struct {
-		name    string
-		tracks  []matroska.EbmlTrack
-		wantErr bool
+		name      string
+		tracks    []matroska.EbmlTrack
+		chapters  []matroska.EbmlChapters
+		container matroska.EbmlContainer
+		wantErr   bool
 	}{
 		{
 			name: "Valid German and English tracks",
@@ -357,11 +359,119 @@ func TestRunTrackChecks(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Valid chapters",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0},
+								{TimeStart: 15000000000},
+								{TimeStart: 120000000000},
+							},
+						},
+					},
+				},
+			},
+			container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Duration: 300000000000},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid chapters - first start non-zero",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 5000000000},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - non-monotonic",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0},
+								{TimeStart: 120000000000},
+								{TimeStart: 30000000000},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - duplicate timestamps",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0},
+								{TimeStart: 60000000000},
+								{TimeStart: 60000000000},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - interval too close",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0},
+								{TimeStart: 5000000000},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - exceed duration",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0},
+								{TimeStart: 350000000000},
+							},
+						},
+					},
+				},
+			},
+			container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Duration: 300000000000},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks}, nil, nil, nil)
+			res := runTrackChecks("", &matroska.EbmlMetadata{
+				Tracks:    tt.tracks,
+				Chapters:  tt.chapters,
+				Container: tt.container,
+			}, nil, nil, nil)
 
 			hasFailure := false
 

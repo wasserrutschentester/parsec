@@ -193,6 +193,11 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_title_hygiene":            true,
 	"matroska_app_hygiene":              true,
 	"matroska_truehd_compatibility":     true,
+	"matroska_chapters_start_non_zero":  true,
+	"matroska_chapters_non_monotonic":   true,
+	"matroska_chapters_duplicate":       true,
+	"matroska_chapters_too_close":       true,
+	"matroska_chapters_exceed_duration": true,
 }
 
 func checkValueTypes() {

@@ -74,6 +74,11 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_video_cropping",
 		"matroska_track_delay",
 		"matroska_truehd_compatibility",
+		"matroska_chapters_start_non_zero",
+		"matroska_chapters_non_monotonic",
+		"matroska_chapters_duplicate",
+		"matroska_chapters_too_close",
+		"matroska_chapters_exceed_duration",
 		"matroska_app_hygiene",
 	}
 
@@ -101,6 +106,25 @@ func RunMatroskaChecks(filePath string, meta *metadata.Metadata) []CheckResult {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {
 		return checkMatroskaFormat(err)
+	}
+
+	if ebml.HasChapters() {
+		xmlChapters, err := matroska.ExtractChapters(filePath)
+		if err == nil {
+			if len(ebml.Chapters) == 0 {
+				ebml.Chapters = append(ebml.Chapters, matroska.EbmlChapters{
+					NumEntries: len(xmlChapters),
+				})
+			}
+
+			ebml.Chapters[0].Editions = []matroska.EbmlEdition{
+				{
+					Chapters: xmlChapters,
+				},
+			}
+		} else {
+			ui.PrintDebug(fmt.Sprintf("Failed to extract chapters via mkvextract: %v", err))
+		}
 	}
 
 	fontMap, attachmentNames := getFontMapping(filePath, ebml.Attachments)
@@ -165,7 +189,35 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentNames))
 	}
 
+	runChaptersChecks(ebml, agg)
+
 	return agg.ToSlice()
+}
+
+func runChaptersChecks(ebml *matroska.EbmlMetadata, agg *trackResultAggregator) {
+	if len(ebml.Chapters) == 0 {
+		return
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_start_non_zero") {
+		agg.Add(checkChaptersStartNonZero(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_non_monotonic") {
+		agg.Add(checkChaptersNonMonotonic(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_duplicate") {
+		agg.Add(checkChaptersDuplicate(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_too_close") {
+		agg.Add(checkChaptersTooClose(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_exceed_duration") {
+		agg.Add(checkChaptersExceedDuration(ebml))
+	}
 }
 
 func runSingleIterationChecks(
