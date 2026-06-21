@@ -321,7 +321,7 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
-		if (track.Type != "Audio" && track.Type != "Text") || track.Duration == 0 {
+		if (track.Type != "Audio" && track.Type != "Text" && track.Type != "General") || track.Duration == 0 {
 			continue
 		}
 
