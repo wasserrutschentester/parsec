@@ -1,4 +1,7 @@
-#build files
+# build files
 /parsec
 .parsec.toml
 vendor/
+
+# test files
+*.mkv

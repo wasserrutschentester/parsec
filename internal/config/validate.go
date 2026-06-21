@@ -166,6 +166,7 @@ var validCheckIdentifiers = map[string]bool{
 	"mediainfo_redundant_audio":        true,
 	"mediainfo_resolution":             true,
 	"mediainfo_dialogue_normalization": true,
+	"mediainfo_stereo_lossless":        true,
 	"matroska_language_tag":            true,
 
 	"matroska_multi_lang":               true,

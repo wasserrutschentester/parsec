@@ -67,6 +67,11 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		results = append(results, checkDialogueNormalization(mi)...)
 	}
 
+	// 8. Stereo/Mono Lossless Codec
+	if config.IsCheckEnabled("mediainfo_stereo_lossless") {
+		results = append(results, checkStereoLossless(mi)...)
+	}
+
 	return results
 }
 
@@ -359,4 +364,41 @@ func getDurationWarning(track *mediainfo.Track, diff, percentDiff float64) strin
 	}
 
 	return ""
+}
+
+func checkStereoLossless(mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_stereo_lossless",
+		Passed:     true,
+	}
+
+	for i := range mi.Media.Tracks {
+		track := &mi.Media.Tracks[i]
+		if track.Type != "Audio" {
+			continue
+		}
+
+		if track.Channels <= 0 {
+			continue
+		}
+
+		if track.Channels <= 2 {
+			codec := metadata.AudioCodecName(track.Format, track.FormatProfile, track.FormatAdditionalFeatures)
+			uCodec := strings.ToUpper(codec)
+
+			isOtherLossless := false
+			if uCodec == "TRUEHD" || uCodec == "DTS-HD MA" || uCodec == "ALAC" || strings.Contains(uCodec, "PCM") {
+				isOtherLossless = true
+			}
+
+			if isOtherLossless {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Warning = "Audio track with 2 or less channels should use FLAC for lossless audio"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, fmt.Sprintf("uses %s with %d channels (should be FLAC)", codec, track.Channels)))
+			}
+		}
+	}
+
+	return []CheckResult{res}
 }
