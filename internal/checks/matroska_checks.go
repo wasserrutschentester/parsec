@@ -232,20 +232,19 @@ func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	props := track.Properties
-	if props.PixelWidth == 0 || props.PixelHeight == 0 {
+
+	pixelWidth, pixelHeight := matroska.ParseDimensions(props.PixelDimensions)
+	if pixelWidth == 0 || pixelHeight == 0 {
 		return nil
 	}
 
-	if hasAnyCropping(props) {
+	displayWidth, displayHeight := matroska.ParseDimensions(props.DisplayDimensions)
+	if displayWidth <= 0 || displayHeight <= 0 {
 		return nil
 	}
 
-	if props.DisplayWidth <= 0 || props.DisplayHeight <= 0 {
-		return nil
-	}
-
-	pixelAR := float64(props.PixelWidth) / float64(props.PixelHeight)
-	displayAR := float64(props.DisplayWidth) / float64(props.DisplayHeight)
+	pixelAR := float64(pixelWidth) / float64(pixelHeight)
+	displayAR := float64(displayWidth) / float64(displayHeight)
 
 	// If display AR is wider than pixel AR, but no crop values are set,
 	// it might be a "fake" crop or black bars that should be cropped.
@@ -258,17 +257,12 @@ func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func hasAnyCropping(props matroska.EbmlTrackProperties) bool {
-	return props.PixelCroppingLeft != 0 || props.PixelCroppingTop != 0 ||
-		props.PixelCroppingRight != 0 || props.PixelCroppingBottom != 0
-}
-
 func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
-	if track.Properties.Delay == 0 {
+	if track.Properties.CodecDelay == 0 {
 		return nil
 	}
 
-	absDelay := track.Properties.Delay
+	absDelay := track.Properties.CodecDelay
 	if absDelay < 0 {
 		absDelay = -absDelay
 	}
@@ -282,7 +276,7 @@ func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	if absDelay > maxDelayNs {
-		warning := fmt.Sprintf("delay of %dms exceeds ±1001ms", track.Properties.Delay/1000000)
+		warning := fmt.Sprintf("delay of %dms exceeds ±1001ms", track.Properties.CodecDelay/1000000)
 
 		return newFailedTrackResult("matroska_track_delay", "Excessive Container Delay", "warning", &track, warning)
 	}

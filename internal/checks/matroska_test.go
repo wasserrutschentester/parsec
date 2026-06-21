@@ -289,7 +289,7 @@ func TestRunTrackChecks(t *testing.T) {
 		{
 			name: "ASS Script Info resolution mismatch",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080}},
+				{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080"}},
 				{
 					ID:    2,
 					Type:  "subtitles",
@@ -771,7 +771,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Track with reasonable delay",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Delay: 5000000, Language: "ger", Number: 1}},
+						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 5000000, Language: "ger", Number: 1}},
 					},
 				},
 				identifier: "matroska_track_delay",
@@ -781,7 +781,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Track with excessive delay",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Delay: 2000000000, Language: "ger", Number: 1}},
+						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 2000000000, Language: "ger", Number: 1}},
 					},
 				},
 				identifier: "matroska_track_delay",
@@ -805,7 +805,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Video with proper cropping",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080, PixelCroppingTop: 140, PixelCroppingBottom: 140}},
+						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x1080"}},
 					},
 				},
 				identifier: "matroska_video_cropping",
@@ -815,7 +815,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Video with resolution-based black bars but no MKV crop",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080, DisplayWidth: 1920, DisplayHeight: 800}},
+						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x800"}},
 					},
 				},
 				identifier: "matroska_video_cropping",

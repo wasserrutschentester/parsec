@@ -1,6 +1,7 @@
 package matroska
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"os"
 	"testing"
@@ -85,5 +86,62 @@ func TestCountTypes(t *testing.T) {
 		if track.TypeOrder != expected[i] {
 			t.Errorf("track %d (type %s) expected TypeNumber %d, got %d", i, track.Type, expected[i], track.TypeOrder)
 		}
+	}
+}
+
+func TestParseDimensions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		wantW int
+		wantH int
+	}{
+		{"1920x1080", 1920, 1080},
+		{"1280x720", 1280, 720},
+		{"", 0, 0},
+		{"invalid", 0, 0},
+		{"1920", 0, 0},
+		{"1920x", 0, 0},
+		{"x1080", 0, 0},
+		{"1920x1080x10", 0, 0},
+	}
+
+	for _, tt := range tests {
+		w, h := ParseDimensions(tt.input)
+		if w != tt.wantW || h != tt.wantH {
+			t.Errorf("ParseDimensions(%q) = (%d, %d), want (%d, %d)", tt.input, w, h, tt.wantW, tt.wantH)
+		}
+	}
+}
+
+func TestUnmarshalRealJSON(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../scratch_mkvmerge.json")
+	if err != nil {
+		t.Skip("skipping test; scratch_mkvmerge.json not found")
+	}
+
+	var metadata EbmlMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		t.Fatalf("failed to unmarshal scratch_mkvmerge.json: %v", err)
+	}
+
+	// Verify that we successfully unmarshaled tracks
+	if len(metadata.Tracks) == 0 {
+		t.Fatalf("expected at least one track, got 0")
+	}
+
+	// The first track should be video (ID: 0)
+	videoTrack := metadata.Tracks[0]
+	if videoTrack.Type != "video" {
+		t.Errorf("expected track 0 type to be 'video', got %q", videoTrack.Type)
+	}
+
+	// Verify pixel_dimensions parsing via helper
+	w, h := ParseDimensions(videoTrack.Properties.PixelDimensions)
+	if w != 1920 || h != 804 {
+		t.Errorf("expected parsed pixel dimensions 1920x804, got %dx%d", w, h)
 	}
 }

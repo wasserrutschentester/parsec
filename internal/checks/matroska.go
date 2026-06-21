@@ -489,11 +489,18 @@ func getVideoDimensions(tracks []matroska.EbmlTrack) (int, int) {
 	for _, track := range tracks {
 		if track.Type == "video" {
 			props := track.Properties
-			if props.DisplayWidth > 0 && props.DisplayHeight > 0 {
-				return props.DisplayWidth, props.DisplayHeight
+
+			// Try display_dimensions string
+			dw, dh := matroska.ParseDimensions(props.DisplayDimensions)
+			if dw > 0 && dh > 0 {
+				return dw, dh
 			}
 
-			return props.PixelWidth, props.PixelHeight
+			// Fallback to pixel_dimensions string
+			pw, ph := matroska.ParseDimensions(props.PixelDimensions)
+			if pw > 0 && ph > 0 {
+				return pw, ph
+			}
 		}
 	}
 
