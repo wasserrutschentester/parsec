@@ -346,7 +346,7 @@ func getDurationWarning(track *mediainfo.Track, diff, percentDiff float64) strin
 		return fmt.Sprintf("%s (diff: %.1fs)", ui.Warning.Render("significantly shorter"), diff)
 	}
 
-	if percentDiff > 10.0 {
+	if percentDiff > 10.0 && !track.Forced {
 		return fmt.Sprintf("%.1f%% %s (diff: %.1fs)", percentDiff, ui.Warning.Render("shorter"), diff)
 	}
 
