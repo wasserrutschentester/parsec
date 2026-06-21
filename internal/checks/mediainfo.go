@@ -160,8 +160,18 @@ func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 		}
 	}
 
+	getRedundantAudioWarning(&res, langCounts)
+
+	return []CheckResult{res}
+}
+
+func getRedundantAudioWarning(res *CheckResult, langCounts map[string][]*mediainfo.Track) {
 	for _, tracks := range langCounts {
 		if len(tracks) > 1 {
+			if tracks[0].CodecID == "A_TRUEHD" && len(tracks) == 2 {
+				continue
+			}
+
 			res.Passed = false
 			res.Severity = "warning"
 
@@ -171,8 +181,6 @@ func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 			}
 		}
 	}
-
-	return []CheckResult{res}
 }
 
 func checkResolution(videoTrack *mediainfo.Track) []CheckResult {
