@@ -187,6 +187,11 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `matroska_ass_styles`: Deep validation of ASS styles.
 -   `matroska_ass_events`: Validation of ASS event lines.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
+-   `matroska_track_delay`: Warn if a track has container delay exceeding ±1001ms (excluding TrueHD audio).
+-   `matroska_video_cropping`: Warn if resolution-based black bars are detected but no MKV crop values are set.
+-   `matroska_title_hygiene`: Verify container title doesn't contain technical metadata noise.
+-   `matroska_app_hygiene`: Verify writing application metadata is clean of local paths/UUIDs.
+-   `matroska_truehd_compatibility`: Verify Dolby TrueHD tracks are followed by a lossy compatibility track (AC3/E-AC3) in the same language.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.
 -   `filename_streaming`: Check for service tags on WEB sources.

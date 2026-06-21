@@ -186,6 +186,11 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_track_order":              true,
 	"matroska_unused_fonts":             true,
 	"matroska_font_filename_compliance": true,
+	"matroska_track_delay":              true,
+	"matroska_video_cropping":           true,
+	"matroska_title_hygiene":            true,
+	"matroska_app_hygiene":              true,
+	"matroska_truehd_compatibility":     true,
 }
 
 func checkValueTypes() {

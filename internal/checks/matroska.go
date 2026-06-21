@@ -73,6 +73,7 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_title_hygiene",
 		"matroska_video_cropping",
 		"matroska_track_delay",
+		"matroska_truehd_compatibility",
 		"matroska_app_hygiene",
 	}
 
@@ -150,6 +151,10 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 			&lastAudioTrack, &lastSubTrack, &lastAudioPriority, &lastSubPriority,
 			reportedOrderTracks, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs,
 			audioCounts, subCounts, langHasOriginalFlag, videoWidth, videoHeight, allUsedFonts, fontMap)
+	}
+
+	if config.IsCheckEnabled("matroska_truehd_compatibility") {
+		agg.Add(checkTrueHDCompatibility(tracks))
 	}
 
 	if config.IsCheckEnabled("matroska_unused_fonts") {

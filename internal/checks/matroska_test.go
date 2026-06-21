@@ -303,6 +303,53 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Valid TrueHD with AC3 compatibility track",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid TrueHD with EAC3 compatibility track",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_EAC3", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid TrueHD - last track in file",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TrueHD - followed by different language",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TrueHD - followed by incompatible codec",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_AAC", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TrueHD - followed by non-audio track",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "S_TEXT/UTF8", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Audio tracks are ignored",
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},

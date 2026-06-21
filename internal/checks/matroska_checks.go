@@ -1291,3 +1291,64 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 
 	return nil
 }
+
+// checkTrueHDCompatibility checks if a Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/EAC3) in the same language.
+func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
+	res := &CheckResult{
+		Identifier: "matroska_truehd_compatibility",
+		Warning:    "TrueHD track is not followed by a lossy compatibility track",
+		Passed:     true,
+	}
+
+	for i := range tracks {
+		track := &tracks[i]
+		if track.Type != "audio" {
+			continue
+		}
+
+		if !strings.Contains(strings.ToUpper(track.Codec), "A_TRUEHD") {
+			continue
+		}
+
+		// TrueHD track found. Check next track.
+		if i+1 >= len(tracks) {
+			res.Passed = false
+			res.Severity = "warning"
+			res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, "TrueHD track is the last track and has no lossy compatibility track"))
+
+			continue
+		}
+
+		nextTrack := &tracks[i+1]
+		if nextTrack.Type != "audio" {
+			res.Passed = false
+			res.Severity = "warning"
+			res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, "TrueHD track is followed by a non-audio track of type "+nextTrack.Type))
+
+			continue
+		}
+
+		if nextTrack.Properties.Language != track.Properties.Language {
+			res.Passed = false
+			res.Severity = "warning"
+			res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("TrueHD track is followed by a track with different language: %s (expected %s)", nextTrack.Properties.Language, track.Properties.Language)))
+
+			continue
+		}
+
+		nextCodec := strings.ToUpper(nextTrack.Codec)
+		if !strings.Contains(nextCodec, "A_AC3") && !strings.Contains(nextCodec, "A_EAC3") {
+			res.Passed = false
+			res.Severity = "warning"
+			res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("TrueHD track is followed by an incompatible codec: %s (expected AC3 or EAC3)", nextTrack.Codec)))
+
+			continue
+		}
+	}
+
+	if !res.Passed {
+		return res
+	}
+
+	return nil
+}
