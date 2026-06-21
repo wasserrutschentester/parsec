@@ -366,9 +366,9 @@ func TestRunTrackChecks(t *testing.T) {
 					Editions: []matroska.EbmlEdition{
 						{
 							Chapters: []matroska.EbmlChapterAtom{
-								{TimeStart: 0},
-								{TimeStart: 15000000000},
-								{TimeStart: 120000000000},
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 15000000000, Display: []matroska.EbmlDisplay{{String: "The Journey", Language: "eng"}}},
+								{TimeStart: 120000000000, Display: []matroska.EbmlDisplay{{String: "Credits", Language: "eng"}}},
 							},
 						},
 					},
@@ -386,7 +386,7 @@ func TestRunTrackChecks(t *testing.T) {
 					Editions: []matroska.EbmlEdition{
 						{
 							Chapters: []matroska.EbmlChapterAtom{
-								{TimeStart: 5000000000},
+								{TimeStart: 5000000000, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
 							},
 						},
 					},
@@ -401,9 +401,9 @@ func TestRunTrackChecks(t *testing.T) {
 					Editions: []matroska.EbmlEdition{
 						{
 							Chapters: []matroska.EbmlChapterAtom{
-								{TimeStart: 0},
-								{TimeStart: 120000000000},
-								{TimeStart: 30000000000},
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 120000000000, Display: []matroska.EbmlDisplay{{String: "The End", Language: "eng"}}},
+								{TimeStart: 30000000000, Display: []matroska.EbmlDisplay{{String: "The Middle", Language: "eng"}}},
 							},
 						},
 					},
@@ -418,9 +418,9 @@ func TestRunTrackChecks(t *testing.T) {
 					Editions: []matroska.EbmlEdition{
 						{
 							Chapters: []matroska.EbmlChapterAtom{
-								{TimeStart: 0},
-								{TimeStart: 60000000000},
-								{TimeStart: 60000000000},
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 60000000000, Display: []matroska.EbmlDisplay{{String: "Part 2", Language: "eng"}}},
+								{TimeStart: 60000000000, Display: []matroska.EbmlDisplay{{String: "Part 3", Language: "eng"}}},
 							},
 						},
 					},
@@ -435,8 +435,8 @@ func TestRunTrackChecks(t *testing.T) {
 					Editions: []matroska.EbmlEdition{
 						{
 							Chapters: []matroska.EbmlChapterAtom{
-								{TimeStart: 0},
-								{TimeStart: 5000000000},
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 5000000000, Display: []matroska.EbmlDisplay{{String: "Part 2", Language: "eng"}}},
 							},
 						},
 					},
@@ -451,8 +451,8 @@ func TestRunTrackChecks(t *testing.T) {
 					Editions: []matroska.EbmlEdition{
 						{
 							Chapters: []matroska.EbmlChapterAtom{
-								{TimeStart: 0},
-								{TimeStart: 350000000000},
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 350000000000, Display: []matroska.EbmlDisplay{{String: "Outro", Language: "eng"}}},
 							},
 						},
 					},
@@ -460,6 +460,68 @@ func TestRunTrackChecks(t *testing.T) {
 			},
 			container: matroska.EbmlContainer{
 				Properties: matroska.EbmlContainerProperties{Duration: 300000000000},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - empty display name",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "   ", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - duplicate consecutive display names",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 15000000000, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - missing display language",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "und"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - inconsistent display languages",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 15000000000, Display: []matroska.EbmlDisplay{{String: "Part 2", Language: "fre"}}},
+							},
+						},
+					},
+				},
 			},
 			wantErr: true,
 		},

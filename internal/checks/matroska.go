@@ -79,6 +79,8 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_chapters_duplicate",
 		"matroska_chapters_too_close",
 		"matroska_chapters_exceed_duration",
+		"matroska_chapters_name_hygiene",
+		"matroska_chapters_language_hygiene",
 		"matroska_app_hygiene",
 	}
 
@@ -217,6 +219,14 @@ func runChaptersChecks(ebml *matroska.EbmlMetadata, agg *trackResultAggregator) 
 
 	if config.IsCheckEnabled("matroska_chapters_exceed_duration") {
 		agg.Add(checkChaptersExceedDuration(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_name_hygiene") {
+		agg.Add(checkChaptersNameHygiene(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_language_hygiene") {
+		agg.Add(checkChaptersLanguageHygiene(ebml))
 	}
 }
 

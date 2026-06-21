@@ -1490,3 +1490,177 @@ func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata) *CheckResult {
 
 	return nil
 }
+
+func checkSingleChapterNameHygiene(ch matroska.EbmlChapterAtom) (bool, []string) {
+	hasNonEmpty := false
+
+	var currentNames []string
+
+	for _, display := range ch.Display {
+		name := strings.TrimSpace(display.String)
+		if name != "" {
+			hasNonEmpty = true
+
+			currentNames = append(currentNames, name)
+		}
+	}
+
+	return hasNonEmpty, currentNames
+}
+
+func checkConsecutiveDuplicateNames(currentNames, lastNames []string, timeStart int64) *CheckResult {
+	for _, currentName := range currentNames {
+		for _, lastName := range lastNames {
+			if strings.EqualFold(currentName, lastName) {
+				return &CheckResult{
+					Identifier: "matroska_chapters_name_hygiene",
+					Warning:    "Consecutive duplicate chapter names found",
+					Passed:     false,
+					Severity:   "warning",
+					Actual:     fmt.Sprintf("consecutive chapters have name %q at %s", currentName, formatNsToTime(timeStart)),
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkChaptersNameHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	var lastNames []string
+
+	for i, ch := range chapters {
+		if len(ch.Display) == 0 {
+			return &CheckResult{
+				Identifier: "matroska_chapters_name_hygiene",
+				Warning:    "Chapter has no display name entry",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     fmt.Sprintf("chapter %d (starts at %s)", i+1, formatNsToTime(ch.TimeStart)),
+			}
+		}
+
+		hasNonEmpty, currentNames := checkSingleChapterNameHygiene(ch)
+
+		if !hasNonEmpty {
+			return &CheckResult{
+				Identifier: "matroska_chapters_name_hygiene",
+				Warning:    "Chapter display name is empty or only whitespace",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     fmt.Sprintf("chapter %d (starts at %s)", i+1, formatNsToTime(ch.TimeStart)),
+			}
+		}
+
+		if i > 0 {
+			if res := checkConsecutiveDuplicateNames(currentNames, lastNames, ch.TimeStart); res != nil {
+				return res
+			}
+		}
+
+		if len(currentNames) > 0 {
+			lastNames = currentNames
+		}
+	}
+
+	return nil
+}
+
+func getChapterLanguages(ch matroska.EbmlChapterAtom) (map[string]bool, *CheckResult) {
+	currentLangs := make(map[string]bool)
+
+	for _, display := range ch.Display {
+		lang := strings.TrimSpace(display.Language)
+		if lang == "" || strings.EqualFold(lang, "und") {
+			chapterName := display.String
+			if chapterName == "" {
+				chapterName = "(no name)"
+			}
+
+			return nil, &CheckResult{
+				Identifier: "matroska_chapters_language_hygiene",
+				Warning:    "Chapter display entry has undetermined or missing language",
+				Passed:     false,
+				Severity:   "warning",
+				Actual:     fmt.Sprintf("chapter %q (starts at %s) language is %q", chapterName, formatNsToTime(ch.TimeStart), lang),
+			}
+		}
+
+		currentLangs[strings.ToLower(lang)] = true
+	}
+
+	return currentLangs, nil
+}
+
+func checkLanguagesInconsistent(firstLangs, currentLangs map[string]bool, timeStart int64) *CheckResult {
+	if len(currentLangs) == 0 || len(firstLangs) == 0 {
+		return nil
+	}
+
+	matches := true
+	if len(currentLangs) != len(firstLangs) {
+		matches = false
+	} else {
+		for l := range currentLangs {
+			if !firstLangs[l] {
+				matches = false
+
+				break
+			}
+		}
+	}
+
+	if !matches {
+		var list1, list2 []string
+		for l := range firstLangs {
+			list1 = append(list1, l)
+		}
+
+		for l := range currentLangs {
+			list2 = append(list2, l)
+		}
+
+		return &CheckResult{
+			Identifier: "matroska_chapters_language_hygiene",
+			Warning:    "Inconsistent chapter languages in edition",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     fmt.Sprintf("languages %v vs %v at chapter starting at %s", list1, list2, formatNsToTime(timeStart)),
+		}
+	}
+
+	return nil
+}
+
+func checkChaptersLanguageHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	var firstLangs map[string]bool
+
+	for _, ch := range chapters {
+		currentLangs, res := getChapterLanguages(ch)
+		if res != nil {
+			return res
+		}
+
+		if firstLangs == nil {
+			if len(currentLangs) > 0 {
+				firstLangs = currentLangs
+			}
+		} else {
+			if res := checkLanguagesInconsistent(firstLangs, currentLangs, ch.TimeStart); res != nil {
+				return res
+			}
+		}
+	}
+
+	return nil
+}
