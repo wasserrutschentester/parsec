@@ -449,6 +449,22 @@ func (meta *Metadata) getReplacements() map[string]string {
 		replacements["{crc32}"] = strings.ToUpper(strings.Trim(meta.CRC32, "[]"))
 	}
 
+	meta.addNumberReplacements(replacements)
+
+	if meta.Repack {
+		replacements["{repack}"] = "REPACK"
+	}
+
+	if meta.HasAudioDesc && meta.Accessibility == "" {
+		replacements["{accessibility}"] = "with.Audio.Description"
+	}
+
+	return replacements
+}
+
+// addNumberReplacements adds the numeric template fields (bit depth, year,
+// season and episode) to the replacements map.
+func (meta *Metadata) addNumberReplacements(replacements map[string]string) {
 	if meta.BitDepth > 8 {
 		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
 	}
@@ -466,16 +482,6 @@ func (meta *Metadata) getReplacements() map[string]string {
 	}
 
 	meta.setEpisodeReplacements(replacements)
-
-	if meta.Repack {
-		replacements["{repack}"] = "REPACK"
-	}
-
-	if meta.HasAudioDesc && meta.Accessibility == "" {
-		replacements["{accessibility}"] = "with.Audio.Description"
-	}
-
-	return replacements
 }
 
 func (meta *Metadata) setEpisodeReplacements(replacements map[string]string) {
