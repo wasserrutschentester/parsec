@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"os"
 	"slices"
 	"testing"
 
@@ -270,6 +271,116 @@ func TestComputeFontRenamesDisabled(t *testing.T) {
 
 	if got := ComputeFontRenames("", ebml); got != nil {
 		t.Errorf("expected nil when matroska_font_filename_compliance is disabled, got %+v", got)
+	}
+}
+
+func TestNearestKeyframe(t *testing.T) {
+	t.Parallel()
+
+	keyframes := []int64{0, 10_000_000_000, 20_000_000_000}
+
+	tests := []struct {
+		name      string
+		timeStart int64
+		want      int64
+	}{
+		{"exact match", 10_000_000_000, 10_000_000_000},
+		{"closer to lower", 12_000_000_000, 10_000_000_000},
+		{"closer to upper", 16_000_000_000, 20_000_000_000},
+		{"before first keyframe", -5_000_000_000, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := nearestKeyframe(tt.timeStart, keyframes); got != tt.want {
+				t.Errorf("nearestKeyframe(%d) = %d, want %d", tt.timeStart, got, tt.want)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeChapterKeyframeSnaps(t *testing.T) {
+	config.InitDefaults()
+
+	filePath := createMockCuesFile(t, []uint64{0, 10000, 20000})
+
+	defer func() {
+		_ = os.Remove(filePath)
+	}()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		},
+		Chapters: []matroska.EbmlChapters{
+			{
+				Editions: []matroska.EbmlEdition{
+					{
+						Chapters: []matroska.EbmlChapterAtom{
+							{TimeStart: 0},              // aligned
+							{TimeStart: 16_000_000_000}, // misaligned, nearest is 20s
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fix := ComputeChapterKeyframeSnaps(filePath, ebml)
+
+	if fix.Changed != 1 {
+		t.Fatalf("expected 1 changed chapter, got %d (%+v)", fix.Changed, fix)
+	}
+
+	want := []int64{0, 20_000_000_000}
+	if !slices.Equal(fix.Times, want) {
+		t.Errorf("expected times %v, got %v", want, fix.Times)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeChapterKeyframeSnapsAligned(t *testing.T) {
+	config.InitDefaults()
+
+	filePath := createMockCuesFile(t, []uint64{0, 10000})
+
+	defer func() {
+		_ = os.Remove(filePath)
+	}()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		},
+		Chapters: []matroska.EbmlChapters{
+			{Editions: []matroska.EbmlEdition{{Chapters: []matroska.EbmlChapterAtom{{TimeStart: 0}}}}},
+		},
+	}
+
+	if fix := ComputeChapterKeyframeSnaps(filePath, ebml); fix.Changed != 0 {
+		t.Errorf("expected no changes for an already aligned chapter, got %+v", fix)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeChapterKeyframeSnapsDisabled(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("disabled_checks", []string{"matroska_chapters_keyframe_alignment"})
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		},
+		Chapters: []matroska.EbmlChapters{
+			{Editions: []matroska.EbmlEdition{{Chapters: []matroska.EbmlChapterAtom{{TimeStart: 15_000_000_000}}}}},
+		},
+	}
+
+	if fix := ComputeChapterKeyframeSnaps("", ebml); fix.Changed != 0 {
+		t.Errorf("expected no changes when the check is disabled, got %+v", fix)
 	}
 }
 

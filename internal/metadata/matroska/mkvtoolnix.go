@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -966,8 +967,26 @@ func parseTimeToNs(s string) (int64, error) {
 
 // ExtractChapters uses mkvextract to extract and parse chapters in XML format.
 func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
-	err := CheckForMatroska(filePath)
+	xmlContent, err := ExtractChaptersXML(filePath)
 	if err != nil {
+		return nil, err
+	}
+
+	var xmlCh EbmlChapters
+
+	if err := xml.Unmarshal(xmlContent, &xmlCh); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal chapters XML: %w", err)
+	}
+
+	return parseXMLChapters(xmlCh), nil
+}
+
+// ExtractChaptersXML uses mkvextract to extract the raw chapters XML as
+// written by mkvtoolnix, without parsing it. Used by fix to surgically rewrite
+// a small piece (e.g. timestamps) of the XML while leaving everything else
+// (flags, UIDs, nesting) byte-for-byte untouched.
+func ExtractChaptersXML(filePath string) ([]byte, error) {
+	if err := CheckForMatroska(filePath); err != nil {
 		return nil, err
 	}
 
@@ -985,13 +1004,125 @@ func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
 		return nil, fmt.Errorf("failed to read extracted chapters: %w", err)
 	}
 
-	var xmlCh EbmlChapters
+	return xmlContent, nil
+}
 
-	if err := xml.Unmarshal(xmlContent, &xmlCh); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal chapters XML: %w", err)
+// chapterTimeStartRegex matches a <ChapterTimeStart> element as written by
+// mkvextract, which always emits it on a single line without attributes.
+var chapterTimeStartRegex = regexp.MustCompile(`<ChapterTimeStart>[^<]*</ChapterTimeStart>`)
+
+var errChapterTimestampCountMismatch = errors.New("chapter timestamp count mismatch")
+
+// RewriteChapterTimestamps replaces each <ChapterTimeStart> value found in the
+// file's chapters XML, in document order, with newTimes (nanoseconds), then
+// applies the result with mkvpropedit. Every other byte of the XML (flags,
+// UIDs, display names, nesting) is left untouched. len(newTimes) must equal
+// the number of <ChapterTimeStart> elements found, otherwise nothing is
+// changed and an error is returned, since a mismatch means the caller's
+// chapter model (which only sees the first edition) doesn't match the file.
+func RewriteChapterTimestamps(filePath string, newTimes []int64) error {
+	if len(newTimes) == 0 {
+		return nil
 	}
 
-	return parseXMLChapters(xmlCh), nil
+	xmlContent, err := ExtractChaptersXML(filePath)
+	if err != nil {
+		return err
+	}
+
+	updated, err := replaceChapterTimestamps(xmlContent, newTimes)
+	if err != nil {
+		return err
+	}
+
+	return SetChaptersXML(filePath, updated)
+}
+
+// replaceChapterTimestamps is the pure XML-rewriting half of
+// RewriteChapterTimestamps, split out so it can be tested without mkvextract
+// or a real Matroska file.
+func replaceChapterTimestamps(xmlContent []byte, newTimes []int64) ([]byte, error) {
+	matches := chapterTimeStartRegex.FindAllIndex(xmlContent, -1)
+	if len(matches) != len(newTimes) {
+		return nil, fmt.Errorf("%w: found %d, expected %d", errChapterTimestampCountMismatch, len(matches), len(newTimes))
+	}
+
+	var buf bytes.Buffer
+
+	last := 0
+
+	for i, m := range matches {
+		buf.Write(xmlContent[last:m[0]])
+		buf.WriteString("<ChapterTimeStart>" + formatChapterTimestamp(newTimes[i]) + "</ChapterTimeStart>")
+
+		last = m[1]
+	}
+
+	buf.Write(xmlContent[last:])
+
+	return buf.Bytes(), nil
+}
+
+// formatChapterTimestamp formats nanoseconds as the HH:MM:SS.nnnnnnnnn string
+// mkvextract/mkvmerge use for ChapterTimeStart, the inverse of parseTimeToNs.
+func formatChapterTimestamp(ns int64) string {
+	if ns < 0 {
+		ns = 0
+	}
+
+	hours := ns / 3_600_000_000_000
+	ns -= hours * 3_600_000_000_000
+	mins := ns / 60_000_000_000
+	ns -= mins * 60_000_000_000
+	secs := ns / 1_000_000_000
+	ns -= secs * 1_000_000_000
+
+	return fmt.Sprintf("%02d:%02d:%02d.%09d", hours, mins, secs, ns)
+}
+
+// SetChaptersXML replaces a Matroska file's chapters in place with the given
+// XML content, using mkvpropedit.
+func SetChaptersXML(filePath string, xmlContent []byte) error {
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	tmpFile, err := os.CreateTemp("", "parsec-chapters-write-*.xml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpPath := tmpFile.Name()
+
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+
+	if _, err := tmpFile.Write(xmlContent); err != nil {
+		_ = tmpFile.Close()
+
+		return fmt.Errorf("failed to write chapters XML: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to write chapters XML: %w", err)
+	}
+
+	debugPath := ui.AnonymizePath(filePath)
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --chapters %s", debugPath, tmpPath))
+
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", filePath, "--chapters", tmpPath)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to set chapters: %w: %s", err, output)
+	}
+
+	return nil
 }
 
 func runMkvextractChapters(filePath string) (string, error) {

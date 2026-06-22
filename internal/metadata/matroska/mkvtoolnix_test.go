@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"os"
+	"strings"
 	"testing"
 
 	"codeberg.org/upPollo/parsec/internal/mdb"
@@ -139,6 +140,84 @@ func TestParseDimensions(t *testing.T) {
 		if w != tt.wantW || h != tt.wantH {
 			t.Errorf("ParseDimensions(%q) = (%d, %d), want (%d, %d)", tt.input, w, h, tt.wantW, tt.wantH)
 		}
+	}
+}
+
+func TestFormatChapterTimestamp(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		ns   int64
+		want string
+	}{
+		{0, "00:00:00.000000000"},
+		{20_000_000_000, "00:00:20.000000000"},
+		{3_661_500_000_000, "01:01:01.500000000"},
+		{-1, "00:00:00.000000000"},
+	}
+
+	for _, tt := range tests {
+		if got := formatChapterTimestamp(tt.ns); got != tt.want {
+			t.Errorf("formatChapterTimestamp(%d) = %q, want %q", tt.ns, got, tt.want)
+		}
+	}
+}
+
+func TestReplaceChapterTimestamps(t *testing.T) {
+	t.Parallel()
+
+	xmlContent := []byte(`<?xml version="1.0"?>
+<Chapters>
+  <EditionEntry>
+    <EditionUID>1</EditionUID>
+    <ChapterAtom>
+      <ChapterUID>10</ChapterUID>
+      <ChapterTimeStart>00:00:00.000000000</ChapterTimeStart>
+      <ChapterFlagHidden>0</ChapterFlagHidden>
+      <ChapterDisplay>
+        <ChapterString>Intro</ChapterString>
+        <ChapterLanguage>eng</ChapterLanguage>
+      </ChapterDisplay>
+    </ChapterAtom>
+    <ChapterAtom>
+      <ChapterUID>11</ChapterUID>
+      <ChapterTimeStart>00:00:16.000000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Scene 2</ChapterString>
+        <ChapterLanguage>eng</ChapterLanguage>
+      </ChapterDisplay>
+    </ChapterAtom>
+  </EditionEntry>
+</Chapters>
+`)
+
+	got, err := replaceChapterTimestamps(xmlContent, []int64{0, 20_000_000_000})
+	if err != nil {
+		t.Fatalf("replaceChapterTimestamps() error = %v", err)
+	}
+
+	gotStr := string(got)
+
+	if !strings.Contains(gotStr, "<ChapterTimeStart>00:00:20.000000000</ChapterTimeStart>") {
+		t.Errorf("expected second chapter snapped to 20s, got:\n%s", gotStr)
+	}
+
+	if !strings.Contains(gotStr, "<ChapterUID>10</ChapterUID>") || !strings.Contains(gotStr, "<ChapterFlagHidden>0</ChapterFlagHidden>") {
+		t.Errorf("expected unrelated XML content to be preserved untouched, got:\n%s", gotStr)
+	}
+
+	if !strings.Contains(gotStr, "<ChapterString>Scene 2</ChapterString>") {
+		t.Errorf("expected display names to be preserved, got:\n%s", gotStr)
+	}
+}
+
+func TestReplaceChapterTimestampsCountMismatch(t *testing.T) {
+	t.Parallel()
+
+	xmlContent := []byte("<ChapterTimeStart>00:00:00.000000000</ChapterTimeStart>")
+
+	if _, err := replaceChapterTimestamps(xmlContent, []int64{0, 1}); err == nil {
+		t.Error("expected an error when newTimes doesn't match the number of ChapterTimeStart elements")
 	}
 }
 

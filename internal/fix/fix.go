@@ -78,7 +78,46 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return err
 	}
 
+	if err := fixChapterAlignment(filePath, ebml, opts); err != nil {
+		return err
+	}
+
 	return removeUnusedFonts(filePath, ebml, opts)
+}
+
+// fixChapterAlignment snaps misaligned chapter start times to the nearest
+// video keyframe. Re-timing chapters changes seek/navigation points, so it is
+// always confirmed like the other container fixes above.
+func fixChapterAlignment(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
+	fix := checks.ComputeChapterKeyframeSnaps(filePath, ebml)
+	if fix.Changed == 0 {
+		return nil
+	}
+
+	ui.Println(ui.ReportSection("Chapter Keyframe Alignment"))
+	ui.Println(fmt.Sprintf("  Snap %d of %d chapter(s) to the nearest video keyframe.", fix.Changed, len(fix.Times)))
+
+	if opts.DryRun {
+		ui.Println(ui.Muted.Render("Dry run: no changes made."))
+
+		return nil
+	}
+
+	if !opts.Unattended && !ui.ConfirmContinue("Apply chapter keyframe alignment?") {
+		ui.Println(ui.Muted.Render("Skipping chapter alignment..."))
+
+		return nil
+	}
+
+	if err := matroska.RewriteChapterTimestamps(filePath, fix.Times); err != nil {
+		ui.PrintError(fmt.Sprintf("Error aligning chapters for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Chapters aligned to keyframes.")
+
+	return nil
 }
 
 // renameNonCompliantFonts renames font attachments whose filename doesn't

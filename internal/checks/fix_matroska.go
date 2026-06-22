@@ -48,6 +48,96 @@ func ComputeContainerFixes(ebml *matroska.EbmlMetadata) map[string]string {
 	return props
 }
 
+// ChapterAlignmentFix describes the timestamp corrections needed to align
+// chapters with video keyframes, satisfying matroska_chapters_keyframe_alignment.
+// Times is the full, ordered list of chapter start times (ns) to write back:
+// mkvpropedit rewrites chapters by document position, so already-aligned
+// chapters pass their original time through unchanged alongside the snapped
+// ones. Changed counts how many entries actually differ from the original.
+type ChapterAlignmentFix struct {
+	Times   []int64
+	Changed int
+}
+
+// ComputeChapterKeyframeSnaps returns the chapter timestamp corrections that
+// align each misaligned chapter with its nearest video keyframe. Returns a
+// zero-value ChapterAlignmentFix (Changed == 0) when the check is disabled,
+// the file has no chapters, the video keyframe index can't be read, or
+// nothing needs to change. Only the first edition is considered, matching the
+// check's own getChapters(); a file with additional editions is left alone.
+func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) ChapterAlignmentFix {
+	if !config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
+		return ChapterAlignmentFix{}
+	}
+
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 || len(ebml.Chapters) != 1 || len(ebml.Chapters[0].Editions) != 1 {
+		return ChapterAlignmentFix{}
+	}
+
+	videoTrackNum := getVideoTrackNumberFromEBML(ebml)
+	if videoTrackNum == 0 {
+		return ChapterAlignmentFix{}
+	}
+
+	keyframes, err := matroska.ReadKeyframeTimestamps(filePath, videoTrackNum, ebml.Container.Properties.TimestampScale)
+	if err != nil || len(keyframes) == 0 {
+		return ChapterAlignmentFix{}
+	}
+
+	times, changed := snapChaptersToKeyframes(chapters, keyframes)
+	if changed == 0 {
+		return ChapterAlignmentFix{}
+	}
+
+	return ChapterAlignmentFix{Times: times, Changed: changed}
+}
+
+// snapChaptersToKeyframes returns, in chapter order, each chapter's start
+// time snapped to its nearest keyframe when misaligned, or unchanged when
+// already aligned, plus how many entries were actually snapped.
+func snapChaptersToKeyframes(chapters []matroska.EbmlChapterAtom, keyframes []int64) ([]int64, int) {
+	times := make([]int64, len(chapters))
+	changed := 0
+
+	for i, ch := range chapters {
+		if aligned, _ := isAligned(ch.TimeStart, keyframes); aligned {
+			times[i] = ch.TimeStart
+
+			continue
+		}
+
+		times[i] = nearestKeyframe(ch.TimeStart, keyframes)
+		changed++
+	}
+
+	return times, changed
+}
+
+// nearestKeyframe returns the keyframe timestamp closest to timeStart.
+// keyframes must be non-empty.
+func nearestKeyframe(timeStart int64, keyframes []int64) int64 {
+	best := keyframes[0]
+	bestDiff := absInt64(timeStart - best)
+
+	for _, kf := range keyframes[1:] {
+		if diff := absInt64(timeStart - kf); diff < bestDiff {
+			bestDiff = diff
+			best = kf
+		}
+	}
+
+	return best
+}
+
+func absInt64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+
+	return v
+}
+
 // ComputeUnusedFontAttachments returns the font attachments that satisfy the
 // matroska_unused_fonts check's removal criteria: not referenced by any
 // subtitle track's Styles or inline tags. Returns nil when the check is
