@@ -118,6 +118,7 @@ This document lists all individual checks performed by the `parsec check` comman
 | Chapter Exceeds Duration | `checkChaptersExceedDuration` | `matroska_chapters_exceed_duration` | Yes | Ensures no chapter starts after the total duration of the video. |
 | Chapter Name Hygiene | `checkChaptersNameHygiene` | `matroska_chapters_name_hygiene` | Yes | Verifies chapter display names are present, and have no consecutive duplicate names. |
 | Chapter Language Hygiene | `checkChaptersLanguageHygiene` | `matroska_chapters_language_hygiene` | Yes | Ensures all chapter displays have valid, consistent language tags (and are not undetermined/missing). |
+| Chapter Keyframe Alignment | `checkChaptersKeyframeAlignment` | `matroska_chapters_keyframe_alignment` | Yes | Verifies that chapter timestamps fall exactly on video keyframes (seek points) using the container's Cues index. |
 | Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
 
 ### Media Database (MDB) Consistency Checks

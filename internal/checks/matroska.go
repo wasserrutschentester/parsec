@@ -31,13 +31,35 @@ func (a *trackResultAggregator) Add(res *CheckResult) {
 			Identifier: res.Identifier,
 			Warning:    res.Warning,
 			Passed:     true,
+			Actual:     res.Actual,
+			Expected:   res.Expected,
 		}
 		a.aggregated[res.Identifier] = target
+	} else {
+		a.mergeActualExpected(target, res)
 	}
 
 	target.Passed = false
 	target.Severity = res.Severity
 	target.Tracks = append(target.Tracks, res.Tracks...)
+}
+
+func (a *trackResultAggregator) mergeActualExpected(target, res *CheckResult) {
+	if res.Actual != "" {
+		if target.Actual == "" {
+			target.Actual = res.Actual
+		} else {
+			target.Actual += "; " + res.Actual
+		}
+	}
+
+	if res.Expected != "" {
+		if target.Expected == "" {
+			target.Expected = res.Expected
+		} else {
+			target.Expected += "; " + res.Expected
+		}
+	}
 }
 
 func (a *trackResultAggregator) AddAll(results []*CheckResult) {
@@ -81,6 +103,7 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_chapters_exceed_duration",
 		"matroska_chapters_name_hygiene",
 		"matroska_chapters_language_hygiene",
+		"matroska_chapters_keyframe_alignment",
 		"matroska_app_hygiene",
 	}
 
@@ -191,12 +214,12 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentNames))
 	}
 
-	runChaptersChecks(ebml, agg)
+	runChaptersChecks(filePath, ebml, agg)
 
 	return agg.ToSlice()
 }
 
-func runChaptersChecks(ebml *matroska.EbmlMetadata, agg *trackResultAggregator) {
+func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, agg *trackResultAggregator) {
 	if len(ebml.Chapters) == 0 {
 		return
 	}
@@ -227,6 +250,10 @@ func runChaptersChecks(ebml *matroska.EbmlMetadata, agg *trackResultAggregator) 
 
 	if config.IsCheckEnabled("matroska_chapters_language_hygiene") {
 		agg.Add(checkChaptersLanguageHygiene(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
+		agg.Add(checkChaptersKeyframeAlignment(filePath, ebml))
 	}
 }
 

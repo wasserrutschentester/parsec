@@ -1664,3 +1664,106 @@ func checkChaptersLanguageHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 
 	return nil
 }
+
+func isAligned(timeStart int64, keyframes []int64) (bool, int64) {
+	closestDiff := int64(-1)
+
+	for _, kf := range keyframes {
+		var (
+			currentDiff int64
+			inRange     bool
+		)
+
+		diff := timeStart - kf
+
+		if diff >= 0 {
+			currentDiff = diff
+			inRange = diff <= 8_000_000
+		} else {
+			currentDiff = -diff
+			inRange = (-diff) <= 1_000_000 // Allow up to 1ms negative tolerance for rounding errors
+		}
+
+		if closestDiff == -1 || currentDiff < closestDiff {
+			closestDiff = currentDiff
+		}
+
+		if inRange {
+			return true, closestDiff
+		}
+	}
+
+	return false, closestDiff
+}
+
+func getVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
+	for _, track := range ebml.Tracks {
+		if track.Type == "video" {
+			return uint64(track.Properties.Number)
+		}
+	}
+
+	return 0
+}
+
+func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata) *CheckResult {
+	if filePath == "" {
+		return nil
+	}
+
+	videoTrackNum := getVideoTrackNumberFromEBML(ebml)
+	if videoTrackNum == 0 {
+		return nil
+	}
+
+	keyframes, err := matroska.ReadKeyframeTimestamps(filePath, videoTrackNum, ebml.Container.Properties.TimestampScale)
+	if err != nil {
+		return &CheckResult{
+			Identifier: "matroska_chapters_keyframe_alignment",
+			Warning:    "Failed to read video cues index (SeekHead/Cues may be missing or invalid)",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     err.Error(),
+		}
+	}
+
+	if len(keyframes) == 0 {
+		return &CheckResult{
+			Identifier: "matroska_chapters_keyframe_alignment",
+			Warning:    "No video cues/index entries found (seeking might be slow or broken)",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     "zero cues indexed for video track",
+		}
+	}
+
+	chapters := getChapters(ebml)
+	if len(chapters) == 0 {
+		return nil
+	}
+
+	var nonAligned []string
+
+	for i, ch := range chapters {
+		if aligned, diff := isAligned(ch.TimeStart, keyframes); !aligned {
+			nonAligned = append(nonAligned, fmt.Sprintf(
+				"chapter %d at %s (nearest keyframe is off by %.3fs)",
+				i+1,
+				formatNsToTime(ch.TimeStart),
+				float64(diff)/1e9,
+			))
+		}
+	}
+
+	if len(nonAligned) > 0 {
+		return &CheckResult{
+			Identifier: "matroska_chapters_keyframe_alignment",
+			Warning:    "Chapters are not aligned with video keyframes",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     strings.Join(nonAligned, "; "),
+		}
+	}
+
+	return nil
+}

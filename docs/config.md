@@ -201,6 +201,7 @@ See [Validation Checks](checks.md) for more details about what checks are availi
 -   `matroska_chapters_exceed_duration`: Verify that no chapter start time exceeds the total video duration.
 -   `matroska_chapters_name_hygiene`: Flags missing/whitespace-only names or consecutive duplicate names.
 -   `matroska_chapters_language_hygiene`: Flags undetermined (`und`) or missing display languages, or inconsistent languages.
+-   `matroska_chapters_keyframe_alignment`: Verify that chapter timestamps align with video keyframes (seek points) using the container's Cues index.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.
 -   `filename_streaming`: Check for service tags on WEB sources.
