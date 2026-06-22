@@ -1,6 +1,7 @@
 package fix
 
 import (
+	"strings"
 	"testing"
 
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -117,6 +118,58 @@ func TestFormatContainerChange(t *testing.T) {
 
 	if got != want {
 		t.Errorf("formatContainerChange() = %q, want %q", got, want)
+	}
+}
+
+func TestLongestCommonSubsequence(t *testing.T) {
+	t.Parallel()
+
+	got := longestCommonSubsequence([]int{0, 1, 2, 3}, []int{0, 2, 1, 3})
+	want := []int{0, 1, 3} // or {0, 2, 3}; both are valid LCS of equal length
+
+	if len(got) != len(want) {
+		t.Fatalf("longestCommonSubsequence() = %v, want length %d", got, len(want))
+	}
+}
+
+func TestMisplacedTrackIDs(t *testing.T) {
+	t.Parallel()
+
+	// Track 2 (subtitle, out of place before video/audio) moves to the end;
+	// tracks 0, 1 and 3 keep their relative order and just shift index.
+	oldOrder := []int{2, 0, 1, 3}
+	newOrder := []int{0, 1, 3, 2}
+
+	got := misplacedTrackIDs(oldOrder, newOrder)
+
+	if !got[2] {
+		t.Errorf("expected track 2 to be flagged as misplaced, got %v", got)
+	}
+
+	for _, id := range []int{0, 1, 3} {
+		if got[id] {
+			t.Errorf("track %d should not be flagged as misplaced (it only shifted), got %v", id, got)
+		}
+	}
+}
+
+func TestTrackOrderTable(t *testing.T) {
+	t.Parallel()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 2, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng"}},
+			{ID: 0, Type: "video"},
+			{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger"}},
+		},
+	}
+
+	table := trackOrderTable(ebml, []int{0, 1, 2})
+
+	for _, want := range []string{"video", "audio", "subtitles"} {
+		if !strings.Contains(table, want) {
+			t.Errorf("expected rendered table to mention %q, got:\n%s", want, table)
+		}
 	}
 }
 

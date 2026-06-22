@@ -52,11 +52,7 @@ func ApplyFile(filePath string, opts Options) error {
 		return err
 	}
 
-	if opts.Remux {
-		return remuxMatroska(filePath, opts)
-	}
-
-	return nil
+	return remuxMatroska(filePath, opts)
 }
 
 // fixContainerMetadata applies the in-place, mkvpropedit-based container fixes
@@ -391,6 +387,11 @@ func flagChangeTag(key string, set bool) string {
 	return ui.Muted.Render("[-] " + label)
 }
 
+// remuxMatroska previews the pending remux-only fixes (track order,
+// compression stripping, track removals) regardless of --remux, so a plain
+// `fix` run always shows what a rewrite would change. The actual mkvmerge
+// rewrite only runs with --remux, and each of the three pieces is then
+// confirmed independently, same as every other fix.
 func remuxMatroska(filePath string, opts Options) error {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {
@@ -399,7 +400,13 @@ func remuxMatroska(filePath string, opts Options) error {
 		return nil
 	}
 
-	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
+	// The MDB original-language lookup is a real network call (and may prompt
+	// for disambiguation), so it only runs when --remux is actually going to
+	// apply something; a plain preview must stay free of side effects.
+	var originalLang string
+	if opts.Remux {
+		originalLang = lookupOriginalLanguage(filePath, ebml.Tracks, opts)
+	}
 
 	plan := ComputeMatroskaRemux(ebml.Tracks, originalLang)
 	if plan.IsEmpty() {
@@ -408,24 +415,29 @@ func remuxMatroska(filePath string, opts Options) error {
 
 	ui.Println(ui.ReportSection("Container Remux"))
 
-	remuxOpts := matroska.RemuxOptions{
-		TrackOrder:              plan.TrackOrder,
-		StripCompressionIDs:     plan.StripCompressionIDs,
-		DisableTrackCompression: config.IsCheckEnabled("matroska_zlib_compression"),
-	}
-
-	previewRemuxPlan(ebml, plan)
-
-	remuxOpts.RemoveTrackIDs = selectRemovals(ebml, plan.RemovalCandidates, opts)
-	if remuxOpts.IsEmpty() {
-		ui.Println(ui.Muted.Render("Nothing selected to remux."))
+	if !opts.Remux {
+		previewRemuxWithoutApplying(ebml, plan)
 
 		return nil
 	}
 
-	previewCompressionPolicy(plan, remuxOpts)
+	remuxOpts := matroska.RemuxOptions{
+		DisableTrackCompression: config.IsCheckEnabled("matroska_zlib_compression"),
+	}
 
-	if !confirmApply(opts, "Remux now? (this rewrites the whole container)", "Skipping remux...") {
+	if confirmTrackOrder(ebml, plan, opts) {
+		remuxOpts.TrackOrder = plan.TrackOrder
+	}
+
+	if confirmCompressionStrip(ebml, plan, opts) {
+		remuxOpts.StripCompressionIDs = plan.StripCompressionIDs
+	}
+
+	remuxOpts.RemoveTrackIDs = selectRemovals(ebml, plan.RemovalCandidates, opts)
+
+	if remuxOpts.IsEmpty() {
+		ui.Println(ui.Muted.Render("Nothing selected to remux."))
+
 		return nil
 	}
 
@@ -442,27 +454,167 @@ func remuxMatroska(filePath string, opts Options) error {
 	return nil
 }
 
+// previewRemuxWithoutApplying shows the full remux plan and tells the user
+// how to apply it, without performing the MDB lookup or touching the file.
+func previewRemuxWithoutApplying(ebml *matroska.EbmlMetadata, plan MatroskaRemuxPlan) {
+	previewRemuxPlan(ebml, plan)
+
+	if needsOriginalLanguageForUnwantedAudio(ebml.Tracks) {
+		ui.Println(ui.Muted.Render("  (unwanted-language audio pruning needs --remux to resolve the MDB original language)"))
+	}
+
+	ui.Println(ui.Muted.Render("Run with --remux to apply these changes."))
+}
+
+// previewRemuxPlan lists every pending remux-only change (track order,
+// compression stripping, removal candidates with their reasons) without
+// modifying anything, so it's safe to print whether or not --remux was given.
 func previewRemuxPlan(ebml *matroska.EbmlMetadata, plan MatroskaRemuxPlan) {
 	if len(plan.TrackOrder) > 0 {
-		labels := make([]string, 0, len(plan.TrackOrder))
-		for _, id := range plan.TrackOrder {
-			labels = append(labels, trackLabel(findTrackByID(ebml, id)))
-		}
-
-		ui.Println("  Reorder tracks: " + strings.Join(labels, ui.Muted.Render(" > ")))
+		ui.Println(trackOrderTable(ebml, plan.TrackOrder))
 	}
 
 	for _, id := range plan.StripCompressionIDs {
 		ui.Println("  Strip compression from " + trackLabel(findTrackByID(ebml, id)))
 	}
+
+	for _, candidate := range plan.RemovalCandidates {
+		ui.Println("  Remove " + trackLabel(findTrackByID(ebml, candidate.TrackID)) + ": " + ui.Warning.Render(candidate.Reason))
+	}
 }
 
-func previewCompressionPolicy(plan MatroskaRemuxPlan, opts matroska.RemuxOptions) {
-	if !opts.DisableTrackCompression || len(plan.StripCompressionIDs) > 0 {
-		return
+// confirmTrackOrder previews and confirms the track-reordering part of the
+// remux plan independently of compression and removals.
+func confirmTrackOrder(ebml *matroska.EbmlMetadata, plan MatroskaRemuxPlan, opts Options) bool {
+	if len(plan.TrackOrder) == 0 {
+		return false
 	}
 
-	ui.Println("  Write kept tracks without container compression.")
+	ui.Println(trackOrderTable(ebml, plan.TrackOrder))
+
+	return confirmApply(opts, "Reorder tracks like this?", "Skipping track reordering...")
+}
+
+// trackOrderTable renders a before/after table for the reorder: only the
+// tracks that were genuinely out of place (not part of the longest common
+// subsequence between the current and desired order) are highlighted; the
+// rest keep their relative order and just shift index as a side effect.
+func trackOrderTable(ebml *matroska.EbmlMetadata, newOrder []int) string {
+	oldOrder := make([]int, len(ebml.Tracks))
+	for i, t := range ebml.Tracks {
+		oldOrder[i] = t.ID
+	}
+
+	oldIndex := make(map[int]int, len(oldOrder))
+	for i, id := range oldOrder {
+		oldIndex[id] = i + 1
+	}
+
+	misplaced := misplacedTrackIDs(oldOrder, newOrder)
+
+	headers := []string{"Old #", "New #", "Track"}
+	rows := make([][]string, 0, len(newOrder))
+
+	for i, id := range newOrder {
+		label := trackLabel(findTrackByID(ebml, id))
+		if misplaced[id] {
+			label = ui.Warning.Render(label)
+		}
+
+		rows = append(rows, []string{strconv.Itoa(oldIndex[id]), strconv.Itoa(i + 1), label})
+	}
+
+	return ui.TrackTable(headers, rows)
+}
+
+// misplacedTrackIDs returns the track IDs that genuinely need to move:
+// everything in newOrder that isn't part of the longest common subsequence
+// with oldOrder. LCS members are already in correct relative order and only
+// change index because the misplaced ones move around them.
+func misplacedTrackIDs(oldOrder, newOrder []int) map[int]bool {
+	inLCS := make(map[int]bool)
+	for _, id := range longestCommonSubsequence(oldOrder, newOrder) {
+		inLCS[id] = true
+	}
+
+	misplaced := make(map[int]bool)
+
+	for _, id := range newOrder {
+		if !inLCS[id] {
+			misplaced[id] = true
+		}
+	}
+
+	return misplaced
+}
+
+// longestCommonSubsequence returns the longest common subsequence of a and b
+// via the standard O(len(a)*len(b)) DP table.
+func longestCommonSubsequence(a, b []int) []int {
+	dp := lcsTable(a, b)
+	lcs := backtrackLCS(a, b, dp)
+
+	slices.Reverse(lcs)
+
+	return lcs
+}
+
+func lcsTable(a, b []int) [][]int {
+	n, m := len(a), len(b)
+	dp := make([][]int, n+1)
+
+	for i := range dp {
+		dp[i] = make([]int, m+1)
+	}
+
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= m; j++ {
+			switch {
+			case a[i-1] == b[j-1]:
+				dp[i][j] = dp[i-1][j-1] + 1
+			case dp[i-1][j] >= dp[i][j-1]:
+				dp[i][j] = dp[i-1][j]
+			default:
+				dp[i][j] = dp[i][j-1]
+			}
+		}
+	}
+
+	return dp
+}
+
+func backtrackLCS(a, b []int, dp [][]int) []int {
+	n, m := len(a), len(b)
+	lcs := make([]int, 0, dp[n][m])
+
+	for i, j := n, m; i > 0 && j > 0; {
+		switch {
+		case a[i-1] == b[j-1]:
+			lcs = append(lcs, a[i-1])
+			i--
+			j--
+		case dp[i-1][j] >= dp[i][j-1]:
+			i--
+		default:
+			j--
+		}
+	}
+
+	return lcs
+}
+
+// confirmCompressionStrip previews and confirms stripping zlib compression
+// from the flagged tracks, independently of track order and removals.
+func confirmCompressionStrip(ebml *matroska.EbmlMetadata, plan MatroskaRemuxPlan, opts Options) bool {
+	if len(plan.StripCompressionIDs) == 0 {
+		return false
+	}
+
+	for _, id := range plan.StripCompressionIDs {
+		ui.Println("  Strip compression from " + trackLabel(findTrackByID(ebml, id)))
+	}
+
+	return confirmApply(opts, "Strip container compression from these tracks?", "Skipping compression strip...")
 }
 
 func verifyRemuxResult(filePath, originalLang string) {

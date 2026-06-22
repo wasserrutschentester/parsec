@@ -15,11 +15,11 @@ You can provide one or more files or directories to be processed. Directories wi
 `fix` runs in up to two stages per file:
 
 1. **In-place track fixes** (always): track flags and names are corrected directly with `mkvpropedit`. This is fast and lossless — the container is not rewritten.
-2. **Container remux** (only with `--remux`): track order, container compression and track removals are applied by rewriting the file with `mkvmerge`. If non-preferred audio languages are present, `fix` uses `--ov` or looks up the MDB original language and only proposes unwanted-language removals when that information is available. The output replaces the original atomically and the original file mode is preserved.
+2. **Container remux** (preview always shown; applied only with `--remux`): track order, container compression and track removals are reported even on a plain `fix` run, so you always see what a rewrite would change — `fix` just won't touch the file until you pass `--remux`. The MDB original-language lookup needed for unwanted-language pruning is skipped in this preview (it's a real network call) and only runs once `--remux` is given; use `--ov` to provide it without a lookup. The output replaces the original atomically and the original file mode is preserved.
 
 Each check is only fixed if it is enabled in your [configuration](config.md); disabled checks are skipped, just as they are by `check`.
 
-Unrelated groups of fixes (track flags, track names, language tags, title hygiene, writing-application hygiene, font renames, chapter alignment, unused fonts, remux) are each previewed and confirmed **independently**, so declining one never blocks the others. If you want everything applied without stopping to ask, use `--unattended`; to see what would change without writing anything, use `--dry-run`.
+Unrelated groups of fixes (track flags, track names, language tags, title hygiene, writing-application hygiene, font renames, chapter alignment, unused fonts, track order, compression, track removals) are each previewed and confirmed **independently**, so declining one never blocks the others. If you want everything applied without stopping to ask, use `--unattended`; to see what would change without writing anything, use `--dry-run`.
 
 ## What Gets Fixed
 
@@ -52,7 +52,7 @@ The mechanism column indicates how a fix is applied: **In-place** (`mkvpropedit`
 
 | Check | Mechanism | Notes |
 |-------|-----------|-------|
-| `matroska_track_order` | Remux | Reorders tracks by language and type priority. |
+| `matroska_track_order` | Remux / *prompt* | Reorders tracks by language and type priority. Shown as a before/after table; only the tracks that were genuinely out of place are highlighted, the rest just shift index as a side effect and aren't. |
 | `matroska_zlib_compression` | Remux | Strips zlib track compression. |
 | `matroska_duplicate_tracks` | Remux / *prompt* | Removes exact-duplicate tracks (same language, flags and name). |
 | `mdb_unwanted_audio_lang` | Remux / *prompt* | Removes audio in languages other than the preferred or MDB original language. Skipped if the original language is unavailable. Lists the affected languages before confirmation. |
