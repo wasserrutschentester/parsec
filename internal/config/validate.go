@@ -74,6 +74,8 @@ var expectedTypes = map[string]string{
 	"template":              "string",
 	"video_codec_avc":       "string",
 	"video_codec_hevc":      "string",
+	"word_separator":        "string",
+	"normalize_diacritics":  "bool",
 	"title":                 "string",
 	"year":                  "int64",
 	"season":                "int64",
@@ -135,6 +137,8 @@ var validTemplateKeys = map[string]bool{
 	"episode_02":     true,
 	"episode_03":     true,
 	"episode_id":     true,
+	"dual_audio":     true,
+	"crc32":          true,
 	"repack":         true,
 }
 
@@ -162,26 +166,41 @@ var validCheckIdentifiers = map[string]bool{
 	"mediainfo_redundant_audio":        true,
 	"mediainfo_resolution":             true,
 	"mediainfo_dialogue_normalization": true,
+	"mediainfo_stereo_lossless":        true,
+	"mediainfo_empty_tracks":           true,
 	"matroska_language_tag":            true,
 
-	"matroska_multi_lang":               true,
-	"matroska_name_quality":             true,
-	"matroska_name_codecs":              true,
-	"matroska_name_redundant_lang":      true,
-	"matroska_original_language":        true,
-	"matroska_duplicate_tracks":         true,
-	"matroska_name_keywords":            true,
-	"matroska_default_flags":            true,
-	"matroska_subtitle_format":          true,
-	"matroska_subtitle_fonts":           true,
-	"matroska_subtitle_inline_fonts":    true,
-	"matroska_ass_script_info":          true,
-	"matroska_ass_styles":               true,
-	"matroska_ass_events":               true,
-	"matroska_zlib_compression":         true,
-	"matroska_track_order":              true,
-	"matroska_unused_fonts":             true,
-	"matroska_font_filename_compliance": true,
+	"matroska_multi_lang":                  true,
+	"matroska_name_quality":                true,
+	"matroska_name_codecs":                 true,
+	"matroska_name_redundant_lang":         true,
+	"matroska_original_language":           true,
+	"matroska_duplicate_tracks":            true,
+	"matroska_name_keywords":               true,
+	"matroska_default_flags":               true,
+	"matroska_subtitle_format":             true,
+	"matroska_subtitle_fonts":              true,
+	"matroska_subtitle_inline_fonts":       true,
+	"matroska_ass_script_info":             true,
+	"matroska_ass_styles":                  true,
+	"matroska_ass_events":                  true,
+	"matroska_zlib_compression":            true,
+	"matroska_track_order":                 true,
+	"matroska_unused_fonts":                true,
+	"matroska_font_filename_compliance":    true,
+	"matroska_track_delay":                 true,
+	"matroska_video_cropping":              true,
+	"matroska_title_hygiene":               true,
+	"matroska_app_hygiene":                 true,
+	"matroska_truehd_compatibility":        true,
+	"matroska_chapters_start_non_zero":     true,
+	"matroska_chapters_non_monotonic":      true,
+	"matroska_chapters_duplicate":          true,
+	"matroska_chapters_too_close":          true,
+	"matroska_chapters_exceed_duration":    true,
+	"matroska_chapters_name_hygiene":       true,
+	"matroska_chapters_language_hygiene":   true,
+	"matroska_chapters_keyframe_alignment": true,
 }
 
 func checkValueTypes() {
@@ -270,20 +289,68 @@ func validateStructuralSections(k string, v any, prefix, fullKey string) ([]stri
 			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
 		}
 	case "preset":
-		if subMap, ok := v.(map[string]any); ok {
-			var errors []string
-
-			for presetName, presetContent := range subMap {
-				if pcMap, ok := presetContent.(map[string]any); ok {
-					errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
-				}
-			}
-
-			return errors, true
-		}
+		return validatePresetConfig(v), true
+	case "replacements":
+		return validateReplacementsConfig(v, fullKey), true
 	}
 
 	return nil, false
+}
+
+func validatePresetConfig(v any) []string {
+	var errors []string
+
+	subMap, ok := v.(map[string]any)
+	if !ok {
+		return errors
+	}
+
+	for presetName, presetContent := range subMap {
+		if pcMap, ok := presetContent.(map[string]any); ok {
+			errors = append(errors, validateMapTypes(pcMap, "preset."+presetName, expectedTypes)...)
+		}
+	}
+
+	return errors
+}
+
+func validateReplacementsConfig(v any, fullKey string) []string {
+	var errors []string
+
+	subMap, ok := v.(map[string]any)
+	if !ok {
+		return errors
+	}
+
+	for category, rulesAny := range subMap {
+		rulesArray, ok := rulesAny.([]any)
+		if !ok {
+			continue
+		}
+
+		for i, ruleAny := range rulesArray {
+			ruleMap, ok := ruleAny.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			patternAny, ok := ruleMap["pattern"]
+			if !ok {
+				continue
+			}
+
+			pattern, ok := patternAny.(string)
+			if !ok {
+				continue
+			}
+
+			if _, err := regexp.Compile(pattern); err != nil {
+				errors = append(errors, fmt.Sprintf("Invalid regex pattern in '%s.%s[%d]': %v", fullKey, category, i, err))
+			}
+		}
+	}
+
+	return errors
 }
 
 func validateSpecificKeys(k string, v any, fullKey string) []string {

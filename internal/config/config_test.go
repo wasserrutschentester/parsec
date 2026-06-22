@@ -78,7 +78,36 @@ func TestIsCheckEnabled(t *testing.T) {
 	if !IsCheckEnabled("good_check") {
 		t.Errorf("IsCheckEnabled(good_check) = false, want true")
 	}
+}
 
+//nolint:paralleltest // depends on shared global state (viper)
+func TestGetOutputPath(t *testing.T) {
+	viper.Reset()
+	InitDefaults()
+
+	// Default state: empty
+	if GetOutputPath() != "" {
+		t.Errorf("GetOutputPath() = %v, want empty string (default)", GetOutputPath())
+	}
+
+	// Set global value
+	viper.Set("output_path", "/tmp/parsec")
+
+	if GetOutputPath() != "/tmp/parsec" {
+		t.Errorf("GetOutputPath() = %v, want /tmp/parsec", GetOutputPath())
+	}
+
+	// Test preset override
+	viper.Set("preset.my_preset.output_path", "/tmp/parsec_preset")
+	SetPreset("my_preset")
+
+	if GetOutputPath() != "/tmp/parsec_preset" {
+		t.Errorf("GetOutputPath() = %v, want /tmp/parsec_preset", GetOutputPath())
+	}
+}
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestIsCheckEnabledWhitelist(t *testing.T) {
 	// Test whitelist (enabled_checks)
 	viper.Reset()
 	InitDefaults()

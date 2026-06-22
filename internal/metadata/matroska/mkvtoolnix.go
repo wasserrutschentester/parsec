@@ -27,22 +27,92 @@ var errNotMatroska = errors.New("file is not a Matroska file")
 
 // EbmlMetadata represents the JSON output from mkvmerge -J.
 type EbmlMetadata struct {
-	Attachments []EbmlAttachment `json:"attachments,omitempty"`
-	Container   EbmlContainer    `json:"container,omitzero"`
-	Errors      []string         `json:"errors,omitempty"`
-	FileName    string           `json:"file_name,omitempty"`
-	Tracks      []EbmlTrack      `json:"tracks,omitempty"`
+	Attachments                 []EbmlAttachment `json:"attachments,omitempty"`
+	Container                   EbmlContainer    `json:"container,omitzero"`
+	Errors                      []string         `json:"errors,omitempty"`
+	FileName                    string           `json:"file_name,omitempty"`
+	Tracks                      []EbmlTrack      `json:"tracks,omitempty"`
+	Chapters                    []EbmlChapters   `json:"chapters,omitempty"`
+	GlobalTags                  []EbmlGlobalTag  `json:"global_tags,omitempty"`
+	IdentificationFormatVersion int              `json:"identification_format_version,omitempty"`
+	TrackTags                   []EbmlTrackTag   `json:"track_tags,omitempty"`
+	Warnings                    []string         `json:"warnings,omitempty"`
+}
+
+// EbmlGlobalTag represents global tag metadata from mkvmerge -J.
+type EbmlGlobalTag struct {
+	NumEntries int `json:"num_entries"`
+}
+
+// EbmlTrackTag represents track tag metadata from mkvmerge -J.
+type EbmlTrackTag struct {
+	NumEntries int `json:"num_entries"`
+	TrackID    int `json:"track_id"`
+}
+
+// EbmlChapters represents chapter metadata from mkvmerge or mkvextract.
+type EbmlChapters struct {
+	XMLName    xml.Name      `json:"-" xml:"Chapters"`
+	NumEntries int           `json:"num_entries" xml:"-"`
+	Editions   []EbmlEdition `json:"editions" xml:"EditionEntry"`
+}
+
+// EbmlEdition represents an edition of chapters.
+type EbmlEdition struct {
+	UID      uint64            `json:"uid" xml:"EditionUID"`
+	Chapters []EbmlChapterAtom `json:"chapters" xml:"ChapterAtom"`
+}
+
+// EbmlChapterAtom represents an individual chapter marker.
+type EbmlChapterAtom struct {
+	UID          uint64        `json:"uid" xml:"ChapterUID"`
+	TimeStart    int64         `json:"time_start" xml:"-"`
+	TimeStartXML string        `json:"-" xml:"ChapterTimeStart"`
+	Display      []EbmlDisplay `json:"display" xml:"ChapterDisplay"`
+}
+
+// EbmlDisplay represents display info for a chapter atom.
+type EbmlDisplay struct {
+	Language string `json:"language" xml:"ChapterLanguage"`
+	String   string `json:"string" xml:"ChapterString"`
 }
 
 // EbmlContainer represents the global container properties.
 type EbmlContainer struct {
 	Properties EbmlContainerProperties `json:"properties,omitzero"`
+	Recognized bool                    `json:"recognized"`
+	Supported  bool                    `json:"supported"`
+	Type       string                  `json:"type,omitempty"`
 }
 
 // EbmlContainerProperties contains global properties of a Matroska container.
 type EbmlContainerProperties struct {
-	Title              string `json:"title,omitempty"`
-	WritingApplication string `json:"writing_application,omitempty"`
+	Title                 string        `json:"title,omitempty"`
+	WritingApplication    string        `json:"writing_application,omitempty"`
+	Duration              int64         `json:"duration,omitempty"`
+	ContainerType         int           `json:"container_type,omitempty"`
+	DateLocal             string        `json:"date_local,omitempty"`
+	DateUtc               string        `json:"date_utc,omitempty"`
+	IsProvidingTimestamps bool          `json:"is_providing_timestamps,omitempty"`
+	MuxingApplication     string        `json:"muxing_application,omitempty"`
+	NextSegmentUID        string        `json:"next_segment_uid,omitempty"`
+	OtherFile             []string      `json:"other_file,omitempty"`
+	Playlist              bool          `json:"playlist,omitempty"`
+	PlaylistChapters      int           `json:"playlist_chapters,omitempty"`
+	PlaylistDuration      int64         `json:"playlist_duration,omitempty"`
+	PlaylistFile          []string      `json:"playlist_file,omitempty"`
+	PlaylistSize          int64         `json:"playlist_size,omitempty"`
+	PreviousSegmentUID    string        `json:"previous_segment_uid,omitempty"`
+	Programs              []EbmlProgram `json:"programs,omitempty"`
+	SegmentUID            string        `json:"segment_uid,omitempty"`
+	TimestampScale        int64         `json:"timestamp_scale,omitempty"`
+}
+
+// EbmlProgram represents multiplexed program properties.
+type EbmlProgram struct {
+	ProgramNumber   int    `json:"program_number"`
+	ServiceName     string `json:"service_name,omitempty"`
+	ServiceProvider string `json:"service_provider,omitempty"`
 }
 
 // EbmlTrack represents a single track in a Matroska container.
@@ -56,32 +126,87 @@ type EbmlTrack struct {
 
 // EbmlTrackProperties contains detailed properties of a Matroska track.
 type EbmlTrackProperties struct {
-	Language                  string `json:"language,omitempty"`
-	LanguageIetf              string `json:"language_ietf,omitempty"`
-	Name                      string `json:"track_name,omitempty"`
-	Source                    string `json:"tag_source,omitempty"`
-	Number                    int    `json:"number,omitempty"`
-	IndexEntries              int    `json:"num_index_entries,omitempty"`
-	Enabled                   bool   `json:"enabled_track,omitempty"`
-	Default                   bool   `json:"default_track,omitempty"`
-	Forced                    bool   `json:"forced_track,omitempty"`
-	HearingImpaired           bool   `json:"flag_hearing_impaired,omitempty"`
-	VisualImpaired            bool   `json:"flag_visual_impaired,omitempty"`
-	Commentary                bool   `json:"flag_commentary,omitempty"`
-	OriginalLanguage          bool   `json:"flag_original,omitempty"`
-	TextDescriptions          bool   `json:"flag_text_descriptions,omitempty"`
-	TextSubtitles             bool   `json:"text_subtitles,omitempty"`
-	ContentEncodingAlgorithms string `json:"content_encoding_algorithms,omitempty"`
-	CodecPrivate              string `json:"codec_private_data,omitempty"`
-	PixelWidth                int    `json:"pixel_width,omitempty"`
-	PixelHeight               int    `json:"pixel_height,omitempty"`
-	DisplayWidth              int    `json:"display_width,omitempty"`
-	DisplayHeight             int    `json:"display_height,omitempty"`
-	PixelCroppingLeft         int    `json:"pixel_cropping_left,omitempty"`
-	PixelCroppingTop          int    `json:"pixel_cropping_top,omitempty"`
-	PixelCroppingRight        int    `json:"pixel_cropping_right,omitempty"`
-	PixelCroppingBottom       int    `json:"pixel_cropping_bottom,omitempty"`
-	Delay                     int64  `json:"packet_delay,omitempty"`
+	Language                     string  `json:"language,omitempty"`
+	LanguageIetf                 string  `json:"language_ietf,omitempty"`
+	Name                         string  `json:"track_name,omitempty"`
+	Source                       string  `json:"tag_source,omitempty"`
+	Number                       int     `json:"number,omitempty"`
+	IndexEntries                 int     `json:"num_index_entries,omitempty"`
+	Enabled                      bool    `json:"enabled_track,omitempty"`
+	Default                      bool    `json:"default_track,omitempty"`
+	Forced                       bool    `json:"forced_track,omitempty"`
+	HearingImpaired              bool    `json:"flag_hearing_impaired,omitempty"`
+	VisualImpaired               bool    `json:"flag_visual_impaired,omitempty"`
+	Commentary                   bool    `json:"flag_commentary,omitempty"`
+	OriginalLanguage             bool    `json:"flag_original,omitempty"`
+	TextDescriptions             bool    `json:"flag_text_descriptions,omitempty"`
+	TextSubtitles                bool    `json:"text_subtitles,omitempty"`
+	ContentEncodingAlgorithms    string  `json:"content_encoding_algorithms,omitempty"`
+	CodecPrivate                 string  `json:"codec_private_data,omitempty"`
+	CodecDelay                   int64   `json:"codec_delay,omitempty"`
+	AacIsSbr                     string  `json:"aac_is_sbr,omitempty"`
+	AlphaMode                    int     `json:"alpha_mode,omitempty"`
+	AudioBitsPerSample           int     `json:"audio_bits_per_sample,omitempty"`
+	AudioChannels                int     `json:"audio_channels,omitempty"`
+	AudioEmphasis                int     `json:"audio_emphasis,omitempty"`
+	AudioSamplingFrequency       int     `json:"audio_sampling_frequency,omitempty"`
+	CbSubsample                  string  `json:"cb_subsample,omitempty"`
+	ChromaSiting                 string  `json:"chroma_siting,omitempty"`
+	ChromaSubsample              string  `json:"chroma_subsample,omitempty"`
+	ChromaticityCoordinates      string  `json:"chromaticity_coordinates,omitempty"`
+	CodecID                      string  `json:"codec_id,omitempty"`
+	CodecName                    string  `json:"codec_name,omitempty"`
+	CodecPrivateLength           int     `json:"codec_private_length,omitempty"`
+	ColorBitsPerChannel          int     `json:"color_bits_per_channel,omitempty"`
+	ColorMatrixCoefficients      int     `json:"color_matrix_coefficients,omitempty"`
+	ColorPrimaries               int     `json:"color_primaries,omitempty"`
+	ColorRange                   int     `json:"color_range,omitempty"`
+	ColorTransferCharacteristics int     `json:"color_transfer_characteristics,omitempty"`
+	DefaultDuration              int64   `json:"default_duration,omitempty"`
+	DisplayDimensions            string  `json:"display_dimensions,omitempty"`
+	DisplayUnit                  int     `json:"display_unit,omitempty"`
+	Encoding                     string  `json:"encoding,omitempty"`
+	MaxContentLight              int     `json:"max_content_light,omitempty"`
+	MaxFrameLight                int     `json:"max_frame_light,omitempty"`
+	MaxLuminance                 float64 `json:"max_luminance,omitempty"`
+	MinLuminance                 float64 `json:"min_luminance,omitempty"`
+	MinimumTimestamp             int64   `json:"minimum_timestamp,omitempty"`
+	MultiplexedTracks            []int   `json:"multiplexed_tracks,omitempty"`
+	Packetizer                   string  `json:"packetizer,omitempty"`
+	PixelDimensions              string  `json:"pixel_dimensions,omitempty"`
+	ProgramNumber                int     `json:"program_number,omitempty"`
+	ProjectionPosePitch          float64 `json:"projection_pose_pitch,omitempty"`
+	ProjectionPoseRoll           float64 `json:"projection_pose_roll,omitempty"`
+	ProjectionPoseYaw            float64 `json:"projection_pose_yaw,omitempty"`
+	ProjectionPrivate            string  `json:"projection_private,omitempty"`
+	ProjectionType               int     `json:"projection_type,omitempty"`
+	StereoMode                   int     `json:"stereo_mode,omitempty"`
+	StreamID                     int     `json:"stream_id,omitempty"`
+	SubStreamID                  int     `json:"sub_stream_id,omitempty"`
+	TeletextPage                 int     `json:"teletext_page,omitempty"`
+	UID                          uint64  `json:"uid,omitempty"`
+	WhiteColorCoordinates        string  `json:"white_color_coordinates,omitempty"`
+}
+
+// ParseDimensions parses a dimensions string in the format "WIDTHxHEIGHT" (e.g., "1920x1080") into width and height.
+func ParseDimensions(s string) (int, int) {
+	if s == "" {
+		return 0, 0
+	}
+
+	parts := strings.Split(s, "x")
+	if len(parts) != 2 {
+		return 0, 0
+	}
+
+	w, err1 := strconv.Atoi(parts[0])
+
+	h, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return 0, 0
+	}
+
+	return w, h
 }
 
 // DecodeCodecPrivate decodes the base16/hex encoded CodecPrivate string.
@@ -100,10 +225,18 @@ func (p EbmlTrackProperties) DecodeCodecPrivate() ([]byte, error) {
 
 // EbmlAttachment represents an attachment in a Matroska container.
 type EbmlAttachment struct {
-	ID          int    `json:"id,omitempty"`
-	ContentType string `json:"content_type,omitempty"`
-	FileName    string `json:"file_name,omitempty"`
-	Size        int    `json:"size,omitempty"`
+	ID          int                      `json:"id,omitempty"`
+	ContentType string                   `json:"content_type,omitempty"`
+	FileName    string                   `json:"file_name,omitempty"`
+	Size        int                      `json:"size,omitempty"`
+	Description string                   `json:"description,omitempty"`
+	Properties  EbmlAttachmentProperties `json:"properties,omitzero"`
+	Type        string                   `json:"type,omitempty"`
+}
+
+// EbmlAttachmentProperties contains metadata properties of an attachment.
+type EbmlAttachmentProperties struct {
+	UID uint64 `json:"uid"`
 }
 
 type mkvTags struct {
@@ -736,4 +869,135 @@ func createTagsXML(tags mdb.MatroskaTags) (string, error) {
 	}
 
 	return tmpFile.Name(), nil
+}
+
+// HasChapters returns true if mkvmerge detected any chapters in the file.
+func (metadata *EbmlMetadata) HasChapters() bool {
+	for _, ch := range metadata.Chapters {
+		if ch.NumEntries > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+var (
+	errInvalidTimeFormat = errors.New("invalid time format")
+	errInvalidTimeValues = errors.New("invalid time values")
+	errInvalidSubsecond  = errors.New("invalid subsecond value")
+)
+
+// parseTimeToNs parses a time string in format HH:MM:SS.nnnnnnnnn into nanoseconds.
+func parseTimeToNs(s string) (int64, error) {
+	parts := strings.Split(s, ".")
+	timeParts := strings.Split(parts[0], ":")
+
+	if len(timeParts) != 3 {
+		return 0, fmt.Errorf("%w", errInvalidTimeFormat)
+	}
+
+	hours, err1 := strconv.ParseInt(timeParts[0], 10, 64)
+	mins, err2 := strconv.ParseInt(timeParts[1], 10, 64)
+	secs, err3 := strconv.ParseInt(timeParts[2], 10, 64)
+
+	if err1 != nil || err2 != nil || err3 != nil {
+		return 0, fmt.Errorf("%w", errInvalidTimeValues)
+	}
+
+	var ns int64
+
+	if len(parts) > 1 {
+		fractionStr := parts[1]
+
+		if len(fractionStr) < 9 {
+			fractionStr += strings.Repeat("0", 9-len(fractionStr))
+		} else if len(fractionStr) > 9 {
+			fractionStr = fractionStr[:9]
+		}
+
+		var err error
+
+		ns, err = strconv.ParseInt(fractionStr, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("%w", errInvalidSubsecond)
+		}
+	}
+
+	totalNs := hours*3600000000000 + mins*60000000000 + secs*1000000000 + ns
+
+	return totalNs, nil
+}
+
+// ExtractChapters uses mkvextract to extract and parse chapters in XML format.
+func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
+	err := CheckForMatroska(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	tmpFilePath, err := runMkvextractChapters(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = os.Remove(tmpFilePath)
+	}()
+
+	xmlContent, err := os.ReadFile(tmpFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read extracted chapters: %w", err)
+	}
+
+	var xmlCh EbmlChapters
+
+	if err := xml.Unmarshal(xmlContent, &xmlCh); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal chapters XML: %w", err)
+	}
+
+	return parseXMLChapters(xmlCh), nil
+}
+
+func runMkvextractChapters(filePath string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "parsec-chapters-*.xml")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpFilePath := tmpFile.Name()
+	_ = tmpFile.Close()
+
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s chapters %s", ui.AnonymizePath(filePath), tmpFilePath))
+
+	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "chapters", tmpFilePath)
+	if _, err := cmd.Output(); err != nil {
+		_ = os.Remove(tmpFilePath)
+
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
+		}
+
+		return "", fmt.Errorf("failed to extract chapters: %w", err)
+	}
+
+	return tmpFilePath, nil
+}
+
+func parseXMLChapters(xmlCh EbmlChapters) []EbmlChapterAtom {
+	var parsed []EbmlChapterAtom
+
+	for _, edition := range xmlCh.Editions {
+		for _, atom := range edition.Chapters {
+			ns, err := parseTimeToNs(atom.TimeStartXML)
+			if err != nil {
+				continue
+			}
+
+			atom.TimeStart = ns
+			parsed = append(parsed, atom)
+		}
+	}
+
+	return parsed
 }

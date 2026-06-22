@@ -106,7 +106,7 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		TvdbID:           tvdbID,
 		TvdbSlug:         m.Slug,
 		TvdbType:         m.Type,
-		Title:            title,
+		Title:            strings.TrimSpace(title),
 		Year:             resYear,
 		IsTV:             m.Type == "series",
 		Overview:         overview,
@@ -606,8 +606,8 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *Episode {
 	var ep *Episode
 	// 1. Season/Episode Number Match
-	if (meta.Season > 0 && meta.Episode > 0) || allowSpecials {
-		ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episode)
+	if meta.Season >= 0 && len(meta.Episodes) > 0 {
+		ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episodes[0])
 	}
 	// 2. Air Date Match
 	if meta.Date != "" && ep == nil {

@@ -106,8 +106,14 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `disable_update_check` | boolean | Disable automatic update checks in the background and the warning notice if the version is outdated |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
-| `allow_special_matches` | boolean | Allow matching episodes against Specials (Season 0) (default: `false`). |
-| `title_cleaning_regex` | string | Optional custom regex to strip unwanted parts from titles (e.g. `(?i)(\s*\|.*)` to remove everything after a pipe) |
+| `word_separator` | string | The character used to replace spaces in the generated filename, such as in the Title, Episode Title, and Audio Codec names. Use `" "` to preserve spaces (default: `.` ). |
+| `allow_special_matches` | boolean | Allow fallback matching of episodes by Air Date or Episode Title against Specials (Season 0). Prevents incorrectly matching a regular episode without season/episode numbers to a TV special (default: `false`). |
+| `normalize_diacritics` | boolean | Replace diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss) (default: `true`). |
+| `output_path` | string | Output path where files should be moved after renaming. Can be absolute or relative to the current working directory. |
+
+#### Regex Replacements
+
+Parsec supports powerful regex replacements for input filenames, title cleaning, and output filenames. See the [Regex Replacements Documentation](replacements.md) for detailed configuration instructions and examples.
 
 #### Metadata Overrides
 
@@ -164,6 +170,8 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 -   `mediainfo_redundant_audio`: Check for redundant audio tracks.
 -   `mediainfo_resolution`: Check for non-standard resolutions.
 -   `mediainfo_dialogue_normalization`: Check for dialogue normalization in lossless audio tracks.
+-   `mediainfo_stereo_lossless`: Warn if an audio track with 2 or less channels uses a different lossless codec than FLAC.
+-   `mediainfo_empty_tracks`: Warn (with error severity) if an audio track has zero channels or a subtitle track has zero elements.
 -   `matroska_track_order`: Verify track ordering rules.
 -   `matroska_language_tag`: Verify valid ISO language tags on tracks.
 -   `matroska_multi_lang`: Ensure 'mul' tracks have at least two full language names.
@@ -183,6 +191,19 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 -   `matroska_ass_styles`: Deep validation of ASS styles.
 -   `matroska_ass_events`: Validation of ASS event lines.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
+-   `matroska_track_delay`: Warn if a track has container delay exceeding ±1001ms (excluding TrueHD audio).
+-   `matroska_video_cropping`: Warn if resolution-based black bars are detected but no MKV crop values are set.
+-   `matroska_title_hygiene`: Verify container title doesn't contain technical metadata noise.
+-   `matroska_app_hygiene`: Verify writing application metadata is clean of local paths/UUIDs.
+-   `matroska_truehd_compatibility`: Verify Dolby TrueHD tracks are followed by a lossy compatibility track (AC3/E-AC3) in the same language.
+-   `matroska_chapters_start_non_zero`: Verify that the first chapter starts at exactly 00:00:00.000.
+-   `matroska_chapters_non_monotonic`: Verify that chapter start times are strictly increasing.
+-   `matroska_chapters_duplicate`: Check for duplicate chapter timestamps.
+-   `matroska_chapters_too_close`: Warn if consecutive chapters are less than 10 seconds apart.
+-   `matroska_chapters_exceed_duration`: Verify that no chapter start time exceeds the total video duration.
+-   `matroska_chapters_name_hygiene`: Flags missing/whitespace-only names or consecutive duplicate names.
+-   `matroska_chapters_language_hygiene`: Flags undetermined (`und`) or missing display languages, or inconsistent languages.
+-   `matroska_chapters_keyframe_alignment`: Verify that chapter timestamps align with video keyframes (seek points) using the container's Cues index.
 -   `filename_year_missing`: Ensure movies have a year tag.
 -   `filename_year_redundant`: Check for redundant year tags in series.
 -   `filename_streaming`: Check for service tags on WEB sources.

@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -24,9 +25,11 @@ func TestRunTrackChecks(t *testing.T) {
 	})
 
 	tests := []struct {
-		name    string
-		tracks  []matroska.EbmlTrack
-		wantErr bool
+		name      string
+		tracks    []matroska.EbmlTrack
+		chapters  []matroska.EbmlChapters
+		container matroska.EbmlContainer
+		wantErr   bool
 	}{
 		{
 			name: "Valid German and English tracks",
@@ -287,7 +290,7 @@ func TestRunTrackChecks(t *testing.T) {
 		{
 			name: "ASS Script Info resolution mismatch",
 			tracks: []matroska.EbmlTrack{
-				{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080}},
+				{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080"}},
 				{
 					ID:    2,
 					Type:  "subtitles",
@@ -303,6 +306,53 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Valid TrueHD with AC3 compatibility track",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid TrueHD with EAC3 compatibility track",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_EAC3", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid TrueHD - last track in file",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TrueHD - followed by different language",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TrueHD - followed by incompatible codec",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+				{ID: 2, Type: "audio", Codec: "A_AAC", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TrueHD - followed by non-audio track",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Codec: "A_TRUEHD", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 1}},
+				{ID: 2, Type: "subtitles", Codec: "S_TEXT/UTF8", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Audio tracks are ignored",
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Codec: "A_AC3", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 1}},
@@ -310,11 +360,181 @@ func TestRunTrackChecks(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Valid chapters",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 15000000000, Display: []matroska.EbmlDisplay{{String: "The Journey", Language: "eng"}}},
+								{TimeStart: 120000000000, Display: []matroska.EbmlDisplay{{String: "Credits", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Duration: 300000000000},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid chapters - first start non-zero",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 5000000000, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - non-monotonic",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 120000000000, Display: []matroska.EbmlDisplay{{String: "The End", Language: "eng"}}},
+								{TimeStart: 30000000000, Display: []matroska.EbmlDisplay{{String: "The Middle", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - duplicate timestamps",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 60000000000, Display: []matroska.EbmlDisplay{{String: "Part 2", Language: "eng"}}},
+								{TimeStart: 60000000000, Display: []matroska.EbmlDisplay{{String: "Part 3", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - interval too close",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 5000000000, Display: []matroska.EbmlDisplay{{String: "Part 2", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - exceed duration",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 350000000000, Display: []matroska.EbmlDisplay{{String: "Outro", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Duration: 300000000000},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - empty display name",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "   ", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - duplicate consecutive display names",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 15000000000, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - missing display language",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "und"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid chapters - inconsistent display languages",
+			chapters: []matroska.EbmlChapters{
+				{
+					Editions: []matroska.EbmlEdition{
+						{
+							Chapters: []matroska.EbmlChapterAtom{
+								{TimeStart: 0, Display: []matroska.EbmlDisplay{{String: "Intro", Language: "eng"}}},
+								{TimeStart: 15000000000, Display: []matroska.EbmlDisplay{{String: "Part 2", Language: "fre"}}},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tt.tracks}, nil, nil, nil)
+			res := runTrackChecks("", &matroska.EbmlMetadata{
+				Tracks:    tt.tracks,
+				Chapters:  tt.chapters,
+				Container: tt.container,
+			}, nil, nil, nil)
 
 			hasFailure := false
 
@@ -614,7 +834,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Track with reasonable delay",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Delay: 5000000, Language: "ger", Number: 1}},
+						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 5000000, Language: "ger", Number: 1}},
 					},
 				},
 				identifier: "matroska_track_delay",
@@ -624,7 +844,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Track with excessive delay",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Delay: 2000000000, Language: "ger", Number: 1}},
+						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 2000000000, Language: "ger", Number: 1}},
 					},
 				},
 				identifier: "matroska_track_delay",
@@ -648,7 +868,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Video with proper cropping",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080, PixelCroppingTop: 140, PixelCroppingBottom: 140}},
+						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x1080"}},
 					},
 				},
 				identifier: "matroska_video_cropping",
@@ -658,7 +878,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 				name: "Video with resolution-based black bars but no MKV crop",
 				ebml: &matroska.EbmlMetadata{
 					Tracks: []matroska.EbmlTrack{
-						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelWidth: 1920, PixelHeight: 1080, DisplayWidth: 1920, DisplayHeight: 800}},
+						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x800"}},
 					},
 				},
 				identifier: "matroska_video_cropping",
@@ -670,4 +890,279 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 			runHygieneTest(t, tt.name, tt.ebml, nil, tt.identifier, tt.wantErr)
 		}
 	})
+}
+
+func createMockCuesFile(tb testing.TB, cueTimes []uint64) string {
+	tb.Helper()
+
+	seekIDData := encodeTestElement(0x53AB, []byte{0x1C, 0x53, 0xBB, 0x6B})
+	seekPosData := encodeTestElement(0x53AC, []byte{40})
+	seekData := encodeTestElement(0x4DBB, append(seekIDData, seekPosData...))
+	seekHeadData := encodeTestElement(0x114D9B74, seekData)
+
+	padding := append([]byte{0xEC, 0x93}, make([]byte, 19)...)
+
+	cueTrack := encodeTestElement(0xF7, []byte{1})
+	cueTrackPos := encodeTestElement(0xB7, cueTrack)
+
+	var cuesInner []byte
+
+	for _, ct := range cueTimes {
+		var ctBytes []byte
+		if ct > 0xFF {
+			ctBytes = []byte{byte(ct >> 8), byte(ct)}
+		} else {
+			ctBytes = []byte{byte(ct)}
+		}
+
+		cueTime := encodeTestElement(0xB3, ctBytes)
+		cuePoint := encodeTestElement(0xBB, append(cueTime, cueTrackPos...))
+		cuesInner = append(cuesInner, cuePoint...)
+	}
+
+	cuesData := encodeTestElement(0x1C53BB6B, cuesInner)
+
+	segmentPayload := make([]byte, 0, len(seekHeadData)+len(padding)+len(cuesData))
+	segmentPayload = append(segmentPayload, seekHeadData...)
+	segmentPayload = append(segmentPayload, padding...)
+	segmentPayload = append(segmentPayload, cuesData...)
+
+	segmentData := encodeTestElement(0x18538067, segmentPayload)
+	ebmlHeader := encodeTestElement(0x1A45DFA3, nil)
+
+	fileData := make([]byte, 0, len(ebmlHeader)+len(segmentData))
+	fileData = append(fileData, ebmlHeader...)
+	fileData = append(fileData, segmentData...)
+
+	tmpFile, err := os.CreateTemp("", "test-check-ebml-*.mkv")
+	if err != nil {
+		tb.Fatalf("failed to create temp file: %v", err)
+	}
+
+	defer func() {
+		_ = tmpFile.Close()
+	}()
+
+	if _, err := tmpFile.Write(fileData); err != nil {
+		tb.Fatalf("failed to write temp file: %v", err)
+	}
+
+	return tmpFile.Name()
+}
+
+//nolint:paralleltest // Test mutates global viper config and cannot run in parallel
+func TestCheckChaptersKeyframeAlignmentAligned(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"all"})
+
+	filePath := createMockCuesFile(t, []uint64{0, 10000, 20000})
+
+	defer func() {
+		_ = os.Remove(filePath)
+	}()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		},
+		Chapters: []matroska.EbmlChapters{
+			{
+				Editions: []matroska.EbmlEdition{
+					{
+						Chapters: []matroska.EbmlChapterAtom{
+							{TimeStart: 0},
+							{TimeStart: 10000000000},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	res := runTrackChecks(filePath, ebml, nil, nil, nil)
+
+	for _, r := range res {
+		if r.Identifier == "matroska_chapters_keyframe_alignment" {
+			if !r.Passed {
+				t.Errorf("Expected alignment check to pass, got warning: %s", r.Warning)
+			}
+		}
+	}
+}
+
+//nolint:paralleltest // Test mutates global viper config and cannot run in parallel
+func TestCheckChaptersKeyframeAlignmentNonAligned(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"all"})
+
+	filePath := createMockCuesFile(t, []uint64{0, 10000, 20000})
+
+	defer func() {
+		_ = os.Remove(filePath)
+	}()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		},
+		Chapters: []matroska.EbmlChapters{
+			{
+				Editions: []matroska.EbmlEdition{
+					{
+						Chapters: []matroska.EbmlChapterAtom{
+							{TimeStart: 0},
+							{TimeStart: 15000000000},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	res := runTrackChecks(filePath, ebml, nil, nil, nil)
+	found := false
+
+	for _, r := range res {
+		if r.Identifier == "matroska_chapters_keyframe_alignment" {
+			found = true
+
+			if r.Passed {
+				t.Error("Expected alignment check to fail for non-aligned chapters")
+			}
+
+			if !strings.Contains(r.Actual, "off by 5.000s") {
+				t.Errorf("Expected mismatch actual details, got: %q", r.Actual)
+			}
+		}
+	}
+
+	if !found {
+		t.Error("Did not find keyframe alignment check result")
+	}
+}
+
+//nolint:paralleltest // Test mutates global viper config and cannot run in parallel
+func TestCheckChaptersKeyframeAlignmentAsymmetric(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"all"})
+
+	tests := []struct {
+		name       string
+		timeStarts []int64
+		wantPassed bool
+	}{
+		{
+			name:       "aligned slightly after (5ms)",
+			timeStarts: []int64{0, 10005000000},
+			wantPassed: true,
+		},
+		{
+			name:       "aligned slightly before within rounding tolerance (0.5ms)",
+			timeStarts: []int64{0, 9999500000},
+			wantPassed: true,
+		},
+		{
+			name:       "non-aligned before rounding tolerance (2ms)",
+			timeStarts: []int64{0, 9998000000},
+			wantPassed: false,
+		},
+		{
+			name:       "non-aligned after tolerance (15ms)",
+			timeStarts: []int64{0, 10015000000},
+			wantPassed: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := createMockCuesFile(t, []uint64{0, 10000, 20000})
+
+			defer func() {
+				_ = os.Remove(filePath)
+			}()
+
+			res := runAsymmetricCheck(filePath, tt.timeStarts)
+			foundResult := findAlignmentResult(res)
+
+			if tt.wantPassed {
+				if foundResult != nil {
+					t.Errorf("Expected check to pass (not be present in issues), but got failure: %+v", foundResult)
+				}
+			} else {
+				if foundResult == nil {
+					t.Error("Expected check to fail, but found no issue result")
+				} else if foundResult.Passed {
+					t.Error("Expected check result to have Passed=false, but got Passed=true")
+				}
+			}
+		})
+	}
+}
+
+func runAsymmetricCheck(filePath string, timeStarts []int64) []CheckResult {
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		},
+		Chapters: []matroska.EbmlChapters{
+			{
+				Editions: []matroska.EbmlEdition{
+					{
+						Chapters: []matroska.EbmlChapterAtom{
+							{TimeStart: timeStarts[0]},
+							{TimeStart: timeStarts[1]},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return runTrackChecks(filePath, ebml, nil, nil, nil)
+}
+
+func findAlignmentResult(res []CheckResult) *CheckResult {
+	for i := range res {
+		if res[i].Identifier == "matroska_chapters_keyframe_alignment" {
+			return &res[i]
+		}
+	}
+
+	return nil
+}
+
+func encodeTestVINT(val uint64) []byte {
+	if val < 0x80-1 {
+		return []byte{byte(val | 0x80)}
+	}
+
+	if val < 0x4000-1 {
+		return []byte{byte((val >> 8) | 0x40), byte(val)}
+	}
+
+	panic("too large for test VINT")
+}
+
+func encodeTestElement(id uint64, data []byte) []byte {
+	idBytes := make([]byte, 0, 4)
+
+	switch {
+	case id > 0xFFFFFF:
+		idBytes = append(idBytes, byte(id>>24), byte(id>>16), byte(id>>8), byte(id))
+	case id > 0xFFFF:
+		idBytes = append(idBytes, byte(id>>16), byte(id>>8), byte(id))
+	case id > 0xFF:
+		idBytes = append(idBytes, byte(id>>8), byte(id))
+	default:
+		idBytes = append(idBytes, byte(id))
+	}
+
+	sizeBytes := encodeTestVINT(uint64(len(data)))
+
+	res := make([]byte, 0, len(idBytes)+len(sizeBytes)+len(data))
+	res = append(res, idBytes...)
+	res = append(res, sizeBytes...)
+	res = append(res, data...)
+
+	return res
 }

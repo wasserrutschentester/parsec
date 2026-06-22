@@ -67,6 +67,16 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		results = append(results, checkDialogueNormalization(mi)...)
 	}
 
+	// 8. Stereo/Mono Lossless Codec
+	if config.IsCheckEnabled("mediainfo_stereo_lossless") {
+		results = append(results, checkStereoLossless(mi)...)
+	}
+
+	// 9. Empty Tracks Check
+	if config.IsCheckEnabled("mediainfo_empty_tracks") {
+		results = append(results, checkEmptyTracks(mi)...)
+	}
+
 	return results
 }
 
@@ -85,7 +95,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 			isLosslessOrHRA := false
 
 			switch codec {
-			case "TrueHD", "DTS-HD.MA", "DTS-HD.HRA":
+			case "TrueHD", "DTS-HD MA", "DTS-HD HRA":
 				isLosslessOrHRA = true
 			}
 
@@ -160,8 +170,18 @@ func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 		}
 	}
 
+	getRedundantAudioWarning(&res, langCounts)
+
+	return []CheckResult{res}
+}
+
+func getRedundantAudioWarning(res *CheckResult, langCounts map[string][]*mediainfo.Track) {
 	for _, tracks := range langCounts {
 		if len(tracks) > 1 {
+			if tracks[0].CodecID == "A_TRUEHD" && len(tracks) == 2 {
+				continue
+			}
+
 			res.Passed = false
 			res.Severity = "warning"
 
@@ -171,8 +191,6 @@ func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 			}
 		}
 	}
-
-	return []CheckResult{res}
 }
 
 func checkResolution(videoTrack *mediainfo.Track) []CheckResult {
@@ -303,7 +321,7 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
-		if (track.Type != "Audio" && track.Type != "Text") || track.Duration == 0 {
+		if (track.Type != "Audio" && track.Type != "Text" && track.Type != "General") || track.Duration == 0 {
 			continue
 		}
 
@@ -346,9 +364,75 @@ func getDurationWarning(track *mediainfo.Track, diff, percentDiff float64) strin
 		return fmt.Sprintf("%s (diff: %.1fs)", ui.Warning.Render("significantly shorter"), diff)
 	}
 
-	if percentDiff > 10.0 {
+	if percentDiff > 10.0 && !track.Forced {
 		return fmt.Sprintf("%.1f%% %s (diff: %.1fs)", percentDiff, ui.Warning.Render("shorter"), diff)
 	}
 
 	return ""
+}
+
+func checkStereoLossless(mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_stereo_lossless",
+		Passed:     true,
+	}
+
+	for i := range mi.Media.Tracks {
+		track := &mi.Media.Tracks[i]
+		if track.Type != "Audio" {
+			continue
+		}
+
+		if track.Channels <= 0 {
+			continue
+		}
+
+		if track.Channels <= 2 {
+			codec := metadata.AudioCodecName(track.Format, track.FormatProfile, track.FormatAdditionalFeatures)
+			uCodec := strings.ToUpper(codec)
+
+			isOtherLossless := false
+			if uCodec == "TRUEHD" || uCodec == "DTS-HD MA" || uCodec == "ALAC" || strings.Contains(uCodec, "PCM") {
+				isOtherLossless = true
+			}
+
+			if isOtherLossless {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Warning = "Audio track with 2 or less channels should use FLAC for lossless audio"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, fmt.Sprintf("uses %s with %d channels (should be FLAC)", codec, track.Channels)))
+			}
+		}
+	}
+
+	return []CheckResult{res}
+}
+
+func checkEmptyTracks(mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_empty_tracks",
+		Passed:     true,
+	}
+
+	for i := range mi.Media.Tracks {
+		track := &mi.Media.Tracks[i]
+		switch track.Type {
+		case "Audio":
+			if track.Channels <= 0 {
+				res.Passed = false
+				res.Severity = "error"
+				res.Warning = "Audio track has zero channels"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, "audio track has 0 channels"))
+			}
+		case "Text":
+			if track.GetElementCount() <= 0 {
+				res.Passed = false
+				res.Severity = "error"
+				res.Warning = "Subtitle track has zero elements"
+				res.Tracks = append(res.Tracks, miTrackToResult(track, "subtitle track has 0 elements"))
+			}
+		}
+	}
+
+	return []CheckResult{res}
 }

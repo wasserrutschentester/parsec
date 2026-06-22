@@ -1,7 +1,10 @@
 package metadata
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/config"
 )
@@ -97,12 +100,12 @@ func TestAudioCodecName(t *testing.T) {
 		{"AC-3", "", "Dep", "DDP"},
 		{"E-AC-3", "", "", "DDP"},
 		{"MLP FBA", "", "", "TrueHD"},
-		{"DTS", "MA", "", "DTS-HD.MA"},
-		{"DTS", "XLL", "", "DTS-HD.MA"},
-		{"DTS", "MA / XLL", "", "DTS-HD.MA"},
-		{"DTS", "HRA", "", "DTS-HD.HRA"},
-		{"DTS", "XBR", "", "DTS-HD.HRA"},
-		{"DTS", "XXCH", "", "DTS-HD.HRA"},
+		{"DTS", "MA", "", "DTS-HD MA"},
+		{"DTS", "XLL", "", "DTS-HD MA"},
+		{"DTS", "MA / XLL", "", "DTS-HD MA"},
+		{"DTS", "HRA", "", "DTS-HD HRA"},
+		{"DTS", "XBR", "", "DTS-HD HRA"},
+		{"DTS", "XXCH", "", "DTS-HD HRA"},
 		{"DTS", "XLL X", "", "DTS-X"},
 		{"DTS", "XLL", "X", "DTS-X"},
 		{"DTS", "ES", "", "DTS-ES"},
@@ -210,7 +213,7 @@ func TestMetadata_String(t *testing.T) {
 				Title:         "Movie",
 				Year:          2024,
 				Season:        1,
-				Episode:       2,
+				Episodes:      []int{2},
 				Language:      "de",
 				Resolution:    "1080p",
 				Service:       "Netflix",
@@ -262,6 +265,17 @@ func TestMetadata_String(t *testing.T) {
 			},
 			want: "Movie.[Netflix]-GRP",
 		},
+		{
+			name: "Truncate Long Filename",
+			meta: Metadata{
+				Title:        "Movie",
+				Season:       1,
+				Episodes:     []int{1},
+				EpisodeTitle: strings.Repeat("AVeryLongEpisodeTitle", 15), // > 245 chars
+				Resolution:   "1080p",
+			},
+			want: "Movie.S01E01.1080p",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -297,7 +311,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Title:         "The Mandalorian",
 				Year:          2019,
 				Season:        1,
-				Episode:       1,
+				Episodes:      []int{1},
 				EpisodeTitle:  "Chapter 1",
 				Date:          "2019-11-12",
 				Resolution:    "2160p",
@@ -311,7 +325,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Group:         "PAARSEX",
 				IsTV:          true,
 			},
-			want: "The Mandalorian.2019.S01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-PAARSEX",
+			want: "The.Mandalorian.2019.S01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-PAARSEX",
 		},
 		{
 			name: "Season 0 Special",
@@ -319,14 +333,14 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Title:        "The Mandalorian",
 				Year:         2019,
 				Season:       0,
-				Episode:      101,
+				Episodes:     []int{101},
 				EpisodeTitle: "The Director and the Jedi",
 				Date:         "2020-05-04",
 				Resolution:   "1080p",
 				Group:        "PAARSEX",
 				IsTV:         true,
 			},
-			want: "The Mandalorian.2019.S00.1080p-PAARSEX",
+			want: "The.Mandalorian.2019.S00.1080p-PAARSEX",
 		},
 	}
 	for _, tt := range tests {
@@ -337,7 +351,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				t.Errorf("Metadata.GetSeasonPackName() = %v, want %v", got, tt.want)
 			}
 			// Verify that the original metadata was restored
-			if tt.meta.Episode == 0 && tt.name == "Regular Episode" {
+			if len(tt.meta.Episodes) == 0 && tt.name == "Regular Episode" {
 				t.Error("Metadata.GetSeasonPackName() failed to restore Episode")
 			}
 		})
@@ -377,5 +391,87 @@ func TestMetadata_Override(t *testing.T) {
 	updated = meta.Override(&Metadata{})
 	if updated {
 		t.Errorf("Override() should return false when nothing changed")
+	}
+}
+
+//nolint:funlen,paralleltest // depends on shared global state (viper config); comprehensive test cases
+func TestAnimeRendering(t *testing.T) {
+	// Not running in parallel since we mutate global state
+	config.InitDefaults()
+
+	originalWordSeparator := viper.GetString("word_separator")
+
+	viper.Set("word_separator", " ")
+	t.Cleanup(func() {
+		viper.Set("word_separator", originalWordSeparator)
+	})
+
+	tests := []struct {
+		name     string
+		meta     Metadata
+		template string
+		want     string
+	}{
+		{
+			name: "Standard Anime Template",
+			meta: Metadata{
+				Title:      "Anime Name",
+				Season:     1,
+				Episodes:   []int{1},
+				Source:     "BD",
+				Resolution: "1080p",
+				VideoCodec: "HEVC",
+				AudioCodec: "FLAC",
+				DualAudio:  true,
+				CRC32:      "48F1910E",
+				Group:      "Group",
+				IsTV:       true,
+			},
+			template: "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]",
+			want:     "[Group] Anime Name - S01E01 - (BD 1080p HEVC FLAC) Dual-Audio [48F1910E]",
+		},
+		{
+			name: "Anime Template without CRC",
+			meta: Metadata{
+				Title:      "Anime Name",
+				Season:     1,
+				Episodes:   []int{2},
+				Source:     "BD",
+				Resolution: "1080p",
+				VideoCodec: "HEVC",
+				AudioCodec: "FLAC",
+				DualAudio:  false,
+				Group:      "Group",
+				IsTV:       true,
+			},
+			template: "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]",
+			want:     "[Group] Anime Name - S01E02 - (BD 1080p HEVC FLAC)",
+		},
+		{
+			name: "Special Episode",
+			meta: Metadata{
+				Title:        "Anime Name",
+				Season:       0,
+				Episodes:     []int{5},
+				EpisodeTitle: "Title of the Episode",
+				Source:       "BD",
+				Resolution:   "1080p",
+				VideoCodec:   "HEVC",
+				AudioCodec:   "FLAC",
+				DualAudio:    true,
+				Group:        "Group",
+				IsTV:         true,
+			},
+			template: "{title} - {season_id}{episode_id} - {episode_title} ({source} {resolution} {video_codec} {audio_codec}) {dual_audio}-[{group}]",
+			want:     "Anime Name - S00E05 - Title of the Episode (BD 1080p HEVC FLAC) Dual-Audio-[Group]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.meta.render(tt.template); got != tt.want {
+				t.Errorf("Metadata.render() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

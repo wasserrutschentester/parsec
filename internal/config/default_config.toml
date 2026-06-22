@@ -31,10 +31,40 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode
 video_codec_avc = "H.264"
 video_codec_hevc = "H.265"
 
-# Custom regular expression to clean titles before normalization.
-# It will remove any matches of this regex from the Title and Episode Title.
-# e.g. '(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))' to remove anything after | and Part indicators.
-title_cleaning_regex = ""
+# Character used to replace spaces in titles, episode titles, and codecs.
+word_separator = "."
+
+# Replace diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss)
+normalize_diacritics = true
+
+# Path where to move files after renaming (absolute or relative to cwd)
+# output_path = ""
+
+# Custom regex replacements applied to the Title and Episode Title before normalization.
+# Replaces `title_cleaning_regex`.
+[[replacements.title]]
+pattern = '(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))'
+replacement = ''
+
+[[replacements.title]]
+pattern = '&'
+replacement = 'und'
+
+[[replacements.input]]
+pattern = '(?i)(Fernseh|Dokumentar|Spiel|Kurz|Animations|Maerchen|Märchen)film.*(Deutschland|Oesterreich|Österreich|Schweiz|DDR)'
+replacement = ''
+
+# Regex replacements applied to the raw filename before parsing.
+# They are processed in the order they appear.
+[[replacements.input]]
+pattern = '(?i)(Fernseh|Dokumentar|Spiel|Kurz|Animations|Maerchen|Märchen)film.*(Deutschland|Oesterreich|Österreich|Schweiz|DDR)'
+replacement = ''
+
+
+# Regex replacements applied to the final generated filename string.
+# [[replacements.output]]
+# pattern = 'BluRay'
+# replacement = 'Blu-Ray'
 
 # Api keys for Media Databases (required for most features)
 [api_keys]
@@ -114,3 +144,12 @@ allow_special_matches = true
 season = 0
 is_tv = true
 template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resolution}.{service}.{source}.{video_codec}-{group}"
+
+# ------------------------------------------------------------------------------
+# PRESET: anime
+# Use case: Naming scheme following the parsec naming guide for anime.
+# ------------------------------------------------------------------------------
+[preset.anime]
+is_tv = true
+word_separator = ""
+template = "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]"

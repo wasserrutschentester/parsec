@@ -31,13 +31,35 @@ func (a *trackResultAggregator) Add(res *CheckResult) {
 			Identifier: res.Identifier,
 			Warning:    res.Warning,
 			Passed:     true,
+			Actual:     res.Actual,
+			Expected:   res.Expected,
 		}
 		a.aggregated[res.Identifier] = target
+	} else {
+		a.mergeActualExpected(target, res)
 	}
 
 	target.Passed = false
 	target.Severity = res.Severity
 	target.Tracks = append(target.Tracks, res.Tracks...)
+}
+
+func (a *trackResultAggregator) mergeActualExpected(target, res *CheckResult) {
+	if res.Actual != "" {
+		if target.Actual == "" {
+			target.Actual = res.Actual
+		} else {
+			target.Actual += "; " + res.Actual
+		}
+	}
+
+	if res.Expected != "" {
+		if target.Expected == "" {
+			target.Expected = res.Expected
+		} else {
+			target.Expected += "; " + res.Expected
+		}
+	}
 }
 
 func (a *trackResultAggregator) AddAll(results []*CheckResult) {
@@ -73,6 +95,15 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_title_hygiene",
 		"matroska_video_cropping",
 		"matroska_track_delay",
+		"matroska_truehd_compatibility",
+		"matroska_chapters_start_non_zero",
+		"matroska_chapters_non_monotonic",
+		"matroska_chapters_duplicate",
+		"matroska_chapters_too_close",
+		"matroska_chapters_exceed_duration",
+		"matroska_chapters_name_hygiene",
+		"matroska_chapters_language_hygiene",
+		"matroska_chapters_keyframe_alignment",
 		"matroska_app_hygiene",
 	}
 
@@ -100,6 +131,25 @@ func RunMatroskaChecks(filePath string, meta *metadata.Metadata) []CheckResult {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {
 		return checkMatroskaFormat(err)
+	}
+
+	if ebml.HasChapters() {
+		xmlChapters, err := matroska.ExtractChapters(filePath)
+		if err == nil {
+			if len(ebml.Chapters) == 0 {
+				ebml.Chapters = append(ebml.Chapters, matroska.EbmlChapters{
+					NumEntries: len(xmlChapters),
+				})
+			}
+
+			ebml.Chapters[0].Editions = []matroska.EbmlEdition{
+				{
+					Chapters: xmlChapters,
+				},
+			}
+		} else {
+			ui.PrintDebug(fmt.Sprintf("Failed to extract chapters via mkvextract: %v", err))
+		}
 	}
 
 	fontMap, attachmentNames := getFontMapping(filePath, ebml.Attachments)
@@ -152,6 +202,10 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 			audioCounts, subCounts, langHasOriginalFlag, videoWidth, videoHeight, allUsedFonts, fontMap)
 	}
 
+	if config.IsCheckEnabled("matroska_truehd_compatibility") {
+		agg.Add(checkTrueHDCompatibility(tracks))
+	}
+
 	if config.IsCheckEnabled("matroska_unused_fonts") {
 		agg.Add(checkUnusedFonts(ebml.Attachments, attachmentNames, allUsedFonts))
 	}
@@ -160,7 +214,47 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentNames))
 	}
 
+	runChaptersChecks(filePath, ebml, agg)
+
 	return agg.ToSlice()
+}
+
+func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, agg *trackResultAggregator) {
+	if len(ebml.Chapters) == 0 {
+		return
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_start_non_zero") {
+		agg.Add(checkChaptersStartNonZero(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_non_monotonic") {
+		agg.Add(checkChaptersNonMonotonic(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_duplicate") {
+		agg.Add(checkChaptersDuplicate(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_too_close") {
+		agg.Add(checkChaptersTooClose(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_exceed_duration") {
+		agg.Add(checkChaptersExceedDuration(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_name_hygiene") {
+		agg.Add(checkChaptersNameHygiene(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_language_hygiene") {
+		agg.Add(checkChaptersLanguageHygiene(ebml))
+	}
+
+	if config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
+		agg.Add(checkChaptersKeyframeAlignment(filePath, ebml))
+	}
 }
 
 func runSingleIterationChecks(
@@ -459,11 +553,18 @@ func getVideoDimensions(tracks []matroska.EbmlTrack) (int, int) {
 	for _, track := range tracks {
 		if track.Type == "video" {
 			props := track.Properties
-			if props.DisplayWidth > 0 && props.DisplayHeight > 0 {
-				return props.DisplayWidth, props.DisplayHeight
+
+			// Try display_dimensions string
+			dw, dh := matroska.ParseDimensions(props.DisplayDimensions)
+			if dw > 0 && dh > 0 {
+				return dw, dh
 			}
 
-			return props.PixelWidth, props.PixelHeight
+			// Fallback to pixel_dimensions string
+			pw, ph := matroska.ParseDimensions(props.PixelDimensions)
+			if pw > 0 && ph > 0 {
+				return pw, ph
+			}
 		}
 	}
 

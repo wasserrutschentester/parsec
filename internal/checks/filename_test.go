@@ -100,7 +100,7 @@ func TestRunFilenameChecks(t *testing.T) {
 				Title:      "Series.Title",
 				Year:       2023,
 				Season:     2023,
-				Episode:    1,
+				Episodes:   []int{1},
 				Language:   "GERMAN",
 				Resolution: "1080p",
 				Source:     "WEB-DL",
@@ -130,7 +130,7 @@ func TestRunFilenameChecks(t *testing.T) {
 			meta: &metadata.Metadata{
 				Title:      "Series.Title",
 				Season:     0,
-				Episode:    1,
+				Episodes:   []int{1},
 				Language:   "GERMAN",
 				Resolution: "1080p",
 				Source:     "WEB-DL",

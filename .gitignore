@@ -1,7 +1,10 @@
-#build files
+# build files
 /parsec
 .parsec.toml
 vendor/
 
 # IDE
 .idea
+
+# test files
+*.mkv

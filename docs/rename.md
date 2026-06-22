@@ -19,6 +19,7 @@ You can provide one or more files or directories to be processed. Directories wi
 -   **External Metadata**: Fetches "official" titles and episode names from TMDB, TVDB, and IMDb.
 -   **Interactive Preview**: Shows a comparison between the current and proposed filename before applying changes.
 -   **Metadata Overrides**: Manually specify details using flags to correct misparsed information.
+-   **Regex Replacements**: Define custom input, title, and output regex replacements to handle edge cases and enforce precise naming formats. See [Regex Replacements Documentation](replacements.md) for details.
 -   **Normalization**: Automatically normalizes titles and service names according to common standards.
 
 ## Flags
@@ -64,6 +65,7 @@ You can provide one or more files or directories to be processed. Directories wi
 | `--unattended`| `-u` | boolean | Do not prompt for confirmation before renaming. |
 | `--dry-run` | `-d` | boolean | Print the proposed new filename but do not perform the actual rename. |
 | `--season-pack`| `-P` | boolean | Move episodes into a correctly named season pack folder (omitting episode-specific info). |
+| `--output` | `-O` | string | Output path where to move the files after renaming (absolute or relative to current working directory). |
 
 ## Examples
 

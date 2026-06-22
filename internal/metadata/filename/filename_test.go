@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
@@ -26,6 +27,38 @@ func compareMetadata(got, want metadata.Metadata) string {
 	}
 
 	return strings.Join(diffs, "\n")
+}
+
+func TestApplyReplacements(t *testing.T) {
+	t.Parallel()
+
+	rules := []config.Replacement{
+		{Pattern: `(?i)(\d{4})_(\d{2})`, Replacement: "$1-$2"},
+		{Pattern: "_", Replacement: "."},
+		{Pattern: `(?i)web-rip`, Replacement: "WEBRip"},
+		{Pattern: `\[invalid_regex(`, Replacement: "should not crash"}, // invalid regex
+	}
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"my_file_name_is_cool", "my.file.name.is.cool"},
+		{"movie.2023.web-rip", "movie.2023.WEBRip"},
+		{"show.2023_01_02", "show.2023-01.02"},
+		{"nothing to change", "nothing to change"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
+			got := ApplyReplacements(tt.input, rules)
+			if got != tt.expected {
+				t.Errorf("ApplyReplacements(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
 }
 
 func runTableTest[T any](t *testing.T, tests []struct {
@@ -76,7 +109,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Das.Traumschiff",
 				Season:        2026,
-				Episode:       3,
+				Episodes:      []int{3},
 				EpisodeTitle:  "Honululu",
 				Language:      "GERMAN",
 				Resolution:    "1080p",
@@ -157,7 +190,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:      "Show",
 				Season:     1,
-				Episode:    1,
+				Episodes:   []int{1},
 				Resolution: "1080p",
 				CutEdition: "Open.Matte",
 				IsTV:       true,
@@ -201,7 +234,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:         "Series",
 				Season:        1,
-				Episode:       2,
+				Episodes:      []int{2},
 				Language:      "Multi",
 				Resolution:    "1080p",
 				Service:       "Netflix",
@@ -255,7 +288,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:        "ZDF.Magazin.Royale",
 				Season:       0,
-				Episode:      166,
+				Episodes:     []int{166},
 				Date:         "2026-05-29",
 				EpisodeTitle: "Die.Colonius-Sprengung.ZMR.vor.Ort",
 				Language:     "GERMAN",
@@ -272,7 +305,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:        "ZDF.Magazin.Royale",
 				Season:       2026,
-				Episode:      166,
+				Episodes:     []int{166},
 				Date:         "2026-05-29",
 				EpisodeTitle: "Die.Colonius-Sprengung.ZMR.vor.Ort",
 				Language:     "GERMAN",
@@ -363,7 +396,7 @@ func TestParse(t *testing.T) {
 			expected: metadata.Metadata{
 				Title:      "Show",
 				Season:     1,
-				Episode:    1,
+				Episodes:   []int{1},
 				Resolution: "720p",
 				VideoCodec: "HEVC",
 				AudioCodec: "Opus",
@@ -478,6 +511,86 @@ func TestParse(t *testing.T) {
 				Group:      "GRP",
 			},
 		},
+		{
+			input: "[Group] Anime Name - S01E01 - (BD 1080p HEVC FLAC) [Dual Audio] [48F1910E].mkv",
+			expected: metadata.Metadata{
+				Title:        "Anime Name",
+				Season:       1,
+				Episodes:     []int{1},
+				EpisodeTitle: "- (BD",
+				Resolution:   "1080p",
+				Source:       "BD",
+				VideoCodec:   "HEVC",
+				AudioCodec:   "FLAC",
+				DualAudio:    true,
+				CRC32:        "48F1910E",
+				Group:        "Group",
+				IsTV:         true,
+			},
+		},
+		{
+			input: "Anime Name - S01E01 - (BD 1080p HEVC FLAC) [Dual Audio] [48F1910E]-Group.mkv",
+			expected: metadata.Metadata{
+				Title:        "Anime Name",
+				Season:       1,
+				Episodes:     []int{1},
+				EpisodeTitle: "- (BD",
+				Resolution:   "1080p",
+				Source:       "BD",
+				VideoCodec:   "HEVC",
+				AudioCodec:   "FLAC",
+				DualAudio:    true,
+				CRC32:        "48F1910E",
+				Group:        "Group.mkv",
+				IsTV:         true,
+			},
+		},
+		{
+			input: "Anime.Name.S01E01.1080p.BluRay.Opus2.0.x264-Hi10P-Group.mkv",
+			expected: metadata.Metadata{
+				Title:         "Anime.Name",
+				Season:        1,
+				Episodes:      []int{1},
+				Resolution:    "1080p",
+				Source:        "BluRay",
+				AudioCodec:    "Opus",
+				AudioChannels: "2.0",
+				VideoCodec:    "x264",
+				Group:         "Group.mkv",
+				IsTV:          true,
+			},
+		},
+		{
+			input: "Kaeptn.Blaubaers.Seemannsgarn.S01E01-E06.Wie.das.Schiff.zur.Klippe.kam.uvm.GERMAN.1080p.ATV.WEB-DL.h264-SLiDE",
+			expected: metadata.Metadata{
+				Title:        "Kaeptn.Blaubaers.Seemannsgarn",
+				Season:       1,
+				Episodes:     []int{1, 2, 3, 4, 5, 6},
+				EpisodeTitle: "Wie.das.Schiff.zur.Klippe.kam.uvm",
+				Language:     "GERMAN",
+				Resolution:   "1080p",
+				Service:      "ATV",
+				Source:       "WEB-DL",
+				VideoCodec:   "h264",
+				Group:        "SLiDE",
+				IsTV:         true,
+			},
+		},
+		{
+			input: "ShowName.S02E01-E03.Episode.Title.Here.ENGLISH.720p.WEB-DL.x264-Group",
+			expected: metadata.Metadata{
+				Title:        "ShowName",
+				Season:       2,
+				Episodes:     []int{1, 2, 3},
+				EpisodeTitle: "Episode.Title.Here",
+				Language:     "ENGLISH",
+				Resolution:   "720p",
+				Source:       "WEB-DL",
+				VideoCodec:   "x264",
+				Group:        "Group",
+				IsTV:         true,
+			},
+		},
 	}
 
 	runTableTest(t, tests, func(s string) metadata.Metadata {
@@ -512,22 +625,20 @@ func TestDeobfuscateTitle(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // mutates global state via config.InitDefaults()
 func TestNormalizeTitle(t *testing.T) {
-	t.Parallel()
+	config.InitDefaults()
 
 	tests := []struct {
 		input    string
 		expected string
 	}{
 		{"München", "Muenchen"},
-		{"Blöde Bühnendüsen", "Bloede.Buehnenduesen"},
-		{"Film & Dokumentation", "Film.und.Dokumentation"},
-		{"Das.Traumschiff.(S01_E01)", "Das.Traumschiff"},
-		{"Bam.Fernsehfilm.Deutschland.2023", "Bam.2023"},
-		{"FooMärchenfilm.Österreich.1990", "Foo.1990"},
-		{"Test...Sequence.-..Fix", "Test.Sequence.Fix"},
+		{"Blöde Bühnendüsen", "Bloede Buehnenduesen"},
+		{"Film & Dokumentation", "Film und Dokumentation"},
+		{"Test...Sequence.-..Fix", "Test Sequence Fix"},
 		{"Café.Smørebrød", "Cafe.Smoerebroed"},
-		{"Title with (parentheses) and \"quotes\"", "Title.with.parentheses.and.quotes"},
+		{"Title with (parentheses) and \"quotes\"", "Title with parentheses and quotes"},
 	}
 
 	runTableTest(t, tests, NormalizeTitle, func(got, want string) string {

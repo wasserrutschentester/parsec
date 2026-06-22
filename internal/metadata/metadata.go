@@ -17,10 +17,10 @@ import (
 
 // Metadata represents the metadata for a media file.
 type Metadata struct {
-	Title   string
-	Year    int
-	Season  int
-	Episode int
+	Title    string
+	Year     int
+	Season   int
+	Episodes []int
 
 	Date          string
 	EpisodeTitle  string
@@ -40,6 +40,8 @@ type Metadata struct {
 	AudioChannels string
 	AudioMeta     string
 	VideoCodec    string
+	DualAudio     bool
+	CRC32         string
 	Group         string
 	ImdbID        string
 	TmdbID        int
@@ -149,11 +151,11 @@ func detectDTS(uProfile, uFeatures string) string {
 	}
 
 	if isXLL || strings.Contains(combined, "MA") {
-		return "DTS-HD.MA"
+		return "DTS-HD MA"
 	}
 
 	if strings.Contains(combined, "XBR") || strings.Contains(combined, "XXCH") || strings.Contains(combined, "HRA") {
-		return "DTS-HD.HRA"
+		return "DTS-HD HRA"
 	}
 
 	if strings.Contains(combined, "ES") {
@@ -284,8 +286,10 @@ func (meta *Metadata) setBasicDefaults() {
 		meta.Season = config.GetSeason()
 	}
 
-	if meta.Episode == 0 {
-		meta.Episode = config.GetEpisode()
+	if len(meta.Episodes) == 0 {
+		if ep := config.GetEpisode(); ep > 0 {
+			meta.Episodes = []int{ep}
+		}
 	}
 
 	if meta.Date == "" {
@@ -357,38 +361,11 @@ func (meta *Metadata) GetReleaseName() string {
 	return meta.render(template)
 }
 
-// addNumberReplacements adds the numeric template fields (bit depth, year,
-// season and episode) to the replacements map.
-func (meta *Metadata) addNumberReplacements(replacements map[string]string) {
-	if meta.BitDepth > 8 {
-		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
-	}
-
-	// Omit the year when the season already encodes it (daily/dated series),
-	// otherwise it is redundant (see the filename_year_redundant check).
-	if meta.Year > 0 && meta.Season <= 1900 {
-		replacements["{year}"] = strconv.Itoa(meta.Year)
-	}
-
-	if meta.Season > 0 || meta.IsTV {
-		replacements["{season_raw}"] = strconv.Itoa(meta.Season)
-		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
-		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
-	}
-
-	if meta.Episode > 0 {
-		replacements["{episode_raw}"] = strconv.Itoa(meta.Episode)
-		replacements["{episode_02}"] = fmt.Sprintf("%02d", meta.Episode)
-		replacements["{episode_03}"] = fmt.Sprintf("%03d", meta.Episode)
-		replacements["{episode_id}"] = fmt.Sprintf("E%02d", meta.Episode)
-	}
-}
-
 // GetSeasonPackName returns a folder name for a season pack, omitting episode-specific details.
 func (meta *Metadata) GetSeasonPackName() string {
 	// Operate on a copy to avoid mutating the original metadata
 	metaCopy := *meta
-	metaCopy.Episode = 0
+	metaCopy.Episodes = nil
 	metaCopy.EpisodeTitle = ""
 	metaCopy.Date = ""
 
@@ -396,6 +373,55 @@ func (meta *Metadata) GetSeasonPackName() string {
 }
 
 func (meta *Metadata) render(template string) string {
+	replacements := meta.getReplacements()
+
+	result := template
+	for tag, val := range replacements {
+		result = strings.ReplaceAll(result, tag, val)
+	}
+
+	finalName := cleanName(result)
+	sep := config.GetWordSeparator()
+
+	if sep != " " {
+		finalName = strings.ReplaceAll(finalName, " ", sep)
+	}
+
+	// Filename length safeguard
+	finalName = meta.truncateIfTooLong(finalName, template)
+
+	return finalName
+}
+
+func (meta *Metadata) truncateIfTooLong(finalName, template string) string {
+	if len(finalName) <= 245 {
+		return finalName
+	}
+
+	ui.PrintWarning(fmt.Sprintf("Generated filename exceeds 245 bytes (%d bytes). Attempting to truncate.", len(finalName)))
+
+	if meta.EpisodeTitle == "" {
+		ui.PrintError("Cannot truncate: no episode title to remove. This might cause filesystem errors.")
+
+		return finalName
+	}
+
+	metaCopy := *meta
+	metaCopy.EpisodeTitle = ""
+
+	// Recursively render without episode title
+	truncatedName := metaCopy.render(template)
+
+	if len(truncatedName) <= 245 {
+		ui.PrintInfo("Successfully truncated by removing the episode title.")
+	} else {
+		ui.PrintError(fmt.Sprintf("Even without the episode title, the filename is still too long (%d bytes). This might cause filesystem errors.", len(truncatedName)))
+	}
+
+	return truncatedName
+}
+
+func (meta *Metadata) getReplacements() map[string]string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
 		"{date}":           meta.Date,
@@ -415,7 +441,31 @@ func (meta *Metadata) render(template string) string {
 		"{group}":          meta.Group,
 	}
 
-	meta.addNumberReplacements(replacements)
+	if meta.DualAudio {
+		replacements["{dual_audio}"] = "Dual-Audio"
+	}
+
+	if meta.CRC32 != "" {
+		replacements["{crc32}"] = strings.ToUpper(strings.Trim(meta.CRC32, "[]"))
+	}
+
+	if meta.BitDepth > 8 {
+		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
+	}
+
+	// Omit the year when the season already encodes it (daily/dated series),
+	// otherwise it is redundant (see the filename_year_redundant check).
+	if meta.Year > 0 && meta.Season <= 1900 {
+		replacements["{year}"] = strconv.Itoa(meta.Year)
+	}
+
+	if meta.Season > 0 || meta.IsTV {
+		replacements["{season_raw}"] = strconv.Itoa(meta.Season)
+		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
+		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
+	}
+
+	meta.setEpisodeReplacements(replacements)
 
 	if meta.Repack {
 		replacements["{repack}"] = "REPACK"
@@ -425,12 +475,41 @@ func (meta *Metadata) render(template string) string {
 		replacements["{accessibility}"] = "with.Audio.Description"
 	}
 
-	result := template
-	for tag, val := range replacements {
-		result = strings.ReplaceAll(result, tag, val)
+	return replacements
+}
+
+func (meta *Metadata) setEpisodeReplacements(replacements map[string]string) {
+	if len(meta.Episodes) == 0 {
+		return
 	}
 
-	return cleanName(result)
+	eps := make([]int, len(meta.Episodes))
+	copy(eps, meta.Episodes)
+
+	first := eps[0]
+
+	last := eps[0]
+	for _, e := range eps {
+		if e < first {
+			first = e
+		}
+
+		if e > last {
+			last = e
+		}
+	}
+
+	if len(eps) == 1 || first == last {
+		replacements["{episode_raw}"] = strconv.Itoa(first)
+		replacements["{episode_02}"] = fmt.Sprintf("%02d", first)
+		replacements["{episode_03}"] = fmt.Sprintf("%03d", first)
+		replacements["{episode_id}"] = fmt.Sprintf("E%02d", first)
+	} else {
+		replacements["{episode_raw}"] = fmt.Sprintf("%d-%d", first, last)
+		replacements["{episode_02}"] = fmt.Sprintf("%02d-%02d", first, last)
+		replacements["{episode_03}"] = fmt.Sprintf("%03d-%03d", first, last)
+		replacements["{episode_id}"] = fmt.Sprintf("E%02d-E%02d", first, last)
+	}
 }
 
 func cleanName(name string) string {
@@ -495,26 +574,42 @@ func (meta *Metadata) Override(newMeta *Metadata) bool {
 	for i := 0; i < mVal.NumField(); i++ {
 		mField := mVal.Field(i)
 		nField := nVal.Field(i)
+
 		f := typ.Field(i)
-
-		if f.Type.Kind() == reflect.Bool {
-			if mField.Bool() != nField.Bool() && nField.Bool() {
-				ui.PrintDebug(fmt.Sprintf("%s: %t %s %t", f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
-				mField.SetBool(nField.Bool())
-
-				updated = true
-			}
-		} else {
-			if !nField.IsZero() && mField.Interface() != nField.Interface() {
-				ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
-				mField.Set(nField)
-
-				updated = true
-			}
+		if applyOverride(f, nField, mField) {
+			updated = true
 		}
 	}
 
 	return updated
+}
+
+func applyOverride(f reflect.StructField, nField, mField reflect.Value) bool {
+	switch f.Type.Kind() {
+	case reflect.Bool:
+		if mField.Bool() != nField.Bool() && nField.Bool() {
+			ui.PrintDebug(fmt.Sprintf("%s: %t %s %t", f.Name, mField.Bool(), ui.Muted.Render("->"), nField.Bool()))
+			mField.SetBool(nField.Bool())
+
+			return true
+		}
+	case reflect.Slice:
+		if !nField.IsZero() && !reflect.DeepEqual(mField.Interface(), nField.Interface()) {
+			ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
+			mField.Set(nField)
+
+			return true
+		}
+	default:
+		if !nField.IsZero() && mField.Interface() != nField.Interface() {
+			ui.PrintDebug(fmt.Sprintf("%s: %v %s %v", f.Name, mField.Interface(), ui.Muted.Render("->"), nField.Interface()))
+			mField.Set(nField)
+
+			return true
+		}
+	}
+
+	return false
 }
 
 // RemoveDuplicates removes duplicate elements from a slice.

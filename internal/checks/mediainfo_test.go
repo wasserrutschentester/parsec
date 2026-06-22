@@ -370,3 +370,197 @@ func TestCheckDialogueNormalization(t *testing.T) {
 		})
 	}
 }
+
+//nolint:funlen,paralleltest // numerous test cases are needed to cover many codec and channel combinations; depends on shared global state
+func TestCheckStereoLossless(t *testing.T) {
+	tests := []struct {
+		name     string
+		track    mediainfo.Track
+		wantWarn bool
+	}{
+		{
+			name: "Stereo FLAC (Allowed)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "FLAC",
+				Channels: 2,
+			},
+			wantWarn: false,
+		},
+		{
+			name: "Stereo TrueHD (Warning)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "MLP FBA",
+				Channels: 2,
+			},
+			wantWarn: true,
+		},
+		{
+			name: "Mono TrueHD (Warning)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "MLP FBA",
+				Channels: 1,
+			},
+			wantWarn: true,
+		},
+		{
+			name: "5.1 TrueHD (Allowed)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "MLP FBA",
+				Channels: 6,
+			},
+			wantWarn: false,
+		},
+		{
+			name: "Stereo DTS-HD MA (Warning)",
+			track: mediainfo.Track{
+				Type:          "Audio",
+				Format:        "DTS",
+				FormatProfile: "MA / Core",
+				Channels:      2,
+			},
+			wantWarn: true,
+		},
+		{
+			name: "Stereo AAC (Allowed - Lossy)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "AAC",
+				Channels: 2,
+			},
+			wantWarn: false,
+		},
+		{
+			name: "Stereo PCM (Warning)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "PCM",
+				Channels: 2,
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mi := &mediainfo.MediaInfo{
+				Media: mediainfo.Media{
+					Tracks: []mediainfo.Track{tt.track},
+				},
+			}
+			results := checkStereoLossless(mi)
+			hasFailure := false
+
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+
+					break
+				}
+			}
+
+			if tt.wantWarn && !hasFailure {
+				t.Errorf("checkStereoLossless() expected warning, got none")
+			}
+
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("checkStereoLossless() expected no warning, got failure")
+			}
+		})
+	}
+}
+
+//nolint:funlen,paralleltest // numerous test cases are needed to cover zero channels and zero elements check; depends on shared global state
+func TestCheckZeroChannelsElements(t *testing.T) {
+	tests := []struct {
+		name     string
+		track    mediainfo.Track
+		wantWarn bool
+	}{
+		{
+			name: "Audio track with channels (Allowed)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "AC-3",
+				Channels: 6,
+			},
+			wantWarn: false,
+		},
+		{
+			name: "Audio track with zero channels (Error)",
+			track: mediainfo.Track{
+				Type:     "Audio",
+				Format:   "AC-3",
+				Channels: 0,
+			},
+			wantWarn: true,
+		},
+		{
+			name: "Subtitle track with elements (Allowed)",
+			track: mediainfo.Track{
+				Type:         "Text",
+				Format:       "SRT",
+				ElementCount: 150,
+			},
+			wantWarn: false,
+		},
+		{
+			name: "Subtitle track with zero elements (Error)",
+			track: mediainfo.Track{
+				Type:         "Text",
+				Format:       "SRT",
+				ElementCount: 0,
+			},
+			wantWarn: true,
+		},
+		{
+			name: "Subtitle track with zero elements in Extra (Error)",
+			track: mediainfo.Track{
+				Type:   "Text",
+				Format: "SRT",
+				Extra:  mediainfo.Extra{"ElementCount": "0"},
+			},
+			wantWarn: true,
+		},
+		{
+			name: "Subtitle track with zero elements in Extra underscores (Error)",
+			track: mediainfo.Track{
+				Type:   "Text",
+				Format: "SRT",
+				Extra:  mediainfo.Extra{"Element_Count": "0"},
+			},
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mi := &mediainfo.MediaInfo{
+				Media: mediainfo.Media{
+					Tracks: []mediainfo.Track{tt.track},
+				},
+			}
+			results := checkEmptyTracks(mi)
+			hasFailure := false
+
+			for _, r := range results {
+				if !r.Passed {
+					hasFailure = true
+
+					break
+				}
+			}
+
+			if tt.wantWarn && !hasFailure {
+				t.Errorf("checkEmptyTracks() expected warning/error, got none")
+			}
+
+			if !tt.wantWarn && hasFailure {
+				t.Errorf("checkEmptyTracks() expected no warning/error, got failure")
+			}
+		})
+	}
+}

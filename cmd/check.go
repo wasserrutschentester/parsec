@@ -80,7 +80,10 @@ You can also pass a JSON check report file to render it.`),
 
 			if meta != nil && meta.IsTV && (meta.TvdbID > 0 || meta.TmdbID > 0) && meta.Season > 0 {
 				key := seasonKey{tvdbID: meta.TvdbID, tmdbID: meta.TmdbID, season: meta.Season}
-				seasonEpisodes[key] = append(seasonEpisodes[key], meta.Episode)
+				if len(meta.Episodes) > 0 {
+					seasonEpisodes[key] = append(seasonEpisodes[key], meta.Episodes...)
+				}
+
 				seasonMetas[key] = meta
 			}
 

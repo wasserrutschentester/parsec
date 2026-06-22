@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -154,6 +156,7 @@ type Track struct {
 	ScanType                 string    `json:"ScanType,omitempty"`
 	FrameRate                float64   `json:"FrameRate,string,omitempty"`
 	FrameCount               int       `json:"FrameCount,string,omitempty"`
+	ElementCount             int       `json:"ElementCount,string,omitempty"`
 	BitDepth                 int       `json:"BitDepth,string,omitempty"`
 	ChromaSubsampling        string    `json:"ChromaSubsampling,omitempty"`
 	SamplingRate             int       `json:"SamplingRate,string,omitempty"`
@@ -194,6 +197,31 @@ func (t *Track) GetDialNorm() string {
 
 	// Strip " dB" suffix if present
 	return strings.TrimSuffix(val, " dB")
+}
+
+// GetElementCount returns the count of elements (subtitle lines) in the track.
+func (t *Track) GetElementCount() int {
+	if t.ElementCount > 0 {
+		return t.ElementCount
+	}
+
+	if t.FrameCount > 0 && t.Type == "Text" {
+		return t.FrameCount
+	}
+
+	if val := t.Extra.GetString("ElementCount"); val != "" {
+		if count, err := strconv.Atoi(val); err == nil {
+			return count
+		}
+	}
+
+	if val := t.Extra.GetString("Element_Count"); val != "" {
+		if count, err := strconv.Atoi(val); err == nil {
+			return count
+		}
+	}
+
+	return 0
 }
 
 // Get runs mediainfo on the given file path and returns a MediaInfo struct.
@@ -344,9 +372,33 @@ func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	}
 
 	mi.SetLanguageTag(meta)
+
+	if strings.Contains(config.GetTemplate(), "{crc32}") {
+		meta.CRC32 = calculateCRC32(mi.Media.Ref)
+	}
+
 	ui.PrintDebug(fmt.Sprintf("Mediainfo meta: %+v", meta))
 
 	return meta
+}
+
+func calculateCRC32(filePath string) string {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return ""
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	ui.PrintInfo("Calculating CRC32 for " + ui.AnonymizePath(filePath) + "...")
+
+	h := crc32.NewIEEE()
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%08X", h.Sum32())
 }
 
 func (t *Track) detectHDR() string {
@@ -443,8 +495,10 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	case 1:
 	case 2:
 		meta.LanguageExt = "DL"
+		meta.DualAudio = true
 	default:
 		meta.LanguageExt = "ML"
+		meta.DualAudio = true
 	}
 }
 
