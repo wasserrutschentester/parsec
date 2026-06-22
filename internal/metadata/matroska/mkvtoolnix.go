@@ -427,25 +427,43 @@ func ExtractAttachments(filePath string, ids []int) (map[int][]byte, error) {
 
 // GetFontNames extracts the internal Family and Full names from font data.
 func GetFontNames(data []byte) ([]string, error) {
-	f, err := sfnt.Parse(data)
+	collection, err := sfnt.ParseCollection(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse font: %w", err)
 	}
 
 	var names []string
+	for i := range collection.NumFonts() {
+		font, err := collection.Font(i)
+		if err != nil {
+			continue
+		}
+
+		names = appendFontNames(names, font)
+	}
+
+	return names, nil
+}
+
+func appendFontNames(names []string, font *sfnt.Font) []string {
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		seen[name] = true
+	}
 
 	var b sfnt.Buffer
 
 	// NameIDFamily (0) and NameIDFull (4) are the most common ways fonts are identified.
 	// NameIDTypographicFamily (15) is also important for some modern fonts.
 	for _, id := range []sfnt.NameID{sfnt.NameIDFamily, sfnt.NameIDFull, sfnt.NameIDTypographicFamily} {
-		name, err := f.Name(&b, id)
-		if err == nil && name != "" {
+		name, err := font.Name(&b, id)
+		if err == nil && name != "" && !seen[name] {
 			names = append(names, name)
+			seen[name] = true
 		}
 	}
 
-	return names, nil
+	return names
 }
 
 func (metadata *EbmlMetadata) countTypes() {
@@ -635,6 +653,61 @@ func DeleteAttachments(filePath string, ids []int) error {
 		}
 
 		return fmt.Errorf("failed to delete attachments: %w: %s", err, output)
+	}
+
+	return nil
+}
+
+// AttachmentAdd describes a new attachment to add to a Matroska file.
+type AttachmentAdd struct {
+	Path     string
+	Name     string
+	MIMEType string
+}
+
+// AddAttachments adds the given files as Matroska attachments in place using
+// mkvpropedit.
+func AddAttachments(filePath string, attachments []AttachmentAdd) error {
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath}
+	for _, att := range attachments {
+		if att.Name != "" {
+			args = append(args, "--attachment-name", att.Name)
+		}
+
+		if att.MIMEType != "" {
+			args = append(args, "--attachment-mime-type", att.MIMEType)
+		}
+
+		args = append(args, "--add-attachment", att.Path)
+	}
+
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	for i := 1; i < len(debugArgs); i++ {
+		if debugArgs[i-1] == "--add-attachment" {
+			debugArgs[i] = ui.AnonymizePath(debugArgs[i])
+		}
+	}
+
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to add attachments: %w: %s", err, output)
 	}
 
 	return nil

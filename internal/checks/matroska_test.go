@@ -2,6 +2,7 @@ package checks
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -739,6 +740,32 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 
 	if !found {
 		t.Error("Did not find font filename compliance check result")
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMissingFontsFromStyles(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"matroska_subtitle_fonts"})
+
+	tracks := []matroska.EbmlTrack{
+		{
+			ID:    1,
+			Type:  "subtitles",
+			Codec: "S_TEXT/ASS",
+			Properties: matroska.EbmlTrackProperties{
+				// ASS styles reference Arial and Missing Font; only Arial is embedded.
+				CodecPrivate: "5b56342b205374796c65735d0a466f726d61743a204e616d652c20466f6e746e616d650a5374796c653a2044656661756c742c20417269616c0a5374796c653a204f746865722c204d697373696e6720466f6e740a",
+			},
+		},
+	}
+
+	fontMap := map[string]string{"arial": "Arial"}
+	got := ComputeMissingFonts("", tracks, fontMap)
+	want := []string{"Missing Font"}
+
+	if !slices.Equal(got, want) {
+		t.Errorf("ComputeMissingFonts() = %+v, want %+v", got, want)
 	}
 }
 

@@ -99,8 +99,9 @@ var expectedTypes = map[string]string{
 
 // Sub-keys for structural sections
 var apiKeysExpectedTypes = map[string]string{
-	"tmdb": "string",
-	"tvdb": "string",
+	"google_fonts": "string",
+	"tmdb":         "string",
+	"tvdb":         "string",
 }
 
 var prowlarrExpectedTypes = map[string]string{

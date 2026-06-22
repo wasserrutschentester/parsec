@@ -57,9 +57,10 @@ func ApplyFile(filePath string, opts Options) error {
 
 // fixContainerMetadata applies the in-place, mkvpropedit-based container fixes
 // that don't touch individual tracks: clearing junk title/writing-application
-// fields and removing font attachments unused by any subtitle track. Unlike
-// the --remux fixes, these never rewrite the container, but attachment
-// removal is destructive, so it is always prompted and skipped unattended.
+// fields, attaching missing subtitle fonts, and removing font attachments
+// unused by any subtitle track. Unlike the --remux fixes, these never rewrite
+// the container, but attachment removal is destructive, so it is always
+// prompted and skipped unattended.
 func fixContainerMetadata(filePath string, opts Options) error {
 	ebml, err := matroska.GetEbmlMetadata(filePath)
 	if err != nil {
@@ -77,6 +78,10 @@ func fixContainerMetadata(filePath string, opts Options) error {
 	}
 
 	if err := fixChapterAlignment(filePath, ebml, opts); err != nil {
+		return err
+	}
+
+	if err := attachMissingFonts(filePath, ebml, opts); err != nil {
 		return err
 	}
 

@@ -3,6 +3,7 @@ package checks
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -343,15 +344,7 @@ func checkSubtitleFonts(track matroska.EbmlTrack, fontMap map[string]string, all
 		return nil
 	}
 
-	privateBytes, err := track.Properties.DecodeCodecPrivate()
-	if err != nil || len(privateBytes) == 0 {
-		return nil
-	}
-
-	usedFonts := make(map[string]bool)
-	lines := strings.Split(string(privateBytes), "\n")
-	parseFontsFromStyles(lines, usedFonts)
-
+	usedFonts := styleFontsFromTrack(track)
 	if len(usedFonts) == 0 {
 		return nil
 	}
@@ -372,10 +365,7 @@ func checkSubtitleFonts(track matroska.EbmlTrack, fontMap map[string]string, all
 }
 
 func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, fontMap map[string]string, content []byte, allUsedFonts map[string]bool) *CheckResult {
-	usedFonts := make(map[string]bool)
-
-	parseFontsFromInlineTags(string(content), usedFonts)
-
+	usedFonts := inlineFontsFromContent(content)
 	if len(usedFonts) == 0 {
 		return nil
 	}
@@ -855,6 +845,26 @@ func isASSSubtitles(track matroska.EbmlTrack) bool {
 	return track.Type == "subtitles" && (strings.Contains(track.Codec, "ASS") || strings.Contains(track.Codec, "SSA") || strings.Contains(track.Codec, "SubStationAlpha"))
 }
 
+func styleFontsFromTrack(track matroska.EbmlTrack) map[string]bool {
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
+		return nil
+	}
+
+	usedFonts := make(map[string]bool)
+	lines := strings.Split(string(privateBytes), "\n")
+	parseFontsFromStyles(lines, usedFonts)
+
+	return usedFonts
+}
+
+func inlineFontsFromContent(content []byte) map[string]bool {
+	usedFonts := make(map[string]bool)
+	parseFontsFromInlineTags(string(content), usedFonts)
+
+	return usedFonts
+}
+
 // findMissingFonts checks if each used font has a matching attachment using robust internal name mapping.
 func findMissingFonts(usedFonts map[string]bool, fontMap map[string]string) []string {
 	var missing []string
@@ -865,6 +875,8 @@ func findMissingFonts(usedFonts map[string]bool, fontMap map[string]string) []st
 			missing = append(missing, font)
 		}
 	}
+
+	slices.Sort(missing)
 
 	return missing
 }
@@ -955,10 +967,16 @@ func FontFilenameCompliant(fileName string, internalNames []string) bool {
 		baseName = baseName[:idx]
 	}
 
-	normalizedFileName := normalizeFontName(baseName)
+	return FontNameMatches(baseName, internalNames)
+}
+
+// FontNameMatches reports whether name matches one of a font file's internal
+// names using the same normalization as the subtitle-font checks.
+func FontNameMatches(name string, internalNames []string) bool {
+	normalizedName := normalizeFontName(name)
 
 	for _, internalName := range internalNames {
-		if normalizeFontName(internalName) == normalizedFileName {
+		if normalizeFontName(internalName) == normalizedName {
 			return true
 		}
 	}

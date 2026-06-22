@@ -328,6 +328,62 @@ func TestComputeFontRenamesDisabled(t *testing.T) {
 	}
 }
 
+type fakeFontResolver map[string]ResolvedFont
+
+func (f fakeFontResolver) Resolve(fontName string, _ bool) (ResolvedFont, bool) {
+	resolved, ok := f[fontName]
+
+	return resolved, ok
+}
+
+func TestComputeMissingFontAttachmentPlan(t *testing.T) {
+	t.Parallel()
+
+	resolver := fakeFontResolver{
+		"Open Sans": {
+			Path:          "/fonts/OpenSans-Regular.ttf",
+			Source:        fontSourceSystem,
+			InternalNames: []string{"Open Sans", "Open Sans Regular"},
+		},
+	}
+
+	plan := computeMissingFontAttachmentPlan(
+		[]string{"Open Sans", "Unknown Font"},
+		[]matroska.EbmlAttachment{{FileName: "Open Sans.ttf"}},
+		resolver,
+		true,
+	)
+
+	if len(plan.Attachments) != 1 {
+		t.Fatalf("expected 1 attachment, got %+v", plan.Attachments)
+	}
+
+	att := plan.Attachments[0]
+	if att.FontName != "Open Sans" || att.AttachmentName != "Open Sans (2).ttf" || att.MIMEType != "font/ttf" || att.Source != fontSourceSystem {
+		t.Errorf("unexpected attachment plan: %+v", att)
+	}
+
+	if !slices.Equal(plan.Unresolved, []string{"Unknown Font"}) {
+		t.Errorf("unresolved = %+v, want Unknown Font", plan.Unresolved)
+	}
+}
+
+func TestGoogleFontDirName(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"Open Sans":     "opensans",
+		"Noto Sans JP":  "notosansjp",
+		"Roboto Serif!": "robotoserif",
+	}
+
+	for input, want := range tests {
+		if got := googleFontDirName(input); got != want {
+			t.Errorf("googleFontDirName(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestNearestKeyframe(t *testing.T) {
 	t.Parallel()
 

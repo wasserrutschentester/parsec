@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	"codeberg.org/upPollo/parsec/internal/config"
@@ -309,6 +310,50 @@ func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[
 	}
 
 	return allUsedFonts
+}
+
+// ComputeMissingFonts gathers the ASS/SSA font names referenced by subtitle
+// tracks that do not have a matching embedded font attachment. It mirrors the
+// style and inline-font checks so fix policy can use the same source data as
+// check without parsing warning strings.
+func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) []string {
+	seen := make(map[string]bool)
+	missing := make([]string, 0)
+
+	for i := range tracks {
+		track := tracks[i]
+		if !isASSSubtitles(track) {
+			continue
+		}
+
+		if config.IsCheckEnabled("matroska_subtitle_fonts") {
+			missing = addMissingFonts(missing, seen, styleFontsFromTrack(track), fontMap)
+		}
+
+		if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
+			if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
+				missing = addMissingFonts(missing, seen, inlineFontsFromContent(content), fontMap)
+			}
+		}
+	}
+
+	slices.Sort(missing)
+
+	return missing
+}
+
+func addMissingFonts(missing []string, seen map[string]bool, usedFonts map[string]bool, fontMap map[string]string) []string {
+	for _, font := range findMissingFonts(usedFonts, fontMap) {
+		normalized := normalizeFontName(font)
+		if seen[normalized] {
+			continue
+		}
+
+		seen[normalized] = true
+		missing = append(missing, font)
+	}
+
+	return missing
 }
 
 // GetFontMapping extracts the font attachments and returns a normalized

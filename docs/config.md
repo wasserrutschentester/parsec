@@ -44,6 +44,7 @@ video_codec_hevc = "H.265"
 [api_keys]
 tmdb = "your_tmdb_api_key"
 tvdb = "your_tvdb_api_key"
+google_fonts = "" # optional; only needed for missing subtitle font downloads
 
 [preset.marvel]
 title = "Loki"
@@ -79,6 +80,7 @@ These options can only be set at the top level of the configuration file and are
 |-----|------|-------------|
 | `api_keys.tmdb` | string | API key for TMDB. |
 | `api_keys.tvdb` | string | API key for TVDB. |
+| `api_keys.google_fonts` | string | Optional Google Fonts Developer API key. Used by `fix` only when a missing subtitle font is not found locally or in the keyless Google Fonts GitHub repository. |
 
 #### Prowlarr Settings
 
