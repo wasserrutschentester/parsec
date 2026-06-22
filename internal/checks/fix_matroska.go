@@ -16,14 +16,27 @@ import (
 // does not split on dots, so channel notations such as "5.1" stay intact.
 var cleanSplitRegex = regexp.MustCompile(`[\s/,;()]+`)
 
-// ComputeMatroskaFixes inspects the tracks of a Matroska file and returns the
-// track property edits required to satisfy the auto-fixable Matroska checks:
-// default-flag and original-language assignment, and track name cleanup. Checks
-// that are disabled in the configuration are skipped, mirroring RunMatroskaChecks.
-func ComputeMatroskaFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit {
+// ComputeMatroskaFlagFixes inspects the tracks of a Matroska file and returns
+// the track property edits required to satisfy the auto-fixable flag checks:
+// default-flag and original-language assignment. Checks that are disabled in
+// the configuration are skipped, mirroring RunMatroskaChecks. Kept separate
+// from ComputeMatroskaNameFixes so the two can be previewed and confirmed
+// independently.
+func ComputeMatroskaFlagFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit {
 	builder := newFixBuilder()
 	builder.computeDefaultFlagFixes(tracks)
 	builder.computeOriginalFlagFixes(tracks)
+
+	return builder.edits()
+}
+
+// ComputeMatroskaNameFixes inspects the tracks of a Matroska file and returns
+// the track name edits required to satisfy the auto-fixable name-quality
+// checks: junk keyword, codec and redundant-language removal, plus missing
+// keyword appension. Checks that are disabled in the configuration are
+// skipped, mirroring RunMatroskaChecks.
+func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit {
+	builder := newFixBuilder()
 	builder.computeNameFixes(tracks)
 
 	return builder.edits()

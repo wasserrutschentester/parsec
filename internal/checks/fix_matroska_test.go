@@ -114,7 +114,7 @@ func TestComputeMatroskaFixesDefaultFlag(t *testing.T) {
 		{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Forced: true, Name: "Forced", Default: true, Number: 3}},
 	}
 
-	edits := ComputeMatroskaFixes(tracks)
+	edits := ComputeMatroskaFlagFixes(tracks)
 
 	first, ok := findEdit(edits, 1)
 	if !ok || first.Props["flag-default"] != "1" {
@@ -136,11 +136,38 @@ func TestComputeMatroskaFixesOriginalFlag(t *testing.T) {
 		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Number: 2}},
 	}
 
-	edits := ComputeMatroskaFixes(tracks)
+	edits := ComputeMatroskaFlagFixes(tracks)
 
 	second, ok := findEdit(edits, 2)
 	if !ok || second.Props["flag-original"] != "1" {
 		t.Errorf("expected track 2 to gain flag-original=1, got %+v", edits)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaFlagAndNameFixesAreIndependent(t *testing.T) {
+	config.InitDefaults()
+
+	// Track 1 needs both a flag fix (first of two German tracks, missing
+	// default) and a name fix (redundant codec word), to verify the two
+	// computations stay disjoint.
+	tracks := []matroska.EbmlTrack{
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "AC3 5.1", Number: 1}},
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Number: 2}},
+	}
+
+	flagEdits := ComputeMatroskaFlagFixes(tracks)
+	if edit, ok := findEdit(flagEdits, 1); !ok || edit.Props["flag-default"] != "1" {
+		t.Fatalf("expected ComputeMatroskaFlagFixes to set flag-default=1, got %+v", flagEdits)
+	} else if _, hasName := edit.Props["name"]; hasName {
+		t.Errorf("ComputeMatroskaFlagFixes must not include name edits, got %+v", edit)
+	}
+
+	nameEdits := ComputeMatroskaNameFixes(tracks)
+	if edit, ok := findEdit(nameEdits, 1); !ok || edit.Props["name"] != "5.1" {
+		t.Fatalf("expected ComputeMatroskaNameFixes to clean the name to \"5.1\", got %+v", nameEdits)
+	} else if _, hasFlag := edit.Props["flag-default"]; hasFlag {
+		t.Errorf("ComputeMatroskaNameFixes must not include flag edits, got %+v", edit)
 	}
 }
 
