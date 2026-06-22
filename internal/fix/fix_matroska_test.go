@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
@@ -172,7 +173,7 @@ func TestComputeMatroskaFlagAndNameFixesAreIndependent(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // depends on shared global config state
+//nolint:funlen,paralleltest // table-driven policy coverage; depends on shared global config state
 func TestComputeContainerFixes(t *testing.T) {
 	config.InitDefaults()
 
@@ -209,11 +210,23 @@ func TestComputeContainerFixes(t *testing.T) {
 			}},
 			props: map[string]string{},
 		},
+		{
+			name: "title matching parsed metadata untouched",
+			ebml: &matroska.EbmlMetadata{Container: matroska.EbmlContainer{
+				Properties: matroska.EbmlContainerProperties{Title: "Movie (2020)"},
+			}},
+			props: map[string]string{},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ComputeContainerFixes(tt.ebml)
+			meta := (*metadata.Metadata)(nil)
+			if tt.name == "title matching parsed metadata untouched" {
+				meta = &metadata.Metadata{Title: "Movie (2020)"}
+			}
+
+			got := ComputeContainerFixes(tt.ebml, meta)
 			if len(got) != len(tt.props) {
 				t.Fatalf("ComputeContainerFixes() = %+v, want %+v", got, tt.props)
 			}
@@ -514,7 +527,7 @@ func TestComputeMatroskaRemuxTrackOrder(t *testing.T) {
 }
 
 //nolint:paralleltest // depends on shared global config state
-func TestComputeMatroskaRemuxCompressionAndDuplicates(t *testing.T) {
+func TestComputeMatroskaRemuxCompressionDoesNotRemoveLooseDuplicates(t *testing.T) {
 	config.InitDefaults()
 
 	tracks := []matroska.EbmlTrack{
@@ -529,8 +542,8 @@ func TestComputeMatroskaRemuxCompressionAndDuplicates(t *testing.T) {
 		t.Errorf("expected compression strip on track 1, got %v", plan.StripCompressionIDs)
 	}
 
-	if len(plan.RemovalCandidates) != 1 || plan.RemovalCandidates[0].TrackID != 2 {
-		t.Errorf("expected track 2 flagged as duplicate, got %+v", plan.RemovalCandidates)
+	if len(plan.RemovalCandidates) != 0 {
+		t.Errorf("expected no removals from loose duplicate metadata, got %+v", plan.RemovalCandidates)
 	}
 }
 

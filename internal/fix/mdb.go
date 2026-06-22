@@ -37,7 +37,7 @@ func lookupOriginalLanguage(filePath string, tracks []matroska.EbmlTrack, opts O
 		return ""
 	}
 
-	meta := buildMdbLookupMetadata(filePath, opts)
+	meta := buildFixMetadata(filePath, opts)
 
 	result, err := mdbSearch.InteractiveSearch(meta, opts.Unattended)
 	if err != nil {
@@ -118,7 +118,7 @@ func needsOriginalLanguageForUnwantedAudio(tracks []matroska.EbmlTrack) bool {
 	return false
 }
 
-func buildMdbLookupMetadata(filePath string, opts Options) *metadata.Metadata {
+func buildFixMetadata(filePath string, opts Options) *metadata.Metadata {
 	meta := filename.Parse(filename.GetBaseName(filePath))
 
 	mi, err := mediainfo.Get(filePath)

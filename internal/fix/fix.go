@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
@@ -69,7 +70,8 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return nil
 	}
 
-	if err := fixContainerProperties(filePath, ebml, opts); err != nil {
+	meta := buildFixMetadata(filePath, opts)
+	if err := fixContainerProperties(filePath, ebml, meta, opts); err != nil {
 		return err
 	}
 
@@ -89,18 +91,31 @@ func fixContainerMetadata(filePath string, opts Options) error {
 }
 
 // confirmApply prints the dry-run notice and reports false when opts.DryRun is
-// set, otherwise prompts with prompt (defaulting to "no", like every other
-// fix confirmation) and reports false with skipMsg when the user (or
-// --unattended) declines. Every in-place and remux fix below gates its
-// mkvpropedit/mkvmerge call on this, so it's shared in one place.
+// set, otherwise prompts with prompt (defaulting to "no", like every other fix
+// confirmation). Unattended mode auto-applies callers that opt into it via the
+// policy helper below and skips callers that need explicit confirmation.
 func confirmApply(opts Options, prompt, skipMsg string) bool {
+	return confirmApplyWithPolicy(opts, prompt, skipMsg, true)
+}
+
+func confirmApplyWithPolicy(opts Options, prompt, skipMsg string, allowUnattended bool) bool {
 	if opts.DryRun {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))
 
 		return false
 	}
 
-	if !opts.Unattended && !confirmPrompt(prompt) {
+	if opts.Unattended {
+		if allowUnattended {
+			return true
+		}
+
+		ui.Println(ui.Muted.Render(skipMsg))
+
+		return false
+	}
+
+	if !ui.IsTerminal() || !confirmPrompt(prompt) {
 		ui.Println(ui.Muted.Render(skipMsg))
 
 		return false
@@ -121,7 +136,7 @@ func fixChapterAlignment(filePath string, ebml *matroska.EbmlMetadata, opts Opti
 	ui.Println(ui.ReportSection("Chapter Keyframe Alignment"))
 	ui.Println(fmt.Sprintf("  Snap %d of %d chapter(s) to the nearest video keyframe.", fix.Changed, len(fix.Times)))
 
-	if !confirmApply(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...") {
+	if !confirmApplyWithPolicy(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...", false) {
 		return nil
 	}
 
@@ -175,8 +190,8 @@ func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts 
 // hygiene, writing-application hygiene) as its own independently confirmable
 // change, since they come from unrelated checks and one being declined
 // shouldn't block the other.
-func fixContainerProperties(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	props := ComputeContainerFixes(ebml)
+func fixContainerProperties(filePath string, ebml *matroska.EbmlMetadata, meta *metadata.Metadata, opts Options) error {
+	props := ComputeContainerFixes(ebml, meta)
 
 	for _, key := range slices.Sorted(maps.Keys(props)) {
 		if err := applyContainerProperty(filePath, ebml, opts, key, props[key]); err != nil {
@@ -194,7 +209,7 @@ func applyContainerProperty(filePath string, ebml *matroska.EbmlMetadata, opts O
 	ui.Println("  " + formatContainerChange(key, containerPropertyValue(ebml, key), newValue))
 	ui.Println()
 
-	if !confirmApply(opts, "Clear "+label+"?", "Skipping "+label+" fix...") {
+	if !confirmApplyWithPolicy(opts, "Clear "+label+"?", "Skipping "+label+" fix...", false) {
 		return nil
 	}
 
@@ -426,9 +441,7 @@ func remuxMatroska(filePath string, opts Options) error {
 		return nil
 	}
 
-	remuxOpts := matroska.RemuxOptions{
-		DisableTrackCompression: config.IsCheckEnabled("matroska_zlib_compression"),
-	}
+	remuxOpts := matroska.RemuxOptions{}
 
 	if confirmTrackOrder(ebml, plan, opts) {
 		remuxOpts.TrackOrder = plan.TrackOrder
@@ -436,6 +449,7 @@ func remuxMatroska(filePath string, opts Options) error {
 
 	if confirmCompressionStrip(ebml, plan, opts) {
 		remuxOpts.StripCompressionIDs = plan.StripCompressionIDs
+		remuxOpts.DisableTrackCompression = config.IsCheckEnabled("matroska_zlib_compression")
 	}
 
 	remuxOpts.RemoveTrackIDs = selectRemovals(ebml, plan.RemovalCandidates, opts)

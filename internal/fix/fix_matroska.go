@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
@@ -49,10 +50,10 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 // matching property is cleared rather than rewritten with a guessed
 // replacement, mirroring the conservative junk-removal approach used for
 // track names. Checks that are disabled in the configuration are skipped.
-func ComputeContainerFixes(ebml *matroska.EbmlMetadata) map[string]string {
+func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) map[string]string {
 	props := make(map[string]string)
 
-	if config.IsCheckEnabled("matroska_title_hygiene") && checks.MatchesAnyPattern(ebml.Container.Properties.Title, checks.TitleJunkPatterns) {
+	if config.IsCheckEnabled("matroska_title_hygiene") && checks.TitleHygieneNeedsFix(ebml.Container.Properties.Title, meta) {
 		props["title"] = ""
 	}
 
@@ -569,8 +570,6 @@ func ReverseKeywordFlagFixes(track matroska.EbmlTrack) []KeywordFlagFix {
 type RemovalKind string
 
 const (
-	// RemovalDuplicateTrack identifies exact duplicate track removal.
-	RemovalDuplicateTrack RemovalKind = "duplicate_track"
 	// RemovalUnwantedAudioLang identifies non-preferred, non-original audio removal.
 	RemovalUnwantedAudioLang RemovalKind = "unwanted_audio_language"
 	// RemovalEmptyTrack identifies an audio track carrying no channels.
@@ -608,8 +607,8 @@ func (p MatroskaRemuxPlan) IsEmpty() bool {
 
 // ComputeMatroskaRemux inspects the tracks of a Matroska file and returns the
 // remux operations needed to satisfy the checks that cannot be fixed in place:
-// track ordering, container compression and removal of duplicate, redundant and
-// unwanted-language tracks. originalLang is the MDB original language (may be
+// track ordering, container compression and removal of empty or unwanted-language
+// audio tracks. originalLang is the MDB original language (may be
 // empty); without it, unwanted-language pruning is skipped so the original
 // track is never proposed for removal. Disabled checks are skipped.
 func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) MatroskaRemuxPlan {
@@ -707,7 +706,6 @@ func (c *removalCollector) add(track matroska.EbmlTrack, kind RemovalKind, reaso
 func computeRemovalCandidates(tracks []matroska.EbmlTrack, originalLang string) []RemovalCandidate {
 	collector := &removalCollector{seen: make(map[int]bool)}
 
-	collectDuplicateTracks(collector, tracks)
 	collectUnwantedLanguageAudio(collector, tracks, originalLang)
 	collectEmptyAudioTracks(collector, tracks)
 
@@ -727,29 +725,6 @@ func collectEmptyAudioTracks(collector *removalCollector, tracks []matroska.Ebml
 		if track.Type == "audio" && track.Properties.AudioChannels <= 0 {
 			collector.add(track, RemovalEmptyTrack, "audio track has zero channels")
 		}
-	}
-}
-
-func collectDuplicateTracks(collector *removalCollector, tracks []matroska.EbmlTrack) {
-	if !config.IsCheckEnabled("matroska_duplicate_tracks") {
-		return
-	}
-
-	seen := make(map[string]bool)
-
-	for _, track := range tracks {
-		if !checks.IsRelevantTrack(track) {
-			continue
-		}
-
-		key := checks.TrackDuplicateKey(track)
-		if seen[key] {
-			collector.add(track, RemovalDuplicateTrack, "duplicate of an earlier track (same language, flags and name)")
-
-			continue
-		}
-
-		seen[key] = true
 	}
 }
 

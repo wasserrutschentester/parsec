@@ -93,8 +93,8 @@ Automatically repair the issues reported by `check` that can be resolved without
 **Features:**
 - **In-Place Track Fixes**: Corrects Matroska track flags and names directly, without rewriting the file.
 - **Guided Fixes**: Prompts for values that can't be derived automatically (missing language tags, `mul` names, flag mismatches).
-- **Container Remux**: With `--remux`, also fixes track order, compression, and removes duplicate, redundant or unwanted-language tracks when enough MDB data is available.
-- **Safe by Default**: Destructive and interactive fixes are skipped in unattended mode; track removals always require confirmation.
+- **Container Remux**: With `--remux`, also fixes track order, compression, and removes unwanted-language or empty audio tracks when enough metadata is available.
+- **Safe by Default**: Destructive, remote-download and value-input fixes are skipped in unattended mode; track removals always require confirmation.
 
 For more information see the [Fix Documentation](docs/fix.md)
 

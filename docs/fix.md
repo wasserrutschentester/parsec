@@ -15,11 +15,11 @@ You can provide one or more files or directories to be processed. Directories wi
 `fix` runs in up to two stages per file:
 
 1. **In-place track fixes** (always): track flags and names are corrected directly with `mkvpropedit`. This is fast and lossless — the container is not rewritten.
-2. **Container remux** (preview always shown; applied only with `--remux`): track order, container compression and track removals are reported even on a plain `fix` run, so you always see what a rewrite would change — `fix` just won't touch the file until you pass `--remux`. The MDB original-language lookup needed for unwanted-language pruning is skipped in this preview (it's a real network call) and only runs once `--remux` is given; use `--ov` to provide it without a lookup. The output replaces the original atomically and the original file mode is preserved.
+2. **Container remux** (preview always shown; applied only with `--remux`): track order, container compression and safe track removals are reported even on a plain `fix` run, so you always see what a rewrite would change — `fix` just won't touch the file until you pass `--remux`. The MDB original-language lookup needed for unwanted-language pruning is skipped in this preview (it's a real network call) and only runs once `--remux` is given; use `--ov` to provide it without a lookup. The output replaces the original atomically and the original file mode is preserved.
 
 Each check is only fixed if it is enabled in your [configuration](config.md); disabled checks are skipped, just as they are by `check`.
 
-Unrelated groups of fixes (track flags, track names, language tags, title hygiene, writing-application hygiene, missing subtitle fonts, font renames, chapter alignment, unused fonts, track order, compression, track removals) are each previewed and confirmed **independently**, so declining one never blocks the others. If you want everything applied without stopping to ask, use `--unattended`; to see what would change without writing anything, use `--dry-run`.
+Unrelated groups of fixes (track flags, track names, language tags, title hygiene, writing-application hygiene, missing subtitle fonts, font renames, chapter alignment, unused fonts, track order, compression, track removals) are each previewed and confirmed **independently**, so declining one never blocks the others. Use `--unattended` for deterministic non-destructive fixes without prompts; fixes that need user input, discard existing metadata/data, or fetch remote fonts are skipped. To see what would change without writing anything, use `--dry-run`.
 
 ## What Gets Fixed
 
@@ -42,9 +42,9 @@ The mechanism column indicates how a fix is applied: **In-place** (`mkvpropedit`
 
 | Check | Mechanism | Notes |
 |-------|-----------|-------|
-| `matroska_title_hygiene` | In-place / *prompt* | Clears the global title when it contains technical/release metadata noise (resolution, codec, bracketed/parenthesized tags). It is cleared rather than rewritten, since `fix` has no official title to fall back to. |
-| `matroska_app_hygiene` | In-place / *prompt* | Clears the `WritingApplication` field when it leaks a local path or UUID. |
-| `matroska_subtitle_fonts`, `matroska_subtitle_inline_fonts` | In-place / *prompt* | Attaches missing ASS/SSA fonts found in local system fonts first, then in Google Fonts' keyless GitHub repository, then via the Google Fonts Developer API when `api_keys.google_fonts` is configured. `--dry-run` does not download remote fonts. |
+| `matroska_title_hygiene` | In-place / *prompt* | Clears the global title when it contains technical/release metadata noise (resolution, codec, bracketed/parenthesized tags) and does not match the parsed title metadata that `check` would accept. It is cleared rather than rewritten. Skipped in `--unattended` mode. |
+| `matroska_app_hygiene` | In-place / *prompt* | Clears the `WritingApplication` field when it leaks a local path or UUID. Skipped in `--unattended` mode. |
+| `matroska_subtitle_fonts`, `matroska_subtitle_inline_fonts` | In-place / *prompt* | Attaches missing ASS/SSA fonts found in local system fonts first, then in Google Fonts' keyless GitHub repository, then via the Google Fonts Developer API when `api_keys.google_fonts` is configured. Remote downloads happen only after confirmation; `--dry-run` and `--unattended` do not download remote fonts. |
 | `matroska_unused_fonts` | In-place / *prompt* | Deletes font attachments not referenced by any subtitle track's Styles or inline tags. Deletion is destructive, so it is always confirmed and skipped in `--unattended` mode, even though it doesn't require `--remux`. |
 | `matroska_font_filename_compliance` | In-place / *prompt* | Renames a font attachment's filename to match its internal font name via `mkvpropedit --update-attachment`, which only touches the name and never re-uploads the font data. Attachments that `matroska_unused_fonts` would flag as unused (by header or inline-tag usage) are excluded first, since renaming a font about to be removed is pointless. If several distinct attachments embed the same font name, the rename target gets a numbered suffix (`Times New Roman (2).ttf`) instead of colliding. |
 | `matroska_chapters_keyframe_alignment` | In-place / *prompt* | Snaps each misaligned chapter's start time to the nearest video keyframe, rewriting only the affected `<ChapterTimeStart>` values via `mkvpropedit --chapters`. Re-timing chapters changes seek points, so it is always confirmed and skipped in `--unattended` mode. Only the first edition is touched; files with multiple editions are left alone. |
@@ -55,7 +55,6 @@ The mechanism column indicates how a fix is applied: **In-place** (`mkvpropedit`
 |-------|-----------|-------|
 | `matroska_track_order` | Remux / *prompt* | Reorders tracks by language and type priority. Shown as a before/after table; only the tracks that were genuinely out of place are highlighted, the rest just shift index as a side effect and aren't. |
 | `matroska_zlib_compression` | Remux | Strips zlib track compression. |
-| `matroska_duplicate_tracks` | Remux / *prompt* | Removes exact-duplicate tracks (same language, flags and name). |
 | `mdb_unwanted_audio_lang` | Remux / *prompt* | Removes audio in languages other than the preferred or MDB original language. Skipped if the original language is unavailable. Lists the affected languages before confirmation. |
 | `mediainfo_empty_tracks` | Remux / *prompt* | Removes audio tracks reporting zero channels. Only the audio case is covered; a subtitle track with zero elements needs MediaInfo data `fix` does not yet read, so it is still reported by `check` only. |
 
@@ -67,6 +66,7 @@ Some issues cannot be fixed automatically and are left for manual resolution:
 - **Re-encoding required** — `mediainfo_framerate`, `mediainfo_bitrate`, `mediainfo_resolution`, `mediainfo_interlaced_web`, `mediainfo_durations`.
 - **Bitstream metadata** — `mediainfo_dialogue_normalization` lives inside the audio stream, not the container.
 - **Missing source data** — `mdb_audio_language_preferred`, `mdb_subtitle_language_preferred`, `mdb_audio_language_original`, `mdb_subtitle_language_original` (a track that is not present cannot be added), `mdb_episode_existence`, `mdb_error`, `mdb_no_match`, `mdb_unknown_original_lang`.
+- **Duplicate tracks** — `matroska_duplicate_tracks` is reported by `check` but not auto-removed. The check compares metadata such as language, flags and name; that is useful as a warning, but not enough proof that two streams are byte-identical or safe to delete.
 - **Same-language audio bloat** — `mediainfo_redundant_audio` is reported by `check` but **not** auto-removed. When one language has several audio tracks (e.g. a lossless track plus a lossy variant, or DTS-HD MA alongside DTS), `fix` keeps them all, because choosing which to drop needs codec/quality awareness that is not yet implemented. Only **unwanted-language** audio (anything other than the preferred or MDB original language) is pruned. Remove same-language duplicates manually for now.
 - **No safe target value** — `matroska_video_cropping` only detects an aspect-ratio mismatch; it doesn't compute the actual crop pixels needed, so there's nothing safe to write. `matroska_track_delay` flags a container-level timestamp offset that `mkvpropedit` cannot rewrite in place, and resetting it via remux risks turning a legitimate A/V offset into a real sync error. `matroska_chapters_name_hygiene` (empty or consecutively duplicated chapter names) and `matroska_chapters_language_hygiene` (undetermined chapter display language) have no derivable correct value either, for the same reason a track's `matroska_language_tag` is prompted rather than guessed.
 - **Structurally invalid chapter timing** — `matroska_chapters_duplicate`, `matroska_chapters_non_monotonic`, `matroska_chapters_too_close` and `matroska_chapters_exceed_duration` flag chapter timestamps that are out of order, identical, too close together or beyond the file's duration. Unlike keyframe misalignment, there's no single safe correction (the right fix could be removing, reordering or retiming a chapter), so these are left for manual review. `matroska_chapters_start_non_zero` is included here too: the keyframe-alignment fix above will move a non-zero first chapter to keyframe 0 when one exists, but does not by itself guarantee it.
@@ -76,7 +76,7 @@ Some issues cannot be fixed automatically and are left for manual resolution:
 
 ## Prompts
 
-Every confirmation defaults to **no** — an empty Enter declines, matching the destructive-removal prompts. Fixes whose correct value cannot be derived from the file additionally ask for input: missing language tags and `mul` track names are prompted per track (free text, so they can't be batched). Keyword/flag mismatches (e.g. a name mentioning "Commentary" while `flag-commentary` is unset) are instead gathered into one overview table and asked once as "apply **a**ll / **n**one / **s**elect", with "select" falling back to one confirmation per mismatch. These prompts are **skipped** in `--unattended` mode and when not running in a terminal, so unattended runs only apply the deterministic, non-destructive fixes. Track and font attachment removals are never performed without explicit confirmation.
+Every confirmation defaults to **no** — an empty Enter declines, matching the destructive-removal prompts. Fixes whose correct value cannot be derived from the file additionally ask for input: missing language tags and `mul` track names are prompted per track (free text, so they can't be batched). Keyword/flag mismatches (e.g. a name mentioning "Commentary" while `flag-commentary` is unset) are instead gathered into one overview table and asked once as "apply **a**ll / **n**one / **s**elect", with "select" falling back to one confirmation per mismatch. These input prompts are skipped in `--unattended` mode and when not running in a terminal. Unattended runs apply deterministic non-destructive fixes and skip title/application clearing, chapter retiming, missing-font attachment, track removals and unused-font deletion. Track and font attachment removals are never performed without explicit confirmation.
 
 ## Flags
 
@@ -93,7 +93,7 @@ Every confirmation defaults to **no** — an empty Enter declines, matching the 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
 | `--remux` | | boolean | Also apply fixes that require rewriting the container (track order, compression, track removal). |
-| `--unattended`| `-u` | boolean | Do not prompt for confirmation; skips all interactive and destructive fixes. |
+| `--unattended`| `-u` | boolean | Do not prompt; apply deterministic non-destructive fixes and skip interactive, remote-download and destructive fixes. |
 | `--dry-run` | `-d` | boolean | Preview the changes without modifying any files. |
 | `--ov` | | string | Override the MDB original language/OV for unwanted-language audio removal. Accepts a 2- or 3-letter language code. |
 

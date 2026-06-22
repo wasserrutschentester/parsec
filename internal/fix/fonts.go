@@ -482,18 +482,29 @@ func cachedFontPath(fontURL, fileName string) string {
 // attachMissingFonts locates missing ASS/SSA subtitle fonts and embeds the
 // matching font files as Matroska attachments.
 func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	plan := ComputeMissingFontAttachments(filePath, ebml, !opts.DryRun)
+	plan := ComputeMissingFontAttachments(filePath, ebml, false)
 	if len(plan.Attachments) == 0 && len(plan.Unresolved) == 0 {
 		return nil
 	}
 
-	printMissingFontPlan(plan, opts.DryRun)
+	printMissingFontPlan(plan, opts.DryRun, len(plan.Unresolved) > 0)
 
 	if len(plan.Attachments) == 0 {
+		if opts.DryRun {
+			return nil
+		}
+	}
+
+	if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
 		return nil
 	}
 
-	if !confirmApply(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...") {
+	if len(plan.Unresolved) > 0 {
+		plan = ComputeMissingFontAttachments(filePath, ebml, true)
+		printMissingFontPlan(plan, false, false)
+	}
+
+	if len(plan.Attachments) == 0 {
 		return nil
 	}
 
@@ -508,7 +519,7 @@ func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Optio
 	return nil
 }
 
-func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun bool) {
+func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun, downloadsDeferred bool) {
 	ui.Println(ui.ReportSection("Missing Subtitle Fonts"))
 
 	if len(plan.Attachments) > 0 {
@@ -531,6 +542,8 @@ func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun bool) {
 
 	if dryRun && len(plan.Unresolved) > 0 {
 		ui.Println(ui.Muted.Render("Remote font downloads are skipped during dry-run."))
+	} else if downloadsDeferred && len(plan.Unresolved) > 0 {
+		ui.Println(ui.Muted.Render("Remote font downloads are deferred until after confirmation."))
 	}
 }
 

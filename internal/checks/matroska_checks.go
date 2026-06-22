@@ -1310,20 +1310,26 @@ func MatchesAnyPattern(value string, patterns []string) bool {
 	return false
 }
 
-func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *CheckResult {
-	title := ebml.Container.Properties.Title
+// TitleHygieneNeedsFix reports whether a container title should be cleared.
+// It mirrors checkTitleHygiene's metadata-aware exemption so fix never clears a
+// title that check would accept as the parsed/official title.
+func TitleHygieneNeedsFix(title string, meta *metadata.Metadata) bool {
 	if title == "" {
-		return nil
+		return false
 	}
 
-	officialTitle := meta.Title
-	if officialTitle != "" {
-		if normalizeForComparison(title) == normalizeForComparison(officialTitle) {
-			return nil
+	if meta != nil && meta.Title != "" {
+		if normalizeForComparison(title) == normalizeForComparison(meta.Title) {
+			return false
 		}
 	}
 
-	if MatchesAnyPattern(title, TitleJunkPatterns) {
+	return MatchesAnyPattern(title, TitleJunkPatterns)
+}
+
+func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *CheckResult {
+	title := ebml.Container.Properties.Title
+	if TitleHygieneNeedsFix(title, meta) {
 		return &CheckResult{
 			Identifier: "matroska_title_hygiene",
 			Warning:    "Global Title contains technical metadata",

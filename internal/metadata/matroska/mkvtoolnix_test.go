@@ -258,6 +258,25 @@ func TestBuildRemuxArgs(t *testing.T) {
 	}
 }
 
+func TestBuildRemuxArgsDoesNotStripCompressionWhenNotRequested(t *testing.T) {
+	t.Parallel()
+
+	tracks := []EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio"},
+	}
+
+	opts := RemuxOptions{TrackOrder: []int{0, 1}}
+
+	got := buildRemuxArgs("out.mkv", "in.mkv", opts, tracks)
+
+	for _, arg := range got {
+		if strings.HasPrefix(arg, "--compression") || strings.HasSuffix(arg, ":none") {
+			t.Fatalf("unexpected compression argument without confirmation: %v", got)
+		}
+	}
+}
+
 func TestUnmarshalRealJSON(t *testing.T) {
 	t.Parallel()
 

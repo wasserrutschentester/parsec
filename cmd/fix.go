@@ -21,8 +21,8 @@ var fixCmd = &cobra.Command{
   4. Container metadata and font attachments (prompted)
 
 With --remux, also applies fixes that require rewriting the container: track
-order, container compression and (with confirmation) removal of duplicate or
-unwanted-language tracks when enough MDB data is available.
+order, container compression and (with confirmation) removal of unwanted-language
+or empty audio tracks when enough metadata is available.
 
 Issues that require re-encoding (bitrate, resolution, framerate, ...) or human
 judgement are left untouched and should be resolved manually. Filename fixes are
