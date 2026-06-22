@@ -3,7 +3,6 @@ package fix
 import (
 	"testing"
 
-	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
@@ -60,16 +59,16 @@ func testMismatches() []keywordMismatch {
 	return []keywordMismatch{
 		{
 			track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Number: 1, Name: "Commentary"}},
-			fix:   checks.KeywordFlagFix{Property: "flag-commentary", Keyword: "Commentary"},
+			fix:   KeywordFlagFix{Property: "flag-commentary", Keyword: "Commentary"},
 		},
 		{
 			track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Number: 2, Name: "Forced SDH"}},
-			fix:   checks.KeywordFlagFix{Property: "flag-forced", Keyword: "Forced"},
+			fix:   KeywordFlagFix{Property: "flag-forced", Keyword: "Forced"},
 		},
 		{
 			// Same track as above, a second mismatch -> must merge into one edit.
 			track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Number: 2, Name: "Forced SDH"}},
-			fix:   checks.KeywordFlagFix{Property: "flag-hearing-impaired", Keyword: "SDH"},
+			fix:   KeywordFlagFix{Property: "flag-hearing-impaired", Keyword: "SDH"},
 		},
 	}
 }

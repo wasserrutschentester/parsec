@@ -4,7 +4,6 @@ import (
 	"slices"
 	"testing"
 
-	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
@@ -35,7 +34,7 @@ func TestNeedsOriginalLanguageForUnwantedAudio(t *testing.T) {
 func TestRemovalLanguages(t *testing.T) {
 	t.Parallel()
 
-	candidates := []checks.RemovalCandidate{
+	candidates := []RemovalCandidate{
 		{Track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Language: "spa"}}},
 		{Track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Language: "fre"}}},
 		{Track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Language: "spa"}}},

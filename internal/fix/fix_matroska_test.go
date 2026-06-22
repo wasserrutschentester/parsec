@@ -1,4 +1,4 @@
-package checks
+package fix
 
 import (
 	"os"
@@ -223,27 +223,6 @@ func TestComputeContainerFixes(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-//nolint:paralleltest // depends on shared global config state
-func TestUnusedFontAttachments(t *testing.T) {
-	config.InitDefaults()
-
-	attachments := []matroska.EbmlAttachment{
-		{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"},
-		{ID: 2, FileName: "Unused.ttf", ContentType: "font/ttf"},
-		{ID: 3, FileName: "cover.jpg", ContentType: "image/jpeg"},
-	}
-	attachmentNames := map[int][]string{
-		1: {"Arial"},
-		2: {"Unused"},
-	}
-	allUsedFonts := map[string]bool{"Arial": true}
-
-	got := unusedFontAttachments(attachments, attachmentNames, allUsedFonts)
-	if len(got) != 1 || got[0].ID != 2 {
-		t.Fatalf("unusedFontAttachments() = %+v, want only attachment 2", got)
 	}
 }
 

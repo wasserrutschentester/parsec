@@ -152,7 +152,7 @@ func RunMatroskaChecks(filePath string, meta *metadata.Metadata) []CheckResult {
 		}
 	}
 
-	fontMap, attachmentNames := getFontMapping(filePath, ebml.Attachments)
+	fontMap, attachmentNames := GetFontMapping(filePath, ebml.Attachments)
 
 	return runTrackChecks(filePath, ebml, fontMap, attachmentNames, meta)
 }
@@ -183,8 +183,8 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 	agg := newTrackResultAggregator()
 	allUsedFonts := make(map[string]bool)
 
-	audioCounts, subCounts := getTrackCounts(tracks)
-	langHasOriginalFlag := getOriginalLanguageMap(tracks)
+	audioCounts, subCounts := GetTrackCounts(tracks)
+	langHasOriginalFlag := GetOriginalLanguageMap(tracks)
 	videoWidth, videoHeight := getVideoDimensions(tracks)
 
 	if config.IsCheckEnabled("matroska_title_hygiene") {
@@ -272,7 +272,7 @@ func runSingleIterationChecks(
 		agg.Add(checkVideoCropping(*track))
 	}
 
-	if !isRelevantTrack(*track) {
+	if !IsRelevantTrack(*track) {
 		return
 	}
 
@@ -284,11 +284,11 @@ func runSingleIterationChecks(
 	}
 }
 
-// computeUsedFonts gathers the set of font names referenced by ASS/SSA
+// ComputeUsedFonts gathers the set of font names referenced by ASS/SSA
 // subtitle tracks, mirroring the allUsedFonts side effects that
 // checkSubtitleFonts and checkSubtitleInlineFontsWithContent produce during a
 // normal check run so fix policy stays consistent with what check reports.
-func computeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) map[string]bool {
+func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) map[string]bool {
 	allUsedFonts := make(map[string]bool)
 
 	for i := range tracks {
@@ -311,7 +311,10 @@ func computeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[
 	return allUsedFonts
 }
 
-func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
+// GetFontMapping extracts the font attachments and returns a normalized
+// font-name-to-attachment lookup plus the internal font names found per
+// attachment ID. Shared between check and the fix policy in internal/fix.
+func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
 	fontMap := make(map[string]string)
 	attachmentNames := make(map[int][]string)
 
@@ -320,7 +323,7 @@ func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map
 	idToAtt := make(map[int]matroska.EbmlAttachment)
 
 	for _, att := range attachments {
-		if isFontAttachment(att) {
+		if IsFontAttachment(att) {
 			fontIDs = append(fontIDs, att.ID)
 			idToAtt[att.ID] = att
 		}
@@ -459,7 +462,7 @@ func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts ma
 }
 
 func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack **matroska.EbmlTrack, lastAudioPriority, lastSubPriority *int64, reportedOrderTracks map[int]bool, agg *trackResultAggregator) {
-	priority := getTrackPriority(*track)
+	priority := GetTrackPriority(*track)
 	switch track.Type {
 	case "audio":
 		agg.Add(checkTrackOrder(track, *lastAudioTrack, priority, lastAudioPriority, "some Audio tracks are out of order", reportedOrderTracks))
@@ -470,11 +473,14 @@ func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack 
 	}
 }
 
-func getOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
+// GetOriginalLanguageMap returns the set of languages that already have at
+// least one track flagged as original. Shared with the fix policy in
+// internal/fix, which uses it to decide where flag-original is missing.
+func GetOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
 	langHasOriginalFlag := make(map[string]bool)
 
 	for _, track := range tracks {
-		if isRelevantTrack(track) && track.Properties.OriginalLanguage {
+		if IsRelevantTrack(track) && track.Properties.OriginalLanguage {
 			langHasOriginalFlag[track.Properties.Language] = true
 		}
 	}
@@ -525,12 +531,14 @@ func ebmlGetFlagsSlice(track *matroska.EbmlTrack) []string {
 	return flags
 }
 
-func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
+// GetTrackCounts counts audio and subtitle tracks per language. Shared with
+// the fix policy in internal/fix for its default-flag computation.
+func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	audio = make(map[string]int)
 	sub = make(map[string]int)
 
 	for _, track := range tracks {
-		if !isRelevantTrack(track) {
+		if !IsRelevantTrack(track) {
 			continue
 		}
 
@@ -545,7 +553,9 @@ func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	return audio, sub
 }
 
-func isRelevantTrack(track matroska.EbmlTrack) bool {
+// IsRelevantTrack reports whether a track is of type "audio" or "subtitles".
+// Shared with the fix policy in internal/fix.
+func IsRelevantTrack(track matroska.EbmlTrack) bool {
 	return track.Type == "audio" || track.Type == "subtitles"
 }
 

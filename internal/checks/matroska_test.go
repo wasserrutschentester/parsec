@@ -601,9 +601,9 @@ func TestGetTrackPriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getTrackPriority(tt.track)
+			got := GetTrackPriority(tt.track)
 			if got < tt.wantMin || got > tt.wantMax {
-				t.Errorf("getTrackPriority() = %v, want range [%v, %v]", got, tt.wantMin, tt.wantMax)
+				t.Errorf("GetTrackPriority() = %v, want range [%v, %v]", got, tt.wantMin, tt.wantMax)
 			}
 		})
 	}
@@ -1141,6 +1141,26 @@ func encodeTestVINT(val uint64) []byte {
 	}
 
 	panic("too large for test VINT")
+}
+
+func TestUnusedFontAttachments(t *testing.T) {
+	t.Parallel()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"},
+		{ID: 2, FileName: "Unused.ttf", ContentType: "font/ttf"},
+		{ID: 3, FileName: "cover.jpg", ContentType: "image/jpeg"},
+	}
+	attachmentNames := map[int][]string{
+		1: {"Arial"},
+		2: {"Unused"},
+	}
+	allUsedFonts := map[string]bool{"Arial": true}
+
+	got := UnusedFontAttachments(attachments, attachmentNames, allUsedFonts)
+	if len(got) != 1 || got[0].ID != 2 {
+		t.Fatalf("UnusedFontAttachments() = %+v, want only attachment 2", got)
+	}
 }
 
 func encodeTestElement(id uint64, data []byte) []byte {

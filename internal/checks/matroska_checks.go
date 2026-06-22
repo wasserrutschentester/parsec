@@ -15,8 +15,10 @@ import (
 )
 
 var (
-	dtsRegex        = regexp.MustCompile(`\bDTS\b`)
-	adRegex         = regexp.MustCompile(`\bAD\b`)
+	dtsRegex = regexp.MustCompile(`\bDTS\b`)
+	// ADRegex matches a standalone "AD" (audio description) token in a track
+	// name. Shared with the fix policy in internal/fix.
+	ADRegex         = regexp.MustCompile(`\bAD\b`)
 	wordSplitRegex  = regexp.MustCompile(`[\s/.,;()]+`)
 	commonLangNames = map[string]string{
 		"english": "en", "german": "de", "french": "fr", "spanish": "es",
@@ -31,8 +33,12 @@ var (
 		"한국어": "ko", "русский": "ru",
 	}
 
-	junkKeywords = []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
-	simpleCodecs = []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
+	// JunkKeywords are stripped from track names by the name-quality check.
+	// Shared with the fix policy in internal/fix.
+	JunkKeywords = []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
+	// SimpleCodecs are simple codec name tokens stripped from track names.
+	// Shared with the fix policy in internal/fix.
+	SimpleCodecs = []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
 )
 
 const (
@@ -91,7 +97,7 @@ func formatPriority(p int64) string {
 
 func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
-	for _, junk := range junkKeywords {
+	for _, junk := range JunkKeywords {
 		if strings.Contains(nameUpper, junk) {
 			warning := fmt.Sprintf("junk keyword '%s' in Name", ui.Warning.Render(junk))
 
@@ -104,7 +110,7 @@ func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 
 func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
-	for _, codec := range simpleCodecs {
+	for _, codec := range SimpleCodecs {
 		if strings.Contains(nameUpper, codec) {
 			warning := fmt.Sprintf("simple codec '%s' in Name", ui.Warning.Render(codec))
 
@@ -137,7 +143,7 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	target := base.String()
 
 	for _, word := range tokenizeTrackName(name) {
-		if getLanguageCodeFromName(word) == target {
+		if GetLanguageCodeFromName(word) == target {
 			return true
 		}
 	}
@@ -145,7 +151,9 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	return false
 }
 
-func countLanguagesInString(name string) int {
+// CountLanguagesInString counts recognizable language names found in a
+// tokenized track name. Shared with the fix policy in internal/fix.
+func CountLanguagesInString(name string) int {
 	count := 0
 
 	for _, word := range tokenizeTrackName(name) {
@@ -166,10 +174,12 @@ func tokenizeTrackName(name string) []string {
 }
 
 func isLanguageName(word string) bool {
-	return getLanguageCodeFromName(word) != ""
+	return GetLanguageCodeFromName(word) != ""
 }
 
-func getLanguageCodeFromName(word string) string {
+// GetLanguageCodeFromName maps a language word (e.g. "German") to its BCP-47
+// base code. Shared with the fix policy in internal/fix.
+func GetLanguageCodeFromName(word string) string {
 	if len(word) <= 3 {
 		return ""
 	}
@@ -205,7 +215,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 
 	shouldBeDefault := false
 	if !isSpecialized {
-		shouldBeDefault = determineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
+		shouldBeDefault = DetermineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
 	}
 
 	if props.Default != shouldBeDefault {
@@ -284,7 +294,9 @@ func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
+// DetermineShouldBeDefault decides the default-flag policy for a track,
+// dispatching by type. Shared with the fix policy in internal/fix.
+func DetermineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
 	switch track.Type {
 	case "audio":
 		return shouldTrackBeDefault(track, audioCounts, seenAudioLangs)
@@ -864,7 +876,9 @@ func normalizeFontName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-func isFontAttachment(att matroska.EbmlAttachment) bool {
+// IsFontAttachment detects font attachments by file extension or MIME
+// content type. Shared with the fix policy in internal/fix.
+func IsFontAttachment(att matroska.EbmlAttachment) bool {
 	lowerName := strings.ToLower(att.FileName)
 	if strings.HasSuffix(lowerName, ".ttf") || strings.HasSuffix(lowerName, ".otf") || strings.HasSuffix(lowerName, ".ttc") {
 		return true
@@ -878,10 +892,10 @@ func isFontAttachment(att matroska.EbmlAttachment) bool {
 		strings.Contains(lowerType, "font-sfnt")
 }
 
-// unusedFontAttachments returns the font attachments not referenced by any
+// UnusedFontAttachments returns the font attachments not referenced by any
 // subtitle track. Shared by checkUnusedFonts and the fix policy in
 // fix_matroska.go so both agree on what counts as unused.
-func unusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) []matroska.EbmlAttachment {
+func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) []matroska.EbmlAttachment {
 	normalizedUsedFonts := make(map[string]bool)
 	for f := range allUsedFonts {
 		normalizedUsedFonts[normalizeFontName(f)] = true
@@ -890,7 +904,7 @@ func unusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentName
 	var unused []matroska.EbmlAttachment
 
 	for _, att := range attachments {
-		if !isFontAttachment(att) {
+		if !IsFontAttachment(att) {
 			continue
 		}
 
@@ -914,7 +928,7 @@ func unusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentName
 }
 
 func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) *CheckResult {
-	unused := unusedFontAttachments(attachments, attachmentNames, allUsedFonts)
+	unused := UnusedFontAttachments(attachments, attachmentNames, allUsedFonts)
 	if len(unused) == 0 {
 		return nil
 	}
@@ -932,10 +946,10 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map
 	}
 }
 
-// fontFilenameCompliant reports whether att's filename (without extension)
+// FontFilenameCompliant reports whether att's filename (without extension)
 // matches one of its internal font names, ignoring case and separators.
 // Shared by checkFontFilenameCompliance and the fix policy in fix_matroska.go.
-func fontFilenameCompliant(fileName string, internalNames []string) bool {
+func FontFilenameCompliant(fileName string, internalNames []string) bool {
 	baseName := fileName
 	if idx := strings.LastIndex(baseName, "."); idx != -1 {
 		baseName = baseName[:idx]
@@ -956,7 +970,7 @@ func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachme
 	var nonCompliant []string
 
 	for _, att := range attachments {
-		if !isFontAttachment(att) {
+		if !IsFontAttachment(att) {
 			continue
 		}
 
@@ -965,7 +979,7 @@ func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachme
 			continue
 		}
 
-		if !fontFilenameCompliant(att.FileName, names) {
+		if !FontFilenameCompliant(att.FileName, names) {
 			nonCompliant = append(nonCompliant, fmt.Sprintf("%s (internal: %s)", att.FileName, strings.Join(names, ", ")))
 		}
 	}
@@ -1073,9 +1087,9 @@ func checkOriginalLanguageConsistency(track matroska.EbmlTrack, langHasOriginalF
 	return nil
 }
 
-// trackDuplicateKey builds the identity used to detect duplicate tracks: two
+// TrackDuplicateKey builds the identity used to detect duplicate tracks: two
 // tracks sharing this key are considered duplicates.
-func trackDuplicateKey(track matroska.EbmlTrack) string {
+func TrackDuplicateKey(track matroska.EbmlTrack) string {
 	props := track.Properties
 
 	return fmt.Sprintf("%s-%s-%t-%t-%t-%t-%t-%t-%s",
@@ -1085,7 +1099,7 @@ func trackDuplicateKey(track matroska.EbmlTrack) string {
 }
 
 func checkDuplicateTracks(track *matroska.EbmlTrack, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool) *CheckResult {
-	trackKey := trackDuplicateKey(*track)
+	trackKey := TrackDuplicateKey(*track)
 	if firstTrack, ok := seenTracks[trackKey]; ok {
 		res := &CheckResult{
 			Identifier: "matroska_duplicate_tracks",
@@ -1124,13 +1138,13 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 		return res
 	}
 
-	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || adRegex.MatchString(nameUpper)
+	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || ADRegex.MatchString(nameUpper)
 	if res := checkFlagKeywordResult(track, props.VisualImpaired, "Visual Impaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); res != nil {
 		return res
 	}
 
 	if props.Language == "mul" {
-		if countLanguagesInString(props.Name) < 2 {
+		if CountLanguagesInString(props.Name) < 2 {
 			return newFailedTrackResult("matroska_name_keywords", "Track Name and Flags don't match", "warning", &track, fmt.Sprintf("'mul' but Name has %s names", ui.Warning.Render("<2 language")))
 		}
 	}
@@ -1157,7 +1171,10 @@ func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywo
 	return nil
 }
 
-func getTrackPriority(track matroska.EbmlTrack) int64 {
+// GetTrackPriority computes a sort priority for audio/subtitle tracks,
+// combining language and property score. Shared with the fix policy in
+// internal/fix for its remux track-order computation.
+func GetTrackPriority(track matroska.EbmlTrack) int64 {
 	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
 	propertyScore := calculatePropertyScore(track)
 
@@ -1243,10 +1260,10 @@ func calcScore(name string) int64 {
 	return s
 }
 
-// titleJunkPatterns flags technical/release metadata noise in the global
+// TitleJunkPatterns flags technical/release metadata noise in the global
 // container title. Shared between checkTitleHygiene and the fix policy in
 // fix_matroska.go so both agree on what counts as junk.
-var titleJunkPatterns = []string{
+var TitleJunkPatterns = []string{
 	`\[.*\]`, // Bracketed info
 	`\(.*\)`, // Parenthesized info
 	`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
@@ -1254,16 +1271,18 @@ var titleJunkPatterns = []string{
 	`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
 }
 
-// appJunkPatterns flags identifiable information (local paths, UUIDs) leaked
+// AppJunkPatterns flags identifiable information (local paths, UUIDs) leaked
 // into the WritingApplication field. Shared between checkAppHygiene and the
 // fix policy in fix_matroska.go.
-var appJunkPatterns = []string{
+var AppJunkPatterns = []string{
 	`[a-zA-Z]:\\`,            // Windows paths
 	`/(home|Users|var|tmp)/`, // Unix paths
 	`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
 }
 
-func matchesAnyPattern(value string, patterns []string) bool {
+// MatchesAnyPattern reports whether value case-insensitively matches any of
+// patterns. Shared with the fix policy in internal/fix.
+func MatchesAnyPattern(value string, patterns []string) bool {
 	for _, p := range patterns {
 		if regexp.MustCompile("(?i)" + p).MatchString(value) {
 			return true
@@ -1286,7 +1305,7 @@ func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *Ch
 		}
 	}
 
-	if matchesAnyPattern(title, titleJunkPatterns) {
+	if MatchesAnyPattern(title, TitleJunkPatterns) {
 		return &CheckResult{
 			Identifier: "matroska_title_hygiene",
 			Warning:    "Global Title contains technical metadata",
@@ -1305,7 +1324,7 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 		return nil
 	}
 
-	if matchesAnyPattern(app, appJunkPatterns) {
+	if MatchesAnyPattern(app, AppJunkPatterns) {
 		return &CheckResult{
 			Identifier: "matroska_app_hygiene",
 			Warning:    "Writing Application metadata contains potentially identifiable information",
@@ -1379,7 +1398,9 @@ func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func getChapters(ebml *matroska.EbmlMetadata) []matroska.EbmlChapterAtom {
+// GetChapters returns the chapter list of the first edition of the file's
+// first Chapters block, or nil. Shared with the fix policy in internal/fix.
+func GetChapters(ebml *matroska.EbmlMetadata) []matroska.EbmlChapterAtom {
 	if len(ebml.Chapters) == 0 || len(ebml.Chapters[0].Editions) == 0 {
 		return nil
 	}
@@ -1400,7 +1421,7 @@ func formatNsToTime(ns int64) string {
 }
 
 func checkChaptersStartNonZero(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1423,7 +1444,7 @@ func checkChaptersStartNonZero(ebml *matroska.EbmlMetadata) *CheckResult {
 }
 
 func checkChaptersNonMonotonic(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1447,7 +1468,7 @@ func checkChaptersNonMonotonic(ebml *matroska.EbmlMetadata) *CheckResult {
 }
 
 func checkChaptersDuplicate(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1471,7 +1492,7 @@ func checkChaptersDuplicate(ebml *matroska.EbmlMetadata) *CheckResult {
 }
 
 func checkChaptersTooClose(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1498,7 +1519,7 @@ func checkChaptersTooClose(ebml *matroska.EbmlMetadata) *CheckResult {
 }
 
 func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1559,7 +1580,7 @@ func checkConsecutiveDuplicateNames(currentNames, lastNames []string, timeStart 
 }
 
 func checkChaptersNameHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1670,7 +1691,7 @@ func checkLanguagesInconsistent(firstLangs, currentLangs map[string]bool, timeSt
 }
 
 func checkChaptersLanguageHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1697,7 +1718,10 @@ func checkChaptersLanguageHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 	return nil
 }
 
-func isAligned(timeStart int64, keyframes []int64) (bool, int64) {
+// IsAligned reports whether a chapter timestamp falls within tolerance of a
+// keyframe, plus the closest diff found. Shared with the fix policy in
+// internal/fix, which uses the diff to decide what to snap.
+func IsAligned(timeStart int64, keyframes []int64) (bool, int64) {
 	closestDiff := int64(-1)
 
 	for _, kf := range keyframes {
@@ -1728,7 +1752,9 @@ func isAligned(timeStart int64, keyframes []int64) (bool, int64) {
 	return false, closestDiff
 }
 
-func getVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
+// GetVideoTrackNumberFromEBML returns the track Number of the first video
+// track, or 0. Shared with the fix policy in internal/fix.
+func GetVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
 	for _, track := range ebml.Tracks {
 		if track.Type == "video" {
 			return uint64(track.Properties.Number)
@@ -1743,7 +1769,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	videoTrackNum := getVideoTrackNumberFromEBML(ebml)
+	videoTrackNum := GetVideoTrackNumberFromEBML(ebml)
 	if videoTrackNum == 0 {
 		return nil
 	}
@@ -1769,7 +1795,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		}
 	}
 
-	chapters := getChapters(ebml)
+	chapters := GetChapters(ebml)
 	if len(chapters) == 0 {
 		return nil
 	}
@@ -1777,7 +1803,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 	var nonAligned []string
 
 	for i, ch := range chapters {
-		if aligned, diff := isAligned(ch.TimeStart, keyframes); !aligned {
+		if aligned, diff := IsAligned(ch.TimeStart, keyframes); !aligned {
 			nonAligned = append(nonAligned, fmt.Sprintf(
 				"chapter %d at %s (nearest keyframe is off by %.3fs)",
 				i+1,

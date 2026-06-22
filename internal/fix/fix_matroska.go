@@ -1,4 +1,4 @@
-package checks
+package fix
 
 import (
 	"cmp"
@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/text/language"
 
+	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
@@ -50,11 +51,11 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 func ComputeContainerFixes(ebml *matroska.EbmlMetadata) map[string]string {
 	props := make(map[string]string)
 
-	if config.IsCheckEnabled("matroska_title_hygiene") && matchesAnyPattern(ebml.Container.Properties.Title, titleJunkPatterns) {
+	if config.IsCheckEnabled("matroska_title_hygiene") && checks.MatchesAnyPattern(ebml.Container.Properties.Title, checks.TitleJunkPatterns) {
 		props["title"] = ""
 	}
 
-	if config.IsCheckEnabled("matroska_app_hygiene") && matchesAnyPattern(ebml.Container.Properties.WritingApplication, appJunkPatterns) {
+	if config.IsCheckEnabled("matroska_app_hygiene") && checks.MatchesAnyPattern(ebml.Container.Properties.WritingApplication, checks.AppJunkPatterns) {
 		props["writing-application"] = ""
 	}
 
@@ -77,18 +78,18 @@ type ChapterAlignmentFix struct {
 // zero-value ChapterAlignmentFix (Changed == 0) when the check is disabled,
 // the file has no chapters, the video keyframe index can't be read, or
 // nothing needs to change. Only the first edition is considered, matching the
-// check's own getChapters(); a file with additional editions is left alone.
+// check's own checks.GetChapters(); a file with additional editions is left alone.
 func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) ChapterAlignmentFix {
 	if !config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
 		return ChapterAlignmentFix{}
 	}
 
-	chapters := getChapters(ebml)
+	chapters := checks.GetChapters(ebml)
 	if len(chapters) == 0 || len(ebml.Chapters) != 1 || len(ebml.Chapters[0].Editions) != 1 {
 		return ChapterAlignmentFix{}
 	}
 
-	videoTrackNum := getVideoTrackNumberFromEBML(ebml)
+	videoTrackNum := checks.GetVideoTrackNumberFromEBML(ebml)
 	if videoTrackNum == 0 {
 		return ChapterAlignmentFix{}
 	}
@@ -114,7 +115,7 @@ func snapChaptersToKeyframes(chapters []matroska.EbmlChapterAtom, keyframes []in
 	changed := 0
 
 	for i, ch := range chapters {
-		if aligned, _ := isAligned(ch.TimeStart, keyframes); aligned {
+		if aligned, _ := checks.IsAligned(ch.TimeStart, keyframes); aligned {
 			times[i] = ch.TimeStart
 
 			continue
@@ -160,10 +161,10 @@ func ComputeUnusedFontAttachments(filePath string, ebml *matroska.EbmlMetadata) 
 		return nil
 	}
 
-	fontMap, attachmentNames := getFontMapping(filePath, ebml.Attachments)
-	allUsedFonts := computeUsedFonts(filePath, ebml.Tracks, fontMap)
+	fontMap, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
+	allUsedFonts := checks.ComputeUsedFonts(filePath, ebml.Tracks, fontMap)
 
-	return unusedFontAttachments(ebml.Attachments, attachmentNames, allUsedFonts)
+	return checks.UnusedFontAttachments(ebml.Attachments, attachmentNames, allUsedFonts)
 }
 
 // FontRename describes a font attachment filename correction needed to
@@ -182,7 +183,7 @@ func ComputeFontRenames(filePath string, ebml *matroska.EbmlMetadata) []FontRena
 		return nil
 	}
 
-	_, attachmentNames := getFontMapping(filePath, ebml.Attachments)
+	_, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
 
 	return computeFontRenames(ebml.Attachments, attachmentNames)
 }
@@ -193,12 +194,12 @@ func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames m
 	var renames []FontRename
 
 	for _, att := range attachments {
-		if !isFontAttachment(att) {
+		if !checks.IsFontAttachment(att) {
 			continue
 		}
 
 		names := attachmentNames[att.ID]
-		if len(names) == 0 || fontFilenameCompliant(att.FileName, names) {
+		if len(names) == 0 || checks.FontFilenameCompliant(att.FileName, names) {
 			continue
 		}
 
@@ -255,13 +256,13 @@ func (b *fixBuilder) computeDefaultFlagFixes(tracks []matroska.EbmlTrack) {
 		return
 	}
 
-	audioCounts, subCounts := getTrackCounts(tracks)
+	audioCounts, subCounts := checks.GetTrackCounts(tracks)
 	seenAudioLangs := make(map[string]bool)
 	seenSubLangs := make(map[string]bool)
 
 	for i := range tracks {
 		track := tracks[i]
-		if !isRelevantTrack(track) {
+		if !checks.IsRelevantTrack(track) {
 			continue
 		}
 
@@ -270,7 +271,7 @@ func (b *fixBuilder) computeDefaultFlagFixes(tracks []matroska.EbmlTrack) {
 
 		shouldBeDefault := false
 		if !isSpecialized {
-			shouldBeDefault = determineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
+			shouldBeDefault = checks.DetermineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
 		}
 
 		if props.Default != shouldBeDefault {
@@ -284,11 +285,11 @@ func (b *fixBuilder) computeOriginalFlagFixes(tracks []matroska.EbmlTrack) {
 		return
 	}
 
-	langHasOriginalFlag := getOriginalLanguageMap(tracks)
+	langHasOriginalFlag := checks.GetOriginalLanguageMap(tracks)
 
 	for i := range tracks {
 		track := tracks[i]
-		if !isRelevantTrack(track) {
+		if !checks.IsRelevantTrack(track) {
 			continue
 		}
 
@@ -302,7 +303,7 @@ func (b *fixBuilder) computeOriginalFlagFixes(tracks []matroska.EbmlTrack) {
 func (b *fixBuilder) computeNameFixes(tracks []matroska.EbmlTrack) {
 	for i := range tracks {
 		track := tracks[i]
-		if !isRelevantTrack(track) {
+		if !checks.IsRelevantTrack(track) {
 			continue
 		}
 
@@ -344,7 +345,7 @@ func cleanNameTokens(name, lang string) (kept []string, removed bool) {
 		switch {
 		case token == "":
 			continue
-		case removeJunk && slices.Contains(junkKeywords, strings.ToUpper(token)):
+		case removeJunk && slices.Contains(checks.JunkKeywords, strings.ToUpper(token)):
 			removed = true
 		case removeCodecs && isSimpleCodecToken(token):
 			removed = true
@@ -372,7 +373,7 @@ func maybeAppendKeywords(name string, props matroska.EbmlTrackProperties) (strin
 
 func isSimpleCodecToken(token string) bool {
 	upper := strings.ToUpper(token)
-	if slices.Contains(simpleCodecs, upper) {
+	if slices.Contains(checks.SimpleCodecs, upper) {
 		return true
 	}
 
@@ -386,7 +387,7 @@ func isLanguageMatch(word, trackLang string) bool {
 
 	base, _ := tag.Base()
 
-	return getLanguageCodeFromName(word) == base.String()
+	return checks.GetLanguageCodeFromName(word) == base.String()
 }
 
 func appendFlagKeywords(name string, props matroska.EbmlTrackProperties) string {
@@ -414,7 +415,7 @@ func appendFlagKeywords(name string, props matroska.EbmlTrackProperties) string 
 }
 
 func hasVisualImpairedKeyword(upper string) bool {
-	return strings.Contains(upper, "DESCRIPTIVE") || strings.Contains(upper, "DESCRIPTION") || adRegex.MatchString(upper)
+	return strings.Contains(upper, "DESCRIPTIVE") || strings.Contains(upper, "DESCRIPTION") || checks.ADRegex.MatchString(upper)
 }
 
 func boolFlag(value bool) string {
@@ -429,7 +430,7 @@ func boolFlag(value bool) string {
 // the corresponding check is enabled. The correct value is unknown, so the
 // caller must obtain it from the user.
 func NeedsLanguageFix(track matroska.EbmlTrack) bool {
-	if !config.IsCheckEnabled("matroska_language_tag") || !isRelevantTrack(track) {
+	if !config.IsCheckEnabled("matroska_language_tag") || !checks.IsRelevantTrack(track) {
 		return false
 	}
 
@@ -442,7 +443,7 @@ func NeedsLanguageFix(track matroska.EbmlTrack) bool {
 // 'mul' track must have a Name at all) and matroska_name_keywords (a 'mul'
 // track's Name must list at least two languages).
 func NeedsMultiLangName(track matroska.EbmlTrack) bool {
-	if !isRelevantTrack(track) || language.Make(track.Properties.Language) != language.Make("mul") {
+	if !checks.IsRelevantTrack(track) || language.Make(track.Properties.Language) != language.Make("mul") {
 		return false
 	}
 
@@ -452,7 +453,7 @@ func NeedsMultiLangName(track matroska.EbmlTrack) bool {
 		return true
 	}
 
-	return config.IsCheckEnabled("matroska_name_keywords") && countLanguagesInString(name) < 2
+	return config.IsCheckEnabled("matroska_name_keywords") && checks.CountLanguagesInString(name) < 2
 }
 
 // KeywordFlagFix describes a track whose name contains a keyword whose matching
@@ -469,7 +470,7 @@ type KeywordFlagFix struct {
 // name advertises a property (SDH, Forced, Commentary, descriptive) whose flag
 // is not actually set. It returns nil when the name-keywords check is disabled.
 func ReverseKeywordFlagFixes(track matroska.EbmlTrack) []KeywordFlagFix {
-	if !config.IsCheckEnabled("matroska_name_keywords") || !isRelevantTrack(track) {
+	if !config.IsCheckEnabled("matroska_name_keywords") || !checks.IsRelevantTrack(track) {
 		return nil
 	}
 
@@ -578,7 +579,7 @@ func computeTrackOrder(tracks []matroska.EbmlTrack) []int {
 	}
 
 	byPriority := func(a, b matroska.EbmlTrack) int {
-		return cmp.Compare(getTrackPriority(a), getTrackPriority(b))
+		return cmp.Compare(checks.GetTrackPriority(a), checks.GetTrackPriority(b))
 	}
 	slices.SortStableFunc(audio, byPriority)
 	slices.SortStableFunc(subs, byPriority)
@@ -672,11 +673,11 @@ func collectDuplicateTracks(collector *removalCollector, tracks []matroska.EbmlT
 	seen := make(map[string]bool)
 
 	for _, track := range tracks {
-		if !isRelevantTrack(track) {
+		if !checks.IsRelevantTrack(track) {
 			continue
 		}
 
-		key := trackDuplicateKey(track)
+		key := checks.TrackDuplicateKey(track)
 		if seen[key] {
 			collector.add(track, RemovalDuplicateTrack, "duplicate of an earlier track (same language, flags and name)")
 

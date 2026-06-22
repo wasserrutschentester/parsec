@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -113,7 +112,7 @@ func confirmApply(opts Options, prompt, skipMsg string) bool {
 // video keyframe. Re-timing chapters changes seek/navigation points, so it is
 // always confirmed like the other container fixes above.
 func fixChapterAlignment(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	fix := checks.ComputeChapterKeyframeSnaps(filePath, ebml)
+	fix := ComputeChapterKeyframeSnaps(filePath, ebml)
 	if fix.Changed == 0 {
 		return nil
 	}
@@ -141,7 +140,7 @@ func fixChapterAlignment(filePath string, ebml *matroska.EbmlMetadata, opts Opti
 // match a subtitle's \fn reference by filename) stay consistent with the
 // font's actual name. Content is untouched, so this is non-destructive.
 func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	renames := checks.ComputeFontRenames(filePath, ebml)
+	renames := ComputeFontRenames(filePath, ebml)
 	if len(renames) == 0 {
 		return nil
 	}
@@ -175,7 +174,7 @@ func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts 
 // change, since they come from unrelated checks and one being declined
 // shouldn't block the other.
 func fixContainerProperties(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	props := checks.ComputeContainerFixes(ebml)
+	props := ComputeContainerFixes(ebml)
 
 	for _, key := range slices.Sorted(maps.Keys(props)) {
 		if err := applyContainerProperty(filePath, ebml, opts, key, props[key]); err != nil {
@@ -240,7 +239,7 @@ func containerKeyLabel(key string) string {
 // subtitle track. It is skipped in dry-run, unattended, or non-interactive
 // runs since attachment removal is destructive and requires confirmation.
 func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	unused := checks.ComputeUnusedFontAttachments(filePath, ebml)
+	unused := ComputeUnusedFontAttachments(filePath, ebml)
 	if len(unused) == 0 {
 		return nil
 	}
@@ -305,13 +304,13 @@ func fixMatroskaTracks(filePath string, opts Options) error {
 		languageEdits = promptLanguageFixes(ebml)
 	}
 
-	flagEdits := mergeTrackEdits(checks.ComputeMatroskaFlagFixes(ebml.Tracks), keywordFlagEdits)
+	flagEdits := mergeTrackEdits(ComputeMatroskaFlagFixes(ebml.Tracks), keywordFlagEdits)
 	if err := applyTrackEditGroup(filePath, opts, flagEdits, func() { previewFlagEdits(ebml, flagEdits) },
 		"Apply these flag fixes?", "Skipping flag fixes...", "Track flags realigned."); err != nil {
 		return err
 	}
 
-	nameEdits := mergeTrackEdits(checks.ComputeMatroskaNameFixes(ebml.Tracks), multiLangNameEdits)
+	nameEdits := mergeTrackEdits(ComputeMatroskaNameFixes(ebml.Tracks), multiLangNameEdits)
 	if err := applyTrackEditGroup(filePath, opts, nameEdits, func() { previewTrackEdits("Track Names", ebml, nameEdits) },
 		"Apply these name fixes?", "Skipping name fixes...", "Track names realigned."); err != nil {
 		return err
@@ -401,7 +400,7 @@ func remuxMatroska(filePath string, opts Options) error {
 
 	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
 
-	plan := checks.ComputeMatroskaRemux(ebml.Tracks, originalLang)
+	plan := ComputeMatroskaRemux(ebml.Tracks, originalLang)
 	if plan.IsEmpty() {
 		return nil
 	}
@@ -442,7 +441,7 @@ func remuxMatroska(filePath string, opts Options) error {
 	return nil
 }
 
-func previewRemuxPlan(ebml *matroska.EbmlMetadata, plan checks.MatroskaRemuxPlan) {
+func previewRemuxPlan(ebml *matroska.EbmlMetadata, plan MatroskaRemuxPlan) {
 	if len(plan.TrackOrder) > 0 {
 		labels := make([]string, 0, len(plan.TrackOrder))
 		for _, id := range plan.TrackOrder {
@@ -457,7 +456,7 @@ func previewRemuxPlan(ebml *matroska.EbmlMetadata, plan checks.MatroskaRemuxPlan
 	}
 }
 
-func previewCompressionPolicy(plan checks.MatroskaRemuxPlan, opts matroska.RemuxOptions) {
+func previewCompressionPolicy(plan MatroskaRemuxPlan, opts matroska.RemuxOptions) {
 	if !opts.DisableTrackCompression || len(plan.StripCompressionIDs) > 0 {
 		return
 	}
@@ -473,7 +472,7 @@ func verifyRemuxResult(filePath, originalLang string) {
 		return
 	}
 
-	if checks.ComputeMatroskaRemux(ebml.Tracks, originalLang).IsEmpty() {
+	if ComputeMatroskaRemux(ebml.Tracks, originalLang).IsEmpty() {
 		ui.PrintSuccess("Container remux fixes complete.")
 
 		return
@@ -485,7 +484,7 @@ func verifyRemuxResult(filePath, originalLang string) {
 // selectRemovals prompts the user to confirm each proposed track removal and
 // returns the IDs of the tracks they chose to drop. Removals are skipped in
 // unattended mode because they are destructive and require human judgement.
-func selectRemovals(ebml *matroska.EbmlMetadata, candidates []checks.RemovalCandidate, opts Options) []int {
+func selectRemovals(ebml *matroska.EbmlMetadata, candidates []RemovalCandidate, opts Options) []int {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -498,11 +497,11 @@ func selectRemovals(ebml *matroska.EbmlMetadata, candidates []checks.RemovalCand
 
 	var (
 		ids           []int
-		unwantedAudio []checks.RemovalCandidate
+		unwantedAudio []RemovalCandidate
 	)
 
 	for _, candidate := range candidates {
-		if candidate.Kind == checks.RemovalUnwantedAudioLang {
+		if candidate.Kind == RemovalUnwantedAudioLang {
 			unwantedAudio = append(unwantedAudio, candidate)
 
 			continue
@@ -522,7 +521,7 @@ func selectRemovals(ebml *matroska.EbmlMetadata, candidates []checks.RemovalCand
 	return ids
 }
 
-func selectUnwantedAudioRemovals(ebml *matroska.EbmlMetadata, candidates []checks.RemovalCandidate) []int {
+func selectUnwantedAudioRemovals(ebml *matroska.EbmlMetadata, candidates []RemovalCandidate) []int {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -546,7 +545,7 @@ func selectUnwantedAudioRemovals(ebml *matroska.EbmlMetadata, candidates []check
 	return ids
 }
 
-func removalLanguages(candidates []checks.RemovalCandidate) []string {
+func removalLanguages(candidates []RemovalCandidate) []string {
 	seen := make(map[string]bool, len(candidates))
 
 	var langs []string
@@ -582,7 +581,7 @@ func promptLanguageFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
 
 	for i := range ebml.Tracks {
 		track := ebml.Tracks[i]
-		if !checks.NeedsLanguageFix(track) {
+		if !NeedsLanguageFix(track) {
 			continue
 		}
 
@@ -604,7 +603,7 @@ func promptMultiLangNameFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit 
 
 	for i := range ebml.Tracks {
 		track := ebml.Tracks[i]
-		if !checks.NeedsMultiLangName(track) {
+		if !NeedsMultiLangName(track) {
 			continue
 		}
 
@@ -623,7 +622,7 @@ func promptMultiLangNameFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit 
 // resolved, e.g. its name mentions "Commentary" but flag-commentary is unset.
 type keywordMismatch struct {
 	track matroska.EbmlTrack
-	fix   checks.KeywordFlagFix
+	fix   KeywordFlagFix
 }
 
 // promptKeywordFlagFixes gathers every SDH/Forced/Commentary/Descriptive
@@ -635,7 +634,7 @@ func promptKeywordFlagFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
 
 	for i := range ebml.Tracks {
 		track := ebml.Tracks[i]
-		for _, fix := range checks.ReverseKeywordFlagFixes(track) {
+		for _, fix := range ReverseKeywordFlagFixes(track) {
 			mismatches = append(mismatches, keywordMismatch{track: track, fix: fix})
 		}
 	}
