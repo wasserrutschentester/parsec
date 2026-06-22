@@ -233,6 +233,46 @@ func TestComputeUnusedFontAttachmentsDisabled(t *testing.T) {
 	}
 }
 
+func TestComputeFontRenames(t *testing.T) {
+	t.Parallel()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+		{ID: 2, FileName: "Calibri-Bold.ttf", ContentType: "font/ttf"},
+		{ID: 3, FileName: "subs.ass"},
+	}
+
+	attachmentNames := map[int][]string{
+		1: {"Open Sans"},
+		2: {"Calibri Bold"},
+	}
+
+	got := computeFontRenames(attachments, attachmentNames)
+
+	if len(got) != 1 {
+		t.Fatalf("expected 1 rename, got %d: %+v", len(got), got)
+	}
+
+	want := FontRename{ID: 1, OldName: "font1.ttf", NewName: "Open Sans.ttf"}
+	if got[0] != want {
+		t.Errorf("expected %+v, got %+v", want, got[0])
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeFontRenamesDisabled(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("disabled_checks", []string{"matroska_font_filename_compliance"})
+
+	ebml := &matroska.EbmlMetadata{
+		Attachments: []matroska.EbmlAttachment{{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"}},
+	}
+
+	if got := ComputeFontRenames("", ebml); got != nil {
+		t.Errorf("expected nil when matroska_font_filename_compliance is disabled, got %+v", got)
+	}
+}
+
 //nolint:paralleltest // depends on shared global config state
 func TestComputeMatroskaRemuxTrackOrder(t *testing.T) {
 	config.InitDefaults() // preferred language is "de"

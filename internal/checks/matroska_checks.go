@@ -932,6 +932,26 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentNames map
 	}
 }
 
+// fontFilenameCompliant reports whether att's filename (without extension)
+// matches one of its internal font names, ignoring case and separators.
+// Shared by checkFontFilenameCompliance and the fix policy in fix_matroska.go.
+func fontFilenameCompliant(fileName string, internalNames []string) bool {
+	baseName := fileName
+	if idx := strings.LastIndex(baseName, "."); idx != -1 {
+		baseName = baseName[:idx]
+	}
+
+	normalizedFileName := normalizeFontName(baseName)
+
+	for _, internalName := range internalNames {
+		if normalizeFontName(internalName) == normalizedFileName {
+			return true
+		}
+	}
+
+	return false
+}
+
 func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) *CheckResult {
 	var nonCompliant []string
 
@@ -945,24 +965,7 @@ func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachme
 			continue
 		}
 
-		// Get filename without extension
-		baseName := att.FileName
-		if idx := strings.LastIndex(baseName, "."); idx != -1 {
-			baseName = baseName[:idx]
-		}
-
-		normalizedFileName := normalizeFontName(baseName)
-		compliant := false
-
-		for _, internalName := range names {
-			if normalizeFontName(internalName) == normalizedFileName {
-				compliant = true
-
-				break
-			}
-		}
-
-		if !compliant {
+		if !fontFilenameCompliant(att.FileName, names) {
 			nonCompliant = append(nonCompliant, fmt.Sprintf("%s (internal: %s)", att.FileName, strings.Join(names, ", ")))
 		}
 	}

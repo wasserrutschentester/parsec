@@ -639,6 +639,41 @@ func DeleteAttachments(filePath string, ids []int) error {
 	return nil
 }
 
+// RenameAttachments updates the display name of the attachments with the
+// given mkvmerge attachment IDs in a Matroska file in place using mkvpropedit,
+// without touching their content.
+func RenameAttachments(filePath string, renames map[int]string) error {
+	if len(renames) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath}
+	for _, id := range slices.Sorted(maps.Keys(renames)) {
+		args = append(args, "--update-attachment", strconv.Itoa(id), "--attachment-name", renames[id])
+	}
+
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to rename attachments: %w: %s", err, output)
+	}
+
+	return nil
+}
+
 // RemuxOptions describes a lossless remux of a Matroska file via mkvmerge. All
 // track IDs are mkvmerge track IDs (the "id" field reported by mkvmerge -J).
 type RemuxOptions struct {

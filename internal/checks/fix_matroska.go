@@ -63,6 +63,59 @@ func ComputeUnusedFontAttachments(filePath string, ebml *matroska.EbmlMetadata) 
 	return unusedFontAttachments(ebml.Attachments, attachmentNames, allUsedFonts)
 }
 
+// FontRename describes a font attachment filename correction needed to
+// satisfy the matroska_font_filename_compliance check.
+type FontRename struct {
+	ID      int
+	OldName string
+	NewName string
+}
+
+// ComputeFontRenames returns the font attachments whose filename should be
+// renamed to match the font's internal name. Returns nil when the check is
+// disabled or no font attachment carries a usable internal name.
+func ComputeFontRenames(filePath string, ebml *matroska.EbmlMetadata) []FontRename {
+	if !config.IsCheckEnabled("matroska_font_filename_compliance") {
+		return nil
+	}
+
+	_, attachmentNames := getFontMapping(filePath, ebml.Attachments)
+
+	return computeFontRenames(ebml.Attachments, attachmentNames)
+}
+
+// computeFontRenames is the pure font-rename policy, shared with tests so
+// font extraction (and therefore real font files) is not required to verify it.
+func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) []FontRename {
+	var renames []FontRename
+
+	for _, att := range attachments {
+		if !isFontAttachment(att) {
+			continue
+		}
+
+		names := attachmentNames[att.ID]
+		if len(names) == 0 || fontFilenameCompliant(att.FileName, names) {
+			continue
+		}
+
+		renames = append(renames, FontRename{ID: att.ID, OldName: att.FileName, NewName: fontRenameTarget(att.FileName, names[0])})
+	}
+
+	return renames
+}
+
+// fontRenameTarget builds the compliant filename for a font attachment,
+// keeping the original extension and using the font's primary internal name.
+func fontRenameTarget(oldName, internalName string) string {
+	ext := ""
+	if idx := strings.LastIndex(oldName, "."); idx != -1 {
+		ext = oldName[idx:]
+	}
+
+	return internalName + ext
+}
+
 // fixBuilder accumulates property edits per track while preserving the order in
 // which tracks are first touched, so the resulting edit list is deterministic.
 type fixBuilder struct {

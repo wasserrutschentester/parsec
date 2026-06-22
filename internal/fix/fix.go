@@ -74,7 +74,53 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return err
 	}
 
+	if err := renameNonCompliantFonts(filePath, ebml, opts); err != nil {
+		return err
+	}
+
 	return removeUnusedFonts(filePath, ebml, opts)
+}
+
+// renameNonCompliantFonts renames font attachments whose filename doesn't
+// match their internal font name, so naming tools (e.g. fonts that won't
+// match a subtitle's \fn reference by filename) stay consistent with the
+// font's actual name. Content is untouched, so this is non-destructive.
+func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
+	renames := checks.ComputeFontRenames(filePath, ebml)
+	if len(renames) == 0 {
+		return nil
+	}
+
+	ui.Println(ui.ReportSection("Font Filename Compliance"))
+
+	ids := make(map[int]string, len(renames))
+
+	for _, r := range renames {
+		ui.Println(fmt.Sprintf("  %s -> %s", quoteOrNone(r.OldName), quoteOrNone(r.NewName)))
+		ids[r.ID] = r.NewName
+	}
+
+	if opts.DryRun {
+		ui.Println(ui.Muted.Render("Dry run: no changes made."))
+
+		return nil
+	}
+
+	if !opts.Unattended && !ui.ConfirmContinue("Rename these font attachments?") {
+		ui.Println(ui.Muted.Render("Skipping font renames..."))
+
+		return nil
+	}
+
+	if err := matroska.RenameAttachments(filePath, ids); err != nil {
+		ui.PrintError(fmt.Sprintf("Error renaming font attachments for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Font attachment filenames aligned.")
+
+	return nil
 }
 
 func fixContainerProperties(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
