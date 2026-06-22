@@ -404,6 +404,8 @@ const (
 	RemovalDuplicateTrack RemovalKind = "duplicate_track"
 	// RemovalUnwantedAudioLang identifies non-preferred, non-original audio removal.
 	RemovalUnwantedAudioLang RemovalKind = "unwanted_audio_language"
+	// RemovalEmptyTrack identifies an audio track carrying no channels.
+	RemovalEmptyTrack RemovalKind = "empty_track"
 )
 
 // RemovalCandidate describes a track proposed for removal during a remux,
@@ -538,8 +540,25 @@ func computeRemovalCandidates(tracks []matroska.EbmlTrack, originalLang string) 
 
 	collectDuplicateTracks(collector, tracks)
 	collectUnwantedLanguageAudio(collector, tracks, originalLang)
+	collectEmptyAudioTracks(collector, tracks)
 
 	return collector.candidates
+}
+
+// collectEmptyAudioTracks proposes removal of audio tracks reporting zero
+// channels, satisfying mediainfo_empty_tracks for the part derivable from the
+// EBML track properties alone (mkvmerge always reports audio_channels for a
+// genuine audio track).
+func collectEmptyAudioTracks(collector *removalCollector, tracks []matroska.EbmlTrack) {
+	if !config.IsCheckEnabled("mediainfo_empty_tracks") {
+		return
+	}
+
+	for _, track := range tracks {
+		if track.Type == "audio" && track.Properties.AudioChannels <= 0 {
+			collector.add(track, RemovalEmptyTrack, "audio track has zero channels")
+		}
+	}
 }
 
 func collectDuplicateTracks(collector *removalCollector, tracks []matroska.EbmlTrack) {

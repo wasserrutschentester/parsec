@@ -53,6 +53,7 @@ The mechanism column indicates how a fix is applied: **In-place** (`mkvpropedit`
 | `matroska_zlib_compression` | Remux | Strips zlib track compression. |
 | `matroska_duplicate_tracks` | Remux / *prompt* | Removes exact-duplicate tracks (same language, flags and name). |
 | `mdb_unwanted_audio_lang` | Remux / *prompt* | Removes audio in languages other than the preferred or MDB original language. Skipped if the original language is unavailable. Lists the affected languages before confirmation. |
+| `mediainfo_empty_tracks` | Remux / *prompt* | Removes audio tracks reporting zero channels. Only the audio case is covered; a subtitle track with zero elements needs MediaInfo data `fix` does not yet read, so it is still reported by `check` only. |
 
 ### Not Fixed
 

@@ -298,8 +298,8 @@ func TestComputeMatroskaRemuxCompressionAndDuplicates(t *testing.T) {
 
 	tracks := []matroska.EbmlTrack{
 		{ID: 0, Type: "video"},
-		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, ContentEncodingAlgorithms: "0"}},
-		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true}},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, ContentEncodingAlgorithms: "0", AudioChannels: 2}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, AudioChannels: 2}},
 	}
 
 	plan := ComputeMatroskaRemux(tracks, "")
@@ -323,8 +323,8 @@ func TestComputeMatroskaRemuxKeepsSameLanguageAudio(t *testing.T) {
 
 	tracks := []matroska.EbmlTrack{
 		{ID: 0, Type: "video"},
-		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "TrueHD"}},
-		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "AC-3"}},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Name: "TrueHD", AudioChannels: 6}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Name: "AC-3", AudioChannels: 6}},
 	}
 
 	if got := ComputeMatroskaRemux(tracks, "").RemovalCandidates; len(got) != 0 {
@@ -338,10 +338,10 @@ func TestComputeMatroskaRemuxUnwantedLanguage(t *testing.T) {
 
 	tracks := []matroska.EbmlTrack{
 		{ID: 0, Type: "video"},
-		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true}}, // preferred
-		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "jpn"}},                // original
-		{ID: 3, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fra"}},                // unwanted
-		{ID: 4, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "zxx"}},                // no dialogue: kept
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, AudioChannels: 6}}, // preferred
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "jpn", AudioChannels: 2}},                // original
+		{ID: 3, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fra", AudioChannels: 2}},                // unwanted
+		{ID: 4, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "zxx", AudioChannels: 2}},                // no dialogue: kept
 	}
 
 	// Without the original language, nothing is pruned (safe default).
@@ -358,6 +358,41 @@ func TestComputeMatroskaRemuxUnwantedLanguage(t *testing.T) {
 
 	if plan.RemovalCandidates[0].Kind != RemovalUnwantedAudioLang {
 		t.Errorf("expected unwanted audio language removal kind, got %q", plan.RemovalCandidates[0].Kind)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxEmptyAudioTrack(t *testing.T) {
+	config.InitDefaults()
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, AudioChannels: 6}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", AudioChannels: 0}},
+	}
+
+	plan := ComputeMatroskaRemux(tracks, "")
+	if len(plan.RemovalCandidates) != 1 || plan.RemovalCandidates[0].TrackID != 2 {
+		t.Errorf("expected track 2 flagged as empty, got %+v", plan.RemovalCandidates)
+	}
+
+	if plan.RemovalCandidates[0].Kind != RemovalEmptyTrack {
+		t.Errorf("expected empty track removal kind, got %q", plan.RemovalCandidates[0].Kind)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxEmptyAudioTrackDisabled(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("disabled_checks", []string{"mediainfo_empty_tracks"})
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", AudioChannels: 0}},
+	}
+
+	if got := ComputeMatroskaRemux(tracks, "").RemovalCandidates; len(got) != 0 {
+		t.Errorf("expected no removals when mediainfo_empty_tracks is disabled, got %+v", got)
 	}
 }
 
