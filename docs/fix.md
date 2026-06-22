@@ -19,6 +19,8 @@ You can provide one or more files or directories to be processed. Directories wi
 
 Each check is only fixed if it is enabled in your [configuration](config.md); disabled checks are skipped, just as they are by `check`.
 
+Unrelated groups of fixes (track flags, track names, language tags, title hygiene, writing-application hygiene, font renames, chapter alignment, unused fonts, remux) are each previewed and confirmed **independently**, so declining one never blocks the others. If you want everything applied without stopping to ask, use `--unattended`; to see what would change without writing anything, use `--dry-run`.
+
 ## What Gets Fixed
 
 The mechanism column indicates how a fix is applied: **In-place** (`mkvpropedit`) or **Remux** (`mkvmerge`, requires `--remux`). Fixes marked *prompt* ask for confirmation or input.
@@ -74,7 +76,7 @@ Some issues cannot be fixed automatically and are left for manual resolution:
 
 ## Prompts
 
-Fixes whose correct value cannot be derived from the file ask for input or confirmation: missing language tags, `mul` track names, keyword/flag mismatches, and every track or font attachment removal. These prompts are **skipped** in `--unattended` mode and when not running in a terminal, so unattended runs only apply the deterministic, non-destructive fixes. Track and font attachment removals are never performed without explicit confirmation.
+Every confirmation defaults to **no** — an empty Enter declines, matching the destructive-removal prompts. Fixes whose correct value cannot be derived from the file additionally ask for input: missing language tags and `mul` track names are prompted per track (free text, so they can't be batched). Keyword/flag mismatches (e.g. a name mentioning "Commentary" while `flag-commentary` is unset) are instead gathered into one overview table and asked once as "apply **a**ll / **n**one / **s**elect", with "select" falling back to one confirmation per mismatch. These prompts are **skipped** in `--unattended` mode and when not running in a terminal, so unattended runs only apply the deterministic, non-destructive fixes. Track and font attachment removals are never performed without explicit confirmation.
 
 ## Flags
 
