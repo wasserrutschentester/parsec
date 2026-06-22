@@ -55,17 +55,6 @@ The resulting filename is generated according to the configured template.`),
 }
 
 func renameFile(cmd *cobra.Command, filePath string) error {
-	meta, ext, err := gatherRenameMetadata(cmd, filePath)
-	if err != nil {
-		return err
-	}
-
-	return commitRenameFile(filePath, meta, ext)
-}
-
-// gatherRenameMetadata runs the full metadata pipeline (filename, MediaInfo,
-// CLI flags and MDB search) and returns the enriched metadata and file extension.
-func gatherRenameMetadata(cmd *cobra.Command, filePath string) (*metadata.Metadata, string, error) {
 	ext := filepath.Ext(filePath)
 	filenameNoExt := filename.GetBaseName(filePath)
 
@@ -75,7 +64,7 @@ func gatherRenameMetadata(cmd *cobra.Command, filePath string) (*metadata.Metada
 	// 2. Get MediaInfo/EBML and merge
 	mi, err := renameGetMediaMetadata(filePath, meta)
 	if err != nil {
-		return nil, "", err
+		return err
 	}
 
 	// 2.3 Apply MDB IDs from file tags
@@ -97,12 +86,7 @@ func gatherRenameMetadata(cmd *cobra.Command, filePath string) (*metadata.Metada
 	// 7. Set defaults for missing fields (Source, Group)
 	meta.SetDefaults()
 
-	return meta, ext, nil
-}
-
-// commitRenameFile generates the target name and renames the file unless it is
-// already correctly named.
-func commitRenameFile(filePath string, meta *metadata.Metadata, ext string) error {
+	// 8. Generate new name and rename, unless it is already correctly named.
 	newNameBase := meta.GetReleaseName()
 	newNameBase = filename.ApplyReplacements(newNameBase, config.GetOutputReplacements())
 	newName := newNameBase + ext
@@ -288,56 +272,51 @@ func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb
 
 func init() {
 	rootCmd.AddCommand(renameCmd)
-	registerRenameFlags(renameCmd)
-}
 
-// registerRenameFlags registers rename's metadata, P2P and ID override flags,
-// including their usage groups.
-func registerRenameFlags(cmd *cobra.Command) {
 	// Metadata
-	cmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
-	cmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
-	cmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
-	cmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
-	cmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
-	cmd.Flags().StringVar(&cutEditionFlag, "cut-edition", "", "special edition or cut")
-	cmd.Flags().StringVar(&hdrFlag, "hdr", "", "HDR format")
+	renameCmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
+	renameCmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
+	renameCmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
+	renameCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
+	renameCmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date (YYYY-MM-DD)")
+	renameCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
+	renameCmd.Flags().StringVar(&cutEditionFlag, "cut-edition", "", "special edition or cut")
+	renameCmd.Flags().StringVar(&hdrFlag, "hdr", "", "HDR format")
 	// P2P
-	cmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
-	cmd.Flags().StringVarP(&sourceFlag, "source", "o", "", "source (WEB-DL, BluRay, etc.)")
-	cmd.Flags().BoolVarP(&isRepackFlag, "repack", "R", false, "is repack")
-	cmd.Flags().BoolVar(&isSubbedFlag, "subbed", false, "has subtitles in the preferred language")
-	cmd.Flags().BoolVar(&isAudioDescFlag, "audio-description", false, "add audio description tag")
-	cmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
+	renameCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
+	renameCmd.Flags().StringVarP(&sourceFlag, "source", "o", "", "source (WEB-DL, BluRay, etc.)")
+	renameCmd.Flags().BoolVarP(&isRepackFlag, "repack", "R", false, "is repack")
+	renameCmd.Flags().BoolVar(&isSubbedFlag, "subbed", false, "has subtitles in the preferred language")
+	renameCmd.Flags().BoolVar(&isAudioDescFlag, "audio-description", false, "add audio description tag")
+	renameCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
 	// MDB ID
-	cmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")
-	cmd.Flags().BoolVarP(&isMovieFlag, "movie", "M", false, "identify as movie")
-	cmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
-	cmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
-	cmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	renameCmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")
+	renameCmd.Flags().BoolVarP(&isMovieFlag, "movie", "M", false, "identify as movie")
+	renameCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	renameCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	renameCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	// Other
-	cmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
-	cmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
-	cmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
-	cmd.Flags().StringVarP(&outputPathFlag, "output", "O", "", "output path where to move the files after renaming")
+	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
+	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
+	renameCmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
+	renameCmd.Flags().StringVarP(&outputPathFlag, "output", "O", "", "output path where to move the files after renaming")
 
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
-		_ = cmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
 
 	p2pFlags := []string{"service", "source", "repack", "group"}
 	for _, f := range p2pFlags {
-		_ = cmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
 	// Group ID flags
 	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
-		_ = cmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
-	cmd.Flags().SortFlags = false
+	renameCmd.Flags().SortFlags = false
 }
