@@ -85,6 +85,26 @@ func fixContainerMetadata(filePath string, opts Options) error {
 	return removeUnusedFonts(filePath, ebml, opts)
 }
 
+// confirmApply prints the dry-run notice and reports false when opts.DryRun is
+// set, otherwise prompts with prompt and reports false with skipMsg when the
+// user (or --unattended) declines. Every in-place and remux fix below gates
+// its mkvpropedit/mkvmerge call on this, so it's shared in one place.
+func confirmApply(opts Options, prompt, skipMsg string) bool {
+	if opts.DryRun {
+		ui.Println(ui.Muted.Render("Dry run: no changes made."))
+
+		return false
+	}
+
+	if !opts.Unattended && !ui.ConfirmContinue(prompt) {
+		ui.Println(ui.Muted.Render(skipMsg))
+
+		return false
+	}
+
+	return true
+}
+
 // fixChapterAlignment snaps misaligned chapter start times to the nearest
 // video keyframe. Re-timing chapters changes seek/navigation points, so it is
 // always confirmed like the other container fixes above.
@@ -97,15 +117,7 @@ func fixChapterAlignment(filePath string, ebml *matroska.EbmlMetadata, opts Opti
 	ui.Println(ui.ReportSection("Chapter Keyframe Alignment"))
 	ui.Println(fmt.Sprintf("  Snap %d of %d chapter(s) to the nearest video keyframe.", fix.Changed, len(fix.Times)))
 
-	if opts.DryRun {
-		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-
-		return nil
-	}
-
-	if !opts.Unattended && !ui.ConfirmContinue("Apply chapter keyframe alignment?") {
-		ui.Println(ui.Muted.Render("Skipping chapter alignment..."))
-
+	if !confirmApply(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...") {
 		return nil
 	}
 
@@ -139,15 +151,7 @@ func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts 
 		ids[r.ID] = r.NewName
 	}
 
-	if opts.DryRun {
-		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-
-		return nil
-	}
-
-	if !opts.Unattended && !ui.ConfirmContinue("Rename these font attachments?") {
-		ui.Println(ui.Muted.Render("Skipping font renames..."))
-
+	if !confirmApply(opts, "Rename these font attachments?", "Skipping font renames...") {
 		return nil
 	}
 
@@ -170,15 +174,7 @@ func fixContainerProperties(filePath string, ebml *matroska.EbmlMetadata, opts O
 
 	previewContainerProperties(ebml, props)
 
-	if opts.DryRun {
-		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-
-		return nil
-	}
-
-	if !opts.Unattended && !ui.ConfirmContinue("Apply these container fixes?") {
-		ui.Println(ui.Muted.Render("Skipping container fixes..."))
-
+	if !confirmApply(opts, "Apply these container fixes?", "Skipping container fixes...") {
 		return nil
 	}
 
@@ -277,15 +273,7 @@ func fixMatroskaTracks(filePath string, opts Options) error {
 
 	previewTrackEdits(ebml, edits)
 
-	if opts.DryRun {
-		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-
-		return nil
-	}
-
-	if !opts.Unattended && !ui.ConfirmContinue("Apply these track fixes?") {
-		ui.Println(ui.Muted.Render("Skipping track fixes..."))
-
+	if !confirmApply(opts, "Apply these track fixes?", "Skipping track fixes...") {
 		return nil
 	}
 
@@ -334,15 +322,7 @@ func remuxMatroska(filePath string, opts Options) error {
 
 	previewCompressionPolicy(plan, remuxOpts)
 
-	if opts.DryRun {
-		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-
-		return nil
-	}
-
-	if !opts.Unattended && !ui.ConfirmContinue("Remux now? (this rewrites the whole container)") {
-		ui.Println(ui.Muted.Render("Skipping remux..."))
-
+	if !confirmApply(opts, "Remux now? (this rewrites the whole container)", "Skipping remux...") {
 		return nil
 	}
 
