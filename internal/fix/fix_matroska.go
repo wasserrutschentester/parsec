@@ -2,6 +2,7 @@ package fix
 
 import (
 	"cmp"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -168,28 +169,61 @@ func ComputeUnusedFontAttachments(filePath string, ebml *matroska.EbmlMetadata) 
 }
 
 // FontRename describes a font attachment filename correction needed to
-// satisfy the matroska_font_filename_compliance check.
+// satisfy the matroska_font_filename_compliance check. InternalNames lists
+// every font name embedded in the attachment (a font file can carry more
+// than one face/name); NewName is derived from the first one since a
+// filename can only hold one.
 type FontRename struct {
-	ID      int
-	OldName string
-	NewName string
+	ID            int
+	OldName       string
+	NewName       string
+	InternalNames []string
 }
 
 // ComputeFontRenames returns the font attachments whose filename should be
-// renamed to match the font's internal name. Returns nil when the check is
-// disabled or no font attachment carries a usable internal name.
+// renamed to match the font's internal name. Unused attachments (not
+// referenced by any subtitle track's Styles or inline tags, the same check
+// matroska_unused_fonts uses) are excluded first: renaming a font that's
+// about to be flagged for removal is pointless, and it's exactly the unused
+// case that tends to produce duplicate copies of the same font under
+// different names. Returns nil when the check is disabled or no remaining
+// attachment carries a usable internal name.
 func ComputeFontRenames(filePath string, ebml *matroska.EbmlMetadata) []FontRename {
 	if !config.IsCheckEnabled("matroska_font_filename_compliance") {
 		return nil
 	}
 
-	_, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
+	fontMap, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
+	usedFonts := checks.ComputeUsedFonts(filePath, ebml.Tracks, fontMap)
+	unused := checks.UnusedFontAttachments(ebml.Attachments, attachmentNames, usedFonts)
 
-	return computeFontRenames(ebml.Attachments, attachmentNames)
+	return computeFontRenames(excludeAttachments(ebml.Attachments, unused), attachmentNames)
+}
+
+// excludeAttachments returns the attachments in all that aren't present in
+// exclude, by ID.
+func excludeAttachments(all, exclude []matroska.EbmlAttachment) []matroska.EbmlAttachment {
+	excludedIDs := make(map[int]bool, len(exclude))
+	for _, att := range exclude {
+		excludedIDs[att.ID] = true
+	}
+
+	kept := make([]matroska.EbmlAttachment, 0, len(all))
+
+	for _, att := range all {
+		if !excludedIDs[att.ID] {
+			kept = append(kept, att)
+		}
+	}
+
+	return kept
 }
 
 // computeFontRenames is the pure font-rename policy, shared with tests so
-// font extraction (and therefore real font files) is not required to verify it.
+// font extraction (and therefore real font files) is not required to verify
+// it. Renames that would collide on the same target filename (e.g. several
+// distinct attachments all embedding "Times New Roman") are disambiguated
+// with a " (2)", " (3)", ... suffix rather than silently colliding.
 func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) []FontRename {
 	var renames []FontRename
 
@@ -203,10 +237,41 @@ func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames m
 			continue
 		}
 
-		renames = append(renames, FontRename{ID: att.ID, OldName: att.FileName, NewName: fontRenameTarget(att.FileName, names[0])})
+		renames = append(renames, FontRename{
+			ID:            att.ID,
+			OldName:       att.FileName,
+			NewName:       fontRenameTarget(att.FileName, names[0]),
+			InternalNames: names,
+		})
+	}
+
+	return disambiguateFontRenames(renames)
+}
+
+// disambiguateFontRenames appends a numbered suffix to any rename whose
+// target filename collides with an earlier one in the list.
+func disambiguateFontRenames(renames []FontRename) []FontRename {
+	seen := make(map[string]int, len(renames))
+
+	for i, r := range renames {
+		seen[r.NewName]++
+		if n := seen[r.NewName]; n > 1 {
+			renames[i].NewName = suffixFontName(r.NewName, n)
+		}
 	}
 
 	return renames
+}
+
+// suffixFontName inserts " (n)" before the extension, e.g. "Times New
+// Roman.ttf" -> "Times New Roman (2).ttf".
+func suffixFontName(name string, n int) string {
+	base, ext := name, ""
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		base, ext = name[:idx], name[idx:]
+	}
+
+	return fmt.Sprintf("%s (%d)%s", base, n, ext)
 }
 
 // fontRenameTarget builds the compliant filename for a font attachment,

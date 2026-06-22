@@ -150,7 +150,8 @@ func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts 
 	ids := make(map[int]string, len(renames))
 
 	for _, r := range renames {
-		ui.Println(fmt.Sprintf("  %s -> %s", quoteOrNone(r.OldName), quoteOrNone(r.NewName)))
+		ui.Println(fmt.Sprintf("  %s -> %s %s", quoteOrNone(r.OldName), quoteOrNone(r.NewName),
+			ui.Muted.Render("(internal: "+strings.Join(r.InternalNames, ", ")+")")))
 		ids[r.ID] = r.NewName
 	}
 

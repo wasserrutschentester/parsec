@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
@@ -260,9 +261,56 @@ func TestComputeFontRenames(t *testing.T) {
 		t.Fatalf("expected 1 rename, got %d: %+v", len(got), got)
 	}
 
-	want := FontRename{ID: 1, OldName: "font1.ttf", NewName: "Open Sans.ttf"}
-	if got[0] != want {
+	want := FontRename{ID: 1, OldName: "font1.ttf", NewName: "Open Sans.ttf", InternalNames: []string{"Open Sans"}}
+	if got[0].ID != want.ID || got[0].OldName != want.OldName || got[0].NewName != want.NewName || !slices.Equal(got[0].InternalNames, want.InternalNames) {
 		t.Errorf("expected %+v, got %+v", want, got[0])
+	}
+}
+
+func TestComputeFontRenamesDisambiguatesCollisions(t *testing.T) {
+	t.Parallel()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+		{ID: 2, FileName: "font2.ttf", ContentType: "font/ttf"},
+		{ID: 3, FileName: "font3.ttf", ContentType: "font/ttf"},
+	}
+
+	// Three distinct attachments all embedding the same font name.
+	attachmentNames := map[int][]string{
+		1: {"Times New Roman"},
+		2: {"Times New Roman"},
+		3: {"Times New Roman"},
+	}
+
+	got := computeFontRenames(attachments, attachmentNames)
+
+	if len(got) != 3 {
+		t.Fatalf("expected 3 renames, got %d: %+v", len(got), got)
+	}
+
+	wantNames := []string{"Times New Roman.ttf", "Times New Roman (2).ttf", "Times New Roman (3).ttf"}
+	for i, want := range wantNames {
+		if got[i].NewName != want {
+			t.Errorf("rename %d: NewName = %q, want %q", i, got[i].NewName, want)
+		}
+	}
+}
+
+func TestComputeFontRenamesExcludesUnusedAttachments(t *testing.T) {
+	t.Parallel()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+	}
+	attachmentNames := map[int][]string{1: {"Open Sans"}}
+
+	// font1.ttf isn't referenced by anything used, so it must be excluded
+	// from rename candidates by ComputeFontRenames itself (via
+	// excludeAttachments), matching matroska_unused_fonts' notion of unused.
+	got := excludeAttachments(attachments, checks.UnusedFontAttachments(attachments, attachmentNames, map[string]bool{}))
+	if len(got) != 0 {
+		t.Errorf("expected unused attachment to be excluded, got %+v", got)
 	}
 }
 
