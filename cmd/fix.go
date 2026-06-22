@@ -58,21 +58,18 @@ func fixFile(filePath string) error {
 
 func init() {
 	rootCmd.AddCommand(fixCmd)
-	registerFixFlags(fixCmd)
-}
 
-func registerFixFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
-	cmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
-	cmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
-	cmd.Flags().StringVar(&ovFlag, "ov", "", "override MDB original language/OV (2- or 3-letter code)")
-	cmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
-	cmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
-	cmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	fixCmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
+	fixCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
+	fixCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
+	fixCmd.Flags().StringVar(&ovFlag, "ov", "", "override MDB original language/OV (2- or 3-letter code)")
+	fixCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	fixCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	fixCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 
 	for _, f := range []string{"imdb", "tmdb", "tvdb"} {
-		_ = cmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = fixCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
-	cmd.Flags().SortFlags = false
+	fixCmd.Flags().SortFlags = false
 }
