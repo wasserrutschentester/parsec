@@ -433,6 +433,7 @@ func GetFontNames(data []byte) ([]string, error) {
 	}
 
 	var names []string
+
 	for i := range collection.NumFonts() {
 		font, err := collection.Font(i)
 		if err != nil {
@@ -677,6 +678,7 @@ func AddAttachments(filePath string, attachments []AttachmentAdd) error {
 	}
 
 	args := []string{filePath}
+
 	for _, att := range attachments {
 		if att.Name != "" {
 			args = append(args, "--attachment-name", att.Name)
@@ -691,6 +693,7 @@ func AddAttachments(filePath string, attachments []AttachmentAdd) error {
 
 	debugArgs := slices.Clone(args)
 	debugArgs[0] = ui.AnonymizePath(filePath)
+
 	for i := 1; i < len(debugArgs); i++ {
 		if debugArgs[i-1] == "--add-attachment" {
 			debugArgs[i] = ui.AnonymizePath(debugArgs[i])

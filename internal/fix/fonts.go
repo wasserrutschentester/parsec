@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,7 +33,11 @@ const (
 	maxFontDownloadSize     = 128 << 20
 )
 
-var googleFontDirRe = regexp.MustCompile(`[^a-z0-9]+`)
+var (
+	errFontTooLarge = errors.New("font exceeds maximum download size")
+	errHTTPStatus   = errors.New("unexpected HTTP status")
+	googleFontDirRe = regexp.MustCompile(`[^a-z0-9]+`)
+)
 
 // MissingFontAttachmentPlan describes the missing subtitle fonts that can be
 // embedded and the ones no configured resolver could locate.
@@ -200,6 +205,7 @@ func fontConfigMatches(fontName string) []string {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "fc-match", "-a", "--format", "%{file}\n", fontName)
+
 	output, err := cmd.Output()
 	if err != nil {
 		ui.PrintDebug(fmt.Sprintf("fc-match failed for %s: %v", fontName, err))
@@ -251,6 +257,7 @@ func (r defaultFontResolver) resolveGoogleFontsGitHub(fontName string) (Resolved
 
 	for _, licenseDir := range []string{"ofl", "apache", "ufl"} {
 		var contents []githubContent
+
 		apiURL := fmt.Sprintf("%s/%s/%s?ref=main", googleFontsGitHubAPI, licenseDir, dir)
 		if err := r.getJSON(apiURL, &contents); err != nil {
 			ui.PrintDebug(fmt.Sprintf("Google Fonts GitHub lookup failed for %s: %v", fontName, err))
@@ -321,8 +328,8 @@ func (r defaultFontResolver) resolveGoogleFontsAPI(fontName, key string) (Resolv
 
 		for _, variant := range variants {
 			fontURL := family.Files[variant]
-			if strings.HasPrefix(fontURL, "http://") {
-				fontURL = "https://" + strings.TrimPrefix(fontURL, "http://")
+			if rest, ok := strings.CutPrefix(fontURL, "http://"); ok {
+				fontURL = "https://" + rest
 			}
 
 			if resolved, ok := r.downloadAndMatchFont(fontURL, filepath.Base(fontURL), fontName, fontSourceGoogleAPI); ok {
@@ -337,7 +344,7 @@ func (r defaultFontResolver) resolveGoogleFontsAPI(fontName, key string) (Resolv
 func googleFontsAPIURL(fontName, key string) (string, error) {
 	u, err := url.Parse(googleFontsDeveloperAPI)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("parse Google Fonts Developer API URL: %w", err)
 	}
 
 	q := u.Query()
@@ -363,29 +370,28 @@ func (r defaultFontResolver) getJSON(requestURL string, target any) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("create font metadata request: %w", err)
 	}
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch font metadata: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("status %s", resp.Status)
+		return fmt.Errorf("%w: %s", errHTTPStatus, resp.Status)
 	}
 
-	return json.NewDecoder(resp.Body).Decode(target)
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return fmt.Errorf("decode font metadata response: %w", err)
+	}
+
+	return nil
 }
 
 func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, source string) (ResolvedFont, bool) {
-	path, err := cachedFontPath(fontURL, fileName)
-	if err != nil {
-		ui.PrintDebug(fmt.Sprintf("failed to build font cache path for %s: %v", fontName, err))
-
-		return ResolvedFont{}, false
-	}
+	path := cachedFontPath(fontURL, fileName)
 
 	if _, err := os.Stat(path); err == nil {
 		if names, ok := fontFileMatches(path, fontName); ok {
@@ -426,32 +432,32 @@ func (r defaultFontResolver) downloadFont(fontURL string) ([]byte, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fontURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create font download request: %w", err)
 	}
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("download font: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status %s", resp.Status)
+		return nil, fmt.Errorf("%w: %s", errHTTPStatus, resp.Status)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxFontDownloadSize+1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read font download: %w", err)
 	}
 
 	if len(data) > maxFontDownloadSize {
-		return nil, fmt.Errorf("font exceeds %d bytes", maxFontDownloadSize)
+		return nil, fmt.Errorf("%w: %d bytes", errFontTooLarge, maxFontDownloadSize)
 	}
 
 	return data, nil
 }
 
-func cachedFontPath(fontURL, fileName string) (string, error) {
+func cachedFontPath(fontURL, fileName string) string {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir = os.TempDir()
@@ -470,7 +476,7 @@ func cachedFontPath(fontURL, fileName string) (string, error) {
 
 	hash := sha256.Sum256([]byte(fontURL))
 
-	return filepath.Join(dir, "parsec", "fonts", hex.EncodeToString(hash[:])+ext), nil
+	return filepath.Join(dir, "parsec", "fonts", hex.EncodeToString(hash[:])+ext)
 }
 
 // attachMissingFonts locates missing ASS/SSA subtitle fonts and embeds the
@@ -481,29 +487,7 @@ func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Optio
 		return nil
 	}
 
-	ui.Println(ui.ReportSection("Missing Subtitle Fonts"))
-
-	if len(plan.Attachments) > 0 {
-		ui.Println("  Resolved:")
-	}
-
-	for _, att := range plan.Attachments {
-		ui.Println(fmt.Sprintf("    %s -> %s", quoteOrNone(att.FontName), quoteOrNone(att.AttachmentName)))
-		ui.Println(fmt.Sprintf("      source: %s", att.Source))
-		ui.Println(fmt.Sprintf("      file:   %s", ui.AnonymizePath(att.Path)))
-	}
-
-	if len(plan.Unresolved) > 0 {
-		ui.Println("  Unresolved:")
-	}
-
-	for _, fontName := range plan.Unresolved {
-		ui.Println(fmt.Sprintf("    %s", ui.Warning.Render(quoteOrNone(fontName))))
-	}
-
-	if opts.DryRun && len(plan.Unresolved) > 0 {
-		ui.Println(ui.Muted.Render("Remote font downloads are skipped during dry-run."))
-	}
+	printMissingFontPlan(plan, opts.DryRun)
 
 	if len(plan.Attachments) == 0 {
 		return nil
@@ -513,6 +497,44 @@ func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Optio
 		return nil
 	}
 
+	if err := matroska.AddAttachments(filePath, fontAttachmentAdds(plan)); err != nil {
+		ui.PrintError(fmt.Sprintf("Error attaching fonts for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Missing subtitle fonts attached.")
+
+	return nil
+}
+
+func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun bool) {
+	ui.Println(ui.ReportSection("Missing Subtitle Fonts"))
+
+	if len(plan.Attachments) > 0 {
+		ui.Println("  Resolved:")
+	}
+
+	for _, att := range plan.Attachments {
+		ui.Println(fmt.Sprintf("    %s -> %s", quoteOrNone(att.FontName), quoteOrNone(att.AttachmentName)))
+		ui.Println("      source: " + att.Source)
+		ui.Println("      file:   " + ui.AnonymizePath(att.Path))
+	}
+
+	if len(plan.Unresolved) > 0 {
+		ui.Println("  Unresolved:")
+	}
+
+	for _, fontName := range plan.Unresolved {
+		ui.Println("    " + ui.Warning.Render(quoteOrNone(fontName)))
+	}
+
+	if dryRun && len(plan.Unresolved) > 0 {
+		ui.Println(ui.Muted.Render("Remote font downloads are skipped during dry-run."))
+	}
+}
+
+func fontAttachmentAdds(plan MissingFontAttachmentPlan) []matroska.AttachmentAdd {
 	attachments := make([]matroska.AttachmentAdd, 0, len(plan.Attachments))
 	for _, att := range plan.Attachments {
 		attachments = append(attachments, matroska.AttachmentAdd{
@@ -522,13 +544,5 @@ func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Optio
 		})
 	}
 
-	if err := matroska.AddAttachments(filePath, attachments); err != nil {
-		ui.PrintError(fmt.Sprintf("Error attaching fonts for %s: %v", ui.AnonymizePath(filePath), err))
-
-		return errTrackFix
-	}
-
-	ui.PrintSuccess("Missing subtitle fonts attached.")
-
-	return nil
+	return attachments
 }

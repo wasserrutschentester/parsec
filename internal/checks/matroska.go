@@ -350,6 +350,7 @@ func addMissingFonts(missing []string, seen map[string]bool, usedFonts map[strin
 		}
 
 		seen[normalized] = true
+
 		missing = append(missing, font)
 	}
 
