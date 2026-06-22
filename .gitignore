@@ -3,8 +3,5 @@
 .parsec.toml
 vendor/
 
-# IDE
-.idea
-
 # test files
 *.mkv
