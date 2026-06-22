@@ -322,6 +322,24 @@ func TrackTable(headers []string, rows [][]string) string {
 	return t.Render()
 }
 
+// FontComplianceTable renders a table of font compliance warning details.
+func FontComplianceTable(headers []string, rows [][]string) string {
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(white)).
+		StyleFunc(func(row, _ int) lipgloss.Style {
+			if row < 0 { // Header row
+				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
+			}
+
+			return lipgloss.NewStyle().Padding(0, 1)
+		}).
+		Headers(headers...).
+		Rows(rows...)
+
+	return t.Render()
+}
+
 // calculateTrackTableWidths calculates the maximum width for each column across all provided tracks.
 // It returns a map of column index to its content width (excluding padding and borders).
 func calculateTrackTableWidths(tracks []types.TrackCheckResult) map[int]int {

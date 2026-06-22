@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"encoding/hex"
 	"os"
 	"strings"
 	"testing"
@@ -534,7 +535,7 @@ func TestRunTrackChecks(t *testing.T) {
 				Tracks:    tt.tracks,
 				Chapters:  tt.chapters,
 				Container: tt.container,
-			}, nil, nil, nil)
+			}, nil, nil)
 
 			hasFailure := false
 
@@ -618,7 +619,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 	}
 
-	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil, nil)
+	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil)
 	found := false
 
 	for _, r := range res {
@@ -655,9 +656,8 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 				Type:  "subtitles",
 				Codec: "S_TEXT/ASS",
 				Properties: matroska.EbmlTrackProperties{
-					Language: "ger",
-					Number:   1,
-					// [V4+ Styles]\nFormat: Name, Fontname\nStyle: Default, Arial\n
+					Language:     "ger",
+					Number:       1,
 					CodecPrivate: "5b56342b205374796c65735d0a466f726d61743a204e616d652c20466f6e746e616d650a5374796c653a2044656661756c742c20417269616c0a",
 				},
 			},
@@ -668,15 +668,12 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 		},
 	}
 
-	fontMap := map[string]string{
-		"arial": "Arial",
-	}
-	attachmentNames := map[int][]string{
-		1: {"Arial"},
-		2: {"UnusedFont"},
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FileName: "Arial.ttf", FamilyName: "Arial", Weight: 400, Italic: false},
+		{AttachmentID: 2, FileName: "UnusedFont.ttf", FamilyName: "UnusedFont", Weight: 400, Italic: false},
 	}
 
-	res := runTrackChecks("", ebml, fontMap, attachmentNames, nil)
+	res := runTrackChecks("", ebml, attachmentFonts, nil)
 	found := false
 
 	for _, r := range res {
@@ -711,12 +708,12 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 		},
 	}
 
-	attachmentNames := map[int][]string{
-		1: {"Arial"},
-		2: {"CorrectName"},
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FileName: "Arial.ttf", FamilyName: "Arial"},
+		{AttachmentID: 2, FileName: "WrongName.ttf", FamilyName: "CorrectName"},
 	}
 
-	res := runTrackChecks("", ebml, nil, attachmentNames, nil)
+	res := runTrackChecks("", ebml, attachmentFonts, nil)
 	found := false
 
 	for _, r := range res {
@@ -729,6 +726,10 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 
 			if !strings.Contains(r.Warning, "WrongName.ttf") {
 				t.Errorf("Expected warning to contain WrongName.ttf, got '%s'", r.Warning)
+			}
+
+			if !strings.Contains(r.Warning, "CorrectName.ttf") {
+				t.Errorf("Expected warning to contain proposed CorrectName.ttf, got '%s'", r.Warning)
 			}
 
 			if strings.Contains(r.Warning, "Arial.ttf") {
@@ -746,7 +747,7 @@ func runHygieneTest(t *testing.T, name string, ebml *matroska.EbmlMetadata, meta
 	t.Helper()
 
 	t.Run(name, func(t *testing.T) {
-		res := runTrackChecks("", ebml, nil, nil, meta)
+		res := runTrackChecks("", ebml, nil, meta)
 		found := false
 
 		for _, r := range res {
@@ -979,7 +980,7 @@ func TestCheckChaptersKeyframeAlignmentAligned(t *testing.T) {
 		},
 	}
 
-	res := runTrackChecks(filePath, ebml, nil, nil, nil)
+	res := runTrackChecks(filePath, ebml, nil, nil)
 
 	for _, r := range res {
 		if r.Identifier == "matroska_chapters_keyframe_alignment" {
@@ -1019,7 +1020,7 @@ func TestCheckChaptersKeyframeAlignmentNonAligned(t *testing.T) {
 		},
 	}
 
-	res := runTrackChecks(filePath, ebml, nil, nil, nil)
+	res := runTrackChecks(filePath, ebml, nil, nil)
 	found := false
 
 	for _, r := range res {
@@ -1118,7 +1119,7 @@ func runAsymmetricCheck(filePath string, timeStarts []int64) []CheckResult {
 		},
 	}
 
-	return runTrackChecks(filePath, ebml, nil, nil, nil)
+	return runTrackChecks(filePath, ebml, nil, nil)
 }
 
 func findAlignmentResult(res []CheckResult) *CheckResult {
@@ -1165,4 +1166,105 @@ func encodeTestElement(id uint64, data []byte) []byte {
 	res = append(res, data...)
 
 	return res
+}
+
+//nolint:paralleltest // mutates global state via config.InitDefaults()
+func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
+	config.InitDefaults()
+
+	// Bold Arial style
+	codecPrivate := []byte("[V4+ Styles]\nFormat: Name, Fontname, Bold\nStyle: Default, Arial, -1\n")
+	track := matroska.EbmlTrack{
+		Type:  "subtitles",
+		Codec: "S_TEXT/ASS",
+		Properties: matroska.EbmlTrackProperties{
+			TextSubtitles: true,
+			CodecPrivate:  hex.EncodeToString(codecPrivate),
+		},
+	}
+
+	// 1. Regular Arial attached - should fail
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{FamilyName: "Arial", Weight: 400, Italic: false},
+	}
+
+	res := checkSubtitleFonts(track, attachmentFonts, make(map[fontStyle]bool))
+	if res == nil || res.Passed {
+		t.Error("Expected validation failure when bold style uses only regular font")
+	}
+
+	// 2. Bold Arial attached - should pass
+	attachmentFonts = []matroska.AttachmentFontInfo{
+		{FamilyName: "Arial", Weight: 700, Italic: false},
+	}
+
+	res = checkSubtitleFonts(track, attachmentFonts, make(map[fontStyle]bool))
+	if res != nil {
+		t.Errorf("Expected validation pass when bold style has bold font attached: %v", res.Warning)
+	}
+
+	// 3. Variable font Arial attached - should pass
+	attachmentFonts = []matroska.AttachmentFontInfo{
+		{FamilyName: "Arial", Weight: 400, Italic: false, IsVariable: true},
+	}
+
+	res = checkSubtitleFonts(track, attachmentFonts, make(map[fontStyle]bool))
+	if res != nil {
+		t.Errorf("Expected validation pass when bold style has variable font attached: %v", res.Warning)
+	}
+}
+
+//nolint:paralleltest // mutates global state via config.InitDefaults()
+func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
+	config.InitDefaults()
+
+	track := matroska.EbmlTrack{
+		Type:  "subtitles",
+		Codec: "S_TEXT/ASS",
+	}
+	codecPrivate := []byte("[V4+ Styles]\nFormat: Name, Fontname, Bold\nStyle: Default, Arial, 0\n")
+	// Event content using \b1 (bold) inline override
+	content := []byte(string(codecPrivate) + "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,{\\b1}Bold Override Text\n")
+
+	// 1. Regular Arial attached - should fail
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{FamilyName: "Arial", Weight: 400, Italic: false},
+	}
+
+	res := checkSubtitleInlineFontsWithContent(track, attachmentFonts, content, make(map[fontStyle]bool))
+	if res == nil || res.Passed {
+		t.Error("Expected validation failure when inline bold tag only has regular font")
+	}
+
+	// 2. Bold Arial attached - should pass
+	attachmentFonts = []matroska.AttachmentFontInfo{
+		{FamilyName: "Arial", Weight: 700, Italic: false},
+	}
+
+	res = checkSubtitleInlineFontsWithContent(track, attachmentFonts, content, make(map[fontStyle]bool))
+	if res != nil {
+		t.Errorf("Expected validation pass when inline bold tag has bold font attached: %v", res.Warning)
+	}
+}
+
+//nolint:paralleltest // mutates global state via config.InitDefaults()
+func TestCheckUnusedFontsStyleAware(t *testing.T) {
+	config.InitDefaults()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "Arial-Italic.ttf", ContentType: "font/ttf"},
+	}
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FileName: "Arial-Italic.ttf", FamilyName: "Arial", Weight: 400, Italic: true},
+	}
+
+	// Only regular Arial is used
+	allUsedFonts := map[fontStyle]bool{
+		{Family: "Arial", Weight: 400, Italic: false}: true,
+	}
+
+	res := checkUnusedFonts(attachments, attachmentFonts, allUsedFonts)
+	if res == nil || res.Passed {
+		t.Error("Expected Arial-Italic.ttf to be flagged as unused since only Regular is used")
+	}
 }

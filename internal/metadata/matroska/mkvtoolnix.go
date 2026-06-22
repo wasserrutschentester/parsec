@@ -4,6 +4,7 @@ package matroska
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
@@ -422,23 +423,225 @@ func ExtractAttachments(filePath string, ids []int) (map[int][]byte, error) {
 	return results, nil
 }
 
-// GetFontNames extracts the internal Family and Full names from font data.
-func GetFontNames(data []byte) ([]string, error) {
-	f, err := sfnt.Parse(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse font: %w", err)
+// AttachmentFontInfo represents an attached font face.
+type AttachmentFontInfo struct {
+	AttachmentID   int
+	FileName       string
+	FamilyName     string   // e.g., "Arial"
+	PostScriptName string   // e.g., "Arial-BoldMT"
+	FullNames      []string // e.g., ["Arial Bold"]
+	Weight         int      // Standard weight value (100-900)
+	Italic         bool     // True if italic
+	IsVariable     bool     // True if font is a Variable Font (can satisfy multiple weights)
+}
+
+func parseWeightFromNames(subfamily, fullName string) int {
+	s := strings.ToLower(subfamily + " " + fullName)
+
+	rules := []struct {
+		keyword string
+		weight  int
+	}{
+		{"extrabold", 800},
+		{"ultrabold", 800},
+		{"extra bold", 800},
+		{"ultra bold", 800},
+		{"semibold", 600},
+		{"demibold", 600},
+		{"semi bold", 600},
+		{"demi bold", 600},
+		{" sb ", 600},
+		{"extralight", 200},
+		{"ultrabold", 200}, // fallback
+		{"ultralight", 200},
+		{"extra light", 200},
+		{"ultra light", 200},
+		{"semilight", 350},
+		{"demilight", 350},
+		{"semi light", 350},
+		{"demi light", 350},
+		{"black", 900},
+		{"heavy", 900},
+		{"fat", 900},
+		{"poster", 900},
+		{"nord", 900},
+		{"blk", 900},
+		{"bold", 700},
+		{"bd", 700},
+		{"thin", 100},
+		{"hairline", 100},
+		{"light", 300},
+		{"medium", 500},
 	}
 
-	var names []string
+	for _, rule := range rules {
+		if strings.Contains(s, rule.keyword) {
+			return rule.weight
+		}
+	}
 
-	var b sfnt.Buffer
+	if strings.HasSuffix(s, " sb") {
+		return 600
+	}
 
-	// NameIDFamily (0) and NameIDFull (4) are the most common ways fonts are identified.
-	// NameIDTypographicFamily (15) is also important for some modern fonts.
-	for _, id := range []sfnt.NameID{sfnt.NameIDFamily, sfnt.NameIDFull, sfnt.NameIDTypographicFamily} {
-		name, err := f.Name(&b, id)
-		if err == nil && name != "" {
-			names = append(names, name)
+	return 400
+}
+
+func hasTable(data []byte, tagStr string) bool {
+	if len(data) < 12 {
+		return false
+	}
+
+	// Check if TTC
+	if string(data[:4]) == "ttcf" {
+		if len(data) < 12 {
+			return false
+		}
+
+		numFonts := binary.BigEndian.Uint32(data[8:12])
+
+		for i := range numFonts {
+			offOffset := 12 + i*4
+			if len(data) < int(offOffset+4) {
+				return false
+			}
+
+			offset := binary.BigEndian.Uint32(data[offOffset : offOffset+4])
+
+			if hasTableAtOffset(data, offset, tagStr) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	return hasTableAtOffset(data, 0, tagStr)
+}
+
+func hasTableAtOffset(data []byte, offset uint32, tagStr string) bool {
+	if len(data) < int(offset+12) {
+		return false
+	}
+
+	numTables := binary.BigEndian.Uint16(data[offset+4 : offset+6])
+
+	for i := range numTables {
+		recOffset := offset + 12 + uint32(i)*16
+		if len(data) < int(recOffset+4) {
+			return false
+		}
+
+		tag := string(data[recOffset : recOffset+4])
+
+		if tag == tagStr {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getFontName(f *sfnt.Font, b *sfnt.Buffer, ids ...sfnt.NameID) string {
+	for _, id := range ids {
+		if name, err := f.Name(b, id); err == nil && name != "" {
+			return name
+		}
+	}
+
+	return ""
+}
+
+func isItalicName(subfamily, fullName string) bool {
+	subLower := strings.ToLower(subfamily)
+	fullLower := strings.ToLower(fullName)
+
+	return strings.Contains(subLower, "italic") ||
+		strings.Contains(subLower, "oblique") ||
+		strings.Contains(fullLower, "italic") ||
+		strings.Contains(fullLower, "oblique")
+}
+
+func extractAttachmentFont(id int, fileName string, isVariable bool, f *sfnt.Font) AttachmentFontInfo {
+	var (
+		b         sfnt.Buffer
+		fullNames []string
+	)
+
+	family := getFontName(f, &b, sfnt.NameIDTypographicFamily, sfnt.NameIDFamily)
+	postScript := getFontName(f, &b, sfnt.NameIDPostScript)
+	subfamily := getFontName(f, &b, sfnt.NameIDTypographicSubfamily, sfnt.NameIDSubfamily)
+	fullName := getFontName(f, &b, sfnt.NameIDFull)
+
+	if fullName != "" {
+		fullNames = append(fullNames, fullName)
+	}
+
+	weight := parseWeightFromNames(subfamily, fullName)
+	isItalic := isItalicName(subfamily, fullName)
+
+	return AttachmentFontInfo{
+		AttachmentID:   id,
+		FileName:       fileName,
+		FamilyName:     family,
+		PostScriptName: postScript,
+		FullNames:      fullNames,
+		Weight:         weight,
+		Italic:         isItalic,
+		IsVariable:     isVariable,
+	}
+}
+
+// GetAttachmentFonts extracts font styling information and name metadata for all font faces in an attachment.
+func GetAttachmentFonts(id int, fileName string, data []byte) ([]AttachmentFontInfo, error) {
+	collection, err := sfnt.ParseCollection(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse font collection: %w", err)
+	}
+
+	var fonts []AttachmentFontInfo
+
+	numFonts := collection.NumFonts()
+	isVariable := hasTable(data, "fvar")
+
+	for i := range numFonts {
+		f, err := collection.Font(i)
+		if err != nil {
+			continue
+		}
+
+		fontInfo := extractAttachmentFont(id, fileName, isVariable, f)
+		fonts = append(fonts, fontInfo)
+	}
+
+	return fonts, nil
+}
+
+// GetFontNames extracts the internal Family and Full names from font data.
+func GetFontNames(data []byte) ([]string, error) {
+	collection, err := sfnt.ParseCollection(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse font collection: %w", err)
+	}
+
+	var (
+		names []string
+		b     sfnt.Buffer
+	)
+
+	numFonts := collection.NumFonts()
+
+	for i := range numFonts {
+		f, err := collection.Font(i)
+		if err != nil {
+			continue
+		}
+
+		for _, id := range []sfnt.NameID{sfnt.NameIDFamily, sfnt.NameIDFull, sfnt.NameIDTypographicFamily, sfnt.NameIDPostScript} {
+			name, err := f.Name(&b, id)
+			if err == nil && name != "" {
+				names = append(names, name)
+			}
 		}
 	}
 
