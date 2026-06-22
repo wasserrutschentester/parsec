@@ -86,7 +86,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	// 7. Set defaults for missing fields (Source, Group)
 	meta.SetDefaults()
 
-	// 8. Generate new name and rename, unless it is already correctly named.
+	// 8. Generate new name
 	newNameBase := meta.GetReleaseName()
 	newNameBase = filename.ApplyReplacements(newNameBase, config.GetOutputReplacements())
 	newName := newNameBase + ext
@@ -114,7 +114,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	newPath := filepath.Join(destDir, newName)
 
 	if filePath == newPath {
-		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' already has the correct name.", filepath.Base(filePath))))
+		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' is already has the correct name.", filepath.Base(filePath))))
 
 		return nil
 	}
@@ -142,7 +142,11 @@ func renameCommit(filePath, newPath, newName string) error {
 	}
 
 	if !unattendedFlag {
-		response := ui.Prompt(ui.Info.Render("Proceed with rename? [y/N] "))
+		fmt.Print(ui.Info.Render("Proceed with rename? [y/N] "))
+
+		var response string
+
+		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			ui.Println(ui.Muted.Render("Skipping..."))
 
@@ -262,17 +266,11 @@ func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb
 		}
 	}
 
-	// Correct a date-based release's date from the authoritative aired date.
-	if meta.Date != "" && episodeResult.Airdate != "" {
-		meta.Date = episodeResult.Airdate
-	}
-
 	return episodeResult
 }
 
 func init() {
 	rootCmd.AddCommand(renameCmd)
-
 	// Metadata
 	renameCmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
 	renameCmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
