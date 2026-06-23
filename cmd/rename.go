@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
@@ -161,6 +162,11 @@ func renameCommit(filePath, newPath, newName string) error {
 		return errRename
 	}
 
+	oldAbsPath, _ := filepath.Abs(filePath)
+	newAbsPath, _ := filepath.Abs(newPath)
+
+	oldInfo, statErr := os.Stat(filePath)
+
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
@@ -168,9 +174,27 @@ func renameCommit(filePath, newPath, newName string) error {
 		return errRename
 	}
 
+	newInfo, statErr2 := os.Stat(newPath)
+
+	if statErr == nil && statErr2 == nil {
+		renameMigrateCache(oldAbsPath, newAbsPath, oldInfo, newInfo)
+	}
+
 	ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
 
 	return nil
+}
+
+func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo) {
+	oldMkvKey := fmt.Sprintf("mkvmerge:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newMkvKey := fmt.Sprintf("mkvmerge:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldMkvKey, newMkvKey)
+
+	oldMediaKey := fmt.Sprintf("mediainfo:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newMediaKey := fmt.Sprintf("mediainfo:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldMediaKey, newMediaKey)
 }
 
 func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainfo.MediaInfo, error) {

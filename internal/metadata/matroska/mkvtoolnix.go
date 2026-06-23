@@ -20,6 +20,7 @@ import (
 
 	"golang.org/x/image/font/sfnt"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
@@ -302,7 +303,28 @@ func CheckForMatroska(filePath string) error {
 
 // GetEbmlMetadata runs mkvmerge -J on the file to extract detailed EBML metadata.
 func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
-	err := CheckForMatroska(filePath)
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+
+	cacheKey := fmt.Sprintf("mkvmerge:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
+
+	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
+		var metadata EbmlMetadata
+		if err := json.Unmarshal(cachedData, &metadata); err == nil {
+			metadata.countTypes()
+
+			return &metadata, nil
+		}
+	}
+
+	err = CheckForMatroska(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +347,8 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 	}
 
 	metadata.countTypes()
+
+	_ = cache.SetPersistent(cacheKey, output)
 
 	return &metadata, nil
 }
