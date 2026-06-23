@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/spf13/cobra"
 
@@ -22,6 +25,7 @@ import (
 var (
 	jsonOutputFlag        bool
 	individualReportsFlag bool
+	jobsFlag              int
 )
 
 type seasonKey struct {
@@ -60,47 +64,31 @@ You can also pass a JSON check report file to render it.`),
 
 		ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
 
+		numJobs := getNumJobs(len(expandedArgs))
+		results := runChecksInParallel(cmd, expandedArgs, numJobs, batchMode)
+
 		for i, filePath := range expandedArgs {
-			var (
-				currentReports []types.CheckReport
-				meta           *metadata.Metadata
-			)
+			res := results[i]
 
-			if batchMode && !jsonOutputFlag {
+			if res.err != nil {
+				ui.PrintError(res.err.Error())
+
+				return fmt.Errorf("%w for %s", errCheckDataCollection, filePath)
+			}
+
+			if !batchMode && !jsonOutputFlag {
 				filenameNoExt := filename.GetBaseName(filePath)
-				ui.Println(fmt.Sprintf("Checking (%d/%d): %s", i+1, len(expandedArgs), filenameNoExt))
+
+				ui.Println("\n" + ui.Header.Render("VERIFYING NEW TARGET"))
+				ui.Println(filenameNoExt)
 			}
 
-			isJSON, jsonReports := loadJSONReport(filePath)
-
-			if isJSON {
-				currentReports = jsonReports
-				// We might not have metadata here if loading from JSON, but for now we focus on fresh checks
-			} else {
-				if batchMode {
-					ui.IsSilent = true
-				}
-
-				report, m, err := collectCheckData(cmd, filePath, !batchMode && !jsonOutputFlag)
-
-				if batchMode {
-					ui.IsSilent = jsonOutputFlag
-				}
-
-				if err != nil {
-					ui.PrintError(err.Error())
-
-					return fmt.Errorf("%w for %s", errCheckDataCollection, filePath)
-				}
-
-				currentReports = []types.CheckReport{report}
-				meta = m
-			}
-
-			allReports = append(allReports, currentReports...)
+			allReports = append(allReports, res.reports...)
+			meta := res.meta
 
 			if meta != nil && meta.IsTV && (meta.TvdbID > 0 || meta.TmdbID > 0) && meta.Season > 0 {
 				key := seasonKey{tvdbID: meta.TvdbID, tmdbID: meta.TmdbID, season: meta.Season}
+
 				if len(meta.Episodes) > 0 {
 					seasonEpisodes[key] = append(seasonEpisodes[key], meta.Episodes...)
 				}
@@ -109,7 +97,7 @@ You can also pass a JSON check report file to render it.`),
 			}
 
 			if !jsonOutputFlag && !batchMode {
-				for _, r := range currentReports {
+				for _, r := range res.reports {
 					ui.PrintInteractiveReport(r, unattendedFlag)
 				}
 			}
@@ -321,9 +309,108 @@ func init() {
 	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
 	checkCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Verbose output")
 	checkCmd.Flags().BoolVarP(&individualReportsFlag, "individual", "i", false, "Display the full individual reports for each file in the batch")
+	checkCmd.Flags().IntVar(&jobsFlag, "jobs", 0, "Number of parallel jobs to run (default is number of CPUs)")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
 		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
+}
+
+type checkJobResult struct {
+	reports []types.CheckReport
+	meta    *metadata.Metadata
+	err     error
+}
+
+func runChecksInParallel(cmd *cobra.Command, filePaths []string, numJobs int, batchMode bool) []checkJobResult {
+	results := make([]checkJobResult, len(filePaths))
+
+	type workItem struct {
+		index    int
+		filePath string
+	}
+
+	workChan := make(chan workItem, len(filePaths))
+
+	for i, filePath := range filePaths {
+		workChan <- workItem{index: i, filePath: filePath}
+	}
+
+	close(workChan)
+
+	var (
+		printMu        sync.Mutex
+		completedCount atomic.Int32
+	)
+
+	oldIsSilent := ui.IsSilent
+	ui.IsSilent = true
+
+	var wg sync.WaitGroup
+
+	for range numJobs {
+		wg.Go(func() {
+			for item := range workChan {
+				results[item.index] = checkSingleFile(cmd, item.filePath)
+				completed := completedCount.Add(1)
+
+				if batchMode && !jsonOutputFlag {
+					filenameNoExt := filename.GetBaseName(item.filePath)
+
+					printMu.Lock()
+
+					ui.IsSilent = false
+
+					ui.Println(fmt.Sprintf("Checking (%d/%d): %s", completed, len(filePaths), filenameNoExt))
+
+					ui.IsSilent = true
+
+					printMu.Unlock()
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+
+	ui.IsSilent = oldIsSilent
+
+	return results
+}
+
+func checkSingleFile(cmd *cobra.Command, filePath string) checkJobResult {
+	isJSON, jsonReports := loadJSONReport(filePath)
+
+	if isJSON {
+		return checkJobResult{
+			reports: jsonReports,
+		}
+	}
+
+	report, m, err := collectCheckData(cmd, filePath, false)
+
+	return checkJobResult{
+		reports: []types.CheckReport{report},
+		meta:    m,
+		err:     err,
+	}
+}
+
+func getNumJobs(argCount int) int {
+	numJobs := jobsFlag
+
+	if numJobs <= 0 {
+		numJobs = runtime.NumCPU()
+	}
+
+	if numJobs < 1 {
+		numJobs = 1
+	}
+
+	if numJobs > argCount {
+		numJobs = argCount
+	}
+
+	return numJobs
 }
