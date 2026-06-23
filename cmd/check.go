@@ -19,7 +19,10 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-var jsonOutputFlag bool
+var (
+	jsonOutputFlag        bool
+	individualReportsFlag bool
+)
 
 type seasonKey struct {
 	tvdbID int
@@ -49,17 +52,23 @@ You can also pass a JSON check report file to render it.`),
 		var allReports []types.CheckReport
 
 		expandedArgs := expandArgs(args)
+		batchMode := !individualReportsFlag && len(expandedArgs) > 1
 
 		seasonEpisodes := make(map[seasonKey][]int)
 		seasonMetas := make(map[seasonKey]*metadata.Metadata)
 
 		ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
 
-		for _, filePath := range expandedArgs {
+		for i, filePath := range expandedArgs {
 			var (
 				currentReports []types.CheckReport
 				meta           *metadata.Metadata
 			)
+
+			if batchMode && !jsonOutputFlag {
+				filenameNoExt := filename.GetBaseName(filePath)
+				ui.Println(fmt.Sprintf("Checking (%d/%d): %s", i+1, len(expandedArgs), filenameNoExt))
+			}
 
 			isJSON, jsonReports := loadJSONReport(filePath)
 
@@ -67,7 +76,16 @@ You can also pass a JSON check report file to render it.`),
 				currentReports = jsonReports
 				// We might not have metadata here if loading from JSON, but for now we focus on fresh checks
 			} else {
-				report, m, err := collectCheckData(cmd, filePath)
+				if batchMode {
+					ui.IsSilent = true
+				}
+
+				report, m, err := collectCheckData(cmd, filePath, !batchMode && !jsonOutputFlag)
+
+				if batchMode {
+					ui.IsSilent = jsonOutputFlag
+				}
+
 				if err != nil {
 					ui.PrintError(err.Error())
 
@@ -89,11 +107,15 @@ You can also pass a JSON check report file to render it.`),
 				seasonMetas[key] = meta
 			}
 
-			if !jsonOutputFlag {
+			if !jsonOutputFlag && !batchMode {
 				for _, r := range currentReports {
 					ui.PrintInteractiveReport(r, unattendedFlag)
 				}
 			}
+		}
+
+		if !jsonOutputFlag && batchMode {
+			ui.PrintAggregatedSummary(allReports, unattendedFlag)
 		}
 
 		// Run aggregate season checks
@@ -188,11 +210,15 @@ func parseReports(data []byte) ([]types.CheckReport, error) {
 	return reports, nil
 }
 
-func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, *metadata.Metadata, error) {
+func collectCheckData(cmd *cobra.Command, filePath string, showIndividual bool) (types.CheckReport, *metadata.Metadata, error) {
 	filenameNoExt := filename.GetBaseName(filePath)
 
-	ui.Println("\n" + ui.Header.Render("VERIFYING NEW TARGET"))
-	ui.Println(filenameNoExt)
+	if showIndividual {
+		ui.Println("\n" + ui.Header.Render("VERIFYING NEW TARGET"))
+		ui.Println(filenameNoExt)
+	} else {
+		ui.Println(fmt.Sprintf("Checking %s...", filenameNoExt))
+	}
 
 	match := filename.Parse(filenameNoExt)
 
@@ -293,6 +319,7 @@ func init() {
 	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
 	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
 	checkCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Verbose output")
+	checkCmd.Flags().BoolVarP(&individualReportsFlag, "individual", "i", false, "Display the full individual reports for each file in the batch")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
