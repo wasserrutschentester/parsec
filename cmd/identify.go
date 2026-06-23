@@ -37,34 +37,40 @@ Flags can be used to override or provide missing information.`),
 		ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
 
 		if len(args) == 0 {
-			return identifyFile(cmd, "")
+			_, err := identifyFile(cmd, "", nil)
+
+			return err
 		}
 
 		expandedArgs := expandArgs(args)
+
+		var prevResult *mdb.SearchResult
 		for _, filePath := range expandedArgs {
-			err := identifyFile(cmd, filePath)
+			result, err := identifyFile(cmd, filePath, prevResult)
 			if err != nil {
 				return err
 			}
+
+			prevResult = result
 		}
 
 		return nil
 	},
 }
 
-func identifyFile(cmd *cobra.Command, filePath string) error {
+func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, error) {
 	meta := initializeMetadata(cmd, filePath)
 
 	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
 	if err != nil {
 		ui.PrintError(err.Error())
 
-		return errSearch
+		return nil, errSearch
 	}
 
-	processIdentificationResult(filePath, result, meta)
+	processIdentificationResult(filePath, result, meta, prevResult)
 
-	return nil
+	return result, nil
 }
 
 func initializeMetadata(cmd *cobra.Command, filePath string) *metadata.Metadata {
@@ -84,10 +90,20 @@ func initializeMetadata(cmd *cobra.Command, filePath string) *metadata.Metadata 
 	return meta
 }
 
-func processIdentificationResult(filePath string, result *mdb.SearchResult, meta *metadata.Metadata) {
+func isSameSeries(result, prevResult *mdb.SearchResult) bool {
+	return prevResult != nil &&
+		result.TmdbID == prevResult.TmdbID &&
+		result.ImdbID == prevResult.ImdbID &&
+		result.TvdbID == prevResult.TvdbID
+}
+
+func processIdentificationResult(filePath string, result *mdb.SearchResult, meta *metadata.Metadata, prevResult *mdb.SearchResult) {
 	warnOnIDMismatch(filePath, result)
 
-	mdb.PrintResult(*result)
+	if !isSameSeries(result, prevResult) {
+		mdb.PrintResult(*result)
+	}
+
 	tags := mdb.GetMatroskaTags(*result)
 
 	if meta.IsTV {
