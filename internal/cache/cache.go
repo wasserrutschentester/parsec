@@ -17,6 +17,7 @@ import (
 var (
 	cacheDir string
 	metaDir  string
+	subDir   string
 	mu       sync.Mutex
 
 	errCacheBypassed = errors.New("cache bypassed")
@@ -26,6 +27,7 @@ var (
 const (
 	cacheDuration           = 6 * time.Hour
 	persistentCacheDuration = 30 * 24 * time.Hour // 30 days
+	subtitleCacheDuration   = 7 * 24 * time.Hour  // 7 days
 )
 
 func init() {
@@ -41,11 +43,13 @@ func resetDir() {
 
 	cacheDir = filepath.Join(dir, "parsec", "api")
 	metaDir = filepath.Join(dir, "parsec", "meta")
+	subDir = filepath.Join(dir, "parsec", "subtitles")
 }
 
 func setDir(dir string) {
 	cacheDir = dir
 	metaDir = filepath.Join(dir, "meta")
+	subDir = filepath.Join(dir, "subtitles")
 }
 
 func cleanup() {
@@ -63,6 +67,7 @@ func cleanup() {
 
 	removeExpiredFiles()
 	removeExpiredMetaFiles()
+	removeExpiredSubtitleFiles()
 
 	// Update marker
 	_ = os.WriteFile(markerPath, []byte{}, 0o644)
@@ -116,9 +121,36 @@ func removeExpiredMetaFiles() {
 	}
 }
 
+func removeExpiredSubtitleFiles() {
+	if _, err := os.Stat(subDir); os.IsNotExist(err) {
+		return
+	}
+
+	files, err := os.ReadDir(subDir)
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
+		if time.Since(info.ModTime()) > subtitleCacheDuration {
+			_ = os.Remove(filepath.Join(subDir, file.Name()))
+		}
+	}
+}
+
 func clearCache() {
 	_ = os.RemoveAll(cacheDir)
 	_ = os.RemoveAll(metaDir)
+	_ = os.RemoveAll(subDir)
 }
 
 // Get retrieves data from the cache for the given key.
@@ -255,4 +287,53 @@ func MovePersistent(oldKey, newKey string) error {
 	}
 
 	return nil
+}
+
+// GetSubtitle retrieves subtitle data from the cache for the given key.
+func GetSubtitle(key string) ([]byte, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if config.NoCache {
+		return nil, errCacheBypassed
+	}
+
+	path := getSubPath(key)
+
+	_, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat cache file: %w", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cache file: %w", err)
+	}
+
+	now := time.Now()
+	_ = os.Chtimes(path, now, now)
+
+	return data, nil
+}
+
+// SetSubtitle stores subtitle data in the cache for the given key.
+func SetSubtitle(key string, data []byte) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create cache directory: %w", err)
+	}
+
+	if err := os.WriteFile(getSubPath(key), data, 0o644); err != nil {
+		return fmt.Errorf("failed to write cache file: %w", err)
+	}
+
+	return nil
+}
+
+func getSubPath(key string) string {
+	hash := sha256.Sum256([]byte(key))
+
+	return filepath.Join(subDir, hex.EncodeToString(hash[:]))
 }

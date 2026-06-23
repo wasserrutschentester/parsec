@@ -129,6 +129,8 @@ func TestPersistentCache(t *testing.T) {
 	testExpirationAndTouch(t, key, data)
 	testPruningAndCleanup(t, key)
 	testMoveAndClear(t, key, newKey, data)
+	testSubtitleSetGetTouch(t, key, data)
+	testSubtitlePruning(t, key)
 }
 
 func testSetGetPersistent(t *testing.T, key string, data []byte) {
@@ -253,6 +255,74 @@ func testMoveAndClear(t *testing.T, key, newKey string, data []byte) {
 
 		if _, err := os.Stat(newPath); !os.IsNotExist(err) {
 			t.Errorf("Moved persistent file should be removed by clearCache: %v", err)
+		}
+	})
+}
+
+func testSubtitleSetGetTouch(t *testing.T, key string, data []byte) {
+	t.Run("SetGetSubtitle", func(t *testing.T) {
+		if err := SetSubtitle(key, data); err != nil {
+			t.Fatalf("SetSubtitle failed: %v", err)
+		}
+
+		cached, err := GetSubtitle(key)
+		if err != nil {
+			t.Fatalf("GetSubtitle failed: %v", err)
+		}
+
+		if !bytes.Equal(cached, data) {
+			t.Errorf("Expected %s, got %s", data, cached)
+		}
+	})
+
+	t.Run("GetSubtitleTouchesFile", func(t *testing.T) {
+		path := getSubPath(key)
+		oldTime := time.Now().Add(-1 * time.Hour)
+
+		if err := os.Chtimes(path, oldTime, oldTime); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := GetSubtitle(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if time.Since(info.ModTime()) > 5*time.Second {
+			t.Errorf("GetSubtitle should update modtime on hit")
+		}
+	})
+}
+
+func testSubtitlePruning(t *testing.T, key string) {
+	t.Run("CleanupSubtitlePruning", func(t *testing.T) {
+		path := getSubPath(key)
+		oldTime := time.Now().Add(-6 * 24 * time.Hour)
+
+		if err := os.Chtimes(path, oldTime, oldTime); err != nil {
+			t.Fatal(err)
+		}
+
+		removeExpiredSubtitleFiles()
+
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("Subtitle file should not be pruned at 6 days old")
+		}
+
+		expiredTime := time.Now().Add(-8 * 24 * time.Hour)
+		if err := os.Chtimes(path, expiredTime, expiredTime); err != nil {
+			t.Fatal(err)
+		}
+
+		removeExpiredSubtitleFiles()
+
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("Subtitle file older than 7 days should be pruned")
 		}
 	})
 }

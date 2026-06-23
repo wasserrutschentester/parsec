@@ -370,6 +370,75 @@ func ExtractTracks(filePath string, ids []int) (map[int][]byte, error) {
 		return make(map[int][]byte), nil
 	}
 
+	ebml, err := GetEbmlMetadata(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	trackIDToUID := make(map[int]uint64)
+
+	for _, track := range ebml.Tracks {
+		uid := track.Properties.UID
+		if uid == 0 {
+			uid = uint64(track.ID)
+		}
+
+		trackIDToUID[track.ID] = uid
+	}
+
+	results := make(map[int][]byte)
+	missingIDs := querySubtitleCache(info, ids, trackIDToUID, results)
+
+	if len(missingIDs) == 0 {
+		return results, nil
+	}
+
+	extracted, err := extractTracksNoCache(filePath, missingIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for id, data := range extracted {
+		results[id] = data
+
+		uid, ok := trackIDToUID[id]
+		if ok {
+			cacheKey := fmt.Sprintf("subtitle:%d:%d:%d", info.Size(), info.ModTime().UnixNano(), uid)
+			_ = cache.SetSubtitle(cacheKey, data)
+		}
+	}
+
+	return results, nil
+}
+
+func querySubtitleCache(info os.FileInfo, ids []int, trackIDToUID map[int]uint64, results map[int][]byte) []int {
+	var missingIDs []int
+
+	for _, id := range ids {
+		uid, ok := trackIDToUID[id]
+		if !ok {
+			missingIDs = append(missingIDs, id)
+
+			continue
+		}
+
+		cacheKey := fmt.Sprintf("subtitle:%d:%d:%d", info.Size(), info.ModTime().UnixNano(), uid)
+		if cachedData, err := cache.GetSubtitle(cacheKey); err == nil {
+			results[id] = cachedData
+		} else {
+			missingIDs = append(missingIDs, id)
+		}
+	}
+
+	return missingIDs
+}
+
+func extractTracksNoCache(filePath string, ids []int) (map[int][]byte, error) {
 	err := CheckForMatroska(filePath)
 	if err != nil {
 		return nil, err
