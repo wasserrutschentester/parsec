@@ -594,7 +594,14 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		if ep != nil {
 			res := ep.ToEpisodeResult()
 			ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
-			fillEpisodeTranslation(&res, ep.ID, lang)
+
+			for _, l := range uniqueLangs {
+				if res.Name != "" && res.Overview != "" {
+					break
+				}
+
+				fillEpisodeTranslation(&res, ep.ID, l)
+			}
 
 			return res, nil
 		}
@@ -696,11 +703,11 @@ func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 	ui.PrintDebug(fmt.Sprintf("translation: %+v, err: %v", translation, err))
 
 	if err == nil {
-		if translation.Data.Name != "" {
+		if res.Name == "" && translation.Data.Name != "" {
 			res.Name = translation.Data.Name
 		}
 
-		if translation.Data.Overview != "" {
+		if res.Overview == "" && translation.Data.Overview != "" {
 			res.Overview = translation.Data.Overview
 		}
 	}
