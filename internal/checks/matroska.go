@@ -132,14 +132,16 @@ func newFailedTrackResult(id, desc, severity string, track *matroska.EbmlTrack, 
 }
 
 // RunMatroskaChecks performs checks on the Matroska container and its tracks.
-func RunMatroskaChecks(filePath string, meta *metadata.Metadata) []CheckResult {
-	ebml, err := matroska.GetEbmlMetadata(filePath)
-	if err != nil {
-		return checkMatroskaFormat(err)
+func RunMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, ebmlErr error, meta *metadata.Metadata) []CheckResult {
+	if ebmlErr != nil {
+		return checkMatroskaFormat(ebmlErr)
 	}
 
 	var xmlChapters *matroska.Chapters
+
 	if ebml.HasChapters() {
+		var err error
+
 		xmlChapters, err = matroska.ExtractChapters(filePath)
 		if err != nil {
 			ui.PrintDebug(fmt.Sprintf("Failed to extract chapters via mkvextract: %v", err))

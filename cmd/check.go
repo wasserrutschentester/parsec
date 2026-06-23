@@ -233,7 +233,7 @@ func collectCheckData(cmd *cobra.Command, filePath string, showIndividual bool) 
 	appendFailed(&allIssues, "FILENAME", checks.RunFilenameChecks(filenameNoExt, match))
 	appendFailed(&allIssues, "MDB", checks.RunMdbChecks(mi, match))
 	appendFailed(&allIssues, "MEDIAINFO", checks.RunMediaInfoChecks(mi, match))
-	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath, match))
+	appendFailed(&allIssues, "MATROSKA", checks.RunMatroskaChecks(filePath, ebml, ebmlErr, match))
 
 	return types.CheckReport{
 		File:          filePath,
