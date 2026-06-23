@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"codeberg.org/upPollo/parsec/internal/config"
@@ -15,6 +16,7 @@ import (
 
 var (
 	cacheDir string
+	mu       sync.Mutex
 
 	errCacheBypassed = errors.New("cache bypassed")
 	errCacheExpired  = errors.New("cache expired")
@@ -87,6 +89,9 @@ func clearCache() {
 
 // Get retrieves data from the cache for the given key.
 func Get(key string) ([]byte, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if config.NoCache {
 		return nil, errCacheBypassed
 	}
@@ -114,6 +119,9 @@ func Get(key string) ([]byte, error) {
 
 // Set stores data in the cache for the given key.
 func Set(key string, data []byte) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
@@ -127,6 +135,9 @@ func Set(key string, data []byte) error {
 
 // Remove deletes data from the cache for the given key.
 func Remove(key string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if err := os.Remove(getPath(key)); err != nil {
 		return fmt.Errorf("failed to remove cache file: %w", err)
 	}
