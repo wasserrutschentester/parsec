@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/singleflight"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/mdb/tmdb"
@@ -22,6 +24,9 @@ import (
 var (
 	errSelection = errors.New("invalid selection")
 	errInput     = errors.New("title is required (either from filename or --title flag) OR an ID (--imdb, --tmdb, --tvdb)")
+
+	searchGroup   singleflight.Group
+	searchIDGroup singleflight.Group
 )
 
 // InteractiveSearch performs a search by ID or title, prompting the user if multiple matches are found.
@@ -134,6 +139,25 @@ func searchTV(query string, year int) ([]mdb.SearchResult, error) {
 }
 
 func search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
+	val, err, _ := searchGroup.Do(fmt.Sprintf("%s:%s:%d", mediaType, query, year), func() (any, error) {
+		return executeSearch(mediaType, query, year)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("singleflight search failed: %w", err)
+	}
+
+	original, ok := val.([]mdb.SearchResult)
+	if !ok || original == nil {
+		return nil, nil
+	}
+
+	copied := make([]mdb.SearchResult, len(original))
+	copy(copied, original)
+
+	return copied, nil
+}
+
+func executeSearch(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	ui.PrintDebug(fmt.Sprintf("Starting parallel MDB search: type=%s, query=%s, year=%d", mediaType, query, year))
 
 	var (
@@ -418,7 +442,26 @@ func filterResults(results []mdb.SearchResult) []mdb.SearchResult {
 }
 
 func searchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
+	val, err, _ := searchIDGroup.Do(fmt.Sprintf("%s:%d:%d:%t", imdbID, tmdbID, tvdbID, isTV), func() (any, error) {
+		return executeSearchByID(imdbID, tmdbID, tvdbID, isTV)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("singleflight searchByID failed: %w", err)
+	}
+
+	res, ok := val.(*mdb.SearchResult)
+	if !ok || res == nil {
+		return nil, mdb.ErrNotFound
+	}
+
+	resCopy := *res
+
+	return &resCopy, nil
+}
+
+func executeSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.SearchResult, error) {
 	mediaType := "movie"
+
 	if isTV {
 		mediaType = "tv"
 	}
