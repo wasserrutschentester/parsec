@@ -138,28 +138,17 @@ func RunMatroskaChecks(filePath string, meta *metadata.Metadata) []CheckResult {
 		return checkMatroskaFormat(err)
 	}
 
+	var xmlChapters *matroska.Chapters
 	if ebml.HasChapters() {
-		xmlChapters, err := matroska.ExtractChapters(filePath)
-		if err == nil {
-			if len(ebml.Chapters) == 0 {
-				ebml.Chapters = append(ebml.Chapters, matroska.EbmlChapters{
-					NumEntries: len(xmlChapters),
-				})
-			}
-
-			ebml.Chapters[0].Editions = []matroska.EbmlEdition{
-				{
-					Chapters: xmlChapters,
-				},
-			}
-		} else {
+		xmlChapters, err = matroska.ExtractChapters(filePath)
+		if err != nil {
 			ui.PrintDebug(fmt.Sprintf("Failed to extract chapters via mkvextract: %v", err))
 		}
 	}
 
 	attachmentFonts := getFontMapping(filePath, ebml.Attachments)
 
-	return runTrackChecks(filePath, ebml, attachmentFonts, meta)
+	return runTrackChecks(filePath, ebml, xmlChapters, attachmentFonts, meta)
 }
 
 func checkMatroskaFormat(err error) []CheckResult {
@@ -171,7 +160,7 @@ func checkMatroskaFormat(err error) []CheckResult {
 	}}
 }
 
-func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, meta *metadata.Metadata) []CheckResult {
+func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *matroska.Chapters, attachmentFonts []matroska.AttachmentFontInfo, meta *metadata.Metadata) []CheckResult {
 	tracks := ebml.Tracks
 
 	var (
@@ -203,7 +192,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, attachmentFont
 	}
 
 	runGlobalMatroskaChecks(ebml, meta, agg, allUsedFonts, attachmentFonts)
-	runChaptersChecks(filePath, ebml, agg)
+	runChaptersChecks(filePath, ebml, xmlChapters, agg)
 
 	return agg.ToSlice()
 }
@@ -256,41 +245,41 @@ func runGlobalMatroskaChecks(ebml *matroska.EbmlMetadata, meta *metadata.Metadat
 	}
 }
 
-func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, agg *trackResultAggregator) {
-	if len(ebml.Chapters) == 0 {
+func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *matroska.Chapters, agg *trackResultAggregator) {
+	if xmlChapters.Empty() {
 		return
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_start_non_zero") {
-		agg.Add(checkChaptersStartNonZero(ebml))
+		agg.Add(checkChaptersStartNonZero(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_non_monotonic") {
-		agg.Add(checkChaptersNonMonotonic(ebml))
+		agg.Add(checkChaptersNonMonotonic(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_duplicate") {
-		agg.Add(checkChaptersDuplicate(ebml))
+		agg.Add(checkChaptersDuplicate(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_too_close") {
-		agg.Add(checkChaptersTooClose(ebml))
+		agg.Add(checkChaptersTooClose(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_exceed_duration") {
-		agg.Add(checkChaptersExceedDuration(ebml))
+		agg.Add(checkChaptersExceedDuration(ebml, xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_name_hygiene") {
-		agg.Add(checkChaptersNameHygiene(ebml))
+		agg.Add(checkChaptersNameHygiene(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_language_hygiene") {
-		agg.Add(checkChaptersLanguageHygiene(ebml))
+		agg.Add(checkChaptersLanguageHygiene(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
-		agg.Add(checkChaptersKeyframeAlignment(filePath, ebml))
+		agg.Add(checkChaptersKeyframeAlignment(filePath, ebml, xmlChapters))
 	}
 }
 

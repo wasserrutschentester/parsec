@@ -531,11 +531,16 @@ func TestRunTrackChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var xmlChs *matroska.Chapters
+			if len(tt.chapters) > 0 && len(tt.chapters[0].Editions) > 0 {
+				xmlChs = &matroska.Chapters{Atoms: tt.chapters[0].Editions[0].Chapters}
+			}
+
 			res := runTrackChecks("", &matroska.EbmlMetadata{
 				Tracks:    tt.tracks,
 				Chapters:  tt.chapters,
 				Container: tt.container,
-			}, nil, nil)
+			}, xmlChs, nil, nil)
 
 			hasFailure := false
 
@@ -619,7 +624,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
 	}
 
-	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil)
+	res := runTrackChecks("", &matroska.EbmlMetadata{Tracks: tracks}, nil, nil, nil)
 	found := false
 
 	for _, r := range res {
@@ -673,7 +678,7 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 		{AttachmentID: 2, FileName: "UnusedFont.ttf", FamilyName: "UnusedFont", Weight: 400, Italic: false},
 	}
 
-	res := runTrackChecks("", ebml, attachmentFonts, nil)
+	res := runTrackChecks("", ebml, nil, attachmentFonts, nil)
 	found := false
 
 	for _, r := range res {
@@ -713,7 +718,7 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 		{AttachmentID: 2, FileName: "WrongName.ttf", FamilyName: "CorrectName"},
 	}
 
-	res := runTrackChecks("", ebml, attachmentFonts, nil)
+	res := runTrackChecks("", ebml, nil, attachmentFonts, nil)
 	found := false
 
 	for _, r := range res {
@@ -747,7 +752,7 @@ func runHygieneTest(t *testing.T, name string, ebml *matroska.EbmlMetadata, meta
 	t.Helper()
 
 	t.Run(name, func(t *testing.T) {
-		res := runTrackChecks("", ebml, nil, meta)
+		res := runTrackChecks("", ebml, nil, nil, meta)
 		found := false
 
 		for _, r := range res {
@@ -980,7 +985,12 @@ func TestCheckChaptersKeyframeAlignmentAligned(t *testing.T) {
 		},
 	}
 
-	res := runTrackChecks(filePath, ebml, nil, nil)
+	var xmlChs *matroska.Chapters
+	if len(ebml.Chapters) > 0 && len(ebml.Chapters[0].Editions) > 0 {
+		xmlChs = &matroska.Chapters{Atoms: ebml.Chapters[0].Editions[0].Chapters}
+	}
+
+	res := runTrackChecks(filePath, ebml, xmlChs, nil, nil)
 
 	for _, r := range res {
 		if r.Identifier == "matroska_chapters_keyframe_alignment" {
@@ -1020,7 +1030,12 @@ func TestCheckChaptersKeyframeAlignmentNonAligned(t *testing.T) {
 		},
 	}
 
-	res := runTrackChecks(filePath, ebml, nil, nil)
+	var xmlChs *matroska.Chapters
+	if len(ebml.Chapters) > 0 && len(ebml.Chapters[0].Editions) > 0 {
+		xmlChs = &matroska.Chapters{Atoms: ebml.Chapters[0].Editions[0].Chapters}
+	}
+
+	res := runTrackChecks(filePath, ebml, xmlChs, nil, nil)
 	found := false
 
 	for _, r := range res {
@@ -1119,7 +1134,12 @@ func runAsymmetricCheck(filePath string, timeStarts []int64) []CheckResult {
 		},
 	}
 
-	return runTrackChecks(filePath, ebml, nil, nil)
+	var xmlChs *matroska.Chapters
+	if len(ebml.Chapters) > 0 && len(ebml.Chapters[0].Editions) > 0 {
+		xmlChs = &matroska.Chapters{Atoms: ebml.Chapters[0].Editions[0].Chapters}
+	}
+
+	return runTrackChecks(filePath, ebml, xmlChs, nil, nil)
 }
 
 func findAlignmentResult(res []CheckResult) *CheckResult {

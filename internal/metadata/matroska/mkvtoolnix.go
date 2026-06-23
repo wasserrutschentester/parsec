@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/image/font/sfnt"
 
@@ -25,7 +26,11 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-var errNotMatroska = errors.New("file is not a Matroska file")
+var (
+	errNotMatroska    = errors.New("file is not a Matroska file")
+	ebmlMemoryCache   = make(map[string]*EbmlMetadata)
+	ebmlMemoryCacheMu sync.RWMutex
+)
 
 // EbmlMetadata represents the JSON output from mkvmerge -J.
 type EbmlMetadata struct {
@@ -71,6 +76,16 @@ type EbmlChapterAtom struct {
 	TimeStart    int64         `json:"time_start" xml:"-"`
 	TimeStartXML string        `json:"-" xml:"ChapterTimeStart"`
 	Display      []EbmlDisplay `json:"display" xml:"ChapterDisplay"`
+}
+
+// Chapters represents the parsed chapters of a Matroska file.
+type Chapters struct {
+	Atoms []EbmlChapterAtom `json:"atoms"`
+}
+
+// Empty returns true if there are no chapters or if c is nil.
+func (c *Chapters) Empty() bool {
+	return c == nil || len(c.Atoms) == 0
 }
 
 // EbmlDisplay represents display info for a chapter atom.
@@ -315,16 +330,52 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 
 	cacheKey := fmt.Sprintf("mkvmerge:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
 
+	ebmlMemoryCacheMu.RLock()
+
+	cached, ok := ebmlMemoryCache[cacheKey]
+
+	ebmlMemoryCacheMu.RUnlock()
+
+	if ok {
+		return cached, nil
+	}
+
 	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
 		var metadata EbmlMetadata
 		if err := json.Unmarshal(cachedData, &metadata); err == nil {
 			metadata.countTypes()
 
+			ebmlMemoryCacheMu.Lock()
+			ebmlMemoryCache[cacheKey] = &metadata
+			ebmlMemoryCacheMu.Unlock()
+
 			return &metadata, nil
 		}
 	}
 
-	err = CheckForMatroska(filePath)
+	output, err := runMkvmergeJ(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var metadata EbmlMetadata
+	if err := json.Unmarshal(output, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ebml metadata: %w", err)
+	}
+
+	metadata.countTypes()
+
+	_ = cache.SetPersistent(cacheKey, output)
+
+	ebmlMemoryCacheMu.Lock()
+	ebmlMemoryCache[cacheKey] = &metadata
+	ebmlMemoryCacheMu.Unlock()
+
+	return &metadata, nil
+}
+
+func runMkvmergeJ(filePath string) ([]byte, error) {
+	err := CheckForMatroska(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -341,16 +392,7 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 		return nil, fmt.Errorf("failed to get ebml metadata: %w", err)
 	}
 
-	var metadata EbmlMetadata
-	if err := json.Unmarshal(output, &metadata); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal ebml metadata: %w", err)
-	}
-
-	metadata.countTypes()
-
-	_ = cache.SetPersistent(cacheKey, output)
-
-	return &metadata, nil
+	return output, nil
 }
 
 // ExtractTrack uses mkvextract to extract a specific track from a Matroska file.
@@ -986,8 +1028,28 @@ func parseTimeToNs(s string) (int64, error) {
 	return totalNs, nil
 }
 
+// getCachedChapters retrieves and decodes cached chapters, supporting fallback logic.
+func getCachedChapters(cacheKey string) (*Chapters, bool) {
+	cachedData, err := cache.GetPersistent(cacheKey)
+	if err != nil {
+		return nil, false
+	}
+
+	var chapters Chapters
+	if err := json.Unmarshal(cachedData, &chapters); err == nil {
+		return &chapters, true
+	}
+
+	var atoms []EbmlChapterAtom
+	if err := json.Unmarshal(cachedData, &atoms); err == nil {
+		return &Chapters{Atoms: atoms}, true
+	}
+
+	return nil, false
+}
+
 // ExtractChapters uses mkvextract to extract and parse chapters in XML format.
-func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
+func ExtractChapters(filePath string) (*Chapters, error) {
 	err := CheckForMatroska(filePath)
 	if err != nil {
 		return nil, err
@@ -1005,11 +1067,8 @@ func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
 
 	cacheKey := fmt.Sprintf("chapters:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
 
-	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
-		var chapters []EbmlChapterAtom
-		if err := json.Unmarshal(cachedData, &chapters); err == nil {
-			return chapters, nil
-		}
+	if chapters, ok := getCachedChapters(cacheKey); ok {
+		return chapters, nil
 	}
 
 	tmpFilePath, err := runMkvextractChapters(filePath)
@@ -1032,7 +1091,8 @@ func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
 		return nil, fmt.Errorf("failed to unmarshal chapters XML: %w", err)
 	}
 
-	chapters := parseXMLChapters(xmlCh)
+	atoms := parseXMLChapters(xmlCh)
+	chapters := &Chapters{Atoms: atoms}
 
 	if serialized, err := json.Marshal(chapters); err == nil {
 		_ = cache.SetPersistent(cacheKey, serialized)

@@ -1792,14 +1792,6 @@ func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func getChapters(ebml *matroska.EbmlMetadata) []matroska.EbmlChapterAtom {
-	if len(ebml.Chapters) == 0 || len(ebml.Chapters[0].Editions) == 0 {
-		return nil
-	}
-
-	return ebml.Chapters[0].Editions[0].Chapters
-}
-
 func formatNsToTime(ns int64) string {
 	ms := ns / 1000000
 	hours := ms / 3600000
@@ -1812,13 +1804,12 @@ func formatNsToTime(ns int64) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms)
 }
 
-func checkChaptersStartNonZero(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersStartNonZero(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
-	firstChapter := chapters[0]
+	firstChapter := chapters.Atoms[0]
 	if firstChapter.TimeStart != 0 {
 		timeStr := formatNsToTime(firstChapter.TimeStart)
 
@@ -1835,14 +1826,13 @@ func checkChaptersStartNonZero(ebml *matroska.EbmlMetadata) *CheckResult {
 	return nil
 }
 
-func checkChaptersNonMonotonic(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersNonMonotonic(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
 	var lastTime int64 = -1
-	for _, ch := range chapters {
+	for _, ch := range chapters.Atoms {
 		if lastTime >= 0 && ch.TimeStart < lastTime {
 			return &CheckResult{
 				Identifier: "matroska_chapters_non_monotonic",
@@ -1859,14 +1849,13 @@ func checkChaptersNonMonotonic(ebml *matroska.EbmlMetadata) *CheckResult {
 	return nil
 }
 
-func checkChaptersDuplicate(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersDuplicate(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
 	seenTimes := make(map[int64]bool)
-	for _, ch := range chapters {
+	for _, ch := range chapters.Atoms {
 		if seenTimes[ch.TimeStart] {
 			return &CheckResult{
 				Identifier: "matroska_chapters_duplicate",
@@ -1883,14 +1872,13 @@ func checkChaptersDuplicate(ebml *matroska.EbmlMetadata) *CheckResult {
 	return nil
 }
 
-func checkChaptersTooClose(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersTooClose(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
 	var lastTime int64 = -1
-	for _, ch := range chapters {
+	for _, ch := range chapters.Atoms {
 		if lastTime >= 0 {
 			diff := ch.TimeStart - lastTime
 			if diff < 10000000000 {
@@ -1910,9 +1898,8 @@ func checkChaptersTooClose(ebml *matroska.EbmlMetadata) *CheckResult {
 	return nil
 }
 
-func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata, chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
@@ -1921,7 +1908,7 @@ func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata) *CheckResult {
 		return nil
 	}
 
-	for _, ch := range chapters {
+	for _, ch := range chapters.Atoms {
 		if ch.TimeStart > duration {
 			return &CheckResult{
 				Identifier: "matroska_chapters_exceed_duration",
@@ -1971,15 +1958,14 @@ func checkConsecutiveDuplicateNames(currentNames, lastNames []string, timeStart 
 	return nil
 }
 
-func checkChaptersNameHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersNameHygiene(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
 	var lastNames []string
 
-	for i, ch := range chapters {
+	for i, ch := range chapters.Atoms {
 		if len(ch.Display) == 0 {
 			return &CheckResult{
 				Identifier: "matroska_chapters_name_hygiene",
@@ -2082,15 +2068,14 @@ func checkLanguagesInconsistent(firstLangs, currentLangs map[string]bool, timeSt
 	return nil
 }
 
-func checkChaptersLanguageHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+func checkChaptersLanguageHygiene(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
 	var firstLangs map[string]bool
 
-	for _, ch := range chapters {
+	for _, ch := range chapters.Atoms {
 		currentLangs, res := getChapterLanguages(ch)
 		if res != nil {
 			return res
@@ -2151,7 +2136,7 @@ func getVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
 	return 0
 }
 
-func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata) *CheckResult {
+func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata, chapters *matroska.Chapters) *CheckResult {
 	if filePath == "" {
 		return nil
 	}
@@ -2182,14 +2167,13 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		}
 	}
 
-	chapters := getChapters(ebml)
-	if len(chapters) == 0 {
+	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
 	}
 
 	var nonAligned []string
 
-	for i, ch := range chapters {
+	for i, ch := range chapters.Atoms {
 		if aligned, diff := isAligned(ch.TimeStart, keyframes); !aligned {
 			nonAligned = append(nonAligned, fmt.Sprintf(
 				"chapter %d at %s (nearest keyframe is off by %.3fs)",
