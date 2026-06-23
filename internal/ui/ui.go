@@ -56,7 +56,6 @@ var (
 	Header = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(purple).
-		MarginBottom(1).
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderBottom(true).
 		BorderForeground(purple)

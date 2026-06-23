@@ -53,6 +53,8 @@ You can also pass a JSON check report file to render it.`),
 		seasonEpisodes := make(map[seasonKey][]int)
 		seasonMetas := make(map[seasonKey]*metadata.Metadata)
 
+		ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
+
 		for _, filePath := range expandedArgs {
 			var (
 				currentReports []types.CheckReport
@@ -119,14 +121,14 @@ func runSeasonCompletenessChecks(seasonEpisodes map[seasonKey][]int, seasonMetas
 			continue
 		}
 
+		ui.Println("\n" + ui.Header.Render("AGGREGATE CHECK: SEASON COMPLETENESS"))
+
 		meta := seasonMetas[key]
 		res, err := mdbSearch.InteractiveSearch(meta, true)
 
 		if err == nil && res != nil {
 			completenessResults := checks.RunSeasonCompletenessCheck(res, key.season, episodes)
 			for _, r := range completenessResults {
-				ui.Println("\n" + ui.Header.Render("AGGREGATE CHECK: SEASON COMPLETENESS"))
-
 				if !r.Passed {
 					ui.Println(ui.FormatWarning(r.Warning))
 				} else {
@@ -189,8 +191,8 @@ func parseReports(data []byte) ([]types.CheckReport, error) {
 func collectCheckData(cmd *cobra.Command, filePath string) (types.CheckReport, *metadata.Metadata, error) {
 	filenameNoExt := filename.GetBaseName(filePath)
 
-	ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
-	ui.Println(ui.LabelValue("Target Name:", filenameNoExt))
+	ui.Println("\n" + ui.Header.Render("VERIFYING NEW TARGET"))
+	ui.Println(filenameNoExt)
 
 	match := filename.Parse(filenameNoExt)
 

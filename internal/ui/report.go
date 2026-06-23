@@ -12,7 +12,6 @@ import (
 func PrintInteractiveReport(report types.CheckReport, unattended bool) {
 	if report.Passed {
 		Println("\n" + IconCheck + Success.Render(" All systems nominal! The file fits the specification."))
-		Println()
 
 		return
 	}
