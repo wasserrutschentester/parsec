@@ -16,11 +16,12 @@ import (
 )
 
 var (
-	dtsRegex        = regexp.MustCompile(`\bDTS\b`)
-	adRegex         = regexp.MustCompile(`\bAD\b`)
-	wordSplitRegex  = regexp.MustCompile(`[\s/.,;()]+`)
-	assTimeRegex    = regexp.MustCompile(`^\d:\d\d:\d\d\.\d\d$`)
-	commonLangNames = map[string]string{
+	dtsRegex              = regexp.MustCompile(`\bDTS\b`)
+	adRegex               = regexp.MustCompile(`\bAD\b`)
+	wordSplitRegex        = regexp.MustCompile(`[\s/.,;()]+`)
+	assTimeRegex          = regexp.MustCompile(`^\d:\d\d:\d\d\.\d\d$`)
+	fontSeparatorReplacer = strings.NewReplacer(" ", "", "-", "", "_", "")
+	commonLangNames       = map[string]string{
 		"english": "en", "german": "de", "french": "fr", "spanish": "es",
 		"italian": "it", "japanese": "ja", "chinese": "zh", "korean": "ko",
 		"russian": "ru", "portuguese": "pt", "dutch": "nl", "polish": "pl",
@@ -850,15 +851,22 @@ type fontStyle struct {
 	Italic bool
 }
 
-func hasMatchingAttachment(font fontStyle, attachmentFonts []matroska.AttachmentFontInfo) bool {
-	normalizedFamily := normalizeFontName(font.Family)
-	for _, att := range attachmentFonts {
-		if normalizeFontName(att.PostScriptName) == normalizedFamily {
+type normalizedAttachmentFont struct {
+	normalizedPostScript string
+	normalizedFamily     string
+	italic               bool
+	weight               int
+	isVariable           bool
+}
+
+func hasMatchingAttachmentNorm(font fontStyle, normalizedFamily string, normAtts []normalizedAttachmentFont) bool {
+	for _, att := range normAtts {
+		if att.normalizedPostScript == normalizedFamily {
 			return true
 		}
 
-		if normalizeFontName(att.FamilyName) == normalizedFamily && att.Italic == font.Italic {
-			if att.IsVariable || matchWeight(att.Weight, font.Weight) {
+		if att.normalizedFamily == normalizedFamily && att.italic == font.Italic {
+			if att.isVariable || matchWeight(att.weight, font.Weight) {
 				return true
 			}
 		}
@@ -888,8 +896,20 @@ func formatMissingFontDesc(font fontStyle) string {
 func findMissingFonts(usedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo) []string {
 	var missing []string
 
+	normAtts := make([]normalizedAttachmentFont, len(attachmentFonts))
+	for i, att := range attachmentFonts {
+		normAtts[i] = normalizedAttachmentFont{
+			normalizedPostScript: normalizeFontName(att.PostScriptName),
+			normalizedFamily:     normalizeFontName(att.FamilyName),
+			italic:               att.Italic,
+			weight:               att.Weight,
+			isVariable:           att.IsVariable,
+		}
+	}
+
 	for font := range usedFonts {
-		if !hasMatchingAttachment(font, attachmentFonts) {
+		normalizedFamily := normalizeFontName(font.Family)
+		if !hasMatchingAttachmentNorm(font, normalizedFamily, normAtts) {
 			missing = append(missing, formatMissingFontDesc(font))
 		}
 	}
@@ -913,9 +933,7 @@ func matchWeight(attWeight, requestedWeight int) bool {
 
 func normalizeFontName(name string) string {
 	// Remove common separators and convert to lowercase for robust matching
-	r := strings.NewReplacer(" ", "", "-", "", "_", "")
-
-	return strings.ToLower(r.Replace(name))
+	return strings.ToLower(fontSeparatorReplacer.Replace(name))
 }
 
 func isFontAttachment(att matroska.EbmlAttachment) bool {
@@ -932,18 +950,31 @@ func isFontAttachment(att matroska.EbmlAttachment) bool {
 		strings.Contains(lowerType, "font-sfnt")
 }
 
-func isAttachmentUsed(attID int, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) bool {
-	for font := range allUsedFonts {
-		normalizedFamily := normalizeFontName(font.Family)
+type normalizedUsedFont struct {
+	family string
+	italic bool
+	weight int
+}
 
-		for _, fInfo := range attachmentFonts {
-			if fInfo.AttachmentID == attID {
-				if normalizeFontName(fInfo.PostScriptName) == normalizedFamily {
+type normalizedAttachmentFontID struct {
+	attachmentID         int
+	normalizedPostScript string
+	normalizedFamily     string
+	italic               bool
+	weight               int
+	isVariable           bool
+}
+
+func isAttachmentUsedNorm(attID int, normAtts []normalizedAttachmentFontID, normalizedUsed []normalizedUsedFont) bool {
+	for _, font := range normalizedUsed {
+		for _, fInfo := range normAtts {
+			if fInfo.attachmentID == attID {
+				if fInfo.normalizedPostScript == font.family {
 					return true
 				}
 
-				if normalizeFontName(fInfo.FamilyName) == normalizedFamily && fInfo.Italic == font.Italic {
-					if fInfo.IsVariable || matchWeight(fInfo.Weight, font.Weight) {
+				if fInfo.normalizedFamily == font.family && fInfo.italic == font.italic {
+					if fInfo.isVariable || matchWeight(fInfo.weight, font.weight) {
 						return true
 					}
 				}
@@ -955,10 +986,35 @@ func isAttachmentUsed(attID int, attachmentFonts []matroska.AttachmentFontInfo, 
 }
 
 func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
+	if len(attachments) == 0 {
+		return nil
+	}
+
 	var unused []string
 
+	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
+	for font := range allUsedFonts {
+		normalizedUsed = append(normalizedUsed, normalizedUsedFont{
+			family: normalizeFontName(font.Family),
+			italic: font.Italic,
+			weight: font.Weight,
+		})
+	}
+
+	normAtts := make([]normalizedAttachmentFontID, len(attachmentFonts))
+	for i, att := range attachmentFonts {
+		normAtts[i] = normalizedAttachmentFontID{
+			attachmentID:         att.AttachmentID,
+			normalizedPostScript: normalizeFontName(att.PostScriptName),
+			normalizedFamily:     normalizeFontName(att.FamilyName),
+			italic:               att.Italic,
+			weight:               att.Weight,
+			isVariable:           att.IsVariable,
+		}
+	}
+
 	for _, att := range attachments {
-		if isFontAttachment(att) && !isAttachmentUsed(att.ID, attachmentFonts, allUsedFonts) {
+		if isFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
 			unused = append(unused, att.FileName)
 		}
 	}
