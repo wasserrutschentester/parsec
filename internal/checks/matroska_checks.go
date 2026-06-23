@@ -19,6 +19,7 @@ var (
 	dtsRegex        = regexp.MustCompile(`\bDTS\b`)
 	adRegex         = regexp.MustCompile(`\bAD\b`)
 	wordSplitRegex  = regexp.MustCompile(`[\s/.,;()]+`)
+	assTimeRegex    = regexp.MustCompile(`^\d:\d\d:\d\d\.\d\d$`)
 	commonLangNames = map[string]string{
 		"english": "en", "german": "de", "french": "fr", "spanish": "es",
 		"italian": "it", "japanese": "ja", "chinese": "zh", "korean": "ko",
@@ -763,11 +764,9 @@ func validateEventLine(rest string, formatFields []string, definedStyles map[str
 func validateEventField(field, val string, definedStyles map[string]bool) []string {
 	var errors []string
 
-	timeRegex := regexp.MustCompile(`^\d:\d\d:\d\d\.\d\d$`)
-
 	switch field {
 	case "Start", "End":
-		if !timeRegex.MatchString(val) {
+		if !assTimeRegex.MatchString(val) {
 			errors = append(errors, "invalid time format '"+val+"'")
 		}
 	case "Style":
@@ -1335,8 +1334,8 @@ func splitDialogueEventLine(line string, fieldCount int) []string {
 func parseInlineTagsAndText(text string, initialStyle fontStyle, styleConfigs map[string]fontStyle, usedFonts map[fontStyle]bool) {
 	active := initialStyle
 	inTag := false
-	tagContent := ""
-	textRun := ""
+	tagStartIndex := -1
+	hasTextRunContent := false
 
 	for i := 0; i < len(text); i++ {
 		c := text[i]
@@ -1344,29 +1343,38 @@ func parseInlineTagsAndText(text string, initialStyle fontStyle, styleConfigs ma
 		case '{':
 			inTag = true
 
-			if len(strings.TrimSpace(textRun)) > 0 {
-				usedFonts[fontStyle{Family: active.Family, Weight: active.Weight, Italic: active.Italic}] = true
-				textRun = ""
+			if hasTextRunContent {
+				usedFonts[active] = true
+				hasTextRunContent = false
 			}
 
-			tagContent = ""
+			tagStartIndex = i + 1
 		case '}':
-			inTag = false
-
-			parseTagsBlock(tagContent, &active, initialStyle, styleConfigs)
-			tagContent = ""
+			inTag, active = handleTagEnd(inTag, tagStartIndex, text[:i], active, initialStyle, styleConfigs)
 		default:
-			if inTag {
-				tagContent += string(c)
-			} else {
-				textRun += string(c)
+			if !inTag && !isWhitespace(c) {
+				hasTextRunContent = true
 			}
 		}
 	}
 
-	if len(strings.TrimSpace(textRun)) > 0 {
-		usedFonts[fontStyle{Family: active.Family, Weight: active.Weight, Italic: active.Italic}] = true
+	if hasTextRunContent {
+		usedFonts[active] = true
 	}
+}
+
+func isWhitespace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
+}
+
+func handleTagEnd(inTag bool, tagStartIndex int, textPrefix string, active, initialStyle fontStyle, styleConfigs map[string]fontStyle) (bool, fontStyle) {
+	if inTag && tagStartIndex >= 0 {
+		parseTagsBlock(textPrefix[tagStartIndex:], &active, initialStyle, styleConfigs)
+
+		return false, active
+	}
+
+	return inTag, active
 }
 
 func parseTagsBlock(tagContent string, active *fontStyle, lineStyle fontStyle, styleConfigs map[string]fontStyle) {

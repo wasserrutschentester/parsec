@@ -48,6 +48,7 @@ You can also pass a JSON check report file to render it.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
+		ui.IsJSON = jsonOutputFlag
 
 		var allReports []types.CheckReport
 

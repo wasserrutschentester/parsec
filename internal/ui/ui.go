@@ -23,6 +23,9 @@ var (
 	// IsDebug enables debug output
 	IsDebug bool
 
+	// IsJSON suppresses non-JSON output and progress bars
+	IsJSON bool
+
 	// Base Colors
 	blue   = lipgloss.Color("51")
 	green  = lipgloss.Color("118")
@@ -658,4 +661,52 @@ func IsTerminal() bool {
 	}
 
 	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
+var lastPercent = -1
+
+// RenderProgressBar returns a styled progress bar string for the given percentage.
+func RenderProgressBar(percent int) string {
+	width := 30
+	completed := (percent * width) / 100
+
+	var bar strings.Builder
+	bar.WriteString(Info.Render("Demuxing: ["))
+
+	for i := range width {
+		if i < completed {
+			bar.WriteString(Success.Render("█"))
+		} else {
+			bar.WriteString(Muted.Render("░"))
+		}
+	}
+
+	bar.WriteString(Info.Render(fmt.Sprintf("] %3d%%", percent)))
+
+	return bar.String()
+}
+
+// ResetProgress resets the progress bar state.
+func ResetProgress() {
+	lastPercent = -1
+}
+
+// UpdateProgress prints a styled progress bar to stdout, overwriting the current line.
+func UpdateProgress(percent int) {
+	if IsJSON || !IsTerminal() {
+		return
+	}
+
+	if percent == lastPercent {
+		return
+	}
+
+	lastPercent = percent
+	fmt.Printf("\r\033[K%s", RenderProgressBar(percent))
+
+	if percent >= 100 {
+		fmt.Println()
+
+		lastPercent = -1
+	}
 }

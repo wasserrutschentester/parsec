@@ -2,6 +2,7 @@
 package matroska
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -10,6 +11,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -329,43 +331,120 @@ func GetEbmlMetadata(filePath string) (*EbmlMetadata, error) {
 
 // ExtractTrack uses mkvextract to extract a specific track from a Matroska file.
 func ExtractTrack(filePath string, trackID int) ([]byte, error) {
+	res, err := ExtractTracks(filePath, []int{trackID})
+	if err != nil {
+		return nil, err
+	}
+
+	return res[trackID], nil
+}
+
+// ExtractTracks uses mkvextract to extract multiple tracks from a Matroska file in one command.
+// It returns a map where the key is the track ID and the value is the extracted content.
+func ExtractTracks(filePath string, ids []int) (map[int][]byte, error) {
+	if len(ids) == 0 {
+		return make(map[int][]byte), nil
+	}
+
 	err := CheckForMatroska(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	tmpFile, err := os.CreateTemp("", "parsec-extract-*.ass")
+	tmpDir, err := os.MkdirTemp("", "parsec-tracks-*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
+		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
-
-	tmpFilePath := tmpFile.Name()
-	if err := tmpFile.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close temp file: %w", err)
-	}
-
 	defer func() {
-		_ = os.Remove(tmpFilePath)
+		_ = os.RemoveAll(tmpDir)
 	}()
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tracks %d:%s", ui.AnonymizePath(filePath), trackID, tmpFilePath))
-	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tracks", fmt.Sprintf("%d:%s", trackID, tmpFilePath))
+	args, idToPath := prepareExtractionArgs(filePath, ids, tmpDir)
 
-	_, err = cmd.Output()
+	ui.PrintDebug("Executing: mkvextract " + ui.AnonymizePath(filePath) + " tracks " + strings.Join(args[2:], " "))
+	cmd := exec.CommandContext(context.Background(), "mkvextract", args...)
+
+	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return nil, fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	var stderrBuf bytes.Buffer
+
+	cmd.Stderr = &stderrBuf
+
+	ui.ResetProgress()
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start mkvextract: %w", err)
+	}
+
+	parseExtractionProgress(stdoutPipe)
+
+	err = cmd.Wait()
+	if err != nil {
+		return nil, handleExtractionError(err, &stderrBuf)
+	}
+
+	return readExtractedTracks(idToPath)
+}
+
+func prepareExtractionArgs(filePath string, ids []int, tmpDir string) ([]string, map[int]string) {
+	args := make([]string, 0, 2+len(ids))
+	args = append(args, filePath, "tracks")
+	idToPath := make(map[int]string)
+
+	for _, id := range ids {
+		tmpPath := filepath.Join(tmpDir, fmt.Sprintf("track-%d.ass", id))
+		args = append(args, fmt.Sprintf("%d:%s", id, tmpPath))
+		idToPath[id] = tmpPath
+	}
+
+	return args, idToPath
+}
+
+func parseExtractionProgress(r io.Reader) {
+	scanner := bufio.NewScanner(r)
+	scanner.Split(splitCRLF)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if after, ok := strings.CutPrefix(line, "Progress:"); ok {
+			percentStr := strings.TrimSpace(after)
+			percentStr = strings.TrimSuffix(percentStr, "%")
+
+			if p, err := strconv.Atoi(percentStr); err == nil {
+				ui.UpdateProgress(p)
+			}
+		}
+	}
+}
+
+func handleExtractionError(err error, stderrBuf *bytes.Buffer) error {
+	if errors.Is(err, exec.ErrNotFound) {
+		return fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
+	}
+
+	if stderrBuf.Len() > 0 {
+		return fmt.Errorf("failed to extract tracks: %s (%w)", strings.TrimSpace(stderrBuf.String()), err)
+	}
+
+	return fmt.Errorf("failed to extract tracks: %w", err)
+}
+
+func readExtractedTracks(idToPath map[int]string) (map[int][]byte, error) {
+	results := make(map[int][]byte)
+
+	for id, path := range idToPath {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read extracted track %d: %w", id, err)
 		}
 
-		return nil, fmt.Errorf("failed to extract track %d: %w", trackID, err)
+		results[id] = content
 	}
 
-	content, err := os.ReadFile(tmpFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read extracted track: %w", err)
-	}
-
-	return content, nil
+	return results, nil
 }
 
 // ExtractAttachments uses mkvextract to extract multiple attachments from a Matroska file in one command.
@@ -885,4 +964,22 @@ func parseXMLChapters(xmlCh EbmlChapters) []EbmlChapterAtom {
 	}
 
 	return parsed
+}
+
+func splitCRLF(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+
+	for i, c := range data {
+		if c == '\r' || c == '\n' {
+			return i + 1, data[0:i], nil
+		}
+	}
+
+	if atEOF {
+		return len(data), data, nil
+	}
+
+	return 0, nil, nil
 }

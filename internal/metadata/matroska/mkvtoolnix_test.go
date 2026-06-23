@@ -145,3 +145,42 @@ func TestUnmarshalRealJSON(t *testing.T) {
 		t.Errorf("expected parsed pixel dimensions 1920x804, got %dx%d", w, h)
 	}
 }
+
+func TestSplitCRLF(t *testing.T) {
+	t.Parallel()
+
+	input := []byte("Extracting...\nProgress: 10%\rProgress: 50%\rProgress: 100%\n")
+	expected := []string{
+		"Extracting...",
+		"Progress: 10%",
+		"Progress: 50%",
+		"Progress: 100%",
+	}
+
+	var results []string
+
+	data := input
+	for len(data) > 0 {
+		advance, token, err := splitCRLF(data, false)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if advance == 0 {
+			break
+		}
+
+		results = append(results, string(token))
+		data = data[advance:]
+	}
+
+	if len(results) != len(expected) {
+		t.Fatalf("expected %d tokens, got %d: %v", len(expected), len(results), results)
+	}
+
+	for i, got := range results {
+		if got != expected[i] {
+			t.Errorf("token %d: expected %q, got %q", i, expected[i], got)
+		}
+	}
+}
