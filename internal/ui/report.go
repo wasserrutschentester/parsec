@@ -179,7 +179,7 @@ func PrintAggregatedSummary(reports []types.CheckReport, unattended bool) {
 	printOutlierIssues(outlierIssues, totalFiles, unattended)
 }
 
-func promptForFirstAffectedReport(reports []types.CheckReport, systemicIssues []*aggIssue, outlierIssues []*aggIssue, unattended bool) {
+func promptForFirstAffectedReport(reports []types.CheckReport, systemicIssues, outlierIssues []*aggIssue, unattended bool) {
 	if len(systemicIssues) == 0 {
 		return
 	}
@@ -205,7 +205,7 @@ func promptForFirstAffectedReport(reports []types.CheckReport, systemicIssues []
 	}
 }
 
-func findFirstAffectedReport(reports []types.CheckReport, systemicIssues []*aggIssue, outlierIssues []*aggIssue) *types.CheckReport {
+func findFirstAffectedReport(reports []types.CheckReport, systemicIssues, outlierIssues []*aggIssue) *types.CheckReport {
 	fileHasSystemic := make(map[string]bool)
 	fileHasOutlier := make(map[string]bool)
 

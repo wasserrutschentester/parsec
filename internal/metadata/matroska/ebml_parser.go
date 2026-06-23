@@ -1,11 +1,15 @@
 package matroska
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/bits"
 	"os"
+	"path/filepath"
+
+	"codeberg.org/upPollo/parsec/internal/cache"
 )
 
 // EBML ID Constants
@@ -125,7 +129,7 @@ func readUint(r io.Reader, size uint64) (uint64, error) {
 	return val, nil
 }
 
-func parseSeekChild(r io.Reader, id uint64, size uint64) (uint64, uint64, error) {
+func parseSeekChild(r io.Reader, id, size uint64) (uint64, uint64, error) {
 	switch id {
 	case idSeekID:
 		val, err := readUint(r, size)
@@ -274,7 +278,7 @@ func parseCueTrackPositions(r io.Reader, size uint64) (uint64, error) {
 	return track, nil
 }
 
-func parseCuePointChild(r io.Reader, id uint64, size uint64, targetTrack uint64) (uint64, bool, bool, error) {
+func parseCuePointChild(r io.Reader, id, size, targetTrack uint64) (uint64, bool, bool, error) {
 	switch id {
 	case idCueTime:
 		val, err := readUint(r, size)
@@ -303,7 +307,7 @@ func parseCuePointChild(r io.Reader, id uint64, size uint64, targetTrack uint64)
 	}
 }
 
-func parseCuePoint(r io.Reader, size uint64, targetTrack uint64) (uint64, bool, error) {
+func parseCuePoint(r io.Reader, size, targetTrack uint64) (uint64, bool, error) {
 	cuePointLimit := io.LimitReader(r, int64(size))
 
 	var (
@@ -345,7 +349,7 @@ func parseCuePoint(r io.Reader, size uint64, targetTrack uint64) (uint64, bool, 
 	return cueTime, hasTime && matches, nil
 }
 
-func parseCues(r io.Reader, size uint64, targetTrack uint64) ([]int64, error) {
+func parseCues(r io.Reader, size, targetTrack uint64) ([]int64, error) {
 	limitReader := io.LimitReader(r, int64(size))
 
 	var timestamps []int64
@@ -489,6 +493,38 @@ func ReadKeyframeTimestamps(filePath string, videoTrackNumber uint64, timestampS
 		scale = 1_000_000
 	}
 
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+
+	cacheKey := fmt.Sprintf("keyframes:%s:%d:%d:%d:%d", absPath, info.Size(), info.ModTime().UnixNano(), videoTrackNumber, scale)
+
+	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
+		var timestamps []int64
+		if err := json.Unmarshal(cachedData, &timestamps); err == nil {
+			return timestamps, nil
+		}
+	}
+
+	scaledTimestamps, err := parseCuesFromFile(filePath, videoTrackNumber, scale)
+	if err != nil {
+		return nil, err
+	}
+
+	if serialized, err := json.Marshal(scaledTimestamps); err == nil {
+		_ = cache.SetPersistent(cacheKey, serialized)
+	}
+
+	return scaledTimestamps, nil
+}
+
+func parseCuesFromFile(filePath string, videoTrackNumber uint64, scale int64) ([]int64, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)

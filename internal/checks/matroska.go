@@ -1,10 +1,14 @@
 package checks
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -319,7 +323,24 @@ func runSingleIterationChecks(
 }
 
 func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
-	var fontFonts []matroska.AttachmentFontInfo
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+
+	cacheKey := fmt.Sprintf("font_mapping:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
+
+	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
+		var fontFonts []matroska.AttachmentFontInfo
+		if err := json.Unmarshal(cachedData, &fontFonts); err == nil {
+			return fontFonts
+		}
+	}
 
 	var fontIDs []int
 
@@ -333,8 +354,20 @@ func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) []ma
 	}
 
 	if len(fontIDs) == 0 {
-		return fontFonts
+		return nil
 	}
+
+	fontFonts := extractAndParseFonts(filePath, fontIDs, idToAtt)
+
+	if serialized, err := json.Marshal(fontFonts); err == nil {
+		_ = cache.SetPersistent(cacheKey, serialized)
+	}
+
+	return fontFonts
+}
+
+func extractAndParseFonts(filePath string, fontIDs []int, idToAtt map[int]matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
+	var fontFonts []matroska.AttachmentFontInfo
 
 	extracted, err := matroska.ExtractAttachments(filePath, fontIDs)
 	if err != nil {

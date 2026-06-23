@@ -167,6 +167,8 @@ func renameCommit(filePath, newPath, newName string) error {
 
 	oldInfo, statErr := os.Stat(filePath)
 
+	ebml, _ := matroska.GetEbmlMetadata(filePath)
+
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
@@ -177,7 +179,7 @@ func renameCommit(filePath, newPath, newName string) error {
 	newInfo, statErr2 := os.Stat(newPath)
 
 	if statErr == nil && statErr2 == nil {
-		renameMigrateCache(oldAbsPath, newAbsPath, oldInfo, newInfo)
+		renameMigrateCache(oldAbsPath, newAbsPath, oldInfo, newInfo, ebml)
 	}
 
 	ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
@@ -185,7 +187,7 @@ func renameCommit(filePath, newPath, newName string) error {
 	return nil
 }
 
-func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo) {
+func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo, ebml *matroska.EbmlMetadata) {
 	oldMkvKey := fmt.Sprintf("mkvmerge:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
 	newMkvKey := fmt.Sprintf("mkvmerge:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
 
@@ -195,6 +197,43 @@ func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo) {
 	newMediaKey := fmt.Sprintf("mediainfo:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
 
 	_ = cache.MovePersistent(oldMediaKey, newMediaKey)
+
+	// Migrate chapters cache
+	oldChaptersKey := fmt.Sprintf("chapters:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newChaptersKey := fmt.Sprintf("chapters:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldChaptersKey, newChaptersKey)
+
+	// Migrate font mapping cache
+	oldFontKey := fmt.Sprintf("font_mapping:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newFontKey := fmt.Sprintf("font_mapping:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldFontKey, newFontKey)
+
+	// Migrate keyframes cache if video track is present
+	if ebml != nil {
+		var videoTrackNum uint64
+
+		for _, track := range ebml.Tracks {
+			if track.Type == "video" {
+				videoTrackNum = uint64(track.ID)
+
+				break
+			}
+		}
+
+		if videoTrackNum != 0 {
+			scale := ebml.Container.Properties.TimestampScale
+			if scale <= 0 {
+				scale = 1_000_000
+			}
+
+			oldKey := fmt.Sprintf("keyframes:%s:%d:%d:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano(), videoTrackNum, scale)
+			newKey := fmt.Sprintf("keyframes:%s:%d:%d:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano(), videoTrackNum, scale)
+
+			_ = cache.MovePersistent(oldKey, newKey)
+		}
+	}
 }
 
 func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainfo.MediaInfo, error) {

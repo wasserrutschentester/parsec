@@ -528,14 +528,14 @@ func ExtractAttachments(filePath string, ids []int) (map[int][]byte, error) {
 
 // AttachmentFontInfo represents an attached font face.
 type AttachmentFontInfo struct {
-	AttachmentID   int
-	FileName       string
-	FamilyName     string   // e.g., "Arial"
-	PostScriptName string   // e.g., "Arial-BoldMT"
-	FullNames      []string // e.g., ["Arial Bold"]
-	Weight         int      // Standard weight value (100-900)
-	Italic         bool     // True if italic
-	IsVariable     bool     // True if font is a Variable Font (can satisfy multiple weights)
+	AttachmentID   int      `json:"attachment_id"`
+	FileName       string   `json:"file_name"`
+	FamilyName     string   `json:"family_name"`      // e.g., "Arial"
+	PostScriptName string   `json:"post_script_name"` // e.g., "Arial-BoldMT"
+	FullNames      []string `json:"full_names"`       // e.g., ["Arial Bold"]
+	Weight         int      `json:"weight"`           // Standard weight value (100-900)
+	Italic         bool     `json:"italic"`           // True if italic
+	IsVariable     bool     `json:"is_variable"`      // True if font is a Variable Font (can satisfy multiple weights)
 }
 
 func parseWeightFromNames(subfamily, fullName string) int {
@@ -924,6 +924,25 @@ func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
 		return nil, err
 	}
 
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+
+	cacheKey := fmt.Sprintf("chapters:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
+
+	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
+		var chapters []EbmlChapterAtom
+		if err := json.Unmarshal(cachedData, &chapters); err == nil {
+			return chapters, nil
+		}
+	}
+
 	tmpFilePath, err := runMkvextractChapters(filePath)
 	if err != nil {
 		return nil, err
@@ -944,7 +963,13 @@ func ExtractChapters(filePath string) ([]EbmlChapterAtom, error) {
 		return nil, fmt.Errorf("failed to unmarshal chapters XML: %w", err)
 	}
 
-	return parseXMLChapters(xmlCh), nil
+	chapters := parseXMLChapters(xmlCh)
+
+	if serialized, err := json.Marshal(chapters); err == nil {
+		_ = cache.SetPersistent(cacheKey, serialized)
+	}
+
+	return chapters, nil
 }
 
 func runMkvextractChapters(filePath string) (string, error) {
