@@ -173,3 +173,29 @@ func TestIsCheckEnabledSpecialValues(t *testing.T) {
 		t.Errorf("IsCheckEnabled(matroska_subtitle_inline_fonts) with [] = false, want true")
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestGetOriginalLanguage(t *testing.T) {
+	viper.Reset()
+	InitDefaults()
+
+	// Default state: empty
+	if GetOriginalLanguage() != "" {
+		t.Errorf("GetOriginalLanguage() = %v, want empty string (default)", GetOriginalLanguage())
+	}
+
+	// Set global value
+	viper.Set("original_language", "en")
+
+	if GetOriginalLanguage() != "en" {
+		t.Errorf("GetOriginalLanguage() = %v, want en", GetOriginalLanguage())
+	}
+
+	// Test preset override
+	viper.Set("preset.my_preset.original_language", "fr")
+	SetPreset("my_preset")
+
+	if GetOriginalLanguage() != "fr" {
+		t.Errorf("GetOriginalLanguage() = %v, want fr", GetOriginalLanguage())
+	}
+}

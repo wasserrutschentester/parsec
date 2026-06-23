@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/checks"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
@@ -26,6 +27,7 @@ var (
 	jsonOutputFlag        bool
 	individualReportsFlag bool
 	jobsFlag              int
+	originalLanguageFlag  string
 )
 
 type seasonKey struct {
@@ -53,6 +55,10 @@ You can also pass a JSON check report file to render it.`),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
 		ui.IsJSON = jsonOutputFlag
+
+		if originalLanguageFlag != "" {
+			viper.Set("original_language", originalLanguageFlag)
+		}
 
 		var allReports []types.CheckReport
 
@@ -305,6 +311,7 @@ func init() {
 	checkCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	checkCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	checkCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "Override original language")
 	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
 	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
 	checkCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Verbose output")

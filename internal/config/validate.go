@@ -69,6 +69,7 @@ var expectedTypes = map[string]string{
 	"group":                 "string",
 	"source":                "string",
 	"preferred_language":    "string",
+	"original_language":     "string",
 	"subbed_tagging":        "bool",
 	"audio_description":     "bool",
 	"template":              "string",
@@ -361,7 +362,7 @@ func validateSpecificKeys(k string, v any, fullKey string) []string {
 		if templateStr, ok := v.(string); ok {
 			errors = append(errors, validateTemplateKeys(templateStr, fullKey)...)
 		}
-	case "preferred_language":
+	case "preferred_language", "original_language":
 		if langStr, ok := v.(string); ok {
 			errors = append(errors, validateLanguage(langStr, fullKey)...)
 		}
