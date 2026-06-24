@@ -2,8 +2,10 @@ package checks
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -12,8 +14,11 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
+
+var getMediaInfo = mediainfo.Get
 
 var (
 	dtsRegex              = regexp.MustCompile(`\bDTS\b`)
@@ -2270,6 +2275,107 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 			Severity:   "warning",
 			Actual:     strings.Join(nonAligned, "; "),
 		}
+	}
+
+	return nil
+}
+
+func checkCommentaryChannels(tracks []matroska.EbmlTrack) *CheckResult {
+	res := &CheckResult{
+		Identifier: "matroska_commentary_channels",
+		Warning:    "Commentary audio track has more than 2 channels",
+		Passed:     true,
+	}
+
+	for i := range tracks {
+		track := &tracks[i]
+
+		if track.Type == "audio" && track.Properties.Commentary {
+			if track.Properties.AudioChannels > 2 {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("Commentary track has %d channels (expected <= 2)", track.Properties.AudioChannels)))
+			}
+		}
+	}
+
+	if !res.Passed {
+		return res
+	}
+
+	return nil
+}
+
+func isLosslessCodec(miTrack *mediainfo.Track) bool {
+	codec := metadata.AudioCodecName(miTrack.Format, miTrack.FormatProfile, miTrack.FormatAdditionalFeatures)
+	c := strings.ToUpper(codec)
+
+	return strings.Contains(c, "TRUEHD") || strings.Contains(c, "DTS-HD MA") || strings.Contains(c, "FLAC") || strings.Contains(c, "PCM") || strings.Contains(c, "ALAC")
+}
+
+func checkCommentaryBitrate(filePath string, tracks []matroska.EbmlTrack) *CheckResult {
+	isRemux := strings.Contains(strings.ToUpper(filepath.Base(filePath)), "REMUX")
+	if isRemux {
+		return nil
+	}
+
+	mi, err := getMediaInfo(filePath)
+	if err != nil {
+		return nil
+	}
+
+	miAudioTracks := make(map[string]*mediainfo.Track)
+
+	for i := range mi.Media.Tracks {
+		t := &mi.Media.Tracks[i]
+
+		if t.Type == "Audio" {
+			miAudioTracks[t.ID] = t
+		}
+	}
+
+	res := &CheckResult{
+		Identifier: "matroska_commentary_bitrate",
+		Warning:    "Commentary audio track bitrate exceeds 128 kbps",
+		Passed:     true,
+	}
+
+	for i := range tracks {
+		if tr := verifyCommentaryTrackBitrate(&tracks[i], miAudioTracks); tr != nil {
+			res.Passed = false
+			res.Severity = "warning"
+			res.Tracks = append(res.Tracks, *tr)
+		}
+	}
+
+	if !res.Passed {
+		return res
+	}
+
+	return nil
+}
+
+func verifyCommentaryTrackBitrate(track *matroska.EbmlTrack, miAudioTracks map[string]*mediainfo.Track) *TrackCheckResult {
+	if track.Type != "audio" || !track.Properties.Commentary {
+		return nil
+	}
+
+	idStr := strconv.Itoa(track.Properties.Number)
+
+	miTrack, ok := miAudioTracks[idStr]
+	if !ok {
+		return nil
+	}
+
+	if isLosslessCodec(miTrack) {
+		return nil
+	}
+
+	if miTrack.BitRate > 0 && miTrack.BitRate > 128000 {
+		bitrateKbps := float64(miTrack.BitRate) / 1000.0
+		tr := ebmlTrackToResult(track, false, fmt.Sprintf("Commentary track bitrate is %.1f kbps (expected <= 128 kbps)", bitrateKbps))
+
+		return &tr
 	}
 
 	return nil

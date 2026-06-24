@@ -101,6 +101,8 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_video_cropping",
 		"matroska_track_delay",
 		"matroska_truehd_compatibility",
+		"matroska_commentary_channels",
+		"matroska_commentary_bitrate",
 		"matroska_chapters_start_non_zero",
 		"matroska_chapters_non_monotonic",
 		"matroska_chapters_duplicate",
@@ -193,7 +195,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *m
 			extractedTracks)
 	}
 
-	runGlobalMatroskaChecks(ebml, meta, agg, allUsedFonts, attachmentFonts)
+	runGlobalMatroskaChecks(filePath, ebml, meta, agg, allUsedFonts, attachmentFonts)
 	runChaptersChecks(filePath, ebml, xmlChapters, agg)
 
 	return agg.ToSlice()
@@ -225,7 +227,7 @@ func batchExtractTracksIfNeeded(filePath string, tracks []matroska.EbmlTrack) ma
 	return extractedTracks
 }
 
-func runGlobalMatroskaChecks(ebml *matroska.EbmlMetadata, meta *metadata.Metadata, agg *trackResultAggregator, allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo) {
+func runGlobalMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, meta *metadata.Metadata, agg *trackResultAggregator, allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo) {
 	if config.IsCheckEnabled("matroska_title_hygiene") {
 		agg.Add(checkTitleHygiene(ebml, meta))
 	}
@@ -244,6 +246,14 @@ func runGlobalMatroskaChecks(ebml *matroska.EbmlMetadata, meta *metadata.Metadat
 
 	if config.IsCheckEnabled("matroska_font_filename_compliance") {
 		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentFonts))
+	}
+
+	if config.IsCheckEnabled("matroska_commentary_channels") {
+		agg.Add(checkCommentaryChannels(ebml.Tracks))
+	}
+
+	if config.IsCheckEnabled("matroska_commentary_bitrate") {
+		agg.Add(checkCommentaryBitrate(filePath, ebml.Tracks))
 	}
 }
 

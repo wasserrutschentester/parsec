@@ -194,6 +194,8 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_title_hygiene":               true,
 	"matroska_app_hygiene":                 true,
 	"matroska_truehd_compatibility":        true,
+	"matroska_commentary_channels":         true,
+	"matroska_commentary_bitrate":          true,
 	"matroska_chapters_start_non_zero":     true,
 	"matroska_chapters_non_monotonic":      true,
 	"matroska_chapters_duplicate":          true,

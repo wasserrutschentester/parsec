@@ -11,6 +11,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
 //nolint:funlen,paralleltest // comprehensive test cases for diverse matroska track configurations; depends on shared global state
@@ -1362,5 +1363,240 @@ func TestCheckUnusedFontsStyleAware(t *testing.T) {
 	res := checkUnusedFonts(attachments, attachmentFonts, allUsedFonts)
 	if res == nil || res.Passed {
 		t.Error("Expected Arial-Italic.ttf to be flagged as unused since only Regular is used")
+	}
+}
+
+//nolint:funlen,paralleltest // table-driven test cases mutating config and stubs
+func TestCheckCommentaryChannels(t *testing.T) {
+	config.InitDefaults()
+
+	tests := []struct {
+		name     string
+		tracks   []matroska.EbmlTrack
+		expected bool // true if passed, false if failed
+	}{
+		{
+			name: "stereo commentary passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:        1,
+						Commentary:    true,
+						AudioChannels: 2,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mono commentary passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:        1,
+						Commentary:    true,
+						AudioChannels: 1,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "5.1 commentary fails",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:        1,
+						Commentary:    true,
+						AudioChannels: 6,
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "5.1 non-commentary passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:        1,
+						Commentary:    false,
+						AudioChannels: 6,
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := checkCommentaryChannels(tt.tracks)
+			if tt.expected && res != nil {
+				t.Errorf("Expected pass, got warning: %v", res.Warning)
+			}
+
+			if !tt.expected && res == nil {
+				t.Error("Expected warning, got pass")
+			}
+		})
+	}
+}
+
+//nolint:funlen,paralleltest // table-driven test cases mutating config and stubs
+func TestCheckCommentaryBitrate(t *testing.T) {
+	config.InitDefaults()
+
+	// Stub getMediaInfo
+	oldGetMediaInfo := getMediaInfo
+	defer func() { getMediaInfo = oldGetMediaInfo }()
+
+	var mockTracks []mediainfo.Track
+
+	getMediaInfo = func(_ string) (*mediainfo.MediaInfo, error) {
+		return &mediainfo.MediaInfo{
+			Media: mediainfo.Media{
+				Tracks: mockTracks,
+			},
+		}, nil
+	}
+
+	tests := []struct {
+		name     string
+		filePath string
+		tracks   []matroska.EbmlTrack
+		miTracks []mediainfo.Track
+		expected bool // true if passed, false if failed
+	}{
+		{
+			name:     "encode with low bitrate commentary passes",
+			filePath: "Movie.2024.1080p.x264-GRP.mkv",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+					},
+				},
+			},
+			miTracks: []mediainfo.Track{
+				{
+					ID:      "1",
+					Type:    "Audio",
+					Format:  "AAC",
+					BitRate: 96000,
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "encode with high bitrate commentary fails",
+			filePath: "Movie.2024.1080p.x264-GRP.mkv",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+					},
+				},
+			},
+			miTracks: []mediainfo.Track{
+				{
+					ID:      "1",
+					Type:    "Audio",
+					Format:  "AAC",
+					BitRate: 192000,
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "remux with high bitrate commentary passes",
+			filePath: "Movie.2024.1080p.REMUX.mkv",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+					},
+				},
+			},
+			miTracks: []mediainfo.Track{
+				{
+					ID:      "1",
+					Type:    "Audio",
+					Format:  "AC-3",
+					BitRate: 192000,
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "lossless commentary on encode passes",
+			filePath: "Movie.2024.1080p.x264-GRP.mkv",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+					},
+				},
+			},
+			miTracks: []mediainfo.Track{
+				{
+					ID:            "1",
+					Type:          "Audio",
+					Format:        "FLAC",
+					FormatProfile: "",
+					BitRate:       320000,
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "non-commentary high bitrate passes",
+			filePath: "Movie.2024.1080p.x264-GRP.mkv",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: false,
+					},
+				},
+			},
+			miTracks: []mediainfo.Track{
+				{
+					ID:      "1",
+					Type:    "Audio",
+					Format:  "AAC",
+					BitRate: 640000,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockTracks = tt.miTracks
+
+			res := checkCommentaryBitrate(tt.filePath, tt.tracks)
+			if tt.expected && res != nil {
+				t.Errorf("Expected pass, got warning: %v", res.Warning)
+			}
+
+			if !tt.expected && res == nil {
+				t.Error("Expected warning, got pass")
+			}
+		})
 	}
 }
