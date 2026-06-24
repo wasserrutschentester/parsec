@@ -245,7 +245,7 @@ func TestMetadata_String(t *testing.T) {
 				EpisodeTitle: "Title",
 				Group:        "GRP",
 			},
-			want: "Show.2024-05-24.Title-GRP",
+			want: "Show.Title-GRP",
 		},
 		{
 			name: "Repack",

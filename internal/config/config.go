@@ -14,7 +14,7 @@ var defaultConfig string
 
 // InitDefaults initializes the default configuration values in viper.
 func InitDefaults() {
-	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
+	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("original_language", "")
 	viper.SetDefault("subbed_tagging", true)

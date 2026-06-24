@@ -317,12 +317,9 @@ func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb
 		if episodeResult.Name != "" {
 			meta.EpisodeTitle = episodeResult.Name
 			meta.Season = episodeResult.Season
-			// Note: this overrides episodes with just the FIRST found episode's ID if we only found one,
-			// wait, mdbSearch.FindEpisode should probably return all episodes if there are multiple.
-			// I'll fix this in the next replacement. Let's just leave it for a sec.
-			// Actually we will handle this in FindEpisode by returning a combined EpisodeResult.
-			// For now, assume it returns the unified object.
-			// However, since we matched them, we should probably just keep meta.Episodes intact unless we only searched by title/date.
+			meta.Date = episodeResult.Airdate
+
+			// only set episode numbers if empty
 			if len(meta.Episodes) == 0 {
 				meta.Episodes = []int{episodeResult.Episode}
 			}
