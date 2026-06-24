@@ -103,6 +103,8 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_truehd_compatibility",
 		"matroska_commentary_channels",
 		"matroska_commentary_bitrate",
+		"matroska_commentary_prefix",
+		"matroska_commentary_pairing",
 		"matroska_chapters_start_non_zero",
 		"matroska_chapters_non_monotonic",
 		"matroska_chapters_duplicate",
@@ -254,6 +256,14 @@ func runGlobalMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, meta 
 
 	if config.IsCheckEnabled("matroska_commentary_bitrate") {
 		agg.Add(checkCommentaryBitrate(filePath, ebml.Tracks))
+	}
+
+	if config.IsCheckEnabled("matroska_commentary_prefix") {
+		agg.Add(checkCommentaryPrefix(ebml.Tracks))
+	}
+
+	if config.IsCheckEnabled("matroska_commentary_pairing") {
+		agg.Add(checkCommentaryPairing(ebml.Tracks))
 	}
 }
 

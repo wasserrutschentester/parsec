@@ -24,6 +24,10 @@ func TestRunTrackChecks(t *testing.T) {
 		"matroska_title_hygiene",
 		"matroska_app_hygiene",
 		"matroska_track_delay",
+		"matroska_commentary_channels",
+		"matroska_commentary_bitrate",
+		"matroska_commentary_prefix",
+		"matroska_commentary_pairing",
 	})
 
 	tests := []struct {
@@ -1590,6 +1594,294 @@ func TestCheckCommentaryBitrate(t *testing.T) {
 			mockTracks = tt.miTracks
 
 			res := checkCommentaryBitrate(tt.filePath, tt.tracks)
+			if tt.expected && res != nil {
+				t.Errorf("Expected pass, got warning: %v", res.Warning)
+			}
+
+			if !tt.expected && res == nil {
+				t.Error("Expected warning, got pass")
+			}
+		})
+	}
+}
+
+//nolint:funlen,paralleltest // table-driven test cases mutating config and stubs
+func TestCheckCommentaryPrefix(t *testing.T) {
+	config.InitDefaults()
+
+	tests := []struct {
+		name     string
+		tracks   []matroska.EbmlTrack
+		expected bool // true if passed, false if failed
+	}{
+		{
+			name: "standard commentary prefix passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "dialect prefixed commentary passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "French / Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "multi-slash dialect and SDH prefixed commentary passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "English / SDH / Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "isolated score prefix passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "Isolated score with commentary by composer Mark Isham",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "The Hysteria Continues prefix passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "Commentary by The Hysteria Continues",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "non-standard prefix fails",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "Audio commentary by John Carpenter",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty name fails",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Name:       "",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "non-commentary passes with any name",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: false,
+						Name:       "Audio commentary by John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := checkCommentaryPrefix(tt.tracks)
+			if tt.expected && res != nil {
+				t.Errorf("Expected pass, got warning: %v", res.Warning)
+			}
+
+			if !tt.expected && res == nil {
+				t.Error("Expected warning, got pass")
+			}
+		})
+	}
+}
+
+//nolint:funlen,paralleltest // table-driven test cases mutating config and stubs
+func TestCheckCommentaryPairing(t *testing.T) {
+	config.InitDefaults()
+
+	tests := []struct {
+		name     string
+		tracks   []matroska.EbmlTrack
+		expected bool // true if passed, false if failed
+	}{
+		{
+			name: "perfect pairing passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Language:   "eng",
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     2,
+						Commentary: true,
+						Language:   "eng",
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pairing ignoring dialect and SDH passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Language:   "fre",
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     2,
+						Commentary: true,
+						Language:   "fre",
+						Name:       "French / Commentary by director John Carpenter (SDH)",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pairing with multiple slashes and SDH prefix passes",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Language:   "eng",
+						Name:       "English / Commentary by director John Carpenter",
+					},
+				},
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     2,
+						Commentary: true,
+						Language:   "eng",
+						Name:       "English / SDH / Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "missing audio commentary pairing fails",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Language:   "eng",
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "mismatched language passes if names match",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "audio",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: true,
+						Language:   "eng",
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     2,
+						Commentary: true,
+						Language:   "fre",
+						Name:       "Commentary by director John Carpenter",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "non-commentary subtitle does not require pairing",
+			tracks: []matroska.EbmlTrack{
+				{
+					Type: "subtitles",
+					Properties: matroska.EbmlTrackProperties{
+						Number:     1,
+						Commentary: false,
+						Language:   "eng",
+						Name:       "English",
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := checkCommentaryPairing(tt.tracks)
 			if tt.expected && res != nil {
 				t.Errorf("Expected pass, got warning: %v", res.Warning)
 			}

@@ -2380,3 +2380,99 @@ func verifyCommentaryTrackBitrate(track *matroska.EbmlTrack, miAudioTracks map[s
 
 	return nil
 }
+
+var commentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
+
+func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
+	res := &CheckResult{
+		Identifier: "matroska_commentary_prefix",
+		Warning:    "Commentary track name does not start with a standard prefix",
+		Passed:     true,
+	}
+
+	for i := range tracks {
+		track := &tracks[i]
+
+		if track.Properties.Commentary {
+			name := track.Properties.Name
+			if name == "" {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, "Commentary track has no name"))
+
+				continue
+			}
+
+			if !commentaryPrefixRegex.MatchString(name) {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("Track name %q does not start with standard prefix (e.g., \"Commentary by ...\")", name)))
+			}
+		}
+	}
+
+	if !res.Passed {
+		return res
+	}
+
+	return nil
+}
+
+func extractCoreCommentaryName(name string) string {
+	lowerName := strings.ToLower(name)
+	if idx := strings.Index(lowerName, "commentary by"); idx != -1 {
+		name = name[idx:]
+	} else if idx := strings.Index(lowerName, "isolated score"); idx != -1 {
+		name = name[idx:]
+	} else {
+		if idx := strings.Index(name, "/"); idx != -1 {
+			name = name[idx+1:]
+		}
+	}
+
+	name = strings.TrimSpace(name)
+	name = strings.ReplaceAll(name, "(SDH)", "")
+	name = strings.ReplaceAll(name, "[SDH]", "")
+	name = strings.ReplaceAll(name, "SDH", "")
+
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
+	res := &CheckResult{
+		Identifier: "matroska_commentary_pairing",
+		Warning:    "Commentary subtitle track name does not match any audio commentary track name",
+		Passed:     true,
+	}
+
+	var audioCommentaries []string
+
+	for i := range tracks {
+		track := &tracks[i]
+
+		if track.Type == "audio" && track.Properties.Commentary {
+			core := extractCoreCommentaryName(track.Properties.Name)
+			audioCommentaries = append(audioCommentaries, core)
+		}
+	}
+
+	for i := range tracks {
+		track := &tracks[i]
+
+		if track.Type == "subtitles" && track.Properties.Commentary {
+			core := extractCoreCommentaryName(track.Properties.Name)
+
+			if !slices.Contains(audioCommentaries, core) {
+				res.Passed = false
+				res.Severity = "warning"
+				res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("Commentary subtitle %q does not match any audio commentary track", track.Properties.Name)))
+			}
+		}
+	}
+
+	if !res.Passed {
+		return res
+	}
+
+	return nil
+}
