@@ -2476,3 +2476,317 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 
 	return nil
 }
+
+func isSRTSubtitles(track matroska.EbmlTrack) bool {
+	return track.Type == "subtitles" && strings.Contains(track.Codec, "SRT")
+}
+
+func checkSRTValidation(track matroska.EbmlTrack, content []byte) *CheckResult {
+	if len(content) == 0 {
+		return nil
+	}
+
+	contentStr := string(content)
+	contentStr = strings.TrimPrefix(contentStr, "\ufeff")
+	contentStr = strings.ReplaceAll(contentStr, "\r\n", "\n")
+	lines := strings.Split(contentStr, "\n")
+
+	parser := &srtParser{
+		timestampRegex: regexp.MustCompile(`^\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}`),
+	}
+
+	for i := range lines {
+		line := strings.TrimSpace(lines[i])
+		parser.feedLine(line, i+1)
+	}
+
+	if parser.state == 2 {
+		parser.validateCurrentBlock()
+	}
+
+	return buildSRTCheckResult(&track, parser)
+}
+
+func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckResult {
+	if len(parser.syntaxErrors) > 0 || len(parser.tagErrors) > 0 {
+		var msgs []string
+
+		if len(parser.syntaxErrors) > 0 {
+			msgs = append(msgs, "SRT syntax errors:\n  "+strings.Join(limitErrorList(parser.syntaxErrors), "\n  "))
+		}
+
+		if len(parser.tagErrors) > 0 {
+			msgs = append(msgs, "Invalid HTML tags:\n  "+strings.Join(limitErrorList(parser.tagErrors), "\n  "))
+		}
+
+		if len(parser.posWarnings) > 0 {
+			msgs = append(msgs, "Alignment/positioning detected (should use ASS):\n  "+strings.Join(limitErrorList(parser.posWarnings), "\n  "))
+		}
+
+		warning := strings.Join(msgs, "\n")
+
+		return newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, warning)
+	}
+
+	if len(parser.posWarnings) > 0 {
+		warning := "Alignment/positioning detected (should use ASS):\n  " + strings.Join(limitErrorList(parser.posWarnings), "\n  ")
+
+		return newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, warning)
+	}
+
+	return nil
+}
+
+type srtParser struct {
+	state             int
+	blockStartLineNum int
+	posWarnings       []string
+	syntaxErrors      []string
+	tagErrors         []string
+	currentBlockLines []string
+	timestampRegex    *regexp.Regexp
+}
+
+func (p *srtParser) feedLine(line string, lineNum int) {
+	if line == "" {
+		if p.state == 2 {
+			p.validateCurrentBlock()
+
+			p.state = 0
+		}
+
+		return
+	}
+
+	switch p.state {
+	case 0:
+		if _, err := strconv.Atoi(line); err == nil {
+			p.state = 1
+			p.blockStartLineNum = lineNum
+		} else if p.timestampRegex.MatchString(line) {
+			p.state = 2
+			p.blockStartLineNum = lineNum
+
+			p.checkTimestamp(line, lineNum)
+		} else {
+			p.syntaxErrors = append(p.syntaxErrors, fmt.Sprintf("Line %d: expected sequence number, got %q", lineNum, line))
+		}
+	case 1:
+		if p.timestampRegex.MatchString(line) {
+			p.state = 2
+
+			p.checkTimestamp(line, lineNum)
+		} else {
+			p.syntaxErrors = append(p.syntaxErrors, fmt.Sprintf("Line %d: expected timestamp line, got %q", lineNum, line))
+
+			p.state = 0
+		}
+	case 2:
+		p.currentBlockLines = append(p.currentBlockLines, line)
+	}
+}
+
+func (p *srtParser) validateCurrentBlock() {
+	tagErr, hasPos, posWarn := validateSRTBlock(p.currentBlockLines, p.blockStartLineNum)
+
+	if tagErr != "" {
+		p.tagErrors = append(p.tagErrors, tagErr)
+	}
+
+	if hasPos {
+		p.posWarnings = append(p.posWarnings, posWarn)
+	}
+
+	p.currentBlockLines = nil
+}
+
+func (p *srtParser) checkTimestamp(line string, lineNum int) {
+	parts := strings.Split(line, "-->")
+	if len(parts) < 2 {
+		return
+	}
+
+	endPart := strings.TrimSpace(parts[1])
+	endTimestampRegex := regexp.MustCompile(`^\d{2}:\d{2}:\d{2}[,.]\d{3}`)
+
+	loc := endTimestampRegex.FindStringIndex(endPart)
+	if loc == nil {
+		return
+	}
+
+	remaining := strings.TrimSpace(endPart[loc[1]:])
+	if remaining != "" {
+		p.posWarnings = append(p.posWarnings, fmt.Sprintf("Line %d: contains display coordinates/metadata %q", lineNum, remaining))
+	}
+}
+
+func validateSRTBlock(currentBlockLines []string, blockStartLineNum int) (tagErr string, hasPos bool, posWarn string) {
+	if len(currentBlockLines) == 0 {
+		return "", false, ""
+	}
+
+	blockText := strings.Join(currentBlockLines, "\n")
+
+	if ok, errMsg := validateSRTText(blockText); !ok {
+		tagErr = fmt.Sprintf("Block starting at line %d: %s", blockStartLineNum, errMsg)
+	}
+
+	if strings.Contains(blockText, "{\\") {
+		hasPos = true
+		posWarn = fmt.Sprintf("Block starting at line %d: contains inline styling/positioning tag \"%s\"", blockStartLineNum, extractASSTags(blockText))
+	}
+
+	return tagErr, hasPos, posWarn
+}
+
+func limitErrorList(errs []string) []string {
+	if len(errs) <= 5 {
+		return errs
+	}
+
+	truncated := make([]string, 0, 6)
+	truncated = append(truncated, errs[:5]...)
+	truncated = append(truncated, fmt.Sprintf("... and %d more", len(errs)-5))
+
+	return truncated
+}
+
+func extractASSTags(line string) string {
+	start := strings.Index(line, "{")
+	if start == -1 {
+		return ""
+	}
+
+	end := strings.Index(line[start:], "}")
+	if end == -1 {
+		return line[start:]
+	}
+
+	return line[start : start+end+1]
+}
+
+func parseHTMLTagName(text string, startIdx int) (string, int) {
+	i := startIdx
+	n := len(text)
+
+	for i < n && ((text[i] >= 'a' && text[i] <= 'z') || (text[i] >= 'A' && text[i] <= 'Z') || (text[i] >= '0' && text[i] <= '9')) {
+		i++
+	}
+
+	return strings.ToLower(text[startIdx:i]), i
+}
+
+func parseHTMLTagAttributes(text string, startIdx int) (bool, int) {
+	i := startIdx
+	n := len(text)
+	isSelfClosing := false
+
+	for i < n && text[i] != '>' {
+		if text[i] == '/' {
+			isSelfClosing = true
+		}
+
+		i++
+	}
+
+	return isSelfClosing, i
+}
+
+func parseHTMLTag(text string, startIdx int) (string, bool, bool, int, string) {
+	i := startIdx + 1 // skip '<'
+	n := len(text)
+	isClose := false
+
+	if i < n && text[i] == '/' {
+		isClose = true
+		i++
+	}
+
+	tagName, nextIdx := parseHTMLTagName(text, i)
+	i = nextIdx
+
+	isSelfClosing, nextIdx := parseHTMLTagAttributes(text, i)
+	i = nextIdx
+
+	if i >= n {
+		return "", false, false, i, "malformed or unclosed HTML tag starting with '<'"
+	}
+
+	i++ // consume '>'
+
+	if tagName == "" {
+		return "", false, false, i, "empty HTML-like tag '<>'"
+	}
+
+	return tagName, isClose, isSelfClosing, i, ""
+}
+
+func processSRTTag(tagName string, isClose bool, stack []string) ([]string, string) {
+	if isClose {
+		if len(stack) == 0 {
+			return nil, fmt.Sprintf("closing tag '</%s>' without opening tag", tagName)
+		}
+
+		top := stack[len(stack)-1]
+		if top != tagName {
+			return nil, fmt.Sprintf("mismatched closing tag '</%s>' (expected '</%s>')", tagName, top)
+		}
+
+		return stack[:len(stack)-1], ""
+	}
+
+	return append(stack, tagName), ""
+}
+
+func isAllowedSRTTag(tag string) bool {
+	return tag == "b" || tag == "i" || tag == "u" || tag == "font" || tag == "br"
+}
+
+func handleHTMLTag(text string, idx int, stack []string) ([]string, int, bool, string) {
+	tagName, isClose, isSelfClosing, nextIdx, errMsg := parseHTMLTag(text, idx)
+	if errMsg != "" {
+		return nil, nextIdx, false, errMsg
+	}
+
+	if !isAllowedSRTTag(tagName) {
+		return nil, nextIdx, false, fmt.Sprintf("disallowed HTML-like tag '<%s>' (broken conversion from WebVTT or other format)", tagName)
+	}
+
+	if tagName == "br" || isSelfClosing {
+		return stack, nextIdx, true, ""
+	}
+
+	newStack, err := processSRTTag(tagName, isClose, stack)
+	if err != "" {
+		return nil, nextIdx, false, err
+	}
+
+	return newStack, nextIdx, true, ""
+}
+
+func validateSRTText(text string) (bool, string) {
+	var stack []string
+
+	i := 0
+	n := len(text)
+
+	for i < n {
+		if text[i] == '<' {
+			newStack, nextIdx, ok, errMsg := handleHTMLTag(text, i, stack)
+			if !ok {
+				return false, errMsg
+			}
+
+			stack = newStack
+			i = nextIdx
+		} else {
+			i++
+		}
+	}
+
+	if len(stack) > 0 {
+		return false, fmt.Sprintf("unclosed HTML tag '%s'", stack[len(stack)-1])
+	}
+
+	return true, ""
+}

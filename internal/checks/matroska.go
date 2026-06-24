@@ -90,6 +90,7 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_subtitle_format",
 		"matroska_subtitle_fonts",
 		"matroska_subtitle_inline_fonts",
+		"matroska_srt_validation",
 		"matroska_unused_fonts",
 		"matroska_ass_script_info",
 		"matroska_ass_styles",
@@ -204,7 +205,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *m
 }
 
 func batchExtractTracksIfNeeded(filePath string, tracks []matroska.EbmlTrack) map[int][]byte {
-	needsExtraction := config.IsCheckEnabled("matroska_subtitle_inline_fonts") || config.IsCheckEnabled("matroska_ass_events")
+	needsExtraction := config.IsCheckEnabled("matroska_subtitle_inline_fonts") || config.IsCheckEnabled("matroska_ass_events") || config.IsCheckEnabled("matroska_srt_validation")
 	if !needsExtraction {
 		return nil
 	}
@@ -212,8 +213,10 @@ func batchExtractTracksIfNeeded(filePath string, tracks []matroska.EbmlTrack) ma
 	var extractTrackIDs []int
 
 	for _, track := range tracks {
-		if isRelevantTrack(track) && isASSSubtitles(track) {
-			extractTrackIDs = append(extractTrackIDs, track.ID)
+		if isRelevantTrack(track) {
+			if isASSSubtitles(track) || isSRTSubtitles(track) {
+				extractTrackIDs = append(extractTrackIDs, track.ID)
+			}
 		}
 	}
 
@@ -436,6 +439,18 @@ func runIndividualTrackChecks(
 		results = append(results, checkOriginalLanguageConsistency(track, langHasOriginalFlag))
 	}
 
+	results = append(results, runSubtitleSpecificChecks(filePath, track, videoWidth, videoHeight, allUsedFonts, attachmentFonts, extractedTracks)...)
+
+	return results
+}
+
+func runSubtitleSpecificChecks(
+	filePath string, track matroska.EbmlTrack, videoWidth, videoHeight int,
+	allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo,
+	extractedTracks map[int][]byte,
+) []*CheckResult {
+	var results []*CheckResult
+
 	if config.IsCheckEnabled("matroska_subtitle_format") {
 		results = append(results, checkSubtitleFormat(track))
 	}
@@ -447,6 +462,14 @@ func runIndividualTrackChecks(
 	// ASS specific checks
 	if isASSSubtitles(track) {
 		results = append(results, runASSSpecificChecks(filePath, track, videoWidth, videoHeight, allUsedFonts, attachmentFonts, extractedTracks)...)
+	}
+
+	// SRT specific checks
+	if isSRTSubtitles(track) && config.IsCheckEnabled("matroska_srt_validation") {
+		content, err := getTrackContent(filePath, track.ID, extractedTracks)
+		if err == nil {
+			results = append(results, checkSRTValidation(track, content))
+		}
 	}
 
 	if track.Type == "subtitles" && config.IsCheckEnabled("matroska_zlib_compression") {

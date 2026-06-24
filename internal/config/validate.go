@@ -182,6 +182,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_subtitle_format":             true,
 	"matroska_subtitle_fonts":              true,
 	"matroska_subtitle_inline_fonts":       true,
+	"matroska_srt_validation":              true,
 	"matroska_ass_script_info":             true,
 	"matroska_ass_styles":                  true,
 	"matroska_ass_events":                  true,

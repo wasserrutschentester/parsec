@@ -60,19 +60,8 @@ func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
 			continue
 		}
 
-		if isASSValidation(res.Identifier) {
-			for _, t := range res.Tracks {
-				header := fmt.Sprintf("      Track %s (%s/%s)", t.ID, t.Type, t.Codec)
-				if t.Language != "" {
-					header += fmt.Sprintf(" [%s]", t.Language)
-				}
-
-				Println(Muted.Render(header + ":"))
-
-				for line := range strings.SplitSeq(t.Warning, "\n") {
-					Println("      - " + line)
-				}
-			}
+		if isListTrackReport(res.Identifier) {
+			printListTrackReport(res)
 
 			continue
 		}
@@ -81,8 +70,35 @@ func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
 	}
 }
 
-func isASSValidation(id string) bool {
-	return id == "matroska_ass_styles" || id == "matroska_ass_events" || id == "matroska_ass_script_info"
+func printListTrackReport(res types.CheckResult) {
+	printListTrackReportWithIndent(res.Identifier, res.Tracks, "      ")
+}
+
+func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheckResult, indent string) {
+	for _, t := range tracks {
+		header := fmt.Sprintf("%sTrack %s (%s/%s)", indent, t.ID, t.Type, t.Codec)
+		if t.Language != "" {
+			header += fmt.Sprintf(" [%s]", t.Language)
+		}
+
+		Println(Muted.Render(header + ":"))
+
+		for line := range strings.SplitSeq(t.Warning, "\n") {
+			if identifier == "matroska_srt_validation" {
+				if !strings.HasPrefix(line, "  ") && strings.HasSuffix(line, ":") {
+					Println(indent + Warning.Render(line))
+				} else {
+					Println(indent + "  - " + strings.TrimSpace(line))
+				}
+			} else {
+				Println(indent + "- " + line)
+			}
+		}
+	}
+}
+
+func isListTrackReport(id string) bool {
+	return id == "matroska_ass_styles" || id == "matroska_ass_events" || id == "matroska_ass_script_info" || id == "matroska_srt_validation"
 }
 
 func printUnexpectedDiff(res types.CheckResult) {
@@ -337,19 +353,8 @@ func printTracksDetailsIndented(identifier string, tracks []types.TrackCheckResu
 		return
 	}
 
-	if isASSValidation(identifier) {
-		for _, t := range tracks {
-			header := fmt.Sprintf("          Track %s (%s/%s)", t.ID, t.Type, t.Codec)
-			if t.Language != "" {
-				header += fmt.Sprintf(" [%s]", t.Language)
-			}
-
-			Println(Muted.Render(header + ":"))
-
-			for line := range strings.SplitSeq(t.Warning, "\n") {
-				Println("          - " + line)
-			}
-		}
+	if isListTrackReport(identifier) {
+		printListTrackReportWithIndent(identifier, tracks, "          ")
 	} else {
 		widths := calculateTrackTableWidths(tracks)
 		tableStr := formatTrackTable(tracks, widths)

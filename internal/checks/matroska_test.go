@@ -20,6 +20,7 @@ func TestRunTrackChecks(t *testing.T) {
 	viper.Set("disabled_checks", []string{
 		"matroska_subtitle_inline_fonts",
 		"matroska_ass_events",
+		"matroska_srt_validation",
 		"matroska_video_cropping",
 		"matroska_title_hygiene",
 		"matroska_app_hygiene",
@@ -1890,5 +1891,123 @@ func TestCheckCommentaryPairing(t *testing.T) {
 				t.Error("Expected warning, got pass")
 			}
 		})
+	}
+}
+
+type srtTestCase struct {
+	name             string
+	content          string
+	expectedPassed   bool
+	expectedSeverity string
+	containsWarning  string
+}
+
+func getSRTTestCases() []srtTestCase {
+	return []srtTestCase{
+		{
+			name:           "Valid SRT with allowed tags and multiline block",
+			content:        "1\n00:00:01,000 --> 00:00:04,500\nWelcome to the <b>SRT\nSpecification Guide</b>.\n\n2\n00:00:05,100 --> 00:00:08,200\nYou can use <i>italics</i> or <font color=\"red\">colored text</font>.\n",
+			expectedPassed: true,
+		},
+		{
+			name:             "Invalid SRT with WebVTT tags",
+			content:          "1\n00:00:01,000 --> 00:00:04,500\n<v Speaker 1>Welcome to the guide.</v>\n",
+			expectedPassed:   false,
+			expectedSeverity: "warning",
+			containsWarning:  "disallowed HTML-like tag '<v>'",
+		},
+		{
+			name:             "Invalid SRT with unclosed tag",
+			content:          "1\n00:00:01,000 --> 00:00:04,500\nWelcome to the <b>SRT Specification Guide.\n",
+			expectedPassed:   false,
+			expectedSeverity: "warning",
+			containsWarning:  "unclosed HTML tag 'b'",
+		},
+		{
+			name:             "SRT with alignment info throws info level warning",
+			content:          "1\n00:00:01,000 --> 00:00:04,500\n{\\an8}Welcome to the top center!\n",
+			expectedPassed:   false,
+			expectedSeverity: "info",
+			containsWarning:  "Alignment/positioning detected (should use ASS)",
+		},
+		{
+			name:             "SRT with coordinate metadata on timestamp line throws info level warning",
+			content:          "1\n00:00:01,000 --> 00:00:04,500 X1:100 Y1:50\nWelcome to the coordinates guide.\n",
+			expectedPassed:   false,
+			expectedSeverity: "info",
+			containsWarning:  "contains display coordinates/metadata",
+		},
+		{
+			name:             "SRT with 6 invalid HTML tags limits to 5 results and adds more message",
+			content:          "1\n00:00:01,000 --> 00:00:04,500\n<c>1</c>\n\n2\n00:00:05,000 --> 00:00:08,000\n<d>2</d>\n\n3\n00:00:09,000 --> 00:00:12,000\n<e>3</e>\n\n4\n00:00:13,000 --> 00:00:16,000\n<f>4</f>\n\n5\n00:00:17,000 --> 00:00:20,000\n<g>5</g>\n\n6\n00:00:21,000 --> 00:00:24,000\n<h>6</h>\n",
+			expectedPassed:   false,
+			expectedSeverity: "warning",
+			containsWarning:  "... and 1 more",
+		},
+		{
+			name:           "Valid SRT starting with UTF-8 BOM",
+			content:        "\ufeff1\n00:00:01,000 --> 00:00:04,500\nWelcome to the guide.\n",
+			expectedPassed: true,
+		},
+	}
+}
+
+func TestCheckSRTValidation(t *testing.T) {
+	t.Parallel()
+
+	track := matroska.EbmlTrack{
+		ID:    1,
+		Type:  "subtitles",
+		Codec: "S_TEXT/SRT",
+		Properties: matroska.EbmlTrackProperties{
+			Number:   1,
+			Language: "eng",
+		},
+	}
+
+	tests := getSRTTestCases()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			res := checkSRTValidation(track, []byte(tt.content))
+			assertSRTTestCase(t, tt, res)
+		})
+	}
+}
+
+func assertSRTTestCase(t *testing.T, tt srtTestCase, res *CheckResult) {
+	t.Helper()
+
+	if tt.expectedPassed {
+		if res != nil {
+			t.Errorf("Expected nil check result, got: %+v (Warning: %s)", res, res.Warning)
+		}
+
+		return
+	}
+
+	if res == nil {
+		t.Fatalf("Expected non-nil check result")
+	}
+
+	if res.Passed {
+		t.Errorf("Expected Passed=false, got %v", res.Passed)
+	}
+
+	if res.Severity != tt.expectedSeverity {
+		t.Errorf("Expected Severity=%q, got %q", tt.expectedSeverity, res.Severity)
+	}
+
+	actualWarning := ""
+	if len(res.Tracks) > 0 {
+		actualWarning = res.Tracks[0].Warning
+	} else {
+		actualWarning = res.Warning
+	}
+
+	if tt.containsWarning != "" && !strings.Contains(actualWarning, tt.containsWarning) {
+		t.Errorf("Expected warning to contain %q, got %q", tt.containsWarning, actualWarning)
 	}
 }
