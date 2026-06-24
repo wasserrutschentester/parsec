@@ -121,6 +121,82 @@ func TestRunTrackChecks(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Valid audio commentary ordering (strictly by notability, ignoring language)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 2}},
+				{ID: 3, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Commentary: true, Name: "Commentary by Director", Number: 3}},
+				{ID: 4, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Actor", Number: 4}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid audio commentary ordering (Actor before Director)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Actor", Number: 2}},
+				{ID: 3, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Director", Number: 3}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid subtitle commentary ordering (end group, grouped by language, then notability)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+				{ID: 3, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, Number: 3}},
+				{ID: 4, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Director", Number: 4}},
+				{ID: 5, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Actor", Number: 5}},
+				{ID: 6, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng", Commentary: true, Name: "Commentary by Director", Number: 6}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid subtitle commentary ordering (Commentary before Standard)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Director", Number: 2}},
+				{ID: 3, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 3}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid subtitle commentary ordering (Standard Commentary before SDH Commentary)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+				{ID: 3, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Director", Number: 3}},
+				{ID: 4, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, HearingImpaired: true, Name: "SDH / Commentary by Director", Number: 4}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid subtitle commentary ordering (SDH Commentary before Standard Commentary)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+				{ID: 3, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, HearingImpaired: true, Name: "SDH / Commentary by Director", Number: 3}},
+				{ID: 4, Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger", Commentary: true, Name: "Commentary by Director", Number: 4}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid audio descriptive ordering (Standard Audio before Descriptive Audio)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", VisualImpaired: true, Name: "AD", Number: 2}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid audio descriptive ordering (Descriptive Audio before Standard Audio)",
+			tracks: []matroska.EbmlTrack{
+				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", VisualImpaired: true, Name: "AD", Number: 1}},
+				{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 2}},
+			},
+			wantErr: true,
+		},
+		{
 			name: "Missing default flags for first non-special subs track",
 			tracks: []matroska.EbmlTrack{
 				{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, Number: 1}},

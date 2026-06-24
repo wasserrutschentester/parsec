@@ -39,17 +39,36 @@ var (
 )
 
 const (
-	priorityPreferred = int64(1) << 60
-	priorityOriginal  = int64(2) << 60
-	priorityMul       = int64(3) << 60
-	priorityOther     = int64(4) << 60
+	// Bit positions for layout packing
+	bitCommentary = 62
+	bitCategory   = 60
+	bitBaseLang   = 35
+	bitFullLang   = 10
 
-	propScoreCommentary  = int64(30)
-	propScoreAD          = int64(10)
-	propScoreDescription = int64(20)
+	// Bit masks for properties (ensures values don't overflow their allocated bits)
+	maskCategory = int64(0x3)       // 2 bits (0..3)
+	maskLangName = int64(0x1FFFFFF) // 25 bits
+	maskProperty = int64(0x3FF)     // 10 bits
+
+	// Language/Category values (bits 60..61)
+	categoryPreferred = int64(0)
+	categoryOriginal  = int64(1)
+	categoryMul       = int64(2)
+	categoryOther     = int64(3)
+
+	priorityPreferred = categoryPreferred << bitCategory
+	priorityOriginal  = categoryOriginal << bitCategory
+	priorityMul       = categoryMul << bitCategory
+	priorityOther     = categoryOther << bitCategory
+
+	priorityCommentaryBit = int64(1) << bitCommentary
+
+	// Property scores (bits 0..9)
 	propScoreForced      = int64(0)
-	propScoreSDH         = int64(20)
-	propScoreStandard    = int64(10)
+	propScoreStandard    = int64(2)
+	propScoreAD          = int64(4)
+	propScoreSDH         = int64(4)
+	propScoreDescription = int64(6)
 )
 
 func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int64, lastPriority *int64, description string, reportedTracks map[int]bool) *CheckResult {
@@ -84,12 +103,14 @@ func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int64, lastP
 }
 
 func formatPriority(p int64) string {
-	cat := (p >> 60) & 0xF
-	base := (p >> 35) & 0x1FFFFFF
-	full := (p >> 10) & 0x1FFFFFF
-	typ := p & 0x3FF
+	commentary := (p >> bitCommentary) & 1
+	cat := (p >> bitCategory) & maskCategory
+	catField := (commentary << 2) | cat
+	base := (p >> bitBaseLang) & maskLangName
+	full := (p >> bitFullLang) & maskLangName
+	typ := p & maskProperty
 
-	return fmt.Sprintf("0x%X:%07X:%07X:%03X", cat, base, full, typ)
+	return fmt.Sprintf("0x%X:%07X:%07X:%03X", catField, base, full, typ)
 }
 
 func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
@@ -1580,11 +1601,56 @@ func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywo
 	return nil
 }
 
+var (
+	directorKeywords = []string{"director", "filmmaker", "producer", "writer"}
+	dpKeywords       = []string{"cinematographer", "photography", " dp "}
+	actorKeywords    = []string{"actor", "cast", "crew", "lead"}
+)
+
+func containsAny(s string, keywords []string) bool {
+	for _, kw := range keywords {
+		if strings.Contains(s, kw) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getCommentarySubPriority(name string) int64 {
+	nameLower := strings.ToLower(name)
+
+	switch {
+	case containsAny(nameLower, directorKeywords):
+		return 0
+	case containsAny(nameLower, dpKeywords):
+		return 1
+	case containsAny(nameLower, actorKeywords):
+		return 2
+	default:
+		return 3
+	}
+}
+
 func getTrackPriority(track matroska.EbmlTrack) int64 {
 	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
-	propertyScore := calculatePropertyScore(track)
+	propertyScore := calculatePropertyScore(track) & maskProperty
+
+	if track.Properties.Commentary {
+		commentaryScore := getCommentaryPriority(track)
+		if track.Type == "audio" {
+			// Audio commentaries: Grouped at the absolute end, ordered strictly by notability & properties (ignoring language)
+			return commentaryScore + propertyScore
+		}
+		// Subtitle commentaries: Grouped at the absolute end, ordered by language, then notability & subtitle properties
+		return commentaryScore + langScore + propertyScore
+	}
 
 	return langScore + propertyScore
+}
+
+func getCommentaryPriority(track matroska.EbmlTrack) int64 {
+	return priorityCommentaryBit + (getCommentarySubPriority(track.Properties.Name) << 3)
 }
 
 func calculateLangScore(lang string, isOriginal bool) int64 {
@@ -1608,12 +1674,42 @@ func calculateLangScore(lang string, isOriginal bool) int64 {
 	baseTag, _ := tag.Base()
 	baseName := metadata.LanguageName(baseTag.String())
 
-	langScore += calcScore(baseName) << 35
+	langScore += (calcScore(baseName) & maskLangName) << bitBaseLang
 	if baseName != langName {
-		langScore += calcScore(langName) << 10
+		langScore += (calcScore(langName) & maskLangName) << bitFullLang
 	}
 
 	return langScore
+}
+
+func calculateAudioPropertyScore(props matroska.EbmlTrackProperties) int64 {
+	switch {
+	case props.VisualImpaired:
+		return propScoreAD
+	case props.TextDescriptions:
+		return propScoreDescription
+	default:
+		return propScoreStandard
+	}
+}
+
+func calculateSubtitlePropertyScore(props matroska.EbmlTrackProperties) int64 {
+	var score int64
+
+	switch {
+	case props.Forced:
+		score = propScoreForced
+	case props.HearingImpaired:
+		score = propScoreSDH
+	default:
+		score = propScoreStandard
+	}
+
+	if !props.TextSubtitles {
+		score++
+	}
+
+	return score
 }
 
 func calculatePropertyScore(track matroska.EbmlTrack) int64 {
@@ -1621,27 +1717,9 @@ func calculatePropertyScore(track matroska.EbmlTrack) int64 {
 
 	switch track.Type {
 	case "audio":
-		switch {
-		case track.Properties.Commentary:
-			propertyScore = propScoreCommentary
-		case track.Properties.VisualImpaired:
-			propertyScore = propScoreAD
-		case track.Properties.TextDescriptions:
-			propertyScore = propScoreDescription
-		}
+		propertyScore = calculateAudioPropertyScore(track.Properties)
 	case "subtitles":
-		switch {
-		case track.Properties.Forced:
-			propertyScore = propScoreForced
-		case track.Properties.HearingImpaired:
-			propertyScore = propScoreSDH
-		default:
-			propertyScore = propScoreStandard
-		}
-		// text subs should be before image based subs
-		if !track.Properties.TextSubtitles {
-			propertyScore++
-		}
+		propertyScore = calculateSubtitlePropertyScore(track.Properties)
 	}
 
 	return propertyScore
