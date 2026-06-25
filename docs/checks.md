@@ -85,22 +85,45 @@ This document lists all individual checks performed by the `parsec check` comman
 
 ### Matroska / EBML Checks
 
+These checks ensure the Matroska container and its components meet quality standards.
+
+#### Container & Audio
+
 | Check | Function | Identifier | Configurable | Description |
 |-------|----------|------------|--------------|-------------|
 | Matroska Format | `checkMatroskaFormat` | `matroska_ebml_error` | No | Verifies that the file is a valid Matroska (MKV) container. |
-| Track Order | `checkTrackOrder` | `matroska_track_order` | Yes | Ensures audio and subtitle tracks are sorted by language priority (preferred_language, Original, and then alphabetical by English language and dialect name ) and type (Forced, Standard/Default, SDH/Descriptive, Commentary). |
+| Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
+| Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
+| Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
+| Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
+| TrueHD Compatibility | `checkTrueHDCompatibility` | `matroska_truehd_compatibility` | Yes | Verifies that any Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/E-AC3) of the same language. |
+| Commentary Channels | `checkCommentaryChannels` | `matroska_commentary_channels` | Yes | Warns if a commentary audio track has more than 2 channels. |
+| Commentary Bitrate | `checkCommentaryBitrate` | `matroska_commentary_bitrate` | Yes | Warns if a commentary audio track has a bitrate exceeding 128 kbps (except for lossless codecs). |
+| Commentary Prefix | `checkCommentaryPrefix` | `matroska_commentary_prefix` | Yes | Verifies commentary track names start with a standard prefix like "Commentary by...". |
+| Commentary Pairing | `checkCommentaryPairing` | `matroska_commentary_pairing` | Yes | Verifies that subtitle commentary tracks have a corresponding audio commentary track. |
+
+#### Tracks
+
+| Check | Function | Identifier | Configurable | Description |
+|-------|----------|------------|--------------|-------------|
 | Language Tags | `validateTrackBasics` | `matroska_language_tag` | Yes | Verifies that all tracks have a valid ISO language tag. |
 | 'mul' Track Name | `validateTrackBasics` | `matroska_multi_lang` | Yes | Ensures that tracks with language 'mul' (Multiple) have a Name field listing at least two full language names. |
-| Original Language Consistency | `checkOriginalLanguageConsistency` | `matroska_original_language` | Yes | Verifies that the `OriginalLanguage` flag is applied consistently. |
 | Name Quality | `checkTrackNameQuality` | `matroska_name_quality` | Yes | Detects "junk" keywords (STEREO, ENCODED, SURROUND, etc.) in track names. |
 | Simple Codecs | `checkTrackNameCodecs` | `matroska_name_codecs` | Yes | Detects simple codecs (AC3, AAC, DTS) in track names that are easily identified from technical metadata. |
 | Redundant Language | `checkTrackNameRedundantLang` | `matroska_name_redundant_lang` | Yes | Flags full language names (e.g., "German") in the track title that match the track's language tag. |
-| Flag Keywords | `checkNameKeywords` | `matroska_name_keywords` | Yes | Enforces strict two-way correlation between flags and keywords (SDH, Forced, Commentary, Descriptive/AD) in track names. |
+| Original Language Consistency | `checkOriginalLanguageConsistency` | `matroska_original_language` | Yes | Verifies that the `OriginalLanguage` flag is applied consistently. |
 | Duplicate Tracks | `checkDuplicateTracks` | `matroska_duplicate_tracks` | Yes | Identifies identical tracks (same language, flags, and name). |
+| Flag Keywords | `checkNameKeywords` | `matroska_name_keywords` | Yes | Enforces strict two-way correlation between flags and keywords (SDH, Forced, Commentary, Descriptive/AD) in track names. |
 | Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures specialized tracks (Forced, SDH, Commentary, etc.) are NOT marked as Default, and that the first standard track per language IS marked as Default. |
+| Track Order | `checkTrackOrder` | `matroska_track_order` | Yes | Ensures audio and subtitle tracks are sorted by language priority (preferred_language, Original, and then alphabetical by English language and dialect name ) and type (Forced, Standard/Default, SDH/Descriptive, Commentary). |
+
+#### Subtitles
+
+| Check | Function | Identifier | Configurable | Description |
+|-------|----------|------------|--------------|-------------|
 | Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all text subtitle tracks are in SRT or ASS format. All other text formats should be converted to SRT. |
 | Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | Yes | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle track *Styles* are included as attachments. Matching is done using internal font names (via `sfnt`), making it independent of attachment filenames. |
-| Subtitle Inline Fonts | `checkSubtitleInlineFonts` | `matroska_subtitle_inline_fonts` | No | Verifies fonts used in *inline tags* within SSA/ASS subtitle tracks. Uses internal font names for matching. Requires demuxing the track, which makes this check significantly slower. Disabled by default. |
+| Subtitle Inline Fonts | `checkSubtitleInlineFonts` | `matroska_subtitle_inline_fonts` | Yes | Verifies fonts used in *inline tags* within SSA/ASS subtitle tracks. Uses internal font names for matching. Requires demuxing the track, which makes this check significantly slower. Disabled by default. |
 | SRT Validation | `checkSRTValidation` | `matroska_srt_validation` | Yes | Verifies that SRT subtitle tracks contain valid HTML formatting tags, all tags are properly nested and closed, and throws a warning if positioning/alignment information is present (which should use ASS instead). Disabled by default. |
 | Unused Fonts | `checkUnusedFonts` | `matroska_unused_fonts` | Yes | Identifies font attachments that are not used by any subtitle track. Uses internal font names to ensure accuracy. |
 | Font Filename Compliance | `checkFontFilenameCompliance` | `matroska_font_filename_compliance` | Yes | Verifies that the filename of a font attachment matches its internal font name (Family or Full Name). |
@@ -108,10 +131,11 @@ This document lists all individual checks performed by the `parsec check` comman
 | ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | Yes | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
 | ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | Yes | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. |
 | Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
-| Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
-| Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
-| Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
-| TrueHD Compatibility | `checkTrueHDCompatibility` | `matroska_truehd_compatibility` | Yes | Verifies that any Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/E-AC3) of the same language. |
+
+#### Chapters
+
+| Check | Function | Identifier | Configurable | Description |
+|-------|----------|------------|--------------|-------------|
 | Chapter Non-Zero Start | `checkChaptersStartNonZero` | `matroska_chapters_start_non_zero` | Yes | Verifies that the first chapter starts at exactly `00:00:00.000`. |
 | Chapter Non-Monotonic Order | `checkChaptersNonMonotonic` | `matroska_chapters_non_monotonic` | Yes | Verifies that chapter start times are strictly increasing. |
 | Chapter Duplicate Timestamps | `checkChaptersDuplicate` | `matroska_chapters_duplicate` | Yes | Flags cases where multiple chapters share the exact same timestamp. |
@@ -120,7 +144,6 @@ This document lists all individual checks performed by the `parsec check` comman
 | Chapter Name Hygiene | `checkChaptersNameHygiene` | `matroska_chapters_name_hygiene` | Yes | Verifies chapter display names are present, and have no consecutive duplicate names. |
 | Chapter Language Hygiene | `checkChaptersLanguageHygiene` | `matroska_chapters_language_hygiene` | Yes | Ensures all chapter displays have valid, consistent language tags (and are not undetermined/missing). |
 | Chapter Keyframe Alignment | `checkChaptersKeyframeAlignment` | `matroska_chapters_keyframe_alignment` | Yes | Verifies that chapter timestamps fall exactly on video keyframes (seek points) using the container's Cues index. |
-| Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
 
 ### Media Database (MDB) Consistency Checks
 
