@@ -3,8 +3,13 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
 
 	"codeberg.org/upPollo/parsec/internal/types"
 )
@@ -47,27 +52,122 @@ func getAllTracks(issues []types.IssueGroup) []types.TrackCheckResult {
 func printIssueGroup(group types.IssueGroup, sharedWidths map[int]int) {
 	Println(ReportSection(fmt.Sprintf("%s (%d)", group.Category, len(group.Results))))
 
-	for _, res := range group.Results {
-		if res.Severity == "error" {
-			PrintError(res.Warning)
-		} else {
-			PrintWarning(res.Warning)
+	if group.Category == "MATROSKA" {
+		printMatroskaGroup(group, sharedWidths)
+	} else {
+		for _, res := range group.Results {
+			printSingleResult(res, sharedWidths)
 		}
-
-		if len(res.Tracks) == 0 {
-			printUnexpectedDiff(res)
-
-			continue
-		}
-
-		if isListTrackReport(res.Identifier) {
-			printListTrackReport(res)
-
-			continue
-		}
-
-		Println(formatTrackTable(res.Tracks, sharedWidths))
 	}
+}
+
+func printMatroskaGroup(group types.IssueGroup, sharedWidths map[int]int) {
+	subGroupNames := []string{"Container/Audio", "Tracks", "Subtitles", "Chapters"}
+	groupedResults := make(map[string][]types.CheckResult)
+
+	for _, res := range group.Results {
+		subGrp := getMatroskaSubGroupName(res.Identifier)
+		groupedResults[subGrp] = append(groupedResults[subGrp], res)
+	}
+
+	for _, subGrp := range subGroupNames {
+		results := groupedResults[subGrp]
+		if len(results) == 0 {
+			continue
+		}
+
+		width, _, _ := term.GetSize(os.Stdout.Fd())
+
+		if width <= 0 {
+			width = 80
+		}
+
+		if width > 100 {
+			width = 100
+		}
+
+		prefix := "─── "
+		headerText := subGrp
+		prefixRunes := utf8.RuneCountInString(prefix)
+		headerRunes := utf8.RuneCountInString(headerText)
+
+		suffixLen := max(0, width-prefixRunes-headerRunes-1)
+		divider := prefix + headerText + " " + strings.Repeat("─", suffixLen)
+
+		subHeader := lipgloss.NewStyle().Bold(true).Foreground(purple).Render(divider)
+
+		Println()
+		Println(subHeader)
+		Println()
+
+		for _, res := range results {
+			printSingleResult(res, sharedWidths)
+		}
+	}
+}
+
+func printSingleResult(res types.CheckResult, sharedWidths map[int]int) {
+	if res.Severity == "error" {
+		PrintError(res.Warning)
+	} else {
+		PrintWarning(res.Warning)
+	}
+
+	if len(res.Tracks) == 0 {
+		printUnexpectedDiff(res)
+
+		return
+	}
+
+	if isListTrackReport(res.Identifier) {
+		printListTrackReport(res)
+
+		return
+	}
+
+	Println(formatTrackTable(res.Tracks, sharedWidths))
+}
+
+var matroskaSubGroups = map[string]string{
+	"matroska_language_tag":        "Tracks",
+	"matroska_multi_lang":          "Tracks",
+	"matroska_name_quality":        "Tracks",
+	"matroska_name_codecs":         "Tracks",
+	"matroska_name_redundant_lang": "Tracks",
+	"matroska_original_language":   "Tracks",
+	"matroska_duplicate_tracks":    "Tracks",
+	"matroska_name_keywords":       "Tracks",
+	"matroska_default_flags":       "Tracks",
+	"matroska_track_order":         "Tracks",
+	"matroska_track_delay":         "Tracks",
+
+	"matroska_subtitle_format":          "Subtitles",
+	"matroska_subtitle_fonts":           "Subtitles",
+	"matroska_subtitle_inline_fonts":    "Subtitles",
+	"matroska_srt_validation":           "Subtitles",
+	"matroska_ass_script_info":          "Subtitles",
+	"matroska_ass_styles":               "Subtitles",
+	"matroska_ass_events":               "Subtitles",
+	"matroska_zlib_compression":         "Subtitles",
+	"matroska_unused_fonts":             "Subtitles",
+	"matroska_font_filename_compliance": "Subtitles",
+
+	"matroska_chapters_start_non_zero":     "Chapters",
+	"matroska_chapters_non_monotonic":      "Chapters",
+	"matroska_chapters_duplicate":          "Chapters",
+	"matroska_chapters_too_close":          "Chapters",
+	"matroska_chapters_exceed_duration":    "Chapters",
+	"matroska_chapters_name_hygiene":       "Chapters",
+	"matroska_chapters_language_hygiene":   "Chapters",
+	"matroska_chapters_keyframe_alignment": "Chapters",
+}
+
+func getMatroskaSubGroupName(id string) string {
+	if subGrp, ok := matroskaSubGroups[id]; ok {
+		return subGrp
+	}
+
+	return "Container/Audio"
 }
 
 func printListTrackReport(res types.CheckResult) {
