@@ -99,6 +99,13 @@ func confirmApply(opts Options, prompt, skipMsg string) bool {
 	return confirmApplyWithPolicy(opts, prompt, skipMsg, true)
 }
 
+// canPrompt reports whether interactive prompts can be shown: not dry-run,
+// not unattended, and a terminal is attached. Use this to gate prompt
+// collection loops; use confirmApplyWithPolicy for single bulk confirmations.
+func canPrompt(opts Options) bool {
+	return !opts.DryRun && !opts.Unattended && ui.IsTerminal()
+}
+
 func confirmApplyWithPolicy(opts Options, prompt, skipMsg string, allowUnattended bool) bool {
 	if opts.DryRun {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))
@@ -275,21 +282,7 @@ func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, opts Option
 		}
 	}
 
-	if opts.DryRun {
-		ui.Println(ui.Muted.Render("Dry run: no changes made."))
-
-		return nil
-	}
-
-	if opts.Unattended || !ui.IsTerminal() {
-		ui.PrintWarning("Skipping unused font removal (destructive; requires confirmation).")
-
-		return nil
-	}
-
-	if !confirmPrompt("  Delete these unused font attachments?") {
-		ui.Println(ui.Muted.Render("Skipping unused font removal..."))
-
+	if !confirmApplyWithPolicy(opts, "  Delete these unused font attachments?", "Skipping unused font removal...", false) {
 		return nil
 	}
 
@@ -323,7 +316,7 @@ func fixMatroskaTracks(filePath string, opts Options) error {
 
 	var keywordFlagEdits, multiLangNameEdits, languageEdits []matroska.TrackEdit
 
-	if !opts.DryRun && !opts.Unattended && ui.IsTerminal() {
+	if canPrompt(opts) {
 		keywordFlagEdits = promptKeywordFlagFixes(ebml)
 		multiLangNameEdits = promptMultiLangNameFixes(ebml)
 		languageEdits = promptLanguageFixes(ebml)
@@ -734,8 +727,12 @@ func selectRemovals(ebml *matroska.EbmlMetadata, candidates []RemovalCandidate, 
 		return nil
 	}
 
-	if opts.Unattended || !ui.IsTerminal() {
-		ui.PrintWarning("Skipping track removals (destructive; requires confirmation).")
+	if !canPrompt(opts) {
+		if opts.DryRun {
+			ui.Println(ui.Muted.Render("Dry run: no changes made."))
+		} else {
+			ui.PrintWarning("Skipping track removals (destructive; requires confirmation).")
+		}
 
 		return nil
 	}
