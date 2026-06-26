@@ -12,9 +12,9 @@ import (
 
 var remuxFlag bool
 
-// fixCmd represents the fix command
-var fixCmd = &cobra.Command{
-	Use:   "fix [path...]",
+// correctCmd represents the correct command
+var correctCmd = &cobra.Command{
+	Use:   "correct [path...]",
 	Short: "automatically fix Matroska track issues reported by check",
 	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: COURSE CORRECTION :."),
 		`Automatically repairs Matroska issues that can be fixed without re-encoding:
@@ -42,7 +42,7 @@ You can pass files or directories. Directories are scanned recursively for Matro
 
 		expandedArgs := expandArgs(args)
 		for _, filePath := range expandedArgs {
-			if err := fixFile(filePath); err != nil {
+			if err := correctFile(filePath); err != nil {
 				return err
 			}
 		}
@@ -51,7 +51,7 @@ You can pass files or directories. Directories are scanned recursively for Matro
 	},
 }
 
-func fixFile(filePath string) error {
+func correctFile(filePath string) error {
 	return fixer.ApplyFile(filePath, fixer.Options{
 		DryRun:     dryRunFlag,
 		Remux:      remuxFlag,
@@ -63,19 +63,19 @@ func fixFile(filePath string) error {
 }
 
 func init() {
-	rootCmd.AddCommand(fixCmd)
+	rootCmd.AddCommand(correctCmd)
 
-	fixCmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
-	fixCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
-	fixCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
-	fixCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "override original language (sets original_language config key)")
-	fixCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
-	fixCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
-	fixCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	correctCmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
+	correctCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
+	correctCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
+	correctCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "override original language (sets original_language config key)")
+	correctCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	correctCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	correctCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 
 	for _, f := range []string{"imdb", "tmdb", "tvdb"} {
-		_ = fixCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = correctCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
-	fixCmd.Flags().SortFlags = false
+	correctCmd.Flags().SortFlags = false
 }
