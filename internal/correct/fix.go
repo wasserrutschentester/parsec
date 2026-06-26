@@ -1,6 +1,6 @@
-// Package fix applies deterministic repairs for Matroska track metadata and
+// Package correct applies deterministic repairs for Matroska track metadata and
 // container-level checks.
-package fix
+package correct
 
 import (
 	"errors"

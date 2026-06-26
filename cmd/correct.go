@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	fixer "codeberg.org/upPollo/parsec/internal/fix"
+	fixer "codeberg.org/upPollo/parsec/internal/correct"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
