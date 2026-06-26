@@ -42,7 +42,7 @@ func TestValidate(t *testing.T) {
 group = 123
 source = "WEB-DL"
 repack = "true"
-preferred_language = "not-a-lang"
+preferred_language = "123"
 template = "{title}.{invalid_key}"
 unknown_key = "value"
 
@@ -68,10 +68,10 @@ replacement = ""
 		errors := validateMapTypes(configMap, "", expectedTypes)
 
 		expectedErrors := map[string]bool{
-			"Invalid type for 'group': expected string, got int64":                                                       true,
-			"Invalid type for 'repack': expected bool, got string":                                                       true,
-			"Invalid language tag in 'preferred_language': not-a-lang (must be a language that has a 2-letter ISO code)": true,
-			"Invalid template key in 'template': {invalid_key}":                                                          true,
+			"Invalid type for 'group': expected string, got int64": true,
+			"Invalid type for 'repack': expected bool, got string": true,
+			"Invalid language tag in 'preferred_language': 123":    true,
+			"Invalid template key in 'template': {invalid_key}":    true,
 
 			"Unknown configuration key: 'unknown_key'": true,
 

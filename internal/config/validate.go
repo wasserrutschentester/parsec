@@ -421,11 +421,12 @@ func validateLanguage(lang, keyPath string) []string {
 		return errors
 	}
 
-	// Collapse to base language and check if it has a 2-letter ISO 639-1 code.
-	// Most common languages used in media (de, en, fr, etc.) have a 2-letter code.
-	base, _ := tag.Base()
-	if len(base.String()) != 2 {
-		errors = append(errors, fmt.Sprintf("Invalid language tag in '%s': %s (must be a language that has a 2-letter ISO code)", keyPath, lang))
+	// Reject tags where no base language can be determined with any confidence
+	// (e.g. purely private-use or synthetic tags). Accepts both 2-letter
+	// (ISO 639-1) and 3-letter (ISO 639-2/3) base codes.
+	_, confidence := tag.Base()
+	if confidence == language.No {
+		errors = append(errors, fmt.Sprintf("Invalid language tag in '%s': %s", keyPath, lang))
 	}
 
 	return errors

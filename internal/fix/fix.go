@@ -26,25 +26,17 @@ var (
 // Options controls which fixes are applied and how interactive decisions are
 // handled.
 type Options struct {
-	DryRun           bool
-	Remux            bool
-	Unattended       bool
-	OriginalLanguage string
-	ImdbID           string
-	TmdbID           int
-	TvdbID           int
+	DryRun     bool
+	Remux      bool
+	Unattended bool
+	ImdbID     string
+	TmdbID     int
+	TvdbID     int
 }
 
 // ApplyFile applies enabled Matroska fixes to one file.
 func ApplyFile(filePath string, opts Options) error {
 	ui.Println(ui.LabelValue("Target Name:", filename.GetBaseName(filePath)))
-
-	originalLang, err := normalizeOriginalLanguageCode(opts.OriginalLanguage)
-	if err != nil {
-		return err
-	}
-
-	opts.OriginalLanguage = originalLang
 
 	if err := fixMatroskaTracks(filePath, opts); err != nil {
 		return err

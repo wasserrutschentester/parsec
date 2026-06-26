@@ -4,15 +4,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	fixer "codeberg.org/upPollo/parsec/internal/fix"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-var (
-	remuxFlag bool
-	ovFlag    string
-)
+var remuxFlag bool
 
 // fixCmd represents the fix command
 var fixCmd = &cobra.Command{
@@ -38,6 +36,10 @@ You can pass files or directories. Directories are scanned recursively for Matro
 	RunE: func(_ *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: COURSE CORRECTION :."))
 
+		if originalLanguageFlag != "" {
+			viper.Set("original_language", originalLanguageFlag)
+		}
+
 		expandedArgs := expandArgs(args)
 		for _, filePath := range expandedArgs {
 			if err := fixFile(filePath); err != nil {
@@ -51,13 +53,12 @@ You can pass files or directories. Directories are scanned recursively for Matro
 
 func fixFile(filePath string) error {
 	return fixer.ApplyFile(filePath, fixer.Options{
-		DryRun:           dryRunFlag,
-		Remux:            remuxFlag,
-		Unattended:       unattendedFlag,
-		OriginalLanguage: ovFlag,
-		ImdbID:           imdbIDFlag,
-		TmdbID:           tmdbIDFlag,
-		TvdbID:           tvdbIDFlag,
+		DryRun:     dryRunFlag,
+		Remux:      remuxFlag,
+		Unattended: unattendedFlag,
+		ImdbID:     imdbIDFlag,
+		TmdbID:     tmdbIDFlag,
+		TvdbID:     tvdbIDFlag,
 	})
 }
 
@@ -67,7 +68,7 @@ func init() {
 	fixCmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
 	fixCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
 	fixCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
-	fixCmd.Flags().StringVar(&ovFlag, "ov", "", "override MDB original language/OV (2- or 3-letter code)")
+	fixCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "override original language (sets original_language config key)")
 	fixCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	fixCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	fixCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")

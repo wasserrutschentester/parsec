@@ -27,7 +27,6 @@ var (
 	jsonOutputFlag        bool
 	individualReportsFlag bool
 	jobsFlag              int
-	originalLanguageFlag  string
 )
 
 type seasonKey struct {

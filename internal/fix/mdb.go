@@ -1,10 +1,7 @@
 package fix
 
 import (
-	"errors"
 	"fmt"
-	"strings"
-	"unicode"
 
 	"golang.org/x/text/language"
 
@@ -18,19 +15,15 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-const originalLanguageMaxLength = 3
-
-var errInvalidOriginalLanguage = errors.New("invalid OV override")
-
 func lookupOriginalLanguage(filePath string, tracks []matroska.EbmlTrack, opts Options) string {
 	if !needsOriginalLanguageForUnwantedAudio(tracks) {
 		return ""
 	}
 
-	if opts.OriginalLanguage != "" {
-		ui.Println(ui.Info.Render("Using OV override: " + opts.OriginalLanguage))
+	if override := config.GetOriginalLanguage(); override != "" {
+		ui.Println(ui.Info.Render("Using original_language override: " + override))
 
-		return opts.OriginalLanguage
+		return override
 	}
 
 	if opts.Unattended || !ui.IsTerminal() {
@@ -56,39 +49,6 @@ func lookupOriginalLanguage(filePath string, tracks []matroska.EbmlTrack, opts O
 	mdb.PrintCompactResult(*result)
 
 	return result.OriginalLanguage
-}
-
-func normalizeOriginalLanguageCode(value string) (string, error) {
-	if value == "" {
-		return "", nil
-	}
-
-	trimmed := strings.TrimSpace(value)
-	if len(trimmed) < 2 || len(trimmed) > originalLanguageMaxLength {
-		return "", invalidOriginalLanguageError(value)
-	}
-
-	for _, r := range trimmed {
-		if !unicode.IsLetter(r) {
-			return "", invalidOriginalLanguageError(value)
-		}
-	}
-
-	tag, err := language.Parse(trimmed)
-	if err != nil || tag == language.Und {
-		return "", invalidOriginalLanguageError(value)
-	}
-
-	base, confidence := tag.Base()
-	if confidence == language.No || len(base.String()) != 2 {
-		return "", invalidOriginalLanguageError(value)
-	}
-
-	return base.String(), nil
-}
-
-func invalidOriginalLanguageError(value string) error {
-	return fmt.Errorf("%w %q: expected a 2- or 3-letter language code", errInvalidOriginalLanguage, value)
 }
 
 func needsOriginalLanguageForUnwantedAudio(tracks []matroska.EbmlTrack) bool {

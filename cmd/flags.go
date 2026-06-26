@@ -27,11 +27,12 @@ var (
 	isAudioDescFlag bool
 	groupFlag       string
 	// MDB IDs
-	isTVFlag    bool
-	isMovieFlag bool
-	imdbIDFlag  string
-	tmdbIDFlag  int
-	tvdbIDFlag  int
+	isTVFlag             bool
+	isMovieFlag          bool
+	imdbIDFlag           string
+	tmdbIDFlag           int
+	tvdbIDFlag           int
+	originalLanguageFlag string
 	// other
 	dryRunFlag     bool
 	unattendedFlag bool
