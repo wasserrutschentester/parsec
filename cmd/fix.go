@@ -9,6 +9,11 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var (
+	remuxFlag bool
+	ovFlag    string
+)
+
 // fixCmd represents the fix command
 var fixCmd = &cobra.Command{
 	Use:   "fix [path...]",

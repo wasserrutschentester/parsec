@@ -80,7 +80,7 @@ func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map
 }
 
 // ComputeUsedFonts gathers font names referenced by ASS/SSA subtitle tracks.
-func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) map[string]bool {
+func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, _ map[string]string) map[string]bool {
 	allUsedFonts := make(map[string]bool)
 
 	for _, track := range tracks {
@@ -169,11 +169,13 @@ func addMissingFonts(missing []string, seen map[string]bool, usedFonts map[fontS
 
 		desc := formatMissingFontDesc(font)
 		normalized := normalizeFontName(desc)
+
 		if seen[normalized] {
 			continue
 		}
 
 		seen[normalized] = true
+
 		missing = append(missing, desc)
 	}
 
@@ -188,15 +190,18 @@ func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentName
 	}
 
 	var unused []matroska.EbmlAttachment
+
 	for _, att := range attachments {
 		if !isFontAttachment(att) {
 			continue
 		}
 
 		found := false
+
 		for _, name := range attachmentNames[att.ID] {
 			if normalizedUsedFonts[normalizeFontName(name)] {
 				found = true
+
 				break
 			}
 		}

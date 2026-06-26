@@ -41,8 +41,6 @@ var (
 	noCacheFlag    bool
 	releasesFlag   bool
 	bestFlag       bool
-	remuxFlag      bool
-	ovFlag         string
 	outputPathFlag string
 )
 

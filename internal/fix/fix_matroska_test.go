@@ -91,7 +91,17 @@ func TestFixedTrackName(t *testing.T) {
 		{
 			name:  "leaves a clean name untouched",
 			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "Director Commentary", Commentary: true}},
-			want:  "Director Commentary",
+			want:  "Commentary by Director Commentary",
+		},
+		{
+			name:  "preserves existing commentary prefix",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "Commentary by Jane Doe", Commentary: true}},
+			want:  "Commentary by Jane Doe",
+		},
+		{
+			name:  "prefixes commentary name after language context",
+			track: matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng", Name: "English / Jane Doe", Commentary: true}},
+			want:  "Commentary by Jane Doe",
 		},
 	}
 
@@ -101,6 +111,62 @@ func TestFixedTrackName(t *testing.T) {
 				t.Errorf("fixedTrackName() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaNameFixesCommentaryPairing(t *testing.T) {
+	config.InitDefaults()
+
+	tracks := []matroska.EbmlTrack{
+		{
+			Type: "audio",
+			Properties: matroska.EbmlTrackProperties{
+				Number:     1,
+				Language:   "eng",
+				Name:       "Jane Doe",
+				Commentary: true,
+			},
+		},
+		{
+			Type: "subtitles",
+			Properties: matroska.EbmlTrackProperties{
+				Number:     2,
+				Language:   "eng",
+				Name:       "Different Commentary",
+				Commentary: true,
+			},
+		},
+	}
+
+	edits := ComputeMatroskaNameFixes(tracks)
+
+	audioEdit, ok := findEdit(edits, 1)
+	if !ok || audioEdit.Props["name"] != "Commentary by Jane Doe" {
+		t.Fatalf("expected audio commentary prefix edit, got %+v", edits)
+	}
+
+	subEdit, ok := findEdit(edits, 2)
+	if !ok || subEdit.Props["name"] != "Commentary by Jane Doe" {
+		t.Fatalf("expected subtitle commentary pairing edit, got %+v", edits)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaNameFixesSkipsAmbiguousCommentaryPairing(t *testing.T) {
+	config.InitDefaults()
+
+	tracks := []matroska.EbmlTrack{
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Number: 1, Language: "eng", Name: "Commentary by Jane", Commentary: true}},
+		{Type: "audio", Properties: matroska.EbmlTrackProperties{Number: 2, Language: "eng", Name: "Commentary by John", Commentary: true}},
+		{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Number: 3, Language: "eng", Name: "Different", Commentary: true}},
+	}
+
+	edits := ComputeMatroskaNameFixes(tracks)
+	edit, ok := findEdit(edits, 3)
+
+	if !ok || edit.Props["name"] != "Commentary by Different" {
+		t.Fatalf("expected only commentary prefix fix when pairing is ambiguous, got %+v", edits)
 	}
 }
 

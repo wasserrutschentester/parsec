@@ -16,9 +16,9 @@ import (
 var (
 	getMediaInfo = mediainfo.Get
 
-	// TitleJunkPatterns flags technical/release metadata noise in the global
+	// titleJunkPatterns flags technical/release metadata noise in the global
 	// container title. Shared between checkTitleHygiene and the fix policy.
-	TitleJunkPatterns = []string{
+	titleJunkPatterns = []string{
 		`\[.*\]`, // Bracketed info
 		`\(.*\)`, // Parenthesized info
 		`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
@@ -26,8 +26,7 @@ var (
 		`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
 	}
 
-	// AppJunkPatterns flags identifiable information leaked into WritingApplication.
-	AppJunkPatterns = []string{
+	appJunkPatterns = []string{
 		`[a-zA-Z]:\\`,            // Windows paths
 		`/(home|Users|var|tmp)/`, // Unix paths
 		`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
@@ -94,7 +93,7 @@ func TitleHygieneNeedsFix(title string, meta *metadata.Metadata) bool {
 		}
 	}
 
-	return MatchesAnyPattern(title, TitleJunkPatterns)
+	return matchesAnyPattern(title, titleJunkPatterns)
 }
 
 func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
@@ -103,7 +102,7 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 		return nil
 	}
 
-	if MatchesAnyPattern(app, AppJunkPatterns) {
+	if AppHygieneNeedsFix(app) {
 		return &CheckResult{
 			Identifier: "matroska_app_hygiene",
 			Warning:    "Writing Application metadata contains potentially identifiable information",
@@ -116,9 +115,16 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 	return nil
 }
 
-// MatchesAnyPattern reports whether value case-insensitively matches any of
-// patterns. Shared with the fix policy in internal/fix.
-func MatchesAnyPattern(value string, patterns []string) bool {
+// AppHygieneNeedsFix reports whether WritingApplication should be cleared.
+func AppHygieneNeedsFix(app string) bool {
+	if app == "" {
+		return false
+	}
+
+	return matchesAnyPattern(app, appJunkPatterns)
+}
+
+func matchesAnyPattern(value string, patterns []string) bool {
 	for _, p := range patterns {
 		if regexp.MustCompile("(?i)" + p).MatchString(value) {
 			return true

@@ -55,8 +55,6 @@ Force identification using specific database IDs.
 
 This document lists all individual checks performed by the `parsec check` command. Most of these can be disabled in the [Config](config.md) if you don't want to use them.
 
-Many of these issues can be repaired automatically with the [`fix`](fix.md) command, which lists exactly which checks it can resolve and how.
-
 ### Filename Checks
 
 | Check | Function | Identifier | Configurable | Description |
