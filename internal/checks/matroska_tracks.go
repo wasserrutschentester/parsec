@@ -166,7 +166,8 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	return false
 }
 
-func countLanguagesInString(name string) int {
+// CountLanguagesInString counts recognizable language names found in a track name.
+func CountLanguagesInString(name string) int {
 	count := 0
 
 	for _, word := range tokenizeTrackName(name) {
@@ -364,7 +365,7 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	if props.Language == "mul" {
-		if countLanguagesInString(props.Name) < 2 {
+		if CountLanguagesInString(props.Name) < 2 {
 			return newFailedTrackResult("matroska_name_keywords", "Track Name and Flags don't match", "warning", &track, fmt.Sprintf("'mul' but Name has %s names", ui.Warning.Render("<2 language")))
 		}
 	}

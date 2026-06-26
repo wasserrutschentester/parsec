@@ -17,11 +17,6 @@ var (
 	SimpleCodecs = simpleCodecs
 )
 
-// CountLanguagesInString counts recognizable language names found in a track name.
-func CountLanguagesInString(name string) int {
-	return countLanguagesInString(name)
-}
-
 // GetLanguageCodeFromName maps a language word to its BCP-47 base code.
 func GetLanguageCodeFromName(word string) string {
 	return getLanguageCodeFromName(word)
@@ -65,7 +60,7 @@ func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map
 	attachmentNames := make(map[int][]string)
 
 	for _, font := range attachmentFonts {
-		names := []string{font.FamilyName, font.PostScriptName}
+		names := []string{font.PostScriptName, font.FamilyName}
 		names = append(names, font.FullNames...)
 		attachmentNames[font.AttachmentID] = uniqueStrings(append(attachmentNames[font.AttachmentID], names...))
 	}
@@ -80,6 +75,9 @@ func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map
 }
 
 // ComputeUsedFonts gathers font names referenced by ASS/SSA subtitle tracks.
+// Both style-block and inline tag sources are always scanned regardless of check
+// config, so the fix never incorrectly flags a font as unused because a check
+// happens to be disabled.
 func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, _ map[string]string) map[string]bool {
 	allUsedFonts := make(map[string]bool)
 
@@ -88,17 +86,13 @@ func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, _ map[string
 			continue
 		}
 
-		if config.IsCheckEnabled("matroska_subtitle_fonts") {
-			for font := range styleFontsFromTrack(track) {
-				allUsedFonts[font.Family] = true
-			}
+		for font := range styleFontsFromTrack(track) {
+			allUsedFonts[font.Family] = true
 		}
 
-		if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
-			if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
-				for font := range inlineFontsFromContent(track, content) {
-					allUsedFonts[font.Family] = true
-				}
+		if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
+			for font := range inlineFontsFromContent(track, content) {
+				allUsedFonts[font.Family] = true
 			}
 		}
 	}

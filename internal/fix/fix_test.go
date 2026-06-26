@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
@@ -56,28 +57,19 @@ func TestMergeTrackEditsEmptyExtra(t *testing.T) {
 	}
 }
 
-func testMismatches() []keywordMismatch {
-	return []keywordMismatch{
-		{
-			track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Number: 1, Name: "Commentary"}},
-			fix:   KeywordFlagFix{Property: "flag-commentary", Keyword: "Commentary"},
-		},
-		{
-			track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Number: 2, Name: "Forced SDH"}},
-			fix:   KeywordFlagFix{Property: "flag-forced", Keyword: "Forced"},
-		},
-		{
-			// Same track as above, a second mismatch -> must merge into one edit.
-			track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Number: 2, Name: "Forced SDH"}},
-			fix:   KeywordFlagFix{Property: "flag-hearing-impaired", Keyword: "SDH"},
+//nolint:paralleltest // depends on shared global config state
+func TestBuildKeywordFlagEdits(t *testing.T) {
+	config.InitDefaults()
+
+	ebml := &matroska.EbmlMetadata{
+		Tracks: []matroska.EbmlTrack{
+			{Type: "audio", Properties: matroska.EbmlTrackProperties{Number: 1, Name: "Commentary"}},
+			// Track 2 has two mismatches (Forced + SDH) and must produce one consolidated edit.
+			{Type: "audio", Properties: matroska.EbmlTrackProperties{Number: 2, Name: "Forced SDH"}},
 		},
 	}
-}
 
-func TestKeywordMismatchEditsAll(t *testing.T) {
-	t.Parallel()
-
-	edits := keywordMismatchEdits(testMismatches(), nil)
+	edits := buildKeywordFlagEdits(ebml)
 	if len(edits) != 2 {
 		t.Fatalf("expected 2 edits (one per track), got %d: %+v", len(edits), edits)
 	}
@@ -89,24 +81,6 @@ func TestKeywordMismatchEditsAll(t *testing.T) {
 	track2 := edits[1]
 	if track2.Number != 2 || track2.Props["flag-forced"] != "1" || track2.Props["flag-hearing-impaired"] != "1" {
 		t.Errorf("track 2 edit = %+v, want both flag-forced and flag-hearing-impaired set", track2)
-	}
-}
-
-func TestKeywordMismatchEditsSelected(t *testing.T) {
-	t.Parallel()
-
-	// Only the first mismatch (track 1) is selected.
-	edits := keywordMismatchEdits(testMismatches(), map[int]bool{0: true})
-	if len(edits) != 1 || edits[0].Number != 1 {
-		t.Fatalf("expected only track 1's edit, got %+v", edits)
-	}
-}
-
-func TestKeywordMismatchEditsNoneSelected(t *testing.T) {
-	t.Parallel()
-
-	if edits := keywordMismatchEdits(testMismatches(), map[int]bool{}); len(edits) != 0 {
-		t.Fatalf("expected no edits when nothing is selected, got %+v", edits)
 	}
 }
 

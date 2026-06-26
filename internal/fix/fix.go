@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
@@ -263,8 +264,15 @@ func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, opts Option
 
 	ui.Println(ui.ReportSection("Unused Font Attachments"))
 
+	_, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
+
 	for _, att := range unused {
-		ui.Println("  " + att.FileName)
+		names := attachmentNames[att.ID]
+		if len(names) > 0 {
+			ui.Println(fmt.Sprintf("  %s %s", att.FileName, ui.Muted.Render("("+strings.Join(names, ", ")+")")))
+		} else {
+			ui.Println("  " + att.FileName)
+		}
 	}
 
 	if opts.DryRun {
@@ -362,14 +370,74 @@ func applyTrackEditGroup(filePath string, opts Options, edits []matroska.TrackEd
 	return nil
 }
 
-// previewFlagEdits renders pending flag edits as a track table, matching the
-// layout check uses for track issues. Each flag is shown as a compact
-// "[+] Label" (being set) / "[-] Label" (being cleared) tag instead of a full
-// sentence per flag, since a table cell has little room.
+// previewFlagEdits renders pending flag edits as a track table. When any edit
+// touches flag-default, all audio and subtitle tracks are shown so the user can
+// verify the resulting default distribution; otherwise only edited tracks appear.
+// previewFlagEdits renders pending flag edits as a track table. When any edit
+// touches flag-default, all audio and subtitle tracks are shown so the user can
+// verify the resulting default distribution; otherwise only edited tracks appear.
 func previewFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) {
 	ui.Println(ui.ReportSection("Track Flags"))
 
+	editByNumber := make(map[int]map[string]string, len(edits))
+	hasDefaultEdit := false
+
+	for _, edit := range edits {
+		editByNumber[edit.Number] = edit.Props
+		if _, ok := edit.Props["flag-default"]; ok {
+			hasDefaultEdit = true
+		}
+	}
+
 	headers := []string{"Track", "Type", "Lang", "Name", "Changes"}
+
+	var rows [][]string
+
+	if hasDefaultEdit {
+		rows = defaultFlagRows(ebml, editByNumber)
+	} else {
+		rows = editedFlagRows(ebml, edits)
+	}
+
+	ui.Println(ui.TrackTable(headers, rows))
+	ui.Println()
+}
+
+// defaultFlagRows returns one row per audio/subtitle track, showing pending
+// changes for edited tracks and the unchanged Default state for others.
+func defaultFlagRows(ebml *matroska.EbmlMetadata, editByNumber map[int]map[string]string) [][]string {
+	var rows [][]string
+
+	for i := range ebml.Tracks {
+		track := &ebml.Tracks[i]
+		if track.Type != "audio" && track.Type != "subtitles" {
+			continue
+		}
+
+		props := editByNumber[track.Properties.Number]
+
+		var changes string
+
+		if props != nil {
+			changes = flagChangeTags(props)
+		} else if track.Properties.Default {
+			changes = ui.Muted.Render("Default (unchanged)")
+		}
+
+		rows = append(rows, []string{
+			strconv.Itoa(track.Properties.Number),
+			track.Type,
+			track.Properties.Language,
+			track.Properties.Name,
+			changes,
+		})
+	}
+
+	return rows
+}
+
+// editedFlagRows returns one row per edited track only.
+func editedFlagRows(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) [][]string {
 	rows := make([][]string, 0, len(edits))
 
 	for _, edit := range edits {
@@ -383,8 +451,7 @@ func previewFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) {
 		rows = append(rows, []string{strconv.Itoa(edit.Number), trackType, lang, name, flagChangeTags(edit.Props)})
 	}
 
-	ui.Println(ui.TrackTable(headers, rows))
-	ui.Println()
+	return rows
 }
 
 func flagChangeTags(props map[string]string) string {
@@ -796,48 +863,26 @@ func promptMultiLangNameFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit 
 	return edits
 }
 
-// keywordMismatch pairs a track with one keyword/flag mismatch it needs
-// resolved, e.g. its name mentions "Commentary" but flag-commentary is unset.
-type keywordMismatch struct {
-	track matroska.EbmlTrack
-	fix   KeywordFlagFix
-}
-
 // promptKeywordFlagFixes gathers every SDH/Forced/Commentary/Descriptive
-// keyword-flag mismatch across all tracks into one overview table (the same
-// columns check uses for track issues) instead of one confirmation per track,
-// then lets the user apply all of them, none, or pick individually.
+// keyword-flag mismatch, consolidates them per track, then previews and
+// confirms using previewFlagEdits — consistent with the auto-computed flag edits
+// that follow. Multiple mismatches on the same track are batched into one edit.
 func promptKeywordFlagFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
-	var mismatches []keywordMismatch
-
-	for i := range ebml.Tracks {
-		track := ebml.Tracks[i]
-		for _, fix := range ReverseKeywordFlagFixes(track) {
-			mismatches = append(mismatches, keywordMismatch{track: track, fix: fix})
-		}
-	}
-
-	if len(mismatches) == 0 {
+	edits := buildKeywordFlagEdits(ebml)
+	if len(edits) == 0 {
 		return nil
 	}
 
+	total := countFlagProps(edits)
+
 	ui.Println()
-	ui.Println(ui.ReportSection("Keyword/Flag Mismatches"))
-	ui.Println(keywordMismatchTable(mismatches))
+	previewFlagEdits(ebml, edits)
 
-	switch promptBulkChoice(fmt.Sprintf("Set %d flag(s) to match the track names?", len(mismatches))) {
+	switch promptBulkChoice(fmt.Sprintf("Set %d flag(s) to match track names?", total)) {
 	case bulkAll:
-		return keywordMismatchEdits(mismatches, nil)
+		return edits
 	case bulkSelect:
-		selected := make(map[int]bool, len(mismatches))
-
-		for i, m := range mismatches {
-			if confirmPrompt(fmt.Sprintf("  Set %q on %s?", m.fix.Property, trackLabel(&m.track))) {
-				selected[i] = true
-			}
-		}
-
-		return keywordMismatchEdits(mismatches, selected)
+		return selectKeywordFlagEdits(ebml, edits)
 	default:
 		ui.Println(ui.Muted.Render("Skipping keyword/flag fixes..."))
 
@@ -845,56 +890,56 @@ func promptKeywordFlagFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
 	}
 }
 
-func keywordMismatchTable(mismatches []keywordMismatch) string {
-	headers := []string{"Track", "Type", "Lang", "Name", "Keyword", "Flag"}
-	rows := make([][]string, 0, len(mismatches))
+// buildKeywordFlagEdits consolidates all keyword/flag mismatches per track into
+// a slice of TrackEdits ready for previewFlagEdits and SetTrackProperties.
+func buildKeywordFlagEdits(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
+	var edits []matroska.TrackEdit
 
-	for _, m := range mismatches {
-		rows = append(rows, []string{
-			strconv.Itoa(m.track.Properties.Number),
-			m.track.Type,
-			m.track.Properties.Language,
-			m.track.Properties.Name,
-			m.fix.Keyword,
-			m.fix.Property,
-		})
-	}
-
-	return ui.TrackTable(headers, rows)
-}
-
-// keywordMismatchEdits builds the track edits for the given mismatches. A nil
-// selected applies all of them; otherwise only the indices marked true are
-// included.
-func keywordMismatchEdits(mismatches []keywordMismatch, selected map[int]bool) []matroska.TrackEdit {
-	props := make(map[int]map[string]string)
-
-	var order []int
-
-	for i, m := range mismatches {
-		if selected != nil && !selected[i] {
+	for i := range ebml.Tracks {
+		fixes := ReverseKeywordFlagFixes(ebml.Tracks[i])
+		if len(fixes) == 0 {
 			continue
 		}
 
-		number := m.track.Properties.Number
-
-		p, ok := props[number]
-		if !ok {
-			p = make(map[string]string)
-			props[number] = p
-
-			order = append(order, number)
+		props := make(map[string]string, len(fixes))
+		for _, fix := range fixes {
+			props[fix.Property] = "1"
 		}
 
-		p[m.fix.Property] = "1"
-	}
-
-	edits := make([]matroska.TrackEdit, 0, len(order))
-	for _, number := range order {
-		edits = append(edits, matroska.TrackEdit{Number: number, Props: props[number]})
+		edits = append(edits, matroska.TrackEdit{Number: ebml.Tracks[i].Properties.Number, Props: props})
 	}
 
 	return edits
+}
+
+func countFlagProps(edits []matroska.TrackEdit) int {
+	n := 0
+
+	for _, edit := range edits {
+		n += len(edit.Props)
+	}
+
+	return n
+}
+
+// selectKeywordFlagEdits prompts once per track (showing its pending flag
+// changes) and returns only the edits the user confirmed.
+func selectKeywordFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) []matroska.TrackEdit {
+	var selected []matroska.TrackEdit
+
+	for _, edit := range edits {
+		track := findTrack(ebml, edit.Number)
+
+		ui.Println()
+		ui.Println("  " + trackLabel(track))
+		ui.Println("  " + flagChangeTags(edit.Props))
+
+		if confirmPrompt("  Apply these flag changes?") {
+			selected = append(selected, edit)
+		}
+	}
+
+	return selected
 }
 
 // bulkChoice is the user's answer to a batched all/none/select prompt.
