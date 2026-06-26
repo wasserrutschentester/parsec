@@ -1,21 +1,21 @@
-# Fix Command
+# Correct Command
 
-The `fix` command automatically repairs Matroska issues reported by [`check`](checks.md) that can be resolved **without re-encoding**. It corrects track metadata in place and can optionally rewrite the container. Filename fixes are handled by the [`rename`](rename.md) command.
+The `correct` command automatically repairs Matroska issues reported by [`check`](checks.md) that can be resolved **without re-encoding**. It corrects track metadata in place and can optionally rewrite the container. Filename fixes are handled by the [`rename`](rename.md) command.
 
 ## Usage
 
 ```bash
-parsec fix [path...] [flags]
+parsec correct [path...] [flags]
 ```
 
 You can provide one or more files or directories to be processed. Directories will be scanned recursively for Matroska (.mkv) files.
 
 ## How It Works
 
-`fix` runs in up to two stages per file:
+`correct` runs in up to two stages per file:
 
 1. **In-place track fixes** (always): track flags and names are corrected directly with `mkvpropedit`. This is fast and lossless — the container is not rewritten.
-2. **Container remux** (preview always shown; applied only with `--remux`): track order, container compression and safe track removals are reported even on a plain `fix` run, so you always see what a rewrite would change — `fix` just won't touch the file until you pass `--remux`. The MDB original-language lookup needed for unwanted-language pruning is skipped in this preview (it's a real network call) and only runs once `--remux` is given; use `--ov` to provide it without a lookup. The output replaces the original atomically and the original file mode is preserved.
+2. **Container remux** (preview always shown; applied only with `--remux`): track order, container compression and safe track removals are reported even on a plain `correct` run, so you always see what a rewrite would change — `correct` just won't touch the file until you pass `--remux`. The MDB original-language lookup needed for unwanted-language pruning is skipped in this preview (it's a real network call) and only runs once `--remux` is given; use `--original-language` to provide it without a lookup. The output replaces the original atomically and the original file mode is preserved.
 
 Each check is only fixed if it is enabled in your [configuration](config.md); disabled checks are skipped, just as they are by `check`.
 
@@ -58,7 +58,7 @@ The mechanism column indicates how a fix is applied: **In-place** (`mkvpropedit`
 | `matroska_track_order` | Remux / *prompt* | Reorders tracks by language and type priority. Shown as a before/after table; only the tracks that were genuinely out of place are highlighted, the rest just shift index as a side effect and aren't. |
 | `matroska_zlib_compression` | Remux | Strips zlib track compression. |
 | `mdb_unwanted_audio_lang` | Remux / *prompt* | Removes audio in languages other than the preferred or MDB original language. Skipped if the original language is unavailable. Lists the affected languages before confirmation. |
-| `mediainfo_empty_tracks` | Remux / *prompt* | Removes audio tracks reporting zero channels. Only the audio case is covered; a subtitle track with zero elements needs MediaInfo data `fix` does not yet read, so it is still reported by `check` only. |
+| `mediainfo_empty_tracks` | Remux / *prompt* | Removes audio tracks reporting zero channels. Only the audio case is covered; a subtitle track with zero elements needs MediaInfo data `correct` does not yet read, so it is still reported by `check` only. |
 
 ### Not Fixed
 
@@ -69,11 +69,11 @@ Some issues cannot be fixed automatically and are left for manual resolution:
 - **Bitstream metadata** — `mediainfo_dialogue_normalization` lives inside the audio stream, not the container.
 - **Missing source data** — `mdb_audio_language_preferred`, `mdb_subtitle_language_preferred`, `mdb_audio_language_original`, `mdb_subtitle_language_original` (a track that is not present cannot be added), `mdb_episode_existence`, `mdb_error`, `mdb_no_match`, `mdb_unknown_original_lang`.
 - **Duplicate tracks** — `matroska_duplicate_tracks` is reported by `check` but not auto-removed. The check compares metadata such as language, flags and name; that is useful as a warning, but not enough proof that two streams are byte-identical or safe to delete.
-- **Same-language audio bloat** — `mediainfo_redundant_audio` is reported by `check` but **not** auto-removed. When one language has several audio tracks (e.g. a lossless track plus a lossy variant, or DTS-HD MA alongside DTS), `fix` keeps them all, because choosing which to drop needs codec/quality awareness that is not yet implemented. Only **unwanted-language** audio (anything other than the preferred or MDB original language) is pruned. Remove same-language duplicates manually for now.
+- **Same-language audio bloat** — `mediainfo_redundant_audio` is reported by `check` but **not** auto-removed. When one language has several audio tracks (e.g. a lossless track plus a lossy variant, or DTS-HD MA alongside DTS), `correct` keeps them all, because choosing which to drop needs codec/quality awareness that is not yet implemented. Only **unwanted-language** audio (anything other than the preferred or MDB original language) is pruned. Remove same-language duplicates manually for now.
 - **No safe target value** — `matroska_video_cropping` only detects an aspect-ratio mismatch; it doesn't compute the actual crop pixels needed, so there's nothing safe to write. `matroska_track_delay` flags a container-level timestamp offset that `mkvpropedit` cannot rewrite in place, and resetting it via remux risks turning a legitimate A/V offset into a real sync error. `matroska_chapters_name_hygiene` (empty or consecutively duplicated chapter names) and `matroska_chapters_language_hygiene` (undetermined chapter display language) have no derivable correct value either, for the same reason a track's `matroska_language_tag` is prompted rather than guessed.
 - **Structurally invalid chapter timing** — `matroska_chapters_duplicate`, `matroska_chapters_non_monotonic`, `matroska_chapters_too_close` and `matroska_chapters_exceed_duration` flag chapter timestamps that are out of order, identical, too close together or beyond the file's duration. Unlike keyframe misalignment, there's no single safe correction (the right fix could be removing, reordering or retiming a chapter), so these are left for manual review. `matroska_chapters_start_non_zero` is included here too: the keyframe-alignment fix above will move a non-zero first chapter to keyframe 0 when one exists, but does not by itself guarantee it.
-- **Re-encoding required (audio)** — `matroska_truehd_compatibility` (a TrueHD track needs a lossy compatibility track muxed alongside it), `matroska_commentary_channels`, `matroska_commentary_bitrate` and `mediainfo_stereo_lossless` (mono/stereo lossless audio should be FLAC) require an actual encoder, which `fix` does not have; it only edits container metadata and remuxes existing streams.
-- **Subtitle content issues** — `matroska_ass_script_info`, `matroska_ass_styles`, `matroska_ass_events` and `matroska_srt_validation` validate subtitle script/text content itself, not container metadata, so fixing them is out of scope for `fix`.
+- **Re-encoding required (audio)** — `matroska_truehd_compatibility` (a TrueHD track needs a lossy compatibility track muxed alongside it), `matroska_commentary_channels`, `matroska_commentary_bitrate` and `mediainfo_stereo_lossless` (mono/stereo lossless audio should be FLAC) require an actual encoder, which `correct` does not have; it only edits container metadata and remuxes existing streams.
+- **Subtitle content issues** — `matroska_ass_script_info`, `matroska_ass_styles`, `matroska_ass_events` and `matroska_srt_validation` validate subtitle script/text content itself, not container metadata, so fixing them is out of scope for `correct`.
 - **Other** — `matroska_ebml_error` (broken file), `matroska_subtitle_format` (subtitle conversion), `filename_streaming` (use `rename --service`).
 
 ## Prompts
@@ -97,31 +97,31 @@ Every confirmation defaults to **no** — an empty Enter declines, matching the 
 | `--remux` | | boolean | Also apply fixes that require rewriting the container (track order, compression, track removal). |
 | `--unattended`| `-u` | boolean | Do not prompt; apply deterministic non-destructive fixes and skip interactive, remote-download and destructive fixes. |
 | `--dry-run` | `-d` | boolean | Preview the changes without modifying any files. |
-| `--ov` | | string | Override the MDB original language/OV for unwanted-language audio removal. Accepts a 2- or 3-letter language code. |
+| `--original-language` | | string | Override the MDB original language for unwanted-language audio removal. Accepts a 2- or 3-letter language code. |
 
 ## Examples
 
-**Fix a single file with interactive confirmation:**
+**Correct a single file with interactive confirmation:**
 ```bash
-parsec fix Movie.2023.1080p.mkv
+parsec correct Movie.2023.1080p.mkv
 ```
 
 **Preview the changes without touching the file:**
 ```bash
-parsec fix movie.mkv --dry-run
+parsec correct movie.mkv --dry-run
 ```
 
 **Apply in-place fixes unattended (no remux, no prompts):**
 ```bash
-parsec fix Series.S01E*.mkv -u
+parsec correct Series.S01E*.mkv -u
 ```
 
 **Also rewrite the container to fix track order, compression and removals:**
 ```bash
-parsec fix movie.mkv --remux
+parsec correct movie.mkv --remux
 ```
 
 **Override the original language used for unwanted-language audio removal:**
 ```bash
-parsec fix movie.mkv --remux --ov jpn
+parsec correct movie.mkv --remux --original-language jpn
 ```

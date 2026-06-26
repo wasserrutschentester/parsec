@@ -70,7 +70,7 @@ replacement = ''
 [api_keys]
 tmdb = "your_tmdb_api_key" # https://developer.themoviedb.org/docs/getting-started
 tvdb = "your_tvdb_api_key" # https://thetvdb.com/api-information
-# Optional. Used only by `fix` if a missing subtitle font is not available from
+# Optional. Used only by `correct` if a missing subtitle font is not available from
 # local system fonts or the keyless Google Fonts GitHub repository.
 google_fonts = "" # https://developers.google.com/fonts/docs/developer_api
 
