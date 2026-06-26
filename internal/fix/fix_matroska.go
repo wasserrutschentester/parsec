@@ -486,7 +486,7 @@ func maybePrefixCommentaryName(name string, props matroska.EbmlTrackProperties) 
 }
 
 func hasCommentaryPrefix(name string) bool {
-	core := commentaryCoreWithOriginalCase(name)
+	core := checks.ExtractCommentaryCoreOriginalCase(name)
 	lower := strings.ToLower(core)
 
 	return lower == "commentary by" ||
@@ -530,7 +530,7 @@ func (b *fixBuilder) computeCommentaryPairingNameFixes(tracks []matroska.EbmlTra
 		}
 
 		current := fixedNames[track.Properties.Number]
-		if commentaryCore(current) == commentaryCore(audioName) {
+		if checks.ExtractCommentaryCore(current) == checks.ExtractCommentaryCore(audioName) {
 			continue
 		}
 
@@ -560,35 +560,6 @@ func soleAudioCommentaryName(tracks []matroska.EbmlTrack, fixedNames map[int]str
 	}
 
 	return names[0], true
-}
-
-func commentaryCore(name string) string {
-	return strings.ToLower(strings.TrimSpace(stripCommentaryDecorations(commentaryCoreWithOriginalCase(name))))
-}
-
-func commentaryCoreWithOriginalCase(name string) string {
-	lowerName := strings.ToLower(name)
-	switch {
-	case strings.Contains(lowerName, "commentary by"):
-		idx := strings.Index(lowerName, "commentary by")
-		name = name[idx:]
-	case strings.Contains(lowerName, "isolated score"):
-		idx := strings.Index(lowerName, "isolated score")
-		name = name[idx:]
-	case strings.Contains(name, "/"):
-		_, after, _ := strings.Cut(name, "/")
-		name = after
-	}
-
-	return strings.TrimSpace(name)
-}
-
-func stripCommentaryDecorations(name string) string {
-	name = strings.ReplaceAll(name, "(SDH)", "")
-	name = strings.ReplaceAll(name, "[SDH]", "")
-	name = strings.ReplaceAll(name, "SDH", "")
-
-	return name
 }
 
 func isSimpleCodecToken(token string) bool {

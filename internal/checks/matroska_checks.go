@@ -333,19 +333,26 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func extractCoreCommentaryName(name string) string {
-	lowerName := strings.ToLower(name)
-	if idx := strings.Index(lowerName, "commentary by"); idx != -1 {
-		name = name[idx:]
-	} else if idx := strings.Index(lowerName, "isolated score"); idx != -1 {
-		name = name[idx:]
-	} else {
-		if idx := strings.Index(name, "/"); idx != -1 {
-			name = name[idx+1:]
+// extractCommentaryCoreRaw returns the core identifying part of a commentary
+// track name with original case preserved and without SDH stripping.
+func extractCommentaryCoreRaw(name string) string {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.Contains(lower, "commentary by"):
+		name = name[strings.Index(lower, "commentary by"):]
+	case strings.Contains(lower, "isolated score"):
+		name = name[strings.Index(lower, "isolated score"):]
+	default:
+		if _, after, ok := strings.Cut(name, "/"); ok {
+			name = after
 		}
 	}
 
-	name = strings.TrimSpace(name)
+	return strings.TrimSpace(name)
+}
+
+func extractCoreCommentaryName(name string) string {
+	name = extractCommentaryCoreRaw(name)
 	name = strings.ReplaceAll(name, "(SDH)", "")
 	name = strings.ReplaceAll(name, "[SDH]", "")
 	name = strings.ReplaceAll(name, "SDH", "")

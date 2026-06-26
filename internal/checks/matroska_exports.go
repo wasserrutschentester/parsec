@@ -225,6 +225,18 @@ func FontNameMatches(name string, internalNames []string) bool {
 	return false
 }
 
+// ExtractCommentaryCoreOriginalCase returns the core identifying part of a
+// commentary track name with original case preserved and SDH tokens intact.
+func ExtractCommentaryCoreOriginalCase(name string) string {
+	return extractCommentaryCoreRaw(name)
+}
+
+// ExtractCommentaryCore returns the normalised core of a commentary name:
+// SDH decorations removed, trimmed, and lowercased.
+func ExtractCommentaryCore(name string) string {
+	return extractCoreCommentaryName(name)
+}
+
 // GetVideoTrackNumberFromEBML returns the first video track's Matroska number.
 func GetVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
 	return getVideoTrackNumberFromEBML(ebml)
