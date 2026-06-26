@@ -531,16 +531,22 @@ func trackOrderTable(ebml *matroska.EbmlMetadata, newOrder []int) string {
 
 	misplaced := misplacedTrackIDs(oldOrder, newOrder)
 
-	headers := []string{"Old #", "New #", "Track"}
+	headers := []string{"Old #", "New #", "Type", "Lang", "Codec", "Name", "Flags"}
 	rows := make([][]string, 0, len(newOrder))
 
 	for i, id := range newOrder {
-		label := trackLabel(findTrackByID(ebml, id))
+		track := findTrackByID(ebml, id)
+
+		trackType, lang, codec, name, flags := trackColumns(track)
 		if misplaced[id] {
-			label = ui.Warning.Render(label)
+			trackType = ui.Warning.Render(trackType)
+			lang = ui.Warning.Render(lang)
+			codec = ui.Warning.Render(codec)
+			name = ui.Warning.Render(name)
+			flags = ui.Warning.Render(flags)
 		}
 
-		rows = append(rows, []string{strconv.Itoa(oldIndex[id]), strconv.Itoa(i + 1), label})
+		rows = append(rows, []string{strconv.Itoa(oldIndex[id]), strconv.Itoa(i + 1), trackType, lang, codec, name, flags})
 	}
 
 	return ui.TrackTable(headers, rows)
@@ -965,6 +971,48 @@ func trackLabel(track *matroska.EbmlTrack) string {
 	}
 
 	return label
+}
+
+// trackColumns returns the individual display columns for a track used in the
+// reorder table: type, language, codec, name, and a compact flags string.
+func trackColumns(track *matroska.EbmlTrack) (trackType, lang, codec, name, flags string) {
+	if track == nil {
+		return "?", "", "", "", ""
+	}
+
+	return track.Type, track.Properties.Language, track.Codec, track.Properties.Name, trackFlagsCompact(track)
+}
+
+func trackFlagsCompact(track *matroska.EbmlTrack) string {
+	p := track.Properties
+
+	var parts []string
+
+	if p.Default {
+		parts = append(parts, "D")
+	}
+
+	if p.Forced {
+		parts = append(parts, "Forced")
+	}
+
+	if p.OriginalLanguage {
+		parts = append(parts, "Orig")
+	}
+
+	if p.Commentary {
+		parts = append(parts, "Comm")
+	}
+
+	if p.HearingImpaired {
+		parts = append(parts, "SDH")
+	}
+
+	if p.VisualImpaired {
+		parts = append(parts, "AD")
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func previewTrackEdits(section string, ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) {
