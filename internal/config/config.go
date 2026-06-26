@@ -14,8 +14,10 @@ var defaultConfig string
 
 // InitDefaults initializes the default configuration values in viper.
 func InitDefaults() {
-	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
+	viper.Reset()
+	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
+	viper.SetDefault("original_language", "")
 	viper.SetDefault("subbed_tagging", true)
 	viper.SetDefault("audio_description", false)
 	viper.SetDefault("source", "WEB-DL")
@@ -40,7 +42,7 @@ func InitDefaults() {
 	})
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
-	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events"})
+	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events", "matroska_srt_validation"})
 }
 
 var (
@@ -94,6 +96,11 @@ func GetTemplate() string {
 // GetPreferredLanguage returns the preferred language code from the configuration.
 func GetPreferredLanguage() string {
 	return getString("preferred_language")
+}
+
+// GetOriginalLanguage returns the original language override from the configuration.
+func GetOriginalLanguage() string {
+	return getString("original_language")
 }
 
 // GetOutputPath returns the output path from the configuration.

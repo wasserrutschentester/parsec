@@ -28,6 +28,8 @@ var rootCmd = &cobra.Command{
 	Long:  ui.Banner(".: FIRST STEPS? :."),
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		ui.IsSilent = jsonOutputFlag // make sure only json is printed
+		ui.IsJSON = jsonOutputFlag
+
 		if ui.IsSilent {
 			ui.DisableColors()
 		}

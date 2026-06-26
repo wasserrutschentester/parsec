@@ -69,6 +69,7 @@ var expectedTypes = map[string]string{
 	"group":                 "string",
 	"source":                "string",
 	"preferred_language":    "string",
+	"original_language":     "string",
 	"subbed_tagging":        "bool",
 	"audio_description":     "bool",
 	"template":              "string",
@@ -182,6 +183,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_subtitle_format":             true,
 	"matroska_subtitle_fonts":              true,
 	"matroska_subtitle_inline_fonts":       true,
+	"matroska_srt_validation":              true,
 	"matroska_ass_script_info":             true,
 	"matroska_ass_styles":                  true,
 	"matroska_ass_events":                  true,
@@ -194,6 +196,10 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_title_hygiene":               true,
 	"matroska_app_hygiene":                 true,
 	"matroska_truehd_compatibility":        true,
+	"matroska_commentary_channels":         true,
+	"matroska_commentary_bitrate":          true,
+	"matroska_commentary_prefix":           true,
+	"matroska_commentary_pairing":          true,
 	"matroska_chapters_start_non_zero":     true,
 	"matroska_chapters_non_monotonic":      true,
 	"matroska_chapters_duplicate":          true,
@@ -362,7 +368,7 @@ func validateSpecificKeys(k string, v any, fullKey string) []string {
 		if templateStr, ok := v.(string); ok {
 			errors = append(errors, validateTemplateKeys(templateStr, fullKey)...)
 		}
-	case "preferred_language":
+	case "preferred_language", "original_language":
 		if langStr, ok := v.(string); ok {
 			errors = append(errors, validateLanguage(langStr, fullKey)...)
 		}

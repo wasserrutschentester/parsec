@@ -80,15 +80,24 @@ type ChapterAlignmentFix struct {
 // zero-value ChapterAlignmentFix (Changed == 0) when the check is disabled,
 // the file has no chapters, the video keyframe index can't be read, or
 // nothing needs to change. Only the first edition is considered, matching the
-// check's own checks.GetChapters(); a file with additional editions is left alone.
+// check's own parsed chapter model; a file with additional editions is left alone.
 func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) ChapterAlignmentFix {
 	if !config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
 		return ChapterAlignmentFix{}
 	}
 
-	chapters := checks.GetChapters(ebml)
-	if len(chapters) == 0 || len(ebml.Chapters) != 1 || len(ebml.Chapters[0].Editions) != 1 {
+	if len(ebml.Chapters) != 1 || len(ebml.Chapters[0].Editions) != 1 {
 		return ChapterAlignmentFix{}
+	}
+
+	chapters := ebml.Chapters[0].Editions[0].Chapters
+	if len(chapters) == 0 {
+		extracted, err := matroska.ExtractChapters(filePath)
+		if err != nil || extracted == nil || len(extracted.Atoms) == 0 {
+			return ChapterAlignmentFix{}
+		}
+
+		chapters = extracted.Atoms
 	}
 
 	videoTrackNum := checks.GetVideoTrackNumberFromEBML(ebml)

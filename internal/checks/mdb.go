@@ -30,6 +30,10 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		return checkNoMatch()
 	}
 
+	if origLangOverride := config.GetOriginalLanguage(); origLangOverride != "" {
+		searchResult.OriginalLanguage = origLangOverride
+	}
+
 	mdb.PrintCompactResult(*searchResult)
 
 	if config.IsCheckEnabled("mdb_unknown_original_lang") {

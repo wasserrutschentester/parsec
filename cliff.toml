@@ -14,6 +14,22 @@ body = """
     ## [unreleased]
 {% endif %}\
 
+{% set_global has_breaking = false %}\
+{% for commit in commits %}\
+  {% if commit.breaking %}\
+    {% set_global has_breaking = true %}\
+  {% endif %}\
+{% endfor %}\
+{% if has_breaking %}
+    ### ⚠️ Breaking Changes
+    {% for commit in commits %}\
+        {% if commit.breaking %}\
+        - {% if commit.scope %}**({{ commit.scope }})** {% endif %}\
+            {{ commit.message | upper_first }}\
+        {% endif %}\
+    {% endfor %}\
+{% endif %}\
+
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | upper_first }}
     {% for commit in commits %}
@@ -53,8 +69,8 @@ split_commits = false
 # regex for preprocessing the commit messages
 commit_preprocessors = [
   { pattern = '#([0-9]+)', replace = '[#${1}](https://codeberg.org/upPollo/parsec/issues/${1})' },
-  # Join lines that were split without an empty line (fixes "Incorrect body syntax")
-  { pattern = '^(\w+(\([^)]+\))?: [^\n]+)\n([^\n])', replace = "$1\n\n$3" },
+  # Join lines that were split without an empty line (fixes Zed linebreaks)
+  { pattern = '([^\n])\n([^\n])', replace = "${1} ${2}" },
   # Normalize types to lowercase and preserve scopes
   { pattern = '^(?i)feat(\([^)]+\))?:', replace = 'feat$1:' },
   { pattern = '^(?i)fix(\([^)]+\))?:', replace = 'fix$1:' },
@@ -85,7 +101,6 @@ commit_parsers = [
   { message = "^chore\\(release\\): prepare for", skip = true },
   { message = "^chore\\(deps\\)", group = "<!-- 7 -->📦 Dependencies" },
   { message = "^chore|ci", group = "<!-- 8 -->⚙️ Miscellaneous Tasks" },
-  { body = ".*breaking", group = "<!-- 00 -->⚠️ Breaking Changes" },
   { message = ".*", group = "<!-- 9 -->Other" },
 ]
 # protect breaking changes from being skipped due to matching a skipping commit_parser

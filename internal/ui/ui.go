@@ -23,6 +23,9 @@ var (
 	// IsDebug enables debug output
 	IsDebug bool
 
+	// IsJSON suppresses non-JSON output and progress bars
+	IsJSON bool
+
 	// Base Colors
 	blue   = lipgloss.Color("51")
 	green  = lipgloss.Color("118")
@@ -56,7 +59,6 @@ var (
 	Header = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(purple).
-		MarginBottom(1).
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderBottom(true).
 		BorderForeground(purple)
@@ -308,6 +310,24 @@ func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualVa
 func TrackTable(headers []string, rows [][]string) string {
 	t := table.New().
 		Border(lipgloss.DoubleBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(white)).
+		StyleFunc(func(row, _ int) lipgloss.Style {
+			if row < 0 { // Header row
+				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
+			}
+
+			return lipgloss.NewStyle().Padding(0, 1)
+		}).
+		Headers(headers...).
+		Rows(rows...)
+
+	return t.Render()
+}
+
+// FontComplianceTable renders a table of font compliance warning details.
+func FontComplianceTable(headers []string, rows [][]string) string {
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(white)).
 		StyleFunc(func(row, _ int) lipgloss.Style {
 			if row < 0 { // Header row
@@ -653,4 +673,52 @@ func IsTerminal() bool {
 	}
 
 	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
+var lastPercent = -1
+
+// RenderProgressBar returns a styled progress bar string for the given percentage.
+func RenderProgressBar(percent int) string {
+	width := 30
+	completed := (percent * width) / 100
+
+	var bar strings.Builder
+	bar.WriteString(Info.Render("Demuxing: ["))
+
+	for i := range width {
+		if i < completed {
+			bar.WriteString(Success.Render("█"))
+		} else {
+			bar.WriteString(Muted.Render("░"))
+		}
+	}
+
+	bar.WriteString(Info.Render(fmt.Sprintf("] %3d%%", percent)))
+
+	return bar.String()
+}
+
+// ResetProgress resets the progress bar state.
+func ResetProgress() {
+	lastPercent = -1
+}
+
+// UpdateProgress prints a styled progress bar to stdout, overwriting the current line.
+func UpdateProgress(percent int) {
+	if IsJSON || !IsTerminal() {
+		return
+	}
+
+	if percent == lastPercent {
+		return
+	}
+
+	lastPercent = percent
+	fmt.Printf("\r\033[K%s", RenderProgressBar(percent))
+
+	if percent >= 100 {
+		fmt.Println()
+
+		lastPercent = -1
+	}
 }

@@ -1,10 +1,14 @@
 package checks
 
 import (
+	"encoding/json"
 	"fmt"
-	"slices"
+	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -86,6 +90,7 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_subtitle_format",
 		"matroska_subtitle_fonts",
 		"matroska_subtitle_inline_fonts",
+		"matroska_srt_validation",
 		"matroska_unused_fonts",
 		"matroska_ass_script_info",
 		"matroska_ass_styles",
@@ -97,6 +102,10 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_video_cropping",
 		"matroska_track_delay",
 		"matroska_truehd_compatibility",
+		"matroska_commentary_channels",
+		"matroska_commentary_bitrate",
+		"matroska_commentary_prefix",
+		"matroska_commentary_pairing",
 		"matroska_chapters_start_non_zero",
 		"matroska_chapters_non_monotonic",
 		"matroska_chapters_duplicate",
@@ -128,34 +137,25 @@ func newFailedTrackResult(id, desc, severity string, track *matroska.EbmlTrack, 
 }
 
 // RunMatroskaChecks performs checks on the Matroska container and its tracks.
-func RunMatroskaChecks(filePath string, meta *metadata.Metadata) []CheckResult {
-	ebml, err := matroska.GetEbmlMetadata(filePath)
-	if err != nil {
-		return checkMatroskaFormat(err)
+func RunMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, ebmlErr error, meta *metadata.Metadata) []CheckResult {
+	if ebmlErr != nil {
+		return checkMatroskaFormat(ebmlErr)
 	}
 
-	if ebml.HasChapters() {
-		xmlChapters, err := matroska.ExtractChapters(filePath)
-		if err == nil {
-			if len(ebml.Chapters) == 0 {
-				ebml.Chapters = append(ebml.Chapters, matroska.EbmlChapters{
-					NumEntries: len(xmlChapters),
-				})
-			}
+	var xmlChapters *matroska.Chapters
 
-			ebml.Chapters[0].Editions = []matroska.EbmlEdition{
-				{
-					Chapters: xmlChapters,
-				},
-			}
-		} else {
+	if ebml.HasChapters() {
+		var err error
+
+		xmlChapters, err = matroska.ExtractChapters(filePath)
+		if err != nil {
 			ui.PrintDebug(fmt.Sprintf("Failed to extract chapters via mkvextract: %v", err))
 		}
 	}
 
-	fontMap, attachmentNames := GetFontMapping(filePath, ebml.Attachments)
+	attachmentFonts := getFontMapping(filePath, ebml.Attachments)
 
-	return runTrackChecks(filePath, ebml, fontMap, attachmentNames, meta)
+	return runTrackChecks(filePath, ebml, xmlChapters, attachmentFonts, meta)
 }
 
 func checkMatroskaFormat(err error) []CheckResult {
@@ -167,7 +167,7 @@ func checkMatroskaFormat(err error) []CheckResult {
 	}}
 }
 
-func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[string]string, attachmentNames map[int][]string, meta *metadata.Metadata) []CheckResult {
+func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *matroska.Chapters, attachmentFonts []matroska.AttachmentFontInfo, meta *metadata.Metadata) []CheckResult {
 	tracks := ebml.Tracks
 
 	var (
@@ -182,12 +182,57 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 	seenSubLangs := make(map[string]bool)
 
 	agg := newTrackResultAggregator()
-	allUsedFonts := make(map[string]bool)
+	allUsedFonts := make(map[fontStyle]bool)
 
-	audioCounts, subCounts := GetTrackCounts(tracks)
-	langHasOriginalFlag := GetOriginalLanguageMap(tracks)
+	audioCounts, subCounts := getTrackCounts(tracks)
+	langHasOriginalFlag := getOriginalLanguageMap(tracks)
 	videoWidth, videoHeight := getVideoDimensions(tracks)
 
+	extractedTracks := batchExtractTracksIfNeeded(filePath, tracks)
+
+	for i := range tracks {
+		runSingleIterationChecks(filePath, &tracks[i], agg,
+			&lastAudioTrack, &lastSubTrack, &lastAudioPriority, &lastSubPriority,
+			reportedOrderTracks, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs,
+			audioCounts, subCounts, langHasOriginalFlag, videoWidth, videoHeight, allUsedFonts, attachmentFonts,
+			extractedTracks)
+	}
+
+	runGlobalMatroskaChecks(filePath, ebml, meta, agg, allUsedFonts, attachmentFonts)
+	runChaptersChecks(filePath, ebml, xmlChapters, agg)
+
+	return agg.ToSlice()
+}
+
+func batchExtractTracksIfNeeded(filePath string, tracks []matroska.EbmlTrack) map[int][]byte {
+	needsExtraction := config.IsCheckEnabled("matroska_subtitle_inline_fonts") || config.IsCheckEnabled("matroska_ass_events") || config.IsCheckEnabled("matroska_srt_validation")
+	if !needsExtraction {
+		return nil
+	}
+
+	var extractTrackIDs []int
+
+	for _, track := range tracks {
+		if isRelevantTrack(track) {
+			if isASSSubtitles(track) || isSRTSubtitles(track) {
+				extractTrackIDs = append(extractTrackIDs, track.ID)
+			}
+		}
+	}
+
+	if len(extractTrackIDs) == 0 {
+		return nil
+	}
+
+	extractedTracks, extractErr := matroska.ExtractTracks(filePath, extractTrackIDs)
+	if extractErr != nil {
+		ui.PrintDebug(fmt.Sprintf("Failed to extract tracks: %v", extractErr))
+	}
+
+	return extractedTracks
+}
+
+func runGlobalMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, meta *metadata.Metadata, agg *trackResultAggregator, allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo) {
 	if config.IsCheckEnabled("matroska_title_hygiene") {
 		agg.Add(checkTitleHygiene(ebml, meta))
 	}
@@ -196,65 +241,70 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, fontMap map[st
 		agg.Add(checkAppHygiene(ebml))
 	}
 
-	for i := range tracks {
-		runSingleIterationChecks(filePath, &tracks[i], agg,
-			&lastAudioTrack, &lastSubTrack, &lastAudioPriority, &lastSubPriority,
-			reportedOrderTracks, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs,
-			audioCounts, subCounts, langHasOriginalFlag, videoWidth, videoHeight, allUsedFonts, fontMap)
-	}
-
 	if config.IsCheckEnabled("matroska_truehd_compatibility") {
-		agg.Add(checkTrueHDCompatibility(tracks))
+		agg.Add(checkTrueHDCompatibility(ebml.Tracks))
 	}
 
 	if config.IsCheckEnabled("matroska_unused_fonts") {
-		agg.Add(checkUnusedFonts(ebml.Attachments, attachmentNames, allUsedFonts))
+		agg.Add(checkUnusedFonts(ebml.Attachments, attachmentFonts, allUsedFonts))
 	}
 
 	if config.IsCheckEnabled("matroska_font_filename_compliance") {
-		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentNames))
+		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentFonts))
 	}
 
-	runChaptersChecks(filePath, ebml, agg)
+	if config.IsCheckEnabled("matroska_commentary_channels") {
+		agg.Add(checkCommentaryChannels(ebml.Tracks))
+	}
 
-	return agg.ToSlice()
+	if config.IsCheckEnabled("matroska_commentary_bitrate") {
+		agg.Add(checkCommentaryBitrate(filePath, ebml.Tracks))
+	}
+
+	if config.IsCheckEnabled("matroska_commentary_prefix") {
+		agg.Add(checkCommentaryPrefix(ebml.Tracks))
+	}
+
+	if config.IsCheckEnabled("matroska_commentary_pairing") {
+		agg.Add(checkCommentaryPairing(ebml.Tracks))
+	}
 }
 
-func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, agg *trackResultAggregator) {
-	if len(ebml.Chapters) == 0 {
+func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *matroska.Chapters, agg *trackResultAggregator) {
+	if xmlChapters.Empty() {
 		return
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_start_non_zero") {
-		agg.Add(checkChaptersStartNonZero(ebml))
+		agg.Add(checkChaptersStartNonZero(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_non_monotonic") {
-		agg.Add(checkChaptersNonMonotonic(ebml))
+		agg.Add(checkChaptersNonMonotonic(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_duplicate") {
-		agg.Add(checkChaptersDuplicate(ebml))
+		agg.Add(checkChaptersDuplicate(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_too_close") {
-		agg.Add(checkChaptersTooClose(ebml))
+		agg.Add(checkChaptersTooClose(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_exceed_duration") {
-		agg.Add(checkChaptersExceedDuration(ebml))
+		agg.Add(checkChaptersExceedDuration(ebml, xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_name_hygiene") {
-		agg.Add(checkChaptersNameHygiene(ebml))
+		agg.Add(checkChaptersNameHygiene(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_language_hygiene") {
-		agg.Add(checkChaptersLanguageHygiene(ebml))
+		agg.Add(checkChaptersLanguageHygiene(xmlChapters))
 	}
 
 	if config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
-		agg.Add(checkChaptersKeyframeAlignment(filePath, ebml))
+		agg.Add(checkChaptersKeyframeAlignment(filePath, ebml, xmlChapters))
 	}
 }
 
@@ -263,7 +313,8 @@ func runSingleIterationChecks(
 	lastAudioTrack, lastSubTrack **matroska.EbmlTrack, lastAudioPriority, lastSubPriority *int64,
 	reportedOrderTracks map[int]bool, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool,
 	seenAudioLangs, seenSubLangs map[string]bool, audioCounts, subCounts map[string]int,
-	langHasOriginalFlag map[string]bool, videoWidth, videoHeight int, allUsedFonts map[string]bool, fontMap map[string]string,
+	langHasOriginalFlag map[string]bool, videoWidth, videoHeight int, allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo,
+	extractedTracks map[int][]byte,
 ) {
 	if config.IsCheckEnabled("matroska_track_delay") {
 		agg.Add(checkTrackDelay(*track))
@@ -273,11 +324,11 @@ func runSingleIterationChecks(
 		agg.Add(checkVideoCropping(*track))
 	}
 
-	if !IsRelevantTrack(*track) {
+	if !isRelevantTrack(*track) {
 		return
 	}
 
-	agg.AddAll(runIndividualTrackChecks(filePath, *track, langHasOriginalFlag, videoWidth, videoHeight, allUsedFonts, fontMap))
+	agg.AddAll(runIndividualTrackChecks(filePath, *track, langHasOriginalFlag, videoWidth, videoHeight, allUsedFonts, attachmentFonts, extractedTracks))
 	agg.AddAll(runStatefulTrackChecks(track, audioCounts, subCounts, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs))
 
 	if config.IsCheckEnabled("matroska_track_order") {
@@ -285,125 +336,94 @@ func runSingleIterationChecks(
 	}
 }
 
-// ComputeUsedFonts gathers the set of font names referenced by ASS/SSA
-// subtitle tracks, mirroring the allUsedFonts side effects that
-// checkSubtitleFonts and checkSubtitleInlineFontsWithContent produce during a
-// normal check run so fix policy stays consistent with what check reports.
-func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) map[string]bool {
-	allUsedFonts := make(map[string]bool)
-
-	for i := range tracks {
-		track := tracks[i]
-		if !isASSSubtitles(track) {
-			continue
-		}
-
-		if config.IsCheckEnabled("matroska_subtitle_fonts") {
-			checkSubtitleFonts(track, fontMap, allUsedFonts)
-		}
-
-		if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
-			if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
-				checkSubtitleInlineFontsWithContent(track, fontMap, content, allUsedFonts)
-			}
-		}
+func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil
 	}
 
-	return allUsedFonts
-}
-
-// ComputeMissingFonts gathers the ASS/SSA font names referenced by subtitle
-// tracks that do not have a matching embedded font attachment. It mirrors the
-// style and inline-font checks so fix policy can use the same source data as
-// check without parsing warning strings.
-func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) []string {
-	seen := make(map[string]bool)
-	missing := make([]string, 0)
-
-	for i := range tracks {
-		track := tracks[i]
-		if !isASSSubtitles(track) {
-			continue
-		}
-
-		if config.IsCheckEnabled("matroska_subtitle_fonts") {
-			missing = addMissingFonts(missing, seen, styleFontsFromTrack(track), fontMap)
-		}
-
-		if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
-			if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
-				missing = addMissingFonts(missing, seen, inlineFontsFromContent(content), fontMap)
-			}
-		}
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
 	}
 
-	slices.Sort(missing)
+	cacheKey := fmt.Sprintf("font_mapping:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
 
-	return missing
-}
-
-func addMissingFonts(missing []string, seen map[string]bool, usedFonts map[string]bool, fontMap map[string]string) []string {
-	for _, font := range findMissingFonts(usedFonts, fontMap) {
-		normalized := normalizeFontName(font)
-		if seen[normalized] {
-			continue
+	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
+		var fontFonts []matroska.AttachmentFontInfo
+		if err := json.Unmarshal(cachedData, &fontFonts); err == nil {
+			return fontFonts
 		}
-
-		seen[normalized] = true
-
-		missing = append(missing, font)
 	}
-
-	return missing
-}
-
-// GetFontMapping extracts the font attachments and returns a normalized
-// font-name-to-attachment lookup plus the internal font names found per
-// attachment ID. Shared between check and the fix policy in internal/fix.
-func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
-	fontMap := make(map[string]string)
-	attachmentNames := make(map[int][]string)
 
 	var fontIDs []int
 
 	idToAtt := make(map[int]matroska.EbmlAttachment)
 
 	for _, att := range attachments {
-		if IsFontAttachment(att) {
+		if isFontAttachment(att) {
 			fontIDs = append(fontIDs, att.ID)
 			idToAtt[att.ID] = att
 		}
 	}
 
 	if len(fontIDs) == 0 {
-		return fontMap, attachmentNames
+		return nil
 	}
+
+	fontFonts := extractAndParseFonts(filePath, fontIDs, idToAtt)
+
+	if serialized, err := json.Marshal(fontFonts); err == nil {
+		_ = cache.SetPersistent(cacheKey, serialized)
+	}
+
+	return fontFonts
+}
+
+func extractAndParseFonts(filePath string, fontIDs []int, idToAtt map[int]matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
+	var fontFonts []matroska.AttachmentFontInfo
 
 	extracted, err := matroska.ExtractAttachments(filePath, fontIDs)
 	if err != nil {
 		ui.PrintDebug(fmt.Sprintf("Failed to extract attachments: %v", err))
 
-		return fontMap, attachmentNames
+		return fontFonts
 	}
 
 	for id, data := range extracted {
-		names, err := matroska.GetFontNames(data)
+		fonts, err := matroska.GetAttachmentFonts(id, idToAtt[id].FileName, data)
 		if err != nil {
 			ui.PrintDebug(fmt.Sprintf("Failed to parse font %s: %v", idToAtt[id].FileName, err))
 
 			continue
 		}
 
-		attachmentNames[id] = names
-		for _, name := range names {
-			fontMap[normalizeFontName(name)] = name
+		fontFonts = append(fontFonts, fonts...)
+	}
+
+	return fontFonts
+}
+
+func uniqueStrings(in []string) []string {
+	seen := make(map[string]bool)
+
+	var out []string
+
+	for _, s := range in {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			out = append(out, s)
 		}
 	}
 
-	return fontMap, attachmentNames
+	return out
 }
 
-func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHasOriginalFlag map[string]bool, videoWidth, videoHeight int, allUsedFonts map[string]bool, fontMap map[string]string) []*CheckResult {
+func runIndividualTrackChecks(
+	filePath string, track matroska.EbmlTrack, langHasOriginalFlag map[string]bool,
+	videoWidth, videoHeight int, allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo,
+	extractedTracks map[int][]byte,
+) []*CheckResult {
 	var results []*CheckResult
 
 	// Basic checks
@@ -419,17 +439,37 @@ func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHas
 		results = append(results, checkOriginalLanguageConsistency(track, langHasOriginalFlag))
 	}
 
+	results = append(results, runSubtitleSpecificChecks(filePath, track, videoWidth, videoHeight, allUsedFonts, attachmentFonts, extractedTracks)...)
+
+	return results
+}
+
+func runSubtitleSpecificChecks(
+	filePath string, track matroska.EbmlTrack, videoWidth, videoHeight int,
+	allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo,
+	extractedTracks map[int][]byte,
+) []*CheckResult {
+	var results []*CheckResult
+
 	if config.IsCheckEnabled("matroska_subtitle_format") {
 		results = append(results, checkSubtitleFormat(track))
 	}
 
 	if config.IsCheckEnabled("matroska_subtitle_fonts") {
-		results = append(results, checkSubtitleFonts(track, fontMap, allUsedFonts))
+		results = append(results, checkSubtitleFonts(track, attachmentFonts, allUsedFonts))
 	}
 
 	// ASS specific checks
 	if isASSSubtitles(track) {
-		results = append(results, runASSSpecificChecks(filePath, track, videoWidth, videoHeight, allUsedFonts, fontMap)...)
+		results = append(results, runASSSpecificChecks(filePath, track, videoWidth, videoHeight, allUsedFonts, attachmentFonts, extractedTracks)...)
+	}
+
+	// SRT specific checks
+	if isSRTSubtitles(track) && config.IsCheckEnabled("matroska_srt_validation") {
+		content, err := getTrackContent(filePath, track.ID, extractedTracks)
+		if err == nil {
+			results = append(results, checkSRTValidation(track, content))
+		}
 	}
 
 	if track.Type == "subtitles" && config.IsCheckEnabled("matroska_zlib_compression") {
@@ -439,7 +479,11 @@ func runIndividualTrackChecks(filePath string, track matroska.EbmlTrack, langHas
 	return results
 }
 
-func runASSSpecificChecks(filePath string, track matroska.EbmlTrack, videoWidth, videoHeight int, allUsedFonts map[string]bool, fontMap map[string]string) []*CheckResult {
+func runASSSpecificChecks(
+	filePath string, track matroska.EbmlTrack, videoWidth, videoHeight int,
+	allUsedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo,
+	extractedTracks map[int][]byte,
+) []*CheckResult {
 	var results []*CheckResult
 
 	if config.IsCheckEnabled("matroska_ass_script_info") {
@@ -455,20 +499,38 @@ func runASSSpecificChecks(filePath string, track matroska.EbmlTrack, videoWidth,
 		return results
 	}
 
-	content, err := matroska.ExtractTrack(filePath, track.ID)
+	content, err := getTrackContent(filePath, track.ID, extractedTracks)
 	if err != nil {
 		return results
 	}
 
 	if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
-		results = append(results, checkSubtitleInlineFontsWithContent(track, fontMap, content, allUsedFonts))
+		start := time.Now()
+		res := checkSubtitleInlineFontsWithContent(track, attachmentFonts, content, allUsedFonts)
+		ui.PrintDebug(fmt.Sprintf("checkSubtitleInlineFontsWithContent for track %d took %v", track.ID, time.Since(start)))
+
+		results = append(results, res)
 	}
 
 	if config.IsCheckEnabled("matroska_ass_events") {
-		results = append(results, checkASSEvents(track, content))
+		start := time.Now()
+		res := checkASSEvents(track, content)
+		ui.PrintDebug(fmt.Sprintf("checkASSEvents for track %d took %v", track.ID, time.Since(start)))
+
+		results = append(results, res)
 	}
 
 	return results
+}
+
+func getTrackContent(filePath string, trackID int, extractedTracks map[int][]byte) ([]byte, error) {
+	if extractedTracks != nil {
+		if content, exists := extractedTracks[trackID]; exists {
+			return content, nil
+		}
+	}
+
+	return matroska.ExtractTrack(filePath, trackID)
 }
 
 func runNameChecks(track matroska.EbmlTrack) []*CheckResult {
@@ -508,7 +570,7 @@ func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts ma
 }
 
 func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack **matroska.EbmlTrack, lastAudioPriority, lastSubPriority *int64, reportedOrderTracks map[int]bool, agg *trackResultAggregator) {
-	priority := GetTrackPriority(*track)
+	priority := getTrackPriority(*track)
 	switch track.Type {
 	case "audio":
 		agg.Add(checkTrackOrder(track, *lastAudioTrack, priority, lastAudioPriority, "some Audio tracks are out of order", reportedOrderTracks))
@@ -519,14 +581,11 @@ func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack 
 	}
 }
 
-// GetOriginalLanguageMap returns the set of languages that already have at
-// least one track flagged as original. Shared with the fix policy in
-// internal/fix, which uses it to decide where flag-original is missing.
-func GetOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
+func getOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
 	langHasOriginalFlag := make(map[string]bool)
 
 	for _, track := range tracks {
-		if IsRelevantTrack(track) && track.Properties.OriginalLanguage {
+		if isRelevantTrack(track) && track.Properties.OriginalLanguage {
 			langHasOriginalFlag[track.Properties.Language] = true
 		}
 	}
@@ -577,14 +636,12 @@ func ebmlGetFlagsSlice(track *matroska.EbmlTrack) []string {
 	return flags
 }
 
-// GetTrackCounts counts audio and subtitle tracks per language. Shared with
-// the fix policy in internal/fix for its default-flag computation.
-func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
+func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	audio = make(map[string]int)
 	sub = make(map[string]int)
 
 	for _, track := range tracks {
-		if !IsRelevantTrack(track) {
+		if !isRelevantTrack(track) {
 			continue
 		}
 
@@ -599,9 +656,7 @@ func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	return audio, sub
 }
 
-// IsRelevantTrack reports whether a track is of type "audio" or "subtitles".
-// Shared with the fix policy in internal/fix.
-func IsRelevantTrack(track matroska.EbmlTrack) bool {
+func isRelevantTrack(track matroska.EbmlTrack) bool {
 	return track.Type == "audio" || track.Type == "subtitles"
 }
 

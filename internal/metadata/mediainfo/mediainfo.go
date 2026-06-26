@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/language"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/ui"
@@ -226,8 +228,23 @@ func (t *Track) GetElementCount() int {
 
 // Get runs mediainfo on the given file path and returns a MediaInfo struct.
 func Get(filePath string) (*MediaInfo, error) {
-	if _, err := os.Stat(filePath); err != nil {
+	info, err := os.Stat(filePath)
+	if err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+
+	cacheKey := fmt.Sprintf("mediainfo:%s:%d:%d", absPath, info.Size(), info.ModTime().UnixNano())
+
+	if cachedData, err := cache.GetPersistent(cacheKey); err == nil {
+		var mi MediaInfo
+		if err := json.Unmarshal(cachedData, &mi); err == nil {
+			return &mi, nil
+		}
 	}
 
 	ui.PrintDebug("Executing: mediainfo --Output=JSON --ParseSpeed=0 " + ui.AnonymizePath(filePath))
@@ -256,6 +273,8 @@ func Get(filePath string) (*MediaInfo, error) {
 	if !mi.hasAudio() {
 		return nil, errNoAudioTrack
 	}
+
+	_ = cache.SetPersistent(cacheKey, out)
 
 	return &mi, nil
 }

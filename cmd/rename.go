@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
@@ -161,6 +162,13 @@ func renameCommit(filePath, newPath, newName string) error {
 		return errRename
 	}
 
+	oldAbsPath, _ := filepath.Abs(filePath)
+	newAbsPath, _ := filepath.Abs(newPath)
+
+	oldInfo, statErr := os.Stat(filePath)
+
+	ebml, _ := matroska.GetEbmlMetadata(filePath)
+
 	renameErr := os.Rename(filePath, newPath)
 	if renameErr != nil {
 		ui.PrintError(fmt.Sprintf("Error renaming file %s: %v", ui.AnonymizePath(filePath), renameErr))
@@ -168,9 +176,64 @@ func renameCommit(filePath, newPath, newName string) error {
 		return errRename
 	}
 
+	newInfo, statErr2 := os.Stat(newPath)
+
+	if statErr == nil && statErr2 == nil {
+		renameMigrateCache(oldAbsPath, newAbsPath, oldInfo, newInfo, ebml)
+	}
+
 	ui.Println(ui.Success.Render("All systems nominal! File renamed successfully."))
 
 	return nil
+}
+
+func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo, ebml *matroska.EbmlMetadata) {
+	oldMkvKey := fmt.Sprintf("mkvmerge:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newMkvKey := fmt.Sprintf("mkvmerge:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldMkvKey, newMkvKey)
+
+	oldMediaKey := fmt.Sprintf("mediainfo:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newMediaKey := fmt.Sprintf("mediainfo:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldMediaKey, newMediaKey)
+
+	// Migrate chapters cache
+	oldChaptersKey := fmt.Sprintf("chapters:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newChaptersKey := fmt.Sprintf("chapters:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldChaptersKey, newChaptersKey)
+
+	// Migrate font mapping cache
+	oldFontKey := fmt.Sprintf("font_mapping:%s:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano())
+	newFontKey := fmt.Sprintf("font_mapping:%s:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano())
+
+	_ = cache.MovePersistent(oldFontKey, newFontKey)
+
+	// Migrate keyframes cache if video track is present
+	if ebml != nil {
+		var videoTrackNum uint64
+
+		for _, track := range ebml.Tracks {
+			if track.Type == "video" {
+				videoTrackNum = uint64(track.ID)
+
+				break
+			}
+		}
+
+		if videoTrackNum != 0 {
+			scale := ebml.Container.Properties.TimestampScale
+			if scale <= 0 {
+				scale = 1_000_000
+			}
+
+			oldKey := fmt.Sprintf("keyframes:%s:%d:%d:%d:%d", oldAbs, oldInfo.Size(), oldInfo.ModTime().UnixNano(), videoTrackNum, scale)
+			newKey := fmt.Sprintf("keyframes:%s:%d:%d:%d:%d", newAbs, newInfo.Size(), newInfo.ModTime().UnixNano(), videoTrackNum, scale)
+
+			_ = cache.MovePersistent(oldKey, newKey)
+		}
+	}
 }
 
 func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainfo.MediaInfo, error) {
@@ -254,12 +317,9 @@ func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb
 		if episodeResult.Name != "" {
 			meta.EpisodeTitle = episodeResult.Name
 			meta.Season = episodeResult.Season
-			// Note: this overrides episodes with just the FIRST found episode's ID if we only found one,
-			// wait, mdbSearch.FindEpisode should probably return all episodes if there are multiple.
-			// I'll fix this in the next replacement. Let's just leave it for a sec.
-			// Actually we will handle this in FindEpisode by returning a combined EpisodeResult.
-			// For now, assume it returns the unified object.
-			// However, since we matched them, we should probably just keep meta.Episodes intact unless we only searched by title/date.
+			meta.Date = episodeResult.Airdate
+
+			// only set episode numbers if empty
 			if len(meta.Episodes) == 0 {
 				meta.Episodes = []int{episodeResult.Episode}
 			}

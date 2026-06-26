@@ -130,3 +130,23 @@ func TestAnonymizePath(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderProgressBar(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		percent  int
+		contains string
+	}{
+		{0, "  0%"},
+		{50, " 50%"},
+		{100, "100%"},
+	}
+
+	for _, tt := range tests {
+		got := RenderProgressBar(tt.percent)
+		if !strings.Contains(got, tt.contains) {
+			t.Errorf("RenderProgressBar(%d) = %q, expected to contain %q", tt.percent, got, tt.contains)
+		}
+	}
+}
