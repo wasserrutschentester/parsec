@@ -61,7 +61,7 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // depends on shared global state
+//nolint:paralleltest // mutates global state via viper.Set
 func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 	config.InitDefaults()
 	viper.Set("enabled_checks", []string{"all"})
@@ -104,12 +104,14 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 		}
 	}
 
+	viper.Reset()
+
 	if !found {
 		t.Error("Did not find font filename compliance check result")
 	}
 }
 
-//nolint:paralleltest // mutates global state via config.InitDefaults()
+//nolint:paralleltest // depends on global state via config.InitDefaults()
 func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 	config.InitDefaults()
 
@@ -155,7 +157,7 @@ func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // mutates global state via config.InitDefaults()
+//nolint:paralleltest // depends on global state via config.InitDefaults()
 func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
 	config.InitDefaults()
 
@@ -192,7 +194,7 @@ func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // mutates global state via config.InitDefaults()
+//nolint:paralleltest // depends on global state via config.InitDefaults()
 func TestCheckUnusedFontsStyleAware(t *testing.T) {
 	config.InitDefaults()
 

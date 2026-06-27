@@ -71,6 +71,7 @@ func TestGetTrackPriority(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state
 func TestRunTrackChecksDuplicateTracks(t *testing.T) {
+	viper.Reset()
 	config.InitDefaults()
 
 	tracks := []matroska.EbmlTrack{
