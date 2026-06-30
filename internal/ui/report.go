@@ -180,6 +180,24 @@ func printListTrackReport(res types.CheckResult) {
 	printListTrackReportWithIndent(res.Identifier, res.Tracks, "      ")
 }
 
+func printListTrackWarning(identifier, indent, warning string) {
+	if warning == "" || warning == "See table below" {
+		return
+	}
+
+	for line := range strings.SplitSeq(warning, "\n") {
+		if identifier == "matroska_srt_validation" {
+			if !strings.HasPrefix(line, "  ") && strings.HasSuffix(line, ":") {
+				Println(indent + Warning.Render(line))
+			} else {
+				Println(indent + "  - " + strings.TrimSpace(line))
+			}
+		} else {
+			Println(indent + "- " + line)
+		}
+	}
+}
+
 func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheckResult, indent string) {
 	for _, t := range tracks {
 		header := fmt.Sprintf("%sTrack %s (%s/%s)", indent, t.ID, t.Type, t.Codec)
@@ -189,17 +207,11 @@ func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheck
 
 		Println(Muted.Render(header + ":"))
 
-		for line := range strings.SplitSeq(t.Warning, "\n") {
-			if identifier == "matroska_srt_validation" {
-				if !strings.HasPrefix(line, "  ") && strings.HasSuffix(line, ":") {
-					Println(indent + Warning.Render(line))
-				} else {
-					Println(indent + "  - " + strings.TrimSpace(line))
-				}
-			} else {
-				Println(indent + "- " + line)
-			}
+		if t.Table != nil {
+			Println(indent + "  " + strings.ReplaceAll(DataTable(t.Table.Headers, t.Table.Rows), "\n", "\n"+indent+"  "))
 		}
+
+		printListTrackWarning(identifier, indent, t.Warning)
 	}
 }
 

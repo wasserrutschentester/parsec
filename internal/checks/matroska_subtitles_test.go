@@ -12,6 +12,18 @@ import (
 	"codeberg.org/upPollo/parsec/internal/types"
 )
 
+func getUnusedFontsResult(res []CheckResult) *CheckResult {
+	for _, r := range res {
+		if r.Identifier == "matroska_unused_fonts" {
+			rCopy := r
+
+			return &rCopy
+		}
+	}
+
+	return nil
+}
+
 //nolint:paralleltest // depends on shared global state
 func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	config.InitDefaults()
@@ -41,24 +53,35 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	}
 
 	res := runTrackChecks("", ebml, nil, attachmentFonts, nil)
-	found := false
+	targetRes := getUnusedFontsResult(res)
 
-	for _, r := range res {
-		if r.Identifier == "matroska_unused_fonts" {
-			found = true
+	if targetRes == nil {
+		t.Fatal("Did not find unused fonts check result")
+	}
 
-			if !strings.Contains(r.Warning, "UnusedFont.ttf") {
-				t.Errorf("Expected warning to contain UnusedFont.ttf, got '%s'", r.Warning)
-			}
+	if targetRes.Table == nil {
+		t.Fatalf("Expected Table to be populated")
+	}
 
-			if strings.Contains(r.Warning, "Arial.ttf") {
-				t.Errorf("Warning should not contain Arial.ttf, got '%s'", r.Warning)
-			}
+	foundUnused := false
+	foundArial := false
+
+	for _, row := range targetRes.Table.Rows {
+		if len(row) > 0 && row[0] == "UnusedFont.ttf" {
+			foundUnused = true
+		}
+
+		if len(row) > 0 && row[0] == "Arial.ttf" {
+			foundArial = true
 		}
 	}
 
-	if !found {
-		t.Error("Did not find unused fonts check result")
+	if !foundUnused {
+		t.Errorf("Expected table to contain UnusedFont.ttf")
+	}
+
+	if foundArial {
+		t.Errorf("Table should not contain Arial.ttf")
 	}
 }
 

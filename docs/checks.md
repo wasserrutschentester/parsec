@@ -240,6 +240,7 @@ The interactive output contains the same information as the JSON output, but in 
 | `expected` | string | The expected value (optional, depends on the check). |
 | `actual` | string | The actual value found (optional, depends on the check). |
 | `tracks` | array | List of track-specific results (optional, for checks that evaluate individual tracks). |
+| `table` | object | Table-formatted data (optional, see [TableData Object](#tabledata-object)). |
 
 **Example:**
 ```json
@@ -267,6 +268,7 @@ The interactive output contains the same information as the JSON output, but in 
 | `language` | string | The track's ISO 639-2/T language tag (e.g., `ger`, `eng`). |
 | `flags` | array | List of applied track flags. See [Track Flags](#track-flags). |
 | `warning` | string | Human-readable description of the track-specific issue. |
+| `table` | object | Table-formatted data for this track (optional, see [TableData Object](#tabledata-object)). |
 
 **Example:**
 ```json
@@ -295,6 +297,33 @@ Possible values in the `flags` array:
 * `Visual Impaired`: Track is marked for visual impaired (Descriptive Audio).
 * `Commentary`: Track is marked as commentary.
 * `Original`: Track is marked as being in the original language.
+
+### TableData Object
+
+Used to display structured, multi-dimensional tabular data.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `headers` | array | List of column header names (strings). |
+| `rows` | array | List of row entries, where each entry is a list of strings corresponding to the headers. |
+
+**Example:**
+```json
+{
+  "headers": [
+    "Line #",
+    "Style Name",
+    "Validation Issue"
+  ],
+  "rows": [
+    [
+      "18",
+      "Default",
+      "Encoding should be 1, got 0"
+    ]
+  ]
+}
+```
 
 ### Full Example
 ```bash

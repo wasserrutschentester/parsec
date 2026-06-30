@@ -241,22 +241,37 @@ func checkASSStyles(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	lines := strings.Split(string(privateBytes), "\n")
-	errors := validateStyles(lines)
+	rows := validateStyles(lines)
 
-	if len(errors) > 0 {
-		warning := strings.Join(errors, "\n")
+	if len(rows) > 0 {
+		res := newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, "See table below")
+		res.Tracks[0].Table = &types.TableData{
+			Headers: []string{"Line #", "Style Name", "Validation Issue"},
+			Rows:    rows,
+		}
 
-		return newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, warning)
+		return res
 	}
 
 	return nil
 }
 
-func validateStyles(lines []string) []string {
+func getStyleName(rest string, formatFields []string) string {
+	values := strings.Split(rest, ",")
+	for i, field := range formatFields {
+		if strings.ToLower(strings.TrimSpace(field)) == "name" && i < len(values) {
+			return strings.TrimSpace(values[i])
+		}
+	}
+
+	return "-"
+}
+
+func validateStyles(lines []string) [][]string {
 	inStyles := false
 	formatFields := []string{}
 
-	var errors []string
+	var rows [][]string
 
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
@@ -278,13 +293,18 @@ func validateStyles(lines []string) []string {
 		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
 			formatFields = parseStyleFormat(rest)
 		} else if rest, ok := strings.CutPrefix(line, "Style:"); ok {
+			styleName := getStyleName(rest, formatFields)
 			for _, err := range validateStyleLine(rest, formatFields) {
-				errors = append(errors, fmt.Sprintf("%s (Line %d: Style: %s )", ui.Warning.Render(err), i+1, rest))
+				rows = append(rows, []string{
+					strconv.Itoa(i + 1),
+					styleName,
+					err,
+				})
 			}
 		}
 	}
 
-	return errors
+	return rows
 }
 
 func validateStyleLine(rest string, formatFields []string) []string {
@@ -689,12 +709,49 @@ func isAttachmentUsedNorm(attID int, normAtts []normalizedAttachmentFontID, norm
 	return false
 }
 
+func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) [][]string {
+	rows := make([][]string, 0, len(unused))
+
+	for _, u := range unused {
+		fontName := "-"
+
+		for _, fInfo := range attachmentFonts {
+			if fInfo.AttachmentID == u.ID {
+				if len(fInfo.FullNames) > 0 {
+					fontName = strings.Join(fInfo.FullNames, ", ")
+				} else if fInfo.FamilyName != "" {
+					fontName = fInfo.FamilyName
+				}
+
+				break
+			}
+		}
+
+		sizeStr := ""
+
+		const unit = 1024
+
+		switch {
+		case u.Size < unit:
+			sizeStr = fmt.Sprintf("%d B", u.Size)
+		case u.Size < unit*unit:
+			sizeStr = fmt.Sprintf("%.1f KB", float64(u.Size)/float64(unit))
+		default:
+			sizeStr = fmt.Sprintf("%.1f MB", float64(u.Size)/float64(unit*unit))
+		}
+
+		rows = append(rows, []string{u.FileName, fontName, sizeStr})
+	}
+
+	return rows
+}
+
 func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
 	if len(attachments) == 0 {
 		return nil
 	}
 
-	var unused []string
+	var unused []matroska.EbmlAttachment
 
 	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
 	for font := range allUsedFonts {
@@ -719,7 +776,7 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 
 	for _, att := range attachments {
 		if isFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
-			unused = append(unused, att.FileName)
+			unused = append(unused, att)
 		}
 	}
 
@@ -729,13 +786,15 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 			warning += " (some might be used by inline styles since matroska_subtitle_inline_fonts is disabled)"
 		}
 
-		warning += ": " + strings.Join(unused, ", ")
-
 		return &CheckResult{
 			Identifier: "matroska_unused_fonts",
 			Warning:    warning,
 			Passed:     false,
 			Severity:   "warning",
+			Table: &types.TableData{
+				Headers: []string{"Attachment Name", "Full Name", "Size"},
+				Rows:    getUnusedFontsTableRows(unused, attachmentFonts),
+			},
 		}
 	}
 

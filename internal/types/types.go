@@ -21,15 +21,16 @@ type CheckResult struct {
 
 // TrackCheckResult represents the result of a check on a specific track.
 type TrackCheckResult struct {
-	ID        string   `json:"id"`
-	Type      string   `json:"type"`
-	Passed    bool     `json:"passed"`
-	TypeOrder int      `json:"type_order"`
-	Codec     string   `json:"codec,omitempty"`
-	Name      string   `json:"name,omitempty"`
-	Language  string   `json:"language,omitempty"`
-	Flags     []string `json:"flags,omitempty"`
-	Warning   string   `json:"warning,omitempty"`
+	ID        string     `json:"id"`
+	Type      string     `json:"type"`
+	Passed    bool       `json:"passed"`
+	TypeOrder int        `json:"type_order"`
+	Codec     string     `json:"codec,omitempty"`
+	Name      string     `json:"name,omitempty"`
+	Language  string     `json:"language,omitempty"`
+	Flags     []string   `json:"flags,omitempty"`
+	Warning   string     `json:"warning,omitempty"`
+	Table     *TableData `json:"table,omitempty"`
 }
 
 // IssueGroup represents a group of check results under a specific category.
