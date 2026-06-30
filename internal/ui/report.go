@@ -113,6 +113,12 @@ func printSingleResult(res types.CheckResult, sharedWidths map[int]int) {
 		PrintWarning(res.Warning)
 	}
 
+	if res.Table != nil {
+		Println(DataTable(res.Table.Headers, res.Table.Rows))
+
+		return
+	}
+
 	if len(res.Tracks) == 0 {
 		printUnexpectedDiff(res)
 
@@ -240,6 +246,7 @@ type fileDetail struct {
 	expected string
 	actual   string
 	tracks   []types.TrackCheckResult
+	table    *types.TableData
 }
 
 type aggIssue struct {
@@ -376,6 +383,7 @@ func groupIssues(reports []types.CheckReport) ([]issueKey, map[issueKey]*aggIssu
 					expected: res.Expected,
 					actual:   res.Actual,
 					tracks:   res.Tracks,
+					table:    res.Table,
 				}
 
 				if agg, exists := aggIssuesMap[k]; exists {
@@ -439,11 +447,17 @@ func printOutlierIssues(issues []*aggIssue, totalFiles int, unattended bool) {
 		for _, detail := range agg.details {
 			Println(fmt.Sprintf("    • %s:", detail.fileName))
 
-			// Print diff details if any
-			printUnexpectedDiffIndented(agg.key.identifier, detail.expected, detail.actual, "        ")
+			if detail.table != nil {
+				tableStr := DataTable(detail.table.Headers, detail.table.Rows)
+				indentedTable := "        " + strings.ReplaceAll(tableStr, "\n", "\n        ")
+				Println(indentedTable)
+			} else {
+				// Print diff details if any
+				printUnexpectedDiffIndented(agg.key.identifier, detail.expected, detail.actual, "        ")
 
-			// Print tracks table if any
-			printTracksDetailsIndented(agg.key.identifier, detail.tracks)
+				// Print tracks table if any
+				printTracksDetailsIndented(agg.key.identifier, detail.tracks)
+			}
 		}
 	}
 }

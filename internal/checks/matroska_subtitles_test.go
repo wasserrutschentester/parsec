@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/types"
 )
 
 //nolint:paralleltest // depends on shared global state
@@ -61,10 +62,52 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	}
 }
 
+func getFontComplianceResult(res []CheckResult) *CheckResult {
+	for _, r := range res {
+		if r.Identifier == "matroska_font_filename_compliance" {
+			rCopy := r
+
+			return &rCopy
+		}
+	}
+
+	return nil
+}
+
+func assertFontComplianceTable(t *testing.T, table *types.TableData) {
+	t.Helper()
+
+	if table == nil {
+		t.Fatal("Expected TableData to be populated")
+	}
+
+	var contentBuilder strings.Builder
+
+	for _, row := range table.Rows {
+		contentBuilder.WriteString(strings.Join(row, " ") + "\n")
+	}
+
+	content := contentBuilder.String()
+
+	if !strings.Contains(content, "WrongName.ttf") {
+		t.Errorf("Expected table to contain WrongName.ttf")
+	}
+
+	if !strings.Contains(content, "CorrectName.ttf") {
+		t.Errorf("Expected table to contain proposed CorrectName.ttf")
+	}
+
+	if strings.Contains(content, "Arial.ttf") {
+		t.Errorf("Table should not contain Arial.ttf")
+	}
+}
+
 //nolint:paralleltest // mutates global state via viper.Set
 func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 	config.InitDefaults()
 	viper.Set("enabled_checks", []string{"all"})
+
+	defer viper.Reset()
 
 	ebml := &matroska.EbmlMetadata{
 		Tracks: []matroska.EbmlTrack{},
@@ -80,35 +123,17 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 	}
 
 	res := runTrackChecks("", ebml, nil, attachmentFonts, nil)
-	found := false
 
-	for _, r := range res {
-		if r.Identifier == "matroska_font_filename_compliance" {
-			found = true
-
-			if r.Severity != "info" {
-				t.Errorf("Expected severity to be info, got '%s'", r.Severity)
-			}
-
-			if !strings.Contains(r.Warning, "WrongName.ttf") {
-				t.Errorf("Expected warning to contain WrongName.ttf, got '%s'", r.Warning)
-			}
-
-			if !strings.Contains(r.Warning, "CorrectName.ttf") {
-				t.Errorf("Expected warning to contain proposed CorrectName.ttf, got '%s'", r.Warning)
-			}
-
-			if strings.Contains(r.Warning, "Arial.ttf") {
-				t.Errorf("Warning should not contain Arial.ttf, got '%s'", r.Warning)
-			}
-		}
+	targetRes := getFontComplianceResult(res)
+	if targetRes == nil {
+		t.Fatal("Did not find font filename compliance check result")
 	}
 
-	viper.Reset()
-
-	if !found {
-		t.Error("Did not find font filename compliance check result")
+	if targetRes.Severity != "info" {
+		t.Errorf("Expected severity to be info, got '%s'", targetRes.Severity)
 	}
+
+	assertFontComplianceTable(t, targetRes.Table)
 }
 
 //nolint:paralleltest // depends on global state via config.InitDefaults()

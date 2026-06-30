@@ -1,6 +1,12 @@
 // Package types defines common types used across the parsec codebase.
 package types
 
+// TableData represents generic tabular data to be presented in reports.
+type TableData struct {
+	Headers []string   `json:"headers"`
+	Rows    [][]string `json:"rows"`
+}
+
 // CheckResult represents the result of a single check.
 type CheckResult struct {
 	Identifier string             `json:"identifier"`
@@ -10,6 +16,7 @@ type CheckResult struct {
 	Tracks     []TrackCheckResult `json:"tracks,omitempty"`
 	Expected   string             `json:"expected,omitempty"`
 	Actual     string             `json:"actual,omitempty"`
+	Table      *TableData         `json:"table,omitempty"`
 }
 
 // TrackCheckResult represents the result of a check on a specific track.

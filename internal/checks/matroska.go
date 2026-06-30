@@ -38,6 +38,7 @@ func (a *trackResultAggregator) Add(res *CheckResult) {
 			Passed:     true,
 			Actual:     res.Actual,
 			Expected:   res.Expected,
+			Table:      res.Table,
 		}
 		a.aggregated[res.Identifier] = target
 	} else {

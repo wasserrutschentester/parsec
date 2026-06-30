@@ -324,8 +324,8 @@ func TrackTable(headers []string, rows [][]string) string {
 	return t.Render()
 }
 
-// FontComplianceTable renders a table of font compliance warning details.
-func FontComplianceTable(headers []string, rows [][]string) string {
+// DataTable renders a generic table with headers and rows.
+func DataTable(headers []string, rows [][]string) string {
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(white)).

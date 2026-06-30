@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/types"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -754,6 +755,23 @@ func getAttachmentFontNames(attID int, attachmentFonts []matroska.AttachmentFont
 	return uniqueStrings(names)
 }
 
+func cleanFallbackFontName(fullName string, familyName string) string {
+	if familyName != "" && fullName != familyName && strings.HasPrefix(strings.ToLower(fullName), strings.ToLower(familyName)) {
+		// e.g. fullName: "Times New Roman Bold", familyName: "Times New Roman"
+		style := fullName[len(familyName):]
+		style = strings.TrimSpace(style)
+
+		familyClean := strings.ReplaceAll(familyName, " ", "")
+		styleClean := strings.ReplaceAll(style, " ", "")
+
+		if styleClean != "" {
+			return familyClean + "-" + styleClean
+		}
+	}
+
+	return strings.ReplaceAll(fullName, " ", "")
+}
+
 func getProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
 	var ext string
 
@@ -768,11 +786,11 @@ func getProposedFontFilename(attFileName string, attID int, attachmentFonts []ma
 			}
 
 			if len(fInfo.FullNames) > 0 && fInfo.FullNames[0] != "" {
-				return fInfo.FullNames[0] + ext
+				return cleanFallbackFontName(fInfo.FullNames[0], fInfo.FamilyName) + ext
 			}
 
 			if fInfo.FamilyName != "" {
-				return fInfo.FamilyName + ext
+				return cleanFallbackFontName(fInfo.FamilyName, "") + ext
 			}
 		}
 	}
@@ -798,14 +816,14 @@ func isAttachmentNameCompliant(attFileName string, names []string) bool {
 	return false
 }
 
-func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
-	type complianceRow struct {
-		current  string
-		proposed string
-		internal string
-	}
+type fontComplianceRow struct {
+	attID    int
+	current  string
+	proposed string
+}
 
-	var nonCompliant []complianceRow
+func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []fontComplianceRow {
+	var nonCompliant []fontComplianceRow
 
 	for _, att := range attachments {
 		if !isFontAttachment(att) {
@@ -823,33 +841,73 @@ func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachme
 				proposed = "-"
 			}
 
-			nonCompliant = append(nonCompliant, complianceRow{
+			nonCompliant = append(nonCompliant, fontComplianceRow{
+				attID:    att.ID,
 				current:  att.FileName,
 				proposed: proposed,
-				internal: strings.Join(names, ", "),
 			})
 		}
 	}
 
-	if len(nonCompliant) > 0 {
-		headers := []string{"Current Filename", "Internal Fonts", "Proposed Filename"}
-		rows := make([][]string, 0, len(nonCompliant))
+	return nonCompliant
+}
 
-		for _, row := range nonCompliant {
-			rows = append(rows, []string{row.current, row.internal, row.proposed})
+func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
+	headers := []string{"Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
+
+	var rows [][]string
+
+	for _, row := range nonCompliant {
+		var fInfo *matroska.AttachmentFontInfo
+
+		for _, f := range attachmentFonts {
+			if f.AttachmentID == row.attID {
+				fCopy := f
+				fInfo = &fCopy
+
+				break
+			}
 		}
 
-		tableStr := ui.FontComplianceTable(headers, rows)
+		if fInfo != nil {
+			psName := fInfo.PostScriptName
+			if psName == "" {
+				psName = "-"
+			}
 
-		return &CheckResult{
-			Identifier: "matroska_font_filename_compliance",
-			Warning:    "Font attachment filenames do not match internal font names:\n" + tableStr,
-			Passed:     false,
-			Severity:   "info",
+			fullName := strings.Join(fInfo.FullNames, ", ")
+			if fullName == "" {
+				fullName = "-"
+			}
+
+			rows = append(rows, []string{
+				row.current,
+				fullName,
+				psName,
+				row.proposed,
+			})
 		}
 	}
 
-	return nil
+	return &CheckResult{
+		Identifier: "matroska_font_filename_compliance",
+		Warning:    "Font attachment filenames do not match internal font names",
+		Passed:     false,
+		Severity:   "info",
+		Table: &types.TableData{
+			Headers: headers,
+			Rows:    rows,
+		},
+	}
+}
+
+func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
+	nonCompliant := findNonCompliantFonts(attachments, attachmentFonts)
+	if len(nonCompliant) == 0 {
+		return nil
+	}
+
+	return buildFontComplianceResult(nonCompliant, attachmentFonts)
 }
 
 func parseSingleStyleLine(line string, formatFields []string) (string, fontStyle, bool) {
