@@ -194,6 +194,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_video_cropping":              true,
 	"matroska_title_hygiene":               true,
 	"matroska_app_hygiene":                 true,
+	"matroska_creation_time_privacy":       true,
 	"matroska_truehd_compatibility":        true,
 	"matroska_commentary_channels":         true,
 	"matroska_commentary_bitrate":          true,

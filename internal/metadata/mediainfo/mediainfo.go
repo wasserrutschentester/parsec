@@ -165,6 +165,8 @@ type Track struct {
 	DialogNormalization      string    `json:"Dialog_Normalization,omitempty"`
 	CodecID                  string    `json:"CodecID,omitempty"`
 	CodecIDHint              string    `json:"CodecID_Hint,omitempty"`
+	EncodedDate              string    `json:"Encoded_Date,omitempty"`
+	TaggedDate               string    `json:"Tagged_Date,omitempty"`
 	EncodedLibrary           string    `json:"Encoded_Library,omitempty"`
 	StreamSize               int64     `json:"StreamSize,string,omitempty"`
 	Default                  MediaBool `json:"Default,omitempty"`
