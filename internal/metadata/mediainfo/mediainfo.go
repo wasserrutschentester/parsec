@@ -145,7 +145,7 @@ type Track struct {
 	FormatAdditionalFeatures string    `json:"Format_AdditionalFeatures,omitempty"`
 	Title                    string    `json:"Title,omitempty"`
 	Language                 string    `json:"Language,omitempty"`
-	Duration                 float64   `json:"Duration,string,omitempty"`
+	Duration                 *float64  `json:"Duration,string,omitempty"`
 	Channels                 int       `json:"Channels,string,omitempty"`
 	BitRate                  int       `json:"BitRate,string,omitempty"`
 	BitRateMode              string    `json:"BitRate_Mode,omitempty"`
@@ -157,8 +157,8 @@ type Track struct {
 	DisplayAspectRatio       string    `json:"DisplayAspectRatio,omitempty"`
 	ScanType                 string    `json:"ScanType,omitempty"`
 	FrameRate                float64   `json:"FrameRate,string,omitempty"`
-	FrameCount               int       `json:"FrameCount,string,omitempty"`
-	ElementCount             int       `json:"ElementCount,string,omitempty"`
+	FrameCount               *int      `json:"FrameCount,string,omitempty"`
+	ElementCount             *int      `json:"ElementCount,string,omitempty"`
 	BitDepth                 int       `json:"BitDepth,string,omitempty"`
 	ChromaSubsampling        string    `json:"ChromaSubsampling,omitempty"`
 	SamplingRate             int       `json:"SamplingRate,string,omitempty"`
@@ -168,7 +168,7 @@ type Track struct {
 	EncodedDate              string    `json:"Encoded_Date,omitempty"`
 	TaggedDate               string    `json:"Tagged_Date,omitempty"`
 	EncodedLibrary           string    `json:"Encoded_Library,omitempty"`
-	StreamSize               int64     `json:"StreamSize,string,omitempty"`
+	StreamSize               *int64    `json:"StreamSize,string,omitempty"`
 	Default                  MediaBool `json:"Default,omitempty"`
 	Forced                   MediaBool `json:"Forced,omitempty"`
 
@@ -203,14 +203,14 @@ func (t *Track) GetDialNorm() string {
 	return strings.TrimSuffix(val, " dB")
 }
 
-// GetElementCount returns the count of elements (subtitle lines) in the track.
+// GetElementCount returns the count of elements (subtitle lines) in the track. Returns -1 if unknown/unset.
 func (t *Track) GetElementCount() int {
-	if t.ElementCount > 0 {
-		return t.ElementCount
+	if t.ElementCount != nil {
+		return *t.ElementCount
 	}
 
-	if t.FrameCount > 0 && t.Type == "Text" {
-		return t.FrameCount
+	if t.FrameCount != nil && t.Type == "Text" {
+		return *t.FrameCount
 	}
 
 	if val := t.Extra.GetString("ElementCount"); val != "" {
@@ -225,7 +225,7 @@ func (t *Track) GetElementCount() int {
 		}
 	}
 
-	return 0
+	return -1
 }
 
 // Get runs mediainfo on the given file path and returns a MediaInfo struct.
