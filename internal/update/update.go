@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -42,13 +43,18 @@ var (
 
 // CheckForUpdateBackground checks if a new version is available in the background
 func CheckForUpdateBackground(currentVersion string) {
-	if config.GetDisableUpdateCheck() {
+	if !config.GetCheckUpdates() {
 		return
 	}
 
 	const cacheKey = "latest_release_tag"
 
-	cachedData, err := cache.Get(cacheKey)
+	cacheDur := 6 * time.Hour
+	if config.GetCheckPrereleaseUpdates() {
+		cacheDur = 1 * time.Hour
+	}
+
+	cachedData, err := cache.GetWithDuration(cacheKey, cacheDur)
 	if err == nil {
 		latestTag := string(cachedData)
 		ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
@@ -62,7 +68,7 @@ func CheckForUpdateBackground(currentVersion string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			if rel, err := FetchLatestRelease(ctx); err == nil {
+			if rel, err := FetchLatestRelease(ctx, config.GetCheckPrereleaseUpdates()); err == nil {
 				_ = cache.Set(cacheKey, []byte(rel.TagName))
 			}
 		}()
@@ -72,6 +78,8 @@ func CheckForUpdateBackground(currentVersion string) {
 // Release represents a GitHub-like release from Codeberg.
 type Release struct {
 	TagName string  `json:"tag_name"`
+	Name    string  `json:"name"`
+	Body    string  `json:"body"`
 	Assets  []Asset `json:"assets"`
 }
 
@@ -81,10 +89,59 @@ type Asset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
-// FetchLatestRelease retrieves the latest release information from the Codeberg API.
-func FetchLatestRelease(ctx context.Context) (*Release, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
+var errNotFound = errors.New("release not found")
 
+// FetchLatestRelease retrieves the latest release information from the Codeberg API.
+func FetchLatestRelease(ctx context.Context, checkPrerelease bool) (*Release, error) {
+	stableURL := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
+	stableRel, err := fetchRelease(ctx, stableURL)
+	if err != nil && !errors.Is(err, errNotFound) {
+		return nil, err
+	}
+
+	if !checkPrerelease {
+		if stableRel == nil {
+			return nil, errNotFound
+		}
+		return stableRel, nil
+	}
+
+	nightlyURL := fmt.Sprintf("%s/repos/%s/%s/releases/tags/nightly", baseURL, owner, repo)
+	nightlyRel, err := fetchRelease(ctx, nightlyURL)
+	if err != nil && !errors.Is(err, errNotFound) {
+		return nil, err
+	}
+
+	if nightlyRel != nil {
+		// Extract the true semantic version from the git-cliff changelog body
+		// It outputs: ## [v0.4.1-dev.12+4508cc6] - 2026-07-01
+		matches := regexp.MustCompile(`(?m)^## \[(v[0-9]+\.[0-9]+\.[0-9]+.*?)\]`).FindStringSubmatch(nightlyRel.Body)
+		if len(matches) > 1 {
+			nightlyRel.TagName = matches[1]
+		} else if nightlyRel.Name != "" && nightlyRel.Name != "nightly" {
+			nightlyRel.TagName = nightlyRel.Name
+		}
+	}
+
+	if stableRel == nil && nightlyRel == nil {
+		return nil, errNotFound
+	}
+	if stableRel == nil {
+		return nightlyRel, nil
+	}
+	if nightlyRel == nil {
+		return stableRel, nil
+	}
+
+	// Compare versions to find the absolute latest
+	if IsNewer(nightlyRel.TagName, stableRel.TagName) {
+		return nightlyRel, nil
+	}
+
+	return stableRel, nil
+}
+
+func fetchRelease(ctx context.Context, url string) (*Release, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -92,10 +149,13 @@ func FetchLatestRelease(ctx context.Context) (*Release, error) {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch latest release: %w", err)
+		return nil, fmt.Errorf("failed to fetch release: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, errNotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%w %s", errCodebergStatus, resp.Status)
 	}

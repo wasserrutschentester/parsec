@@ -127,6 +127,13 @@ disabled_checks = [
     "matroska_name_quality"
 ]
 
+[update]
+# Automatically check for updates in the background
+check = true
+
+# Check for prerelease/nightly updates
+prerelease = false
+
 # ------------------------------------------------------------------------------
 # PRESET: tvnation
 # Use case: disable all checks except for disallowed filename characters

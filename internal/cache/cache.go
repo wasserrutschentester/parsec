@@ -155,6 +155,11 @@ func clearCache() {
 
 // Get retrieves data from the cache for the given key.
 func Get(key string) ([]byte, error) {
+	return GetWithDuration(key, cacheDuration)
+}
+
+// GetWithDuration retrieves data from the cache for the given key, using a custom expiration duration.
+func GetWithDuration(key string, d time.Duration) ([]byte, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -169,7 +174,7 @@ func Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to stat cache file: %w", err)
 	}
 
-	if time.Since(info.ModTime()) > cacheDuration {
+	if time.Since(info.ModTime()) > d {
 		_ = os.Remove(path)
 
 		return nil, errCacheExpired

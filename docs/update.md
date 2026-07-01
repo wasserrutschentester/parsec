@@ -19,6 +19,7 @@ parsec update [flags]
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
 | `--force` | `-f` | boolean | Force update even if the current version is the same or newer than the latest release. |
+| `--prerelease` | | boolean | Check for prerelease/nightly updates instead of just stable releases. |
 
 ## Examples
 

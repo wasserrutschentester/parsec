@@ -23,7 +23,8 @@ func InitDefaults() {
 	viper.SetDefault("group", "PAARSEX")
 	viper.SetDefault("video_codec_avc", "H.264")
 	viper.SetDefault("video_codec_hevc", "H.265")
-	viper.SetDefault("disable_update_check", false)
+	viper.SetDefault("update.check", true)
+	viper.SetDefault("update.prerelease", false)
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("word_separator", ".")
 	viper.SetDefault("normalize_diacritics", true)
@@ -259,9 +260,14 @@ func GetTitleReplacements() []Replacement {
 	return replacements
 }
 
-// GetDisableUpdateCheck returns true if background update checks are disabled.
-func GetDisableUpdateCheck() bool {
-	return getBool("disable_update_check")
+// GetCheckUpdates returns whether to check for updates.
+func GetCheckUpdates() bool {
+	return getBool("update.check")
+}
+
+// GetCheckPrereleaseUpdates returns whether to check for prerelease updates.
+func GetCheckPrereleaseUpdates() bool {
+	return getBool("update.prerelease")
 }
 
 // GetNormalizeDiacritics returns true if diacritics should be normalized.

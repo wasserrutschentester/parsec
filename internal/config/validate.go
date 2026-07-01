@@ -94,8 +94,8 @@ var expectedTypes = map[string]string{
 	"tvdb_id":               "int64",
 	"allow_special_matches": "bool",
 	"title_cleaning_regex":  "string",
-	"enabled_checks":        "[]interface {}",
-	"disabled_checks":       "[]interface {}",
+	"enabled_checks":             "[]interface {}",
+	"disabled_checks":            "[]interface {}",
 }
 
 // Sub-keys for structural sections
@@ -110,6 +110,11 @@ var prowlarrExpectedTypes = map[string]string{
 	"indexers":         "[]interface {}",
 	"movie_categories": "[]interface {}",
 	"tv_categories":    "[]interface {}",
+}
+
+var updateExpectedTypes = map[string]string{
+	"check":      "bool",
+	"prerelease": "bool",
 }
 
 var validTemplateKeys = map[string]bool{
@@ -295,6 +300,10 @@ func validateStructuralSections(k string, v any, prefix, fullKey string) ([]stri
 	case "prowlarr":
 		if subMap, ok := v.(map[string]any); ok {
 			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
+		}
+	case "update":
+		if subMap, ok := v.(map[string]any); ok {
+			return validateMapTypes(subMap, fullKey, updateExpectedTypes), true
 		}
 	case "preset":
 		return validatePresetConfig(v), true

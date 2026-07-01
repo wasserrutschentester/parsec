@@ -9,12 +9,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/ui"
 	"codeberg.org/upPollo/parsec/internal/update"
 )
 
 var (
-	forceUpdate bool
+	forceUpdate    bool
+	prereleaseFlag bool
 
 	errFetchReleaseInfo     = errors.New("fetching release info failed")
 	errNoMatchingAsset      = errors.New("no matching asset found")
@@ -25,6 +27,7 @@ var (
 
 func init() {
 	updateCmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "force update even if version is the same or lower")
+	updateCmd.Flags().BoolVar(&prereleaseFlag, "prerelease", false, "check for prerelease/nightly updates")
 	rootCmd.AddCommand(updateCmd)
 }
 
@@ -42,7 +45,8 @@ func runUpdate() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	rel, err := update.FetchLatestRelease(ctx)
+	checkPrerelease := prereleaseFlag || config.GetCheckPrereleaseUpdates()
+	rel, err := update.FetchLatestRelease(ctx, checkPrerelease)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to check for updates: %v", err))
 
