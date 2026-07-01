@@ -17,6 +17,7 @@ import (
 var (
 	forceUpdate    bool
 	prereleaseFlag bool
+	silentFlag     bool
 
 	errFetchReleaseInfo     = errors.New("fetching release info failed")
 	errNoMatchingAsset      = errors.New("no matching asset found")
@@ -27,7 +28,9 @@ var (
 
 func init() {
 	updateCmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "force update even if version is the same or lower")
-	updateCmd.Flags().BoolVar(&prereleaseFlag, "prerelease", false, "check for prerelease/nightly updates")
+	updateCmd.Flags().BoolVarP(&prereleaseFlag, "prerelease", "P", false, "check for prerelease/nightly updates")
+	updateCmd.Flags().BoolVar(&silentFlag, "silent", false, "suppress all output")
+	updateCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "check for updates without applying them")
 	rootCmd.AddCommand(updateCmd)
 }
 
@@ -40,12 +43,17 @@ var updateCmd = &cobra.Command{
 }
 
 func runUpdate() error {
+	if silentFlag {
+		ui.IsSilent = true
+	}
+
 	ui.PrintInfo("Checking for updates...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	checkPrerelease := prereleaseFlag || config.GetCheckPrereleaseUpdates()
+
 	rel, err := update.FetchLatestRelease(ctx, checkPrerelease)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Failed to check for updates: %v", err))
@@ -57,6 +65,12 @@ func runUpdate() error {
 
 	if !forceUpdate && !update.IsNewer(rel.TagName, Version) {
 		ui.PrintSuccess(fmt.Sprintf("You are already on the latest version (%s)", Version))
+
+		return nil
+	}
+
+	if dryRunFlag {
+		ui.PrintSuccess(fmt.Sprintf("A new version is available: %s (Current: %s)", rel.TagName, Version))
 
 		return nil
 	}

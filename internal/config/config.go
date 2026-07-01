@@ -24,6 +24,7 @@ func InitDefaults() {
 	viper.SetDefault("video_codec_avc", "H.264")
 	viper.SetDefault("video_codec_hevc", "H.265")
 	viper.SetDefault("update.check", true)
+	viper.SetDefault("update.auto", false)
 	viper.SetDefault("update.prerelease", false)
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("word_separator", ".")
@@ -263,6 +264,11 @@ func GetTitleReplacements() []Replacement {
 // GetCheckUpdates returns whether to check for updates.
 func GetCheckUpdates() bool {
 	return getBool("update.check")
+}
+
+// GetAutoUpdate returns whether to apply updates automatically.
+func GetAutoUpdate() bool {
+	return getBool("update.auto")
 }
 
 // GetCheckPrereleaseUpdates returns whether to check for prerelease updates.

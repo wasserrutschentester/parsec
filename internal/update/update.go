@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -55,14 +56,7 @@ func CheckForUpdateBackground(currentVersion string) {
 	}
 
 	cachedData, err := cache.GetWithDuration(cacheKey, cacheDur)
-	if err == nil {
-		latestTag := string(cachedData)
-		ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
-
-		if IsNewer(latestTag, currentVersion) {
-			ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
-		}
-	} else {
+	if err != nil {
 		// Cache miss or expired, fetch in background for next time
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -72,6 +66,29 @@ func CheckForUpdateBackground(currentVersion string) {
 				_ = cache.Set(cacheKey, []byte(rel.TagName))
 			}
 		}()
+
+		return
+	}
+
+	latestTag := string(cachedData)
+	ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
+
+	if !IsNewer(latestTag, currentVersion) {
+		return
+	}
+
+	if !config.GetAutoUpdate() {
+		ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
+
+		return
+	}
+
+	ui.PrintWarning(fmt.Sprintf("A new version of parsec is available (%s). It is downloading in the background...", latestTag))
+
+	exe, err := os.Executable()
+	if err == nil {
+		cmd := exec.CommandContext(context.Background(), exe, "update", "--silent")
+		_ = cmd.Start() // Start in background and detach
 	}
 }
 
@@ -94,6 +111,7 @@ var errNotFound = errors.New("release not found")
 // FetchLatestRelease retrieves the latest release information from the Codeberg API.
 func FetchLatestRelease(ctx context.Context, checkPrerelease bool) (*Release, error) {
 	stableURL := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
+
 	stableRel, err := fetchRelease(ctx, stableURL)
 	if err != nil && !errors.Is(err, errNotFound) {
 		return nil, err
@@ -103,42 +121,62 @@ func FetchLatestRelease(ctx context.Context, checkPrerelease bool) (*Release, er
 		if stableRel == nil {
 			return nil, errNotFound
 		}
+
 		return stableRel, nil
 	}
 
+	nightlyRel, err := fetchNightlyRelease(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return pickBestRelease(stableRel, nightlyRel)
+}
+
+func fetchNightlyRelease(ctx context.Context) (*Release, error) {
 	nightlyURL := fmt.Sprintf("%s/repos/%s/%s/releases/tags/nightly", baseURL, owner, repo)
+
 	nightlyRel, err := fetchRelease(ctx, nightlyURL)
 	if err != nil && !errors.Is(err, errNotFound) {
 		return nil, err
 	}
 
 	if nightlyRel != nil {
-		// Extract the true semantic version from the git-cliff changelog body
-		// It outputs: ## [v0.4.1-dev.12+4508cc6] - 2026-07-01
-		matches := regexp.MustCompile(`(?m)^## \[(v[0-9]+\.[0-9]+\.[0-9]+.*?)\]`).FindStringSubmatch(nightlyRel.Body)
-		if len(matches) > 1 {
-			nightlyRel.TagName = matches[1]
-		} else if nightlyRel.Name != "" && nightlyRel.Name != "nightly" {
-			nightlyRel.TagName = nightlyRel.Name
-		}
+		extractNightlyVersion(nightlyRel)
 	}
 
+	return nightlyRel, nil
+}
+
+func pickBestRelease(stableRel, nightlyRel *Release) (*Release, error) {
 	if stableRel == nil && nightlyRel == nil {
 		return nil, errNotFound
 	}
+
 	if stableRel == nil {
 		return nightlyRel, nil
 	}
+
 	if nightlyRel == nil {
 		return stableRel, nil
 	}
 
-	// Compare versions to find the absolute latest
 	if IsNewer(nightlyRel.TagName, stableRel.TagName) {
 		return nightlyRel, nil
 	}
 
 	return stableRel, nil
+}
+
+func extractNightlyVersion(nightlyRel *Release) {
+	// Extract the true semantic version from the git-cliff changelog body
+	// It outputs: ## [v0.4.1-dev.12+4508cc6] - 2026-07-01
+	matches := regexp.MustCompile(`(?m)^## \[(v[0-9]+\.[0-9]+\.[0-9]+.*?)\]`).FindStringSubmatch(nightlyRel.Body)
+	if len(matches) > 1 {
+		nightlyRel.TagName = matches[1]
+	} else if nightlyRel.Name != "" && nightlyRel.Name != "nightly" {
+		nightlyRel.TagName = nightlyRel.Name
+	}
 }
 
 func fetchRelease(ctx context.Context, url string) (*Release, error) {
@@ -156,6 +194,7 @@ func fetchRelease(ctx context.Context, url string) (*Release, error) {
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, errNotFound
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%w %s", errCodebergStatus, resp.Status)
 	}

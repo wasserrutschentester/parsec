@@ -131,6 +131,9 @@ disabled_checks = [
 # Automatically check for updates in the background
 check = true
 
+# Automatically download and install updates in the background
+auto = false
+
 # Check for prerelease/nightly updates
 prerelease = false
 

@@ -94,8 +94,8 @@ var expectedTypes = map[string]string{
 	"tvdb_id":               "int64",
 	"allow_special_matches": "bool",
 	"title_cleaning_regex":  "string",
-	"enabled_checks":             "[]interface {}",
-	"disabled_checks":            "[]interface {}",
+	"enabled_checks":        "[]interface {}",
+	"disabled_checks":       "[]interface {}",
 }
 
 // Sub-keys for structural sections
@@ -114,6 +114,7 @@ var prowlarrExpectedTypes = map[string]string{
 
 var updateExpectedTypes = map[string]string{
 	"check":      "bool",
+	"auto":       "bool",
 	"prerelease": "bool",
 }
 

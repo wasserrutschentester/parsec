@@ -43,16 +43,16 @@ var rootCmd = &cobra.Command{
 		initConfig()
 		config.InitDefaults()
 
-		// Suppress update check for completion commands to avoid polluting shell output
-		if !isCompletionCommand(cmd) {
+		// Suppress update check for certain commands
+		if !isExcludedFromUpdateCheck(cmd) {
 			update.CheckForUpdateBackground(Version)
 		}
 	},
 }
 
-func isCompletionCommand(cmd *cobra.Command) bool {
+func isExcludedFromUpdateCheck(cmd *cobra.Command) bool {
 	switch cmd.Name() {
-	case "__complete", "__completeNoDesc", "completion":
+	case "__complete", "__completeNoDesc", "completion", "update":
 		return true
 	default:
 		// checks for "parsec completion bash" and similar commands

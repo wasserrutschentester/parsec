@@ -105,6 +105,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `original_language` | string | Override original language of the media file used in integrity checks (default: `""`). |
 | `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |
 | `update.check` | boolean | Automatically check for updates in the background (default: `true`). |
+| `update.auto` | boolean | Automatically download and install updates silently in the background (default: `false`). |
 | `update.prerelease` | boolean | Check for prerelease/nightly updates instead of just stable releases (default: `false`). |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |

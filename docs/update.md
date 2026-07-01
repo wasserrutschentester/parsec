@@ -18,8 +18,9 @@ parsec update [flags]
 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
+| `--dry-run` | `-d` | boolean | Check for updates without applying them. |
 | `--force` | `-f` | boolean | Force update even if the current version is the same or newer than the latest release. |
-| `--prerelease` | | boolean | Check for prerelease/nightly updates instead of just stable releases. |
+| `--prerelease` | `-P` | boolean | Check for prerelease/nightly updates instead of just stable releases. |
 
 ## Examples
 
