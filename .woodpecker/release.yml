@@ -3,6 +3,8 @@ when:
       branch: main
       ref:
           include: ["refs/tags/v0.[1-9]*", "refs/tags/v[1-9]*"]
+    - event: cron
+      branch: main
 
 variables:
     - &build_platforms "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
@@ -19,6 +21,17 @@ clone:
             depth: 0
 
 steps:
+    check-changes:
+        image: alpine/git
+        commands:
+            - |
+              if [ "${CI_PIPELINE_EVENT}" = "cron" ]; then
+                if git tag --points-at HEAD | grep -q "^nightly$"; then
+                  echo "No new commits since last nightly build. Skipping."
+                  exit 78
+                fi
+              fi
+
     vendor:
         image: *golang
         commands: go mod vendor
@@ -39,7 +52,13 @@ steps:
             GITEA_TOKEN:
                 from_secret: PARSEC_FORGE_TOKEN
         commands:
-            - git-cliff --current --strip all --output RELEASE_NOTES.md
+            - |
+              if [ -n "$CI_COMMIT_TAG" ]; then
+                git-cliff --current --strip all --output RELEASE_NOTES.md
+              else
+                VERSION=$(./scripts/version.sh)
+                git-cliff --unreleased --tag "$VERSION" --strip all --output RELEASE_NOTES.md
+              fi
 
     build:
         image: *golang
@@ -48,6 +67,7 @@ steps:
         commands:
             - mkdir -p dist
             - |
+                VERSION=$${CI_COMMIT_TAG:-$$(./scripts/version.sh)}
                 for PLATFORM in $$PLATFORMS; do
                   GOOS=$${PLATFORM%/*}
                   GOARCH=$${PLATFORM#*/}
@@ -55,7 +75,6 @@ steps:
                   if [ "$$GOOS" = "windows" ]; then EXT=".exe"; fi
 
                   echo "Building for $$GOOS/$$GOARCH..."
-                  VERSION=$${CI_COMMIT_TAG:-$$(git describe --tags --always --match 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/-[0-9]*-g/-/') }
                   GOOS=$$GOOS GOARCH=$$GOARCH go build \
                     -ldflags="-s -w -X codeberg.org/upPollo/parsec/cmd.Version=$$VERSION" \
                     -o "dist/parsec-$${GOOS}-$${GOARCH}$${EXT}"
@@ -72,6 +91,9 @@ steps:
                 - sha256
             checksum_file: checksums.txt
             checksum_flatten: true
-            title: ${CI_COMMIT_TAG}
+            target_commitish: main
+            tag: ${CI_COMMIT_TAG:-nightly}
+            title: ${CI_COMMIT_TAG:-nightly}
+            prerelease: ${CI_PIPELINE_EVENT=cron}
             note: RELEASE_NOTES.md
             overwrite: true
