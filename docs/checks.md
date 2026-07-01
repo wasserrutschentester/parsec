@@ -239,6 +239,7 @@ The interactive output contains the same information as the JSON output, but in 
 | `warning` | string | Human-readable description of the problem. |
 | `expected` | string | The expected value (optional, depends on the check). |
 | `actual` | string | The actual value found (optional, depends on the check). |
+| `list` | array | A list of string bullet points (optional, used for multi-line formatting). |
 | `tracks` | array | List of track-specific results (optional, for checks that evaluate individual tracks). |
 | `table` | object | Table-formatted data (optional, see [TableData Object](#tabledata-object)). |
 
@@ -268,6 +269,7 @@ The interactive output contains the same information as the JSON output, but in 
 | `language` | string | The track's ISO 639-2/T language tag (e.g., `ger`, `eng`). |
 | `flags` | array | List of applied track flags. See [Track Flags](#track-flags). |
 | `warning` | string | Human-readable description of the track-specific issue. |
+| `list` | array | A list of string bullet points (optional, used for multi-line formatting). |
 | `table` | object | Table-formatted data for this track (optional, see [TableData Object](#tabledata-object)). |
 
 **Example:**

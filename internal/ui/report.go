@@ -113,6 +113,12 @@ func printSingleResult(res types.CheckResult, sharedWidths map[int]int) {
 		PrintWarning(res.Warning)
 	}
 
+	if len(res.List) > 0 {
+		for _, item := range res.List {
+			Println("   - " + item)
+		}
+	}
+
 	if res.Table != nil {
 		Println(DataTable(res.Table.Headers, res.Table.Rows))
 
@@ -177,28 +183,20 @@ func getMatroskaSubGroupName(id string) string {
 }
 
 func printListTrackReport(res types.CheckResult) {
-	printListTrackReportWithIndent(res.Identifier, res.Tracks, "      ")
+	printListTrackReportWithIndent(res.Tracks, "      ")
 }
 
-func printListTrackWarning(identifier, indent, warning string) {
+func printListTrackWarning(indent, warning string) {
 	if warning == "" || warning == "See table below" {
 		return
 	}
 
 	for line := range strings.SplitSeq(warning, "\n") {
-		if identifier == "matroska_srt_validation" {
-			if !strings.HasPrefix(line, "  ") && strings.HasSuffix(line, ":") {
-				Println(indent + Warning.Render(line))
-			} else {
-				Println(indent + "  - " + strings.TrimSpace(line))
-			}
-		} else {
-			Println(indent + "- " + line)
-		}
+		Println(indent + "- " + line)
 	}
 }
 
-func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheckResult, indent string) {
+func printListTrackReportWithIndent(tracks []types.TrackCheckResult, indent string) {
 	for _, t := range tracks {
 		header := fmt.Sprintf("%sTrack %s (%s/%s)", indent, t.ID, t.Type, t.Codec)
 		if t.Language != "" {
@@ -211,7 +209,13 @@ func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheck
 			Println(indent + "  " + strings.ReplaceAll(DataTable(t.Table.Headers, t.Table.Rows), "\n", "\n"+indent+"  "))
 		}
 
-		printListTrackWarning(identifier, indent, t.Warning)
+		if len(t.List) > 0 {
+			for _, item := range t.List {
+				Println(indent + "- " + item)
+			}
+		}
+
+		printListTrackWarning(indent, t.Warning)
 	}
 }
 
@@ -480,7 +484,7 @@ func printTracksDetailsIndented(identifier string, tracks []types.TrackCheckResu
 	}
 
 	if isListTrackReport(identifier) {
-		printListTrackReportWithIndent(identifier, tracks, "          ")
+		printListTrackReportWithIndent(tracks, "          ")
 	} else {
 		widths := calculateTrackTableWidths(tracks)
 		tableStr := formatTrackTable(tracks, widths)

@@ -16,6 +16,7 @@ type CheckResult struct {
 	Tracks     []TrackCheckResult `json:"tracks,omitempty"`
 	Expected   string             `json:"expected,omitempty"`
 	Actual     string             `json:"actual,omitempty"`
+	List       []string           `json:"list,omitempty"`
 	Table      *TableData         `json:"table,omitempty"`
 }
 
@@ -30,6 +31,7 @@ type TrackCheckResult struct {
 	Language  string     `json:"language,omitempty"`
 	Flags     []string   `json:"flags,omitempty"`
 	Warning   string     `json:"warning,omitempty"`
+	List      []string   `json:"list,omitempty"`
 	Table     *TableData `json:"table,omitempty"`
 }
 

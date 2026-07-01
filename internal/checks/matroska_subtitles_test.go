@@ -298,7 +298,7 @@ func getSRTTestCases() []srtTestCase {
 			content:          "1\n00:00:01,000 --> 00:00:04,500\n{\\an8}Welcome to the top center!\n",
 			expectedPassed:   false,
 			expectedSeverity: "info",
-			containsWarning:  "Alignment/positioning detected (should use ASS)",
+			containsWarning:  "Alignment/positioning detected",
 		},
 		{
 			name:             "SRT with coordinate metadata on timestamp line throws info level warning",
@@ -370,14 +370,26 @@ func assertSRTTestCase(t *testing.T, tt srtTestCase, res *CheckResult) {
 		t.Errorf("Expected Severity=%q, got %q", tt.expectedSeverity, res.Severity)
 	}
 
-	actualWarning := ""
-	if len(res.Tracks) > 0 {
-		actualWarning = res.Tracks[0].Warning
-	} else {
-		actualWarning = res.Warning
-	}
+	actualWarning := getActualWarning(res)
 
 	if tt.containsWarning != "" && !strings.Contains(actualWarning, tt.containsWarning) {
 		t.Errorf("Expected warning to contain %q, got %q", tt.containsWarning, actualWarning)
 	}
+}
+
+func getActualWarning(res *CheckResult) string {
+	actualWarning := ""
+	if len(res.Tracks) > 0 {
+		actualWarning = res.Tracks[0].Warning
+		if len(res.Tracks[0].List) > 0 {
+			actualWarning += strings.Join(res.Tracks[0].List, "\n")
+		}
+	} else {
+		actualWarning = res.Warning
+		if len(res.List) > 0 {
+			actualWarning += strings.Join(res.List, "\n")
+		}
+	}
+
+	return actualWarning
 }

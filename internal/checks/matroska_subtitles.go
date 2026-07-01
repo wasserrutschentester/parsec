@@ -112,7 +112,10 @@ func checkASSScriptInfo(track matroska.EbmlTrack, videoWidth, videoHeight int) *
 	errors := validateScriptInfo(info, videoWidth, videoHeight)
 
 	if len(errors) > 0 {
-		return newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, strings.Join(errors, "\n"))
+		res := newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, "")
+		res.Tracks[0].List = errors
+
+		return res
 	}
 
 	return nil
@@ -407,9 +410,10 @@ func checkASSEvents(track matroska.EbmlTrack, content []byte) *CheckResult {
 	errors := validateEvents(lines, definedStyles)
 
 	if len(errors) > 0 {
-		warning := strings.Join(errors, "\n")
+		res := newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, "")
+		res.Tracks[0].List = errors
 
-		return newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, warning)
+		return res
 	}
 
 	return nil
@@ -1323,31 +1327,43 @@ func checkSRTValidation(track matroska.EbmlTrack, content []byte) *CheckResult {
 	return buildSRTCheckResult(&track, parser)
 }
 
+func appendFormattedErrors(msgs []string, prefix string, errs []string) []string {
+	for _, err := range limitErrorList(errs) {
+		msgs = append(msgs, prefix+err)
+	}
+
+	return msgs
+}
+
 func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckResult {
 	if len(parser.syntaxErrors) > 0 || len(parser.tagErrors) > 0 {
 		var msgs []string
 
 		if len(parser.syntaxErrors) > 0 {
-			msgs = append(msgs, "SRT syntax errors:\n  "+strings.Join(limitErrorList(parser.syntaxErrors), "\n  "))
+			msgs = appendFormattedErrors(msgs, "Syntax Error: ", parser.syntaxErrors)
 		}
 
 		if len(parser.tagErrors) > 0 {
-			msgs = append(msgs, "Invalid HTML tags:\n  "+strings.Join(limitErrorList(parser.tagErrors), "\n  "))
+			msgs = appendFormattedErrors(msgs, "Invalid HTML tag: ", parser.tagErrors)
 		}
 
 		if len(parser.posWarnings) > 0 {
-			msgs = append(msgs, "Alignment/positioning detected (should use ASS):\n  "+strings.Join(limitErrorList(parser.posWarnings), "\n  "))
+			msgs = appendFormattedErrors(msgs, "Alignment/positioning detected: ", parser.posWarnings)
 		}
 
-		warning := strings.Join(msgs, "\n")
+		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, "")
+		res.Tracks[0].List = msgs
 
-		return newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, warning)
+		return res
 	}
 
 	if len(parser.posWarnings) > 0 {
-		warning := "Alignment/positioning detected (should use ASS):\n  " + strings.Join(limitErrorList(parser.posWarnings), "\n  ")
+		msgs := appendFormattedErrors(nil, "Alignment/positioning detected: ", parser.posWarnings)
 
-		return newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, warning)
+		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, "")
+		res.Tracks[0].List = msgs
+
+		return res
 	}
 
 	return nil
