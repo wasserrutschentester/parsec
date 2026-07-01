@@ -30,6 +30,20 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		return checkNoMatch()
 	}
 
+	// Propagate discovered IDs back to the metadata object so they can be
+	// used by downstream checks (e.g., season completeness grouping)
+	if meta.TmdbID == 0 && searchResult.TmdbID > 0 {
+		meta.TmdbID = searchResult.TmdbID
+	}
+
+	if meta.TvdbID == 0 && searchResult.TvdbID > 0 {
+		meta.TvdbID = searchResult.TvdbID
+	}
+
+	if meta.ImdbID == "" && searchResult.ImdbID != "" {
+		meta.ImdbID = searchResult.ImdbID
+	}
+
 	if origLangOverride := config.GetOriginalLanguage(); origLangOverride != "" {
 		searchResult.OriginalLanguage = origLangOverride
 	}
