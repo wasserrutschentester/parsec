@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.\n
 
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased]
 {% endif %}\
@@ -45,7 +45,7 @@ body = """
   {% endfor %}
 {% endif %}
 {% if previous.version %}\
-    **Full Changelog**: https://codeberg.org/upPollo/parsec/compare/{{ previous.version }}...{{ version }}
+    **Full Changelog**: https://codeberg.org/upPollo/parsec/compare/{{ previous.version }}...{% if "-dev" in version %}nightly{% else %}{{ version }}{% endif %}
 {% endif %}\n
 """
 

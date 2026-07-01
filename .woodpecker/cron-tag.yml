@@ -1,0 +1,26 @@
+when:
+    - event: cron
+      branch: main
+
+clone:
+    git:
+        image: woodpeckerci/plugin-git
+        settings:
+            partial: false
+            depth: 0
+
+steps:
+    push-nightly-tag:
+        image: alpine/git
+        environment:
+            GITEA_TOKEN:
+                from_secret: PARSEC_FORGE_TOKEN
+        commands:
+            - |
+              if git tag --points-at HEAD | grep -q "^nightly$"; then
+                echo "No new commits since last nightly build. Skipping."
+                exit 78
+              fi
+            - git remote set-url origin https://parsec-bot:$GITEA_TOKEN@codeberg.org/upPollo/parsec.git
+            - git tag -f nightly
+            - git push -f origin nightly
