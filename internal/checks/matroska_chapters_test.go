@@ -195,8 +195,12 @@ func TestCheckChaptersKeyframeAlignmentNonAligned(t *testing.T) {
 				t.Error("Expected alignment check to fail for non-aligned chapters")
 			}
 
-			if !strings.Contains(r.Actual, "off by 5.000s") {
-				t.Errorf("Expected mismatch actual details, got: %q", r.Actual)
+			if r.Table == nil || len(r.Table.Rows) == 0 {
+				t.Fatalf("Expected table rows, got: %v", r.Table)
+			}
+
+			if !strings.Contains(r.Table.Rows[0][3], "5.000s") {
+				t.Errorf("Expected offset to be 5.000s, got: %q", r.Table.Rows[0][3])
 			}
 		}
 	}

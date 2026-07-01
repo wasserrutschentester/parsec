@@ -2,9 +2,11 @@ package checks
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/types"
 )
 
 func formatNsToTime(ns int64) string {
@@ -310,8 +312,28 @@ func checkChaptersLanguageHygiene(chapters *matroska.Chapters) *CheckResult {
 	return nil
 }
 
-func isAligned(timeStart int64, keyframes []int64) (bool, int64) {
+func findPrevNextKeyframes(timeStart int64, keyframes []int64) (int64, int64) {
+	prevKF := int64(-1)
+	nextKF := int64(-1)
+
+	for _, kf := range keyframes {
+		if kf <= timeStart {
+			if prevKF == -1 || kf > prevKF {
+				prevKF = kf
+			}
+		} else {
+			if nextKF == -1 || kf < nextKF {
+				nextKF = kf
+			}
+		}
+	}
+
+	return prevKF, nextKF
+}
+
+func isAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
 	closestDiff := int64(-1)
+	prevKF, nextKF := findPrevNextKeyframes(timeStart, keyframes)
 
 	for _, kf := range keyframes {
 		var (
@@ -334,21 +356,85 @@ func isAligned(timeStart int64, keyframes []int64) (bool, int64) {
 		}
 
 		if inRange {
-			return true, closestDiff
+			return true, closestDiff, -1, -1
 		}
 	}
 
-	return false, closestDiff
+	return false, closestDiff, prevKF, nextKF
 }
 
-func getVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
-	for _, track := range ebml.Tracks {
+func getVideoTrackFromEBML(ebml *matroska.EbmlMetadata) *matroska.EbmlTrack {
+	for i, track := range ebml.Tracks {
 		if track.Type == "video" {
-			return uint64(track.Properties.Number)
+			return &ebml.Tracks[i]
 		}
 	}
 
-	return 0
+	return nil
+}
+
+func formatSeekLatency(prevKF, timeStart int64, videoTrack *matroska.EbmlTrack) string {
+	if prevKF == -1 {
+		return "-"
+	}
+
+	diff := timeStart - prevKF
+	latencyStr := fmt.Sprintf("%.3fs", float64(diff)/1e9)
+
+	if videoTrack != nil && videoTrack.Properties.DefaultDuration > 0 {
+		frames := float64(diff) / float64(videoTrack.Properties.DefaultDuration)
+		latencyStr += fmt.Sprintf(" (%.0ff)", frames)
+	}
+
+	return latencyStr
+}
+
+func formatNextKF(nextKF, timeStart int64, videoTrack *matroska.EbmlTrack) string {
+	if nextKF == -1 {
+		return "-"
+	}
+
+	nextStr := formatNsToTime(nextKF)
+
+	if videoTrack != nil && videoTrack.Properties.DefaultDuration > 0 {
+		frames := float64(nextKF-timeStart) / float64(videoTrack.Properties.DefaultDuration)
+		nextStr += fmt.Sprintf(" (+%.0ff)", frames)
+	}
+
+	return nextStr
+}
+
+func getAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTrack *matroska.EbmlTrack) [][]string {
+	var rows [][]string
+
+	for i, ch := range chapters.Atoms {
+		if aligned, _, prevKF, nextKF := isAligned(ch.TimeStart, keyframes); !aligned {
+			name := "-"
+			if len(ch.Display) > 0 && ch.Display[0].String != "" {
+				name = ch.Display[0].String
+			}
+
+			latencyStr := formatSeekLatency(prevKF, ch.TimeStart, videoTrack)
+
+			prevStr := "-"
+			if prevKF != -1 {
+				prevStr = formatNsToTime(prevKF)
+			}
+
+			nextStr := formatNextKF(nextKF, ch.TimeStart, videoTrack)
+
+			rows = append(rows, []string{
+				strconv.Itoa(i + 1),
+				name,
+				formatNsToTime(ch.TimeStart),
+				latencyStr,
+				prevStr,
+				nextStr,
+			})
+		}
+	}
+
+	return rows
 }
 
 func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata, chapters *matroska.Chapters) *CheckResult {
@@ -356,12 +442,12 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	videoTrackNum := getVideoTrackNumberFromEBML(ebml)
-	if videoTrackNum == 0 {
+	videoTrack := getVideoTrackFromEBML(ebml)
+	if videoTrack == nil {
 		return nil
 	}
 
-	keyframes, err := matroska.ReadKeyframeTimestamps(filePath, videoTrackNum, ebml.Container.Properties.TimestampScale)
+	keyframes, err := matroska.ReadKeyframeTimestamps(filePath, uint64(videoTrack.Properties.Number), ebml.Container.Properties.TimestampScale)
 	if err != nil {
 		return &CheckResult{
 			Identifier: "matroska_chapters_keyframe_alignment",
@@ -386,26 +472,18 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	var nonAligned []string
+	rows := getAlignedTableRows(chapters, keyframes, videoTrack)
 
-	for i, ch := range chapters.Atoms {
-		if aligned, diff := isAligned(ch.TimeStart, keyframes); !aligned {
-			nonAligned = append(nonAligned, fmt.Sprintf(
-				"chapter %d at %s (nearest keyframe is off by %.3fs)",
-				i+1,
-				formatNsToTime(ch.TimeStart),
-				float64(diff)/1e9,
-			))
-		}
-	}
-
-	if len(nonAligned) > 0 {
+	if len(rows) > 0 {
 		return &CheckResult{
 			Identifier: "matroska_chapters_keyframe_alignment",
 			Warning:    "Chapters are not aligned with video keyframes",
 			Passed:     false,
 			Severity:   "warning",
-			Actual:     strings.Join(nonAligned, "; "),
+			Table: &types.TableData{
+				Headers: []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Next KF"},
+				Rows:    rows,
+			},
 		}
 	}
 
