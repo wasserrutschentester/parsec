@@ -49,6 +49,19 @@ type Metadata struct {
 	IsTV          bool
 }
 
+// MatchLanguage determines if two language tags match based on their base language.
+func MatchLanguage(tag1, tag2 language.Tag) bool {
+	// Treat undefined languages as matching only themselves.
+	if tag1 == language.Und || tag2 == language.Und {
+		return tag1 == tag2
+	}
+
+	b1, _ := tag1.Base()
+	b2, _ := tag2.Base()
+
+	return b1 == b2
+}
+
 // LanguageName returns the full name of a language given its code.
 func LanguageName(lang string) string {
 	if lang == "" {

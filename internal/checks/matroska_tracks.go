@@ -450,11 +450,11 @@ func calculateLangScore(lang string, isOriginal bool) int64 {
 	var langScore int64
 
 	switch {
-	case tag == prefTag:
+	case metadata.MatchLanguage(tag, prefTag):
 		langScore = priorityPreferred
 	case isOriginal:
 		langScore = priorityOriginal
-	case tag == language.Make("mul"):
+	case metadata.MatchLanguage(tag, language.Make("mul")):
 		langScore = priorityMul
 	default:
 		langScore = priorityOther
@@ -542,7 +542,7 @@ func validateTrackBasics(track matroska.EbmlTrack) *CheckResult {
 		return newFailedTrackResult("matroska_language_tag", "Track doesn't have valid language tag", "warning", &track, ui.Error.Render("missing or invalid language tag"))
 	}
 
-	if config.IsCheckEnabled("matroska_multi_lang") && tag == language.Make("mul") && track.Properties.Name == "" {
+	if config.IsCheckEnabled("matroska_multi_lang") && metadata.MatchLanguage(tag, language.Make("mul")) && track.Properties.Name == "" {
 		return newFailedTrackResult("matroska_multi_lang", "Multi-language track must have a Name", "warning", &track, ui.Warning.Render("missing Name")+" for 'mul' language")
 	}
 

@@ -721,7 +721,7 @@ func isLanguageMatch(lang string, targets ...string) bool {
 			continue
 		}
 
-		if tag == language.Make(target) {
+		if metadata.MatchLanguage(tag, language.Make(target)) {
 			return true
 		}
 	}

@@ -105,7 +105,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		found := false
 
 		for _, l := range langs {
-			if language.Make(l) == targetTag {
+			if metadata.MatchLanguage(language.Make(l), targetTag) {
 				found = true
 
 				break
@@ -130,7 +130,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 	check("Audio", audioLangs, prefTag, prefLang, "preferred")
 	check("Subtitle", subLangs, prefTag, prefLang, "preferred")
 
-	if origLang != "" && origTag != prefTag {
+	if origLang != "" && !metadata.MatchLanguage(origTag, prefTag) {
 		check("Audio", audioLangs, origTag, origLang, "original")
 		check("Subtitle", subLangs, origTag, origLang, "original")
 	}
@@ -145,14 +145,13 @@ func checkUnknownOriginalLang(result *mdb.SearchResult) []CheckResult {
 
 	origTag := language.Make(origLang)
 	if origLang == "" || origTag == language.Und {
-		res := CheckResult{
+		results = append(results, CheckResult{
 			Identifier: "mdb_unknown_original_lang",
 			Passed:     false,
-			Severity:   "warning",
+			Severity:   "info",
 			Warning:    fmt.Sprintf("original language '%s' is not recognized or missing from TMDB/TVDB", origLang),
 			Actual:     origLang,
-		}
-		results = append(results, res)
+		})
 	}
 
 	return results
@@ -165,18 +164,26 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 	origLang := result.OriginalLanguage
 	audioLangs := mi.GetAudioLanguages()
 
-	wantedLangs := map[language.Tag]bool{
-		language.Make(prefLang): true,
-		language.Make(origLang): true,
-		language.Und:            true,
-		language.Make("mul"):    true,
-	}
-
 	unwantedLangs := []language.Tag{}
+	prefTag := language.Make(prefLang)
+	origTag := language.Make(origLang)
+	mulTag := language.Make("mul")
 
 	for _, lang := range audioLangs {
 		langTag := language.Make(lang)
-		if !wantedLangs[langTag] {
+
+		isWanted := false
+
+		switch {
+		case langTag == language.Und || metadata.MatchLanguage(langTag, mulTag):
+			isWanted = true
+		case metadata.MatchLanguage(langTag, prefTag):
+			isWanted = true
+		case origLang != "" && metadata.MatchLanguage(langTag, origTag):
+			isWanted = true
+		}
+
+		if !isWanted {
 			unwantedLangs = append(unwantedLangs, langTag)
 		}
 	}
