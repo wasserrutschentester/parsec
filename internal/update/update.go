@@ -88,6 +88,7 @@ func CheckForUpdateBackground(currentVersion string) {
 	exe, err := os.Executable()
 	if err == nil {
 		cmd := exec.CommandContext(context.Background(), exe, "update", "--silent")
+		setSysProcAttr(cmd)
 		_ = cmd.Start() // Start in background and detach
 	}
 }
@@ -371,7 +372,7 @@ func ReplaceExecutable(tempFile string) error {
 	oldFile := executablePath + ".old"
 	_ = os.Remove(oldFile) // Ignore error if file doesn't exist
 
-	if err := os.Rename(executablePath, oldFile); err != nil {
+	if err := renameWithRetry(executablePath, oldFile); err != nil {
 		if runtime.GOOS == "windows" {
 			return fmt.Errorf("could not replace running binary on Windows: %w\nPlease download the new version manually from Codeberg", err)
 		}
@@ -379,13 +380,33 @@ func ReplaceExecutable(tempFile string) error {
 		return fmt.Errorf("could not rename current binary: %w", err)
 	}
 
-	if err := os.Rename(tempFile, executablePath); err != nil {
-		_ = os.Rename(oldFile, executablePath) // Try to restore old file on failure
+	if err := renameWithRetry(tempFile, executablePath); err != nil {
+		_ = renameWithRetry(oldFile, executablePath) // Try to restore old file on failure
 
 		return fmt.Errorf("could not replace current binary: %w", err)
 	}
 
 	_ = os.Remove(oldFile) // Clean up old file
+
+	return nil
+}
+
+// renameWithRetry attempts to rename a file, retrying up to 5 times if it fails.
+// This is necessary on Windows where AntiVirus software might temporarily lock a newly downloaded executable.
+func renameWithRetry(oldpath, newpath string) error {
+	var err error
+	for range 5 {
+		err = os.Rename(oldpath, newpath)
+		if err == nil {
+			return nil
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if err != nil {
+		return fmt.Errorf("rename failed: %w", err)
+	}
 
 	return nil
 }
