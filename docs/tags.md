@@ -183,6 +183,24 @@ If the file being tagged is an episode, `.Episode` contains its data. Otherwise,
 - `.Episode.TotalEpisodes` (int)
 - `.Episode.ImdbID` (string)
 
+## Template Functions
+
+In addition to standard Go `text/template` built-ins (like `and`, `or`, `eq`), Parsec bundles several helpful custom functions for formatting your tags:
+
+### String Manipulation
+*   `join`: Joins a string array with a separator. Example: `{{join .Media.Genres ", "}}`
+*   `upper`: Converts a string to uppercase. Example: `{{upper .ReleaseName}}`
+*   `lower`: Converts a string to lowercase. Example: `{{lower .Media.Title}}`
+*   `title`: Converts a string to Title Case. Example: `{{title .Comment}}`
+*   `replace`: Replaces all occurrences of a string. Example: `{{replace .ReleaseName "." " "}}`
+*   `trim`: Removes leading and trailing whitespace. Example: `{{trim .Media.Overview}}`
+
+### Mathematical Operations
+*   `add`: Adds two integers. Example: `{{add .Episode.Episode 1}}`
+*   `sub`: Subtracts two integers. Example: `{{sub .Episode.Season 1}}`
+*   `mul`: Multiplies two integers. Example: `{{mul .Episode.TotalEpisodes 2}}`
+*   `div`: Divides two integers. Example: `{{div .Media.Year 10}}`
+
 ## Official Matroska Tags
 
 Matroska defines [official tag names](https://www.matroska.org/technical/tagging.html) for standard metadata. Parsec maps to any of them freely via your TOML configuration. Here are the most commonly used official tags:
