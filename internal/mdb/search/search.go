@@ -83,13 +83,27 @@ func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.Se
 		return nil, mdb.ErrNotFound
 	}
 
+	var selectedResult *mdb.SearchResult
+
 	if len(results) == 1 || unattended {
 		ui.PrintDebug(fmt.Sprintf("InteractiveSearch auto-selected: %+v", results[0]))
+		selectedResult = &results[0]
+	} else {
+		res, err := promptForResultSelection(results)
+		if err != nil {
+			return nil, err
+		}
 
-		return &results[0], nil
+		selectedResult = res
 	}
 
-	return promptForResultSelection(results)
+	// Fetch full details to get Genres and other extended metadata
+	fullResult, err := tmdb.GetByID(selectedResult.TmdbID, selectedResult.TmdbType)
+	if err == nil && fullResult != nil {
+		selectedResult = fullResult
+	}
+
+	return selectedResult, nil
 }
 
 func promptForResultSelection(results []mdb.SearchResult) (*mdb.SearchResult, error) {

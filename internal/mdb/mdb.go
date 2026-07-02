@@ -33,6 +33,7 @@ type SearchResult struct {
 	Popularity       float64
 	Similarity       float64
 	Overview         string
+	Genres           []string
 }
 
 // ErrNotFound is returned when no results are found in the database.

@@ -159,6 +159,7 @@ Contains the metadata of the matched Movie or TV Show. Key fields include:
 - `.Media.OriginalTitle` (string)
 - `.Media.AltTitle` ([]string)
 - `.Media.Overview` (string)
+- `.Media.Genres` ([]string)
 - `.Media.Year` (int)
 - `.Media.OriginalLanguage` (string)
 - `.Media.TmdbID` (int)
