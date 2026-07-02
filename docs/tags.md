@@ -148,10 +148,12 @@ For a **TV Episode**, the default template beautifully separates the metadata in
 
 ## Available Data
 
-Templates have access to two core objects under the context root:
+Templates have access to these core objects under the context root:
 
-### `.Comment` (String)
-The comment provided via the `--comment` CLI flag, allowing you to manually inject data (like a repack reason) into your tags.
+- `.Media`: Contains the matched metadata from the database.
+- `.Episode`: Contains detailed episode information (only populated if the target is a TV episode).
+- `.Comment`: The user-provided string from the `--comment` flag.
+- `.ReleaseName`: The name of the file being processed (without the extension).
 
 ### `.Media` (Always present)
 Contains the metadata of the matched Movie or TV Show. Key fields include:

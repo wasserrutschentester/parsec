@@ -105,7 +105,16 @@ func processIdentificationResult(filePath string, result *mdb.SearchResult, meta
 		mdb.PrintResult(*result)
 	}
 
-	ctx := mdb.TagTemplateContext{Media: *result, Comment: commentFlag}
+	var relName string
+	if filePath != "" {
+		relName = filename.GetBaseName(filePath)
+	}
+
+	ctx := mdb.TagTemplateContext{
+		Media:       *result,
+		Comment:     commentFlag,
+		ReleaseName: relName,
+	}
 	if meta.IsTV {
 		epRes := getEpisodeResult(result, meta)
 		if epRes.Name != "" {
