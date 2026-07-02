@@ -68,9 +68,19 @@ func cleanup() {
 	removeExpiredFiles()
 	removeExpiredMetaFiles()
 	removeExpiredSubtitleFiles()
+	removeOldExecutable()
 
 	// Update marker
 	_ = os.WriteFile(markerPath, []byte{}, 0o644)
+}
+
+func removeOldExecutable() {
+	if exe, err := os.Executable(); err == nil {
+		if realPath, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = realPath
+		}
+		_ = os.Remove(exe + ".old")
+	}
 }
 
 func removeExpiredFiles() {
