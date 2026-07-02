@@ -583,40 +583,30 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 	}
 }
 
-// FindEpisode attempts to identify an episode on TVDB or TMDB based on search results and metadata.
-func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
+// FindEpisodes attempts to identify an episode on TVDB or TMDB based on search results and metadata.
+func FindEpisodes(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) []mdb.EpisodeResult {
 	if len(meta.Episodes) == 0 {
-		return findSingleEpisode(result, meta, allowSpecials)
+		ep := findSingleEpisode(result, meta, allowSpecials)
+		if ep.Name != "" {
+			return []mdb.EpisodeResult{ep}
+		}
+
+		return nil
 	}
 
-	var (
-		combined mdb.EpisodeResult
-		titles   []string
-	)
+	var episodes []mdb.EpisodeResult
 
-	for i, epNum := range meta.Episodes {
-		// Create a copy of meta for the single episode search
+	for _, epNum := range meta.Episodes {
 		singleMeta := *meta
 		singleMeta.Episodes = []int{epNum}
 
 		epRes := findSingleEpisode(result, &singleMeta, allowSpecials)
 		if epRes.Name != "" {
-			name := strings.TrimSpace(epRes.Name)
-			titles = append(titles, name)
-
-			if i == 0 {
-				combined = epRes
-			}
+			episodes = append(episodes, epRes)
 		}
 	}
 
-	if len(titles) > 0 {
-		combined.Name = strings.Join(titles, " / ")
-
-		return combined
-	}
-
-	return mdb.EpisodeResult{}
+	return episodes
 }
 
 func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {

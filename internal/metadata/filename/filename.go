@@ -126,7 +126,9 @@ func Parse(filename string) *metadata.Metadata {
 	meta.Title = strings.Trim(meta.Title, ". -")
 
 	// Episode title
-	meta.EpisodeTitle = matchEpisodeTitle(filename, meta)
+	if t := matchEpisodeTitle(filename, meta); t != "" {
+		meta.EpisodeTitles = []string{t}
+	}
 
 	ui.PrintDebug(fmt.Sprintf("Filename meta: %+v", meta))
 

@@ -63,6 +63,7 @@ type EpisodeResult struct {
 type TagTemplateContext struct {
 	Media       SearchResult
 	Episode     *EpisodeResult
+	Episodes    []EpisodeResult
 	Comment     string
 	ReleaseName string
 }
@@ -248,6 +249,34 @@ func PrintCompactEpisodeResult(result EpisodeResult) {
 	ui.Println(fmt.Sprintf("       %s (S%02dE%02d) %s", result.Name, result.Season, result.Episode, result.Airdate))
 }
 
+// CombineEpisodeNames joins the names of a slice of EpisodeResult with a slash.
+func CombineEpisodeNames(episodes []EpisodeResult) string {
+	if len(episodes) == 0 {
+		return ""
+	}
+
+	titles := make([]string, 0, len(episodes))
+	for _, ep := range episodes {
+		titles = append(titles, ep.Name)
+	}
+
+	return strings.Join(titles, " / ")
+}
+
+// ExtractEpisodeNumbers extracts all episode numbers from a slice of EpisodeResult.
+func ExtractEpisodeNumbers(episodes []EpisodeResult) []int {
+	if len(episodes) == 0 {
+		return nil
+	}
+
+	nums := make([]int, 0, len(episodes))
+	for _, ep := range episodes {
+		nums = append(nums, ep.Episode)
+	}
+
+	return nums
+}
+
 // GetMatroskaTags creates a slice of MatroskaTagSet from a TagTemplateContext using templates.
 func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
 	configs, err := config.GetTagProfile()
@@ -258,7 +287,7 @@ func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
 	var tagSets []MatroskaTagSet
 
 	for _, cfg := range configs {
-		tagSet, err := evaluateTagConfig(cfg, ctx)
+		tagSetsFromCfg, err := evaluateTagConfig(cfg, ctx)
 		if err != nil {
 			if errors.Is(err, ErrEmptyTarget) {
 				continue
@@ -267,7 +296,7 @@ func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
 			return nil, err
 		}
 
-		tagSets = append(tagSets, *tagSet)
+		tagSets = append(tagSets, tagSetsFromCfg...)
 	}
 
 	return tagSets, nil
@@ -286,7 +315,43 @@ var templateFuncs = template.FuncMap{
 	"div":     func(a, b int) int { return a / b },
 }
 
-func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaTagSet, error) {
+func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) ([]MatroskaTagSet, error) {
+	if cfg.Iterator == "Episodes" && len(ctx.Episodes) > 0 {
+		var allSets []MatroskaTagSet
+
+		for i := range ctx.Episodes {
+			ctxCopy := ctx
+			ctxCopy.Episode = &ctx.Episodes[i]
+
+			tagSet, err := evaluateSingleContext(cfg, ctxCopy)
+			if err != nil {
+				if errors.Is(err, ErrEmptyTarget) {
+					continue
+				}
+
+				return nil, err
+			}
+
+			allSets = append(allSets, *tagSet)
+		}
+
+		if len(allSets) == 0 {
+			return nil, ErrEmptyTarget
+		}
+
+		return allSets, nil
+	}
+
+	// Default behavior (single context)
+	tagSet, err := evaluateSingleContext(cfg, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return []MatroskaTagSet{*tagSet}, nil
+}
+
+func evaluateSingleContext(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaTagSet, error) {
 	tmplTarget, err := template.New("target_value").Funcs(templateFuncs).Parse(cfg.TargetValue)
 	if err != nil {
 		return nil, fmt.Errorf("invalid template for target_value: %w", err)
@@ -299,7 +364,7 @@ func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaT
 
 	targetStr := targetBuf.String()
 	if targetStr == "" {
-		return nil, ErrEmptyTarget // Skip this tag block entirely if target_value evaluates to empty
+		return nil, ErrEmptyTarget
 	}
 
 	targetVal, err := strconv.Atoi(targetStr)

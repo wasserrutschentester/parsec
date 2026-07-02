@@ -23,7 +23,7 @@ type Metadata struct {
 	Episodes []int
 
 	Date          string
-	EpisodeTitle  string
+	EpisodeTitles []string
 	Language      string
 	LanguageExt   string
 	Subbed        bool
@@ -300,17 +300,17 @@ func (meta *Metadata) setBasicDefaults() {
 	}
 
 	if len(meta.Episodes) == 0 {
-		if ep := config.GetEpisode(); ep > 0 {
-			meta.Episodes = []int{ep}
-		}
+		meta.Episodes = config.GetEpisodes()
 	}
 
 	if meta.Date == "" {
 		meta.Date = config.GetDate()
 	}
 
-	if meta.EpisodeTitle == "" {
-		meta.EpisodeTitle = config.GetEpisodeTitle()
+	if len(meta.EpisodeTitles) == 0 {
+		if t := config.GetEpisodeTitle(); t != "" {
+			meta.EpisodeTitles = []string{t}
+		}
 	}
 }
 
@@ -379,7 +379,7 @@ func (meta *Metadata) GetSeasonPackName() string {
 	// Operate on a copy to avoid mutating the original metadata
 	metaCopy := *meta
 	metaCopy.Episodes = nil
-	metaCopy.EpisodeTitle = ""
+	metaCopy.EpisodeTitles = nil
 	metaCopy.Date = ""
 
 	return metaCopy.GetReleaseName()
@@ -413,14 +413,14 @@ func (meta *Metadata) truncateIfTooLong(finalName, template string) string {
 
 	ui.PrintWarning(fmt.Sprintf("Generated filename exceeds 245 bytes (%d bytes). Attempting to truncate.", len(finalName)))
 
-	if meta.EpisodeTitle == "" {
+	if len(meta.EpisodeTitles) == 0 {
 		ui.PrintError("Cannot truncate: no episode title to remove. This might cause filesystem errors.")
 
 		return finalName
 	}
 
 	metaCopy := *meta
-	metaCopy.EpisodeTitle = ""
+	metaCopy.EpisodeTitles = nil
 
 	// Recursively render without episode title
 	truncatedName := metaCopy.render(template)
@@ -438,7 +438,7 @@ func (meta *Metadata) getReplacements() map[string]string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
 		"{date}":           meta.Date,
-		"{episode_title}":  meta.EpisodeTitle,
+		"{episode_title}":  strings.Join(meta.EpisodeTitles, " / "),
 		"{language}":       LanguageName(meta.Language),
 		"{language_ext}":   meta.LanguageExt,
 		"{cut_edition}":    meta.CutEdition,

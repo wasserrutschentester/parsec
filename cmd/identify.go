@@ -116,9 +116,10 @@ func processIdentificationResult(filePath string, result *mdb.SearchResult, meta
 		ReleaseName: relName,
 	}
 	if meta.IsTV {
-		epRes := getEpisodeResult(result, meta)
-		if epRes.Name != "" {
-			ctx.Episode = &epRes
+		episodes := getEpisodeResults(result, meta)
+		if len(episodes) > 0 {
+			ctx.Episodes = episodes
+			ctx.Episode = &episodes[0]
 		}
 	}
 
@@ -178,7 +179,7 @@ func init() {
 	identifyCmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
 	identifyCmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
 	identifyCmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
-	identifyCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
+	identifyCmd.Flags().IntSliceVarP(&episodeFlag, "episode", "e", nil, "episode numbers (comma-separated)")
 	identifyCmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date")
 	identifyCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
 	// Mdb IDs
@@ -258,27 +259,40 @@ func collectMismatches(tagImdb, resImdb string, tagTmdb, resTmdb, tagTvdb, resTv
 	return mismatches
 }
 
-func getEpisodeResult(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
-	var episodeResult mdb.EpisodeResult
+func hasEpisodeMetadata(meta *metadata.Metadata) bool {
+	return (meta.Season >= 0 && len(meta.Episodes) > 0) || len(meta.EpisodeTitles) > 0 || meta.Date != ""
+}
 
-	if (meta.Season >= 0 && len(meta.Episodes) > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
-		ui.Println(ui.Info.Render("Identifying episode..."))
-
-		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
-		if episodeResult.Name != "" {
-			ui.PrintSuccess("Episode identified successfully.")
-			mdb.PrintEpisodeResult(episodeResult)
-
-			meta.Season = episodeResult.Season
-			meta.Episodes = []int{episodeResult.Episode}
-			meta.EpisodeTitle = episodeResult.Name
-		} else if (meta.Season >= 0 && len(meta.Episodes) > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
-			ui.Println(ui.FormatWarning("Could not identify episode metadata"))
-		}
+func getEpisodeResults(result *mdb.SearchResult, meta *metadata.Metadata) []mdb.EpisodeResult {
+	if !hasEpisodeMetadata(meta) {
+		return nil
 	}
 
-	ui.PrintDebug(fmt.Sprintf("%+v\n", meta))
-	ui.PrintDebug(fmt.Sprintf("%+v\n", episodeResult))
+	ui.Println(ui.Info.Render("Identifying episode..."))
 
-	return episodeResult
+	episodes := mdbSearch.FindEpisodes(*result, meta, config.GetAllowSpecials())
+	if len(episodes) == 0 {
+		ui.Println(ui.FormatWarning("Could not identify episode metadata"))
+
+		return nil
+	}
+
+	ui.PrintSuccess("Episode identified successfully.")
+
+	epNums := mdb.ExtractEpisodeNumbers(episodes)
+
+	titles := make([]string, 0, len(episodes))
+	for _, ep := range episodes {
+		mdb.PrintEpisodeResult(ep)
+		titles = append(titles, ep.Name)
+	}
+
+	meta.Season = episodes[0].Season
+	meta.Episodes = epNums
+	meta.EpisodeTitles = titles
+
+	ui.PrintDebug(fmt.Sprintf("%+v\n", meta))
+	ui.PrintDebug(fmt.Sprintf("%+v\n", episodes))
+
+	return episodes
 }

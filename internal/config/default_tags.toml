@@ -19,6 +19,7 @@ TOTAL_PARTS = "{{if .Episode}}{{.Episode.TotalEpisodes}}{{end}}"
 # --- Episode Level ---
 [[tags]]
 target_value = 50
+iterator = "Episodes"
 [tags.fields]
 TITLE = "{{if .Episode}}{{.Episode.Name}}{{end}}"
 PART_NUMBER = "{{if .Episode}}{{.Episode.Episode}}{{end}}"
