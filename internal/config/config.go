@@ -132,9 +132,16 @@ func GetSeason() int {
 	return getInt("season")
 }
 
-// GetEpisode returns the episode override from the configuration.
-func GetEpisode() int {
-	return getInt("episode")
+// GetEpisodes returns the episode overrides from the configuration.
+func GetEpisodes() []int {
+	episodes := viper.GetIntSlice("metadata.episode")
+	if len(episodes) == 0 {
+		if ep := viper.GetInt("metadata.episode"); ep > 0 {
+			episodes = []int{ep}
+		}
+	}
+
+	return episodes
 }
 
 // GetDate returns the date override from the configuration.
@@ -352,6 +359,7 @@ var defaultTags string
 // TagConfig represents a mapped Matroska tagging configuration.
 type TagConfig struct {
 	TargetValue string            `mapstructure:"target_value" toml:"target_value"`
+	Iterator    string            `mapstructure:"iterator" toml:"iterator"`
 	Fields      map[string]string `mapstructure:"fields" toml:"fields"`
 }
 

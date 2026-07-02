@@ -79,7 +79,7 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{EpisodeTitle: "Test Episode"}, false)
+	result, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{EpisodeTitles: []string{"Test Episode"}}, false)
 
 	if result.TvdbID != 789 {
 		t.Errorf("Expected TvdbID 789, got %d", result.TvdbID)

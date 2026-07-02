@@ -263,20 +263,25 @@ func renameApplyMdbSearch(meta *metadata.Metadata) {
 	meta.SetDefaults()
 	result, _ := mdbSearch.InteractiveSearch(meta, true)
 
-	if result != nil {
-		mdb.PrintCompactResult(*result)
-
-		meta.Title = result.Title
-		if result.Year > 0 {
-			meta.Year = result.Year
-		}
-
-		if meta.IsTV {
-			episodeResult := renameGetEpisodeInfo(result, meta)
-			mdb.PrintCompactEpisodeResult(episodeResult)
-		}
-	} else {
+	if result == nil {
 		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
+		ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
+
+		return
+	}
+
+	mdb.PrintCompactResult(*result)
+
+	meta.Title = result.Title
+	if result.Year > 0 {
+		meta.Year = result.Year
+	}
+
+	if meta.IsTV {
+		episodes := renameGetEpisodeInfos(result, meta)
+		for _, ep := range episodes {
+			mdb.PrintCompactEpisodeResult(ep)
+		}
 	}
 
 	ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
@@ -285,8 +290,10 @@ func renameApplyMdbSearch(meta *metadata.Metadata) {
 func renameApplyNormalization(meta *metadata.Metadata) {
 	// Apply normalization to Title, EpisodeTitle and Service
 	meta.Title = filename.NormalizeTitle(meta.Title)
-	if meta.EpisodeTitle != "" {
-		meta.EpisodeTitle = filename.NormalizeTitle(meta.EpisodeTitle)
+	if len(meta.EpisodeTitles) > 0 {
+		for i, t := range meta.EpisodeTitles {
+			meta.EpisodeTitles[i] = filename.NormalizeTitle(t)
+		}
 	}
 }
 
@@ -309,24 +316,31 @@ func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainf
 	}
 }
 
-func renameGetEpisodeInfo(result *mdb.SearchResult, meta *metadata.Metadata) mdb.EpisodeResult {
-	var episodeResult mdb.EpisodeResult
-	if (meta.Season >= 0 && len(meta.Episodes) > 0) || meta.EpisodeTitle != "" || meta.Date != "" {
-		episodeResult = mdbSearch.FindEpisode(*result, meta, config.GetAllowSpecials())
-
-		if episodeResult.Name != "" {
-			meta.EpisodeTitle = episodeResult.Name
-			meta.Season = episodeResult.Season
-			meta.Date = episodeResult.Airdate
-
-			// only set episode numbers if empty
-			if len(meta.Episodes) == 0 {
-				meta.Episodes = []int{episodeResult.Episode}
-			}
-		}
+func renameGetEpisodeInfos(result *mdb.SearchResult, meta *metadata.Metadata) []mdb.EpisodeResult {
+	if !hasEpisodeMetadata(meta) {
+		return nil
 	}
 
-	return episodeResult
+	episodes := mdbSearch.FindEpisodes(*result, meta, config.GetAllowSpecials())
+	if len(episodes) == 0 {
+		return episodes
+	}
+
+	titles := make([]string, 0, len(episodes))
+	for _, ep := range episodes {
+		titles = append(titles, ep.Name)
+	}
+
+	meta.EpisodeTitles = titles
+	meta.Season = episodes[0].Season
+	meta.Date = episodes[0].Airdate
+
+	// only set episode numbers if empty
+	if len(meta.Episodes) == 0 {
+		meta.Episodes = mdb.ExtractEpisodeNumbers(episodes)
+	}
+
+	return episodes
 }
 
 func init() {
@@ -335,7 +349,7 @@ func init() {
 	renameCmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
 	renameCmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
 	renameCmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
-	renameCmd.Flags().IntVarP(&episodeFlag, "episode", "e", 0, "episode number")
+	renameCmd.Flags().IntSliceVarP(&episodeFlag, "episode", "e", nil, "episode numbers (comma-separated)")
 	renameCmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date (YYYY-MM-DD)")
 	renameCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
 	renameCmd.Flags().StringVar(&cutEditionFlag, "cut-edition", "", "special edition or cut")

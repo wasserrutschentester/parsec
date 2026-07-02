@@ -146,12 +146,42 @@ For a **TV Episode**, the default template beautifully separates the metadata in
 </Tags>
 ```
 
+## Advanced: Multi-Episode Files
+
+Parsec supports tagging files that contain multiple episodes (e.g. `Show - S01E01-E02.mkv`). There are two ways to handle this:
+
+### 1. Merging Metadata (Concatenation)
+By default, the engine executes the episode block once. You can use standard template loops to merge the names of all episodes into a single Target 50 block:
+
+```toml
+# --- Episode Level ---
+[[tags]]
+target_value = 50
+[tags.fields]
+TITLE = "{{range $i, $e := .Episodes}}{{if $i}} / {{end}}{{$e.Name}}{{end}}"
+PART_NUMBER = "{{(index .Episodes 0).Episode}}{{if gt (len .Episodes) 1}}-{{(index .Episodes (sub (len .Episodes) 1)).Episode}}{{end}}"
+```
+
+### 2. Multiple Tag Blocks (Iterator)
+If you want Parsec to generate a separate Matroska Target 50 block for *each* episode inside the file, you can use the special `iterator` property:
+
+```toml
+# --- Episode Level ---
+[[tags]]
+target_value = 50
+iterator = "Episodes" # Tells the engine to generate multiple tags!
+[tags.fields]
+TITLE = "{{.Episode.Name}}"
+PART_NUMBER = "{{.Episode.Episode}}"
+```
+
 ## Available Data
 
 Templates have access to these core objects under the context root:
 
 - `.Media`: Contains the matched metadata from the database.
-- `.Episode`: Contains detailed episode information (only populated if the target is a TV episode).
+- `.Episode`: Contains detailed episode information (points to the first episode, or the current episode if inside an `iterator`).
+- `.Episodes`: An array of all matched episodes for the file (useful for looping).
 - `.Comment`: The user-provided string from the `--comment` flag.
 - `.ReleaseName`: The name of the file being processed (without the extension).
 

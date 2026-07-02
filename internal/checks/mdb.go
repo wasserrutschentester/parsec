@@ -260,14 +260,14 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 
 	var results []CheckResult
 
-	epResult := mdbSearch.FindEpisode(*result, meta, false)
+	episodes := mdbSearch.FindEpisodes(*result, meta, false)
 
 	existenceCheck := CheckResult{
 		Identifier: "mdb_episode_existence",
 		Passed:     true,
 	}
 
-	if epResult.Name == "" {
+	if len(episodes) == 0 {
 		if config.IsCheckEnabled("mdb_episode_existence") {
 			existenceCheck.Passed = false
 			existenceCheck.Severity = "warning"
@@ -276,6 +276,14 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 		}
 
 		return results
+	}
+
+	// build combined dummy episode result for checks
+	epResult := mdb.EpisodeResult{
+		Name:    mdb.CombineEpisodeNames(episodes),
+		Airdate: episodes[0].Airdate,
+		Season:  episodes[0].Season,
+		Episode: episodes[0].Episode,
 	}
 
 	results = append(results, existenceCheck)
@@ -295,10 +303,10 @@ func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 		Identifier: "mdb_episode_title",
 		Passed:     true,
 	}
-	if meta.EpisodeTitle != "" {
+	if len(meta.EpisodeTitles) > 0 {
 		res.Expected = epResult.Name
-		res.Actual = meta.EpisodeTitle
-		normParsed := normalizeForComparison(filename.DeobfuscateTitle(meta.EpisodeTitle))
+		res.Actual = strings.Join(meta.EpisodeTitles, " / ")
+		normParsed := normalizeForComparison(filename.DeobfuscateTitle(res.Actual))
 
 		normOfficial := normalizeForComparison(filename.ApplyTitleReplacements(epResult.Name))
 		if normParsed != normOfficial {

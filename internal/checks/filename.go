@@ -165,14 +165,14 @@ func checkTvSpecial(meta *metadata.Metadata) []CheckResult {
 		return nil
 	}
 
-	if meta.Date != "" && meta.EpisodeTitle != "" {
+	if meta.Date != "" && len(meta.EpisodeTitles) > 0 {
 		return nil
 	}
 
 	warning := "Date and Episode Title"
-	if meta.Date == "" && meta.EpisodeTitle != "" {
+	if meta.Date == "" && len(meta.EpisodeTitles) > 0 {
 		warning = "Date"
-	} else if meta.Date != "" && meta.EpisodeTitle == "" {
+	} else if meta.Date != "" && len(meta.EpisodeTitles) == 0 {
 		warning = "Episode Title"
 	}
 

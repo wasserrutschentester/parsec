@@ -579,7 +579,10 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 	langs := []string{preferred, result.OriginalLanguage, "en"}
 	uniqueLangs := metadata.RemoveDuplicates(langs)
 
-	normalizedQueryTitle := metadata.Normalize(meta.EpisodeTitle)
+	normalizedQueryTitle := ""
+	if len(meta.EpisodeTitles) > 0 {
+		normalizedQueryTitle = metadata.Normalize(strings.Join(meta.EpisodeTitles, " / "))
+	}
 
 	for _, lang := range uniqueLangs {
 		episodes, err := GetAllEpisodes(result.TvdbID, lang)
