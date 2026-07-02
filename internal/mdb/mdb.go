@@ -11,6 +11,8 @@ import (
 	"text/template"
 
 	"charm.land/lipgloss/v2"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/ui"
@@ -271,8 +273,21 @@ func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
 	return tagSets, nil
 }
 
+var templateFuncs = template.FuncMap{
+	"join":    strings.Join,
+	"upper":   strings.ToUpper,
+	"lower":   strings.ToLower,
+	"trim":    strings.TrimSpace,
+	"replace": strings.ReplaceAll,
+	"title":   cases.Title(language.Und).String,
+	"add":     func(a, b int) int { return a + b },
+	"sub":     func(a, b int) int { return a - b },
+	"mul":     func(a, b int) int { return a * b },
+	"div":     func(a, b int) int { return a / b },
+}
+
 func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaTagSet, error) {
-	tmplTarget, err := template.New("target_value").Parse(cfg.TargetValue)
+	tmplTarget, err := template.New("target_value").Funcs(templateFuncs).Parse(cfg.TargetValue)
 	if err != nil {
 		return nil, fmt.Errorf("invalid template for target_value: %w", err)
 	}
@@ -294,7 +309,7 @@ func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaT
 
 	tagSet := &MatroskaTagSet{TargetTypeValue: targetVal, Fields: make(map[string]string)}
 	for k, v := range cfg.Fields {
-		tmpl, err := template.New(k).Parse(v)
+		tmpl, err := template.New(k).Funcs(templateFuncs).Parse(v)
 		if err != nil {
 			return nil, fmt.Errorf("invalid tag template for %s: %w", k, err)
 		}
