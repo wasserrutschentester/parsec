@@ -59,9 +59,10 @@ type EpisodeResult struct {
 
 // TagTemplateContext provides metadata to the tag rendering engine.
 type TagTemplateContext struct {
-	Media   SearchResult
-	Episode *EpisodeResult
-	Comment string
+	Media       SearchResult
+	Episode     *EpisodeResult
+	Comment     string
+	ReleaseName string
 }
 
 // MatroskaTagSet represents metadata tags that can be written to a Matroska file for a specific target.
