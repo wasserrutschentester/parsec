@@ -36,6 +36,116 @@ target_value = 60 # Season / Volume target
 TITLE = "Season {{.Episode.Season}}"
 ```
 
+### Example XML Output
+
+Using the default configuration (or a custom one like the above), Parsec constructs standard Matroska XML tags to feed to `mkvpropedit`. 
+
+For a **Movie**, the output typically looks like this:
+
+```xml
+<Tags>
+  <Tag>
+    <Targets>
+      <TargetTypeValue>50</TargetTypeValue>
+    </Targets>
+    <Simple>
+      <Name>TITLE</Name>
+      <String>The Matrix</String>
+    </Simple>
+    <Simple>
+      <Name>DATE_RELEASED</Name>
+      <String>1999</String>
+    </Simple>
+    <Simple>
+      <Name>IMDB</Name>
+      <String>tt0133093</String>
+    </Simple>
+    <Simple>
+      <Name>TMDB</Name>
+      <String>movie/603</String>
+    </Simple>
+    <Simple>
+      <Name>TVDB2</Name>
+      <String>movies/174</String>
+    </Simple>
+  </Tag>
+</Tags>
+```
+
+For a **TV Episode**, the default template beautifully separates the metadata into a hierarchy of Show (70), Season (60), and Episode (50) target levels:
+
+```xml
+<Tags>
+  <Tag>
+    <Targets>
+      <TargetTypeValue>70</TargetTypeValue>
+    </Targets>
+    <Simple>
+      <Name>TITLE</Name>
+      <String>Breaking Bad</String>
+    </Simple>
+    <Simple>
+      <Name>DATE_RELEASED</Name>
+      <String>2008</String>
+    </Simple>
+    <Simple>
+      <Name>IMDB</Name>
+      <String>tt0903747</String>
+    </Simple>
+    <Simple>
+      <Name>TMDB</Name>
+      <String>tv/1396</String>
+    </Simple>
+    <Simple>
+      <Name>TVDB</Name>
+      <String>81189</String>
+    </Simple>
+    <Simple>
+      <Name>TVDB2</Name>
+      <String>series/81189</String>
+    </Simple>
+  </Tag>
+  <Tag>
+    <Targets>
+      <TargetTypeValue>60</TargetTypeValue>
+    </Targets>
+    <Simple>
+      <Name>PART_NUMBER</Name>
+      <String>5</String>
+    </Simple>
+    <Simple>
+      <Name>TOTAL_PARTS</Name>
+      <String>16</String>
+    </Simple>
+  </Tag>
+  <Tag>
+    <Targets>
+      <TargetTypeValue>50</TargetTypeValue>
+    </Targets>
+    <Simple>
+      <Name>TITLE</Name>
+      <String>Ozymandias</String>
+    </Simple>
+    <Simple>
+      <Name>PART_NUMBER</Name>
+      <String>14</String>
+    </Simple>
+    <Simple>
+      <Name>DATE_RELEASED</Name>
+      <String>2013-09-15</String>
+    </Simple>
+    <Simple>
+      <Name>IMDB</Name>
+      <String>tt2301451</String>
+    </Simple>
+    <Simple>
+      <Name>TVDB2</Name>
+      <String>episodes/4599981</String>
+    </Simple>
+  </Tag>
+</Tags>
+```
+
 ## Available Data
 
 Templates have access to two core objects under the context root:
@@ -47,20 +157,54 @@ The comment provided via the `--comment` CLI flag, allowing you to manually inje
 Contains the metadata of the matched Movie or TV Show. Key fields include:
 - `.Media.Title` (string)
 - `.Media.OriginalTitle` (string)
+- `.Media.AltTitle` ([]string)
+- `.Media.Overview` (string)
+- `.Media.Year` (int)
+- `.Media.OriginalLanguage` (string)
 - `.Media.TmdbID` (int)
+- `.Media.TmdbType` (string)
 - `.Media.ImdbID` (string)
 - `.Media.TvdbID` (int)
+- `.Media.TvdbType` (string)
+- `.Media.TvdbSlug` (string)
 - `.Media.IsTV` (bool)
 
 ### `.Episode` (Present only for TV Episodes)
 If the file being tagged is an episode, `.Episode` contains its data. Otherwise, `.Episode` is `nil`.
 - `.Episode.Name` (string)
+- `.Episode.Overview` (string)
 - `.Episode.Season` (int)
 - `.Episode.Episode` (int)
 - `.Episode.Airdate` (string)
 - `.Episode.TvdbID` (int)
 - `.Episode.TotalEpisodes` (int)
 - `.Episode.ImdbID` (string)
+
+## Official Matroska Tags
+
+Matroska defines [official tag names](https://www.matroska.org/technical/tagging.html) for standard metadata. Parsec maps to any of them freely via your TOML configuration. Here are the most commonly used official tags:
+
+*   **`TITLE`**: The title of the entity (e.g. Movie title, Show title, or Episode name).
+*   **`DATE_RELEASED`**: The release year or specific airdate.
+*   **`PART_NUMBER`**: The episode or season number.
+*   **`TOTAL_PARTS`**: The total episodes in the season.
+*   **`SUMMARY`**: A description or overview of the movie/episode.
+*   **`COMMENT`**: Custom notes, repack reasons, or scene release information.
+*   **`IMDB`**, **`TMDB`**, **`TVDB`**, **`TVDB2`**: Official database identifier tags.
+
+Unofficial database IDs (like `WIKIDATA`) are widely adopted by the community and can be safely written exactly as uppercase custom keys.
+
+## Dynamic Target Values
+
+The `target_value` itself can also be a template string! This is incredibly useful for writing a single tag block that dynamically applies to the Show level (70) if it's a TV show, or the Movie level (50) if it's a movie:
+
+```toml
+[[tags]]
+target_value = "{{if .Media.IsTV}}70{{else}}50{{end}}"
+[tags.fields]
+TITLE = "{{.Media.Title}}"
+DATE_RELEASED = "{{.Media.Year}}"
+```
 
 ## Handling Empty Values
 

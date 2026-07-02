@@ -38,6 +38,12 @@ type SearchResult struct {
 // ErrNotFound is returned when no results are found in the database.
 var ErrNotFound = errors.New("no result found")
 
+// ErrInvalidTargetValue is returned when a target_value template resolves to a non-integer.
+var ErrInvalidTargetValue = errors.New("target_value evaluated to non-integer")
+
+// ErrEmptyTarget is returned when a target_value template evaluates to an empty string.
+var ErrEmptyTarget = errors.New("target_value is empty")
+
 // EpisodeResult represents a TV episode found in an online database.
 type EpisodeResult struct {
 	Name          string
@@ -248,27 +254,60 @@ func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
 	var tagSets []MatroskaTagSet
 
 	for _, cfg := range configs {
-		tagSet := MatroskaTagSet{TargetTypeValue: cfg.TargetValue, Fields: make(map[string]string)}
-		for k, v := range cfg.Fields {
-			tmpl, err := template.New(k).Parse(v)
-			if err != nil {
-				return nil, fmt.Errorf("invalid tag template for %s: %w", k, err)
+		tagSet, err := evaluateTagConfig(cfg, ctx)
+		if err != nil {
+			if errors.Is(err, ErrEmptyTarget) {
+				continue
 			}
 
-			var buf bytes.Buffer
-			if err := tmpl.Execute(&buf, ctx); err != nil {
-				return nil, fmt.Errorf("failed to execute tag template for %s: %w", k, err)
-			}
-
-			if buf.String() != "" {
-				tagSet.Fields[k] = buf.String()
-			}
+			return nil, err
 		}
 
-		tagSets = append(tagSets, tagSet)
+		tagSets = append(tagSets, *tagSet)
 	}
 
 	return tagSets, nil
+}
+
+func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaTagSet, error) {
+	tmplTarget, err := template.New("target_value").Parse(cfg.TargetValue)
+	if err != nil {
+		return nil, fmt.Errorf("invalid template for target_value: %w", err)
+	}
+
+	var targetBuf bytes.Buffer
+	if err := tmplTarget.Execute(&targetBuf, ctx); err != nil {
+		return nil, fmt.Errorf("failed to execute target_value template: %w", err)
+	}
+
+	targetStr := targetBuf.String()
+	if targetStr == "" {
+		return nil, ErrEmptyTarget // Skip this tag block entirely if target_value evaluates to empty
+	}
+
+	targetVal, err := strconv.Atoi(targetStr)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidTargetValue, targetStr)
+	}
+
+	tagSet := &MatroskaTagSet{TargetTypeValue: targetVal, Fields: make(map[string]string)}
+	for k, v := range cfg.Fields {
+		tmpl, err := template.New(k).Parse(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid tag template for %s: %w", k, err)
+		}
+
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, ctx); err != nil {
+			return nil, fmt.Errorf("failed to execute tag template for %s: %w", k, err)
+		}
+
+		if buf.String() != "" {
+			tagSet.Fields[k] = buf.String()
+		}
+	}
+
+	return tagSet, nil
 }
 
 // CalculateSimilarity calculates the Levenshtein similarity between two strings (0.0 to 1.0).

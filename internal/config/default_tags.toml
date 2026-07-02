@@ -1,8 +1,28 @@
+# --- Show or Movie Level ---
+[[tags]]
+target_value = "{{if .Media.IsTV}}70{{else}}50{{end}}"
+[tags.fields]
+TITLE = "{{.Media.Title}}"
+DATE_RELEASED = "{{.Media.Year}}"
+IMDB = "{{.Media.ImdbID}}"
+TMDB = "{{if .Media.TmdbID}}{{if .Media.IsTV}}tv{{else}}movie{{end}}/{{.Media.TmdbID}}{{end}}"
+TVDB = "{{if .Media.IsTV}}{{.Media.TvdbID}}{{end}}"
+TVDB2 = "{{if and .Media.TvdbID .Media.TvdbType}}{{.Media.TvdbType}}/{{.Media.TvdbID}}{{end}}"
+
+# --- Season Level ---
+[[tags]]
+target_value = 60 
+[tags.fields]
+PART_NUMBER = "{{if .Episode}}{{.Episode.Season}}{{end}}"
+TOTAL_PARTS = "{{if .Episode}}{{.Episode.TotalEpisodes}}{{end}}"
+
+# --- Episode Level ---
 [[tags]]
 target_value = 50
 [tags.fields]
-TITLE = "{{if .Episode}}{{.Episode.Name}}{{else}}{{.Media.Title}}{{end}}"
-IMDB = "{{.Media.ImdbID}}"
-TMDB = "{{if .Media.TmdbID}}{{if .Media.IsTV}}tv{{else}}movie{{end}}/{{.Media.TmdbID}}{{end}}"
-TVDB = "{{if .Media.IsTV}}{{if .Media.TvdbID}}{{.Media.TvdbID}}{{end}}{{end}}"
-TVDB2 = "{{if .Episode}}{{if .Episode.TvdbID}}episodes/{{.Episode.TvdbID}}{{end}}{{else}}{{if and .Media.TvdbID .Media.TvdbType}}{{.Media.TvdbType}}/{{.Media.TvdbID}}{{end}}{{end}}"
+TITLE = "{{if .Episode}}{{.Episode.Name}}{{end}}"
+PART_NUMBER = "{{if .Episode}}{{.Episode.Episode}}{{end}}"
+DATE_RELEASED = "{{if .Episode}}{{.Episode.Airdate}}{{end}}"
+IMDB = "{{if .Episode}}{{.Episode.ImdbID}}{{end}}"
+TVDB2 = "{{if .Episode}}{{if .Episode.TvdbID}}episodes/{{.Episode.TvdbID}}{{end}}{{end}}"
+COMMENT = "{{if .Comment}}{{.Comment}}{{end}}"

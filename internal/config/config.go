@@ -351,7 +351,7 @@ var defaultTags string
 
 // TagConfig represents a mapped Matroska tagging configuration.
 type TagConfig struct {
-	TargetValue int               `mapstructure:"target_value" toml:"target_value"`
+	TargetValue string            `mapstructure:"target_value" toml:"target_value"`
 	Fields      map[string]string `mapstructure:"fields" toml:"fields"`
 }
 
