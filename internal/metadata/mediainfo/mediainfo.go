@@ -141,8 +141,11 @@ type Track struct {
 	UniqueID                 string    `json:"UniqueID,omitempty"`
 	Format                   string    `json:"Format,omitempty"`
 	FormatProfile            string    `json:"Format_Profile,omitempty"`
+	FormatLevel              string    `json:"Format_Level,omitempty"`
 	FormatVersion            string    `json:"Format_Version,omitempty"`
 	FormatAdditionalFeatures string    `json:"Format_AdditionalFeatures,omitempty"`
+	FormatSettingsCABAC      string    `json:"Format_Settings_CABAC,omitempty"`
+	FormatSettingsRefFrames  string    `json:"Format_Settings_RefFrames,omitempty"`
 	Title                    string    `json:"Title,omitempty"`
 	Language                 string    `json:"Language,omitempty"`
 	Duration                 *float64  `json:"Duration,string,omitempty"`
@@ -154,7 +157,7 @@ type Track struct {
 	TransferCharacteristics  string    `json:"transfer_characteristics,omitempty"`
 	Height                   int       `json:"Height,string,omitempty"`
 	Width                    int       `json:"Width,string,omitempty"`
-	DisplayAspectRatio       string    `json:"DisplayAspectRatio,omitempty"`
+	DisplayAspectRatio       float64   `json:"DisplayAspectRatio,string,omitempty"`
 	ScanType                 string    `json:"ScanType,omitempty"`
 	FrameRate                float64   `json:"FrameRate,string,omitempty"`
 	FrameCount               *int      `json:"FrameCount,string,omitempty"`
@@ -168,6 +171,7 @@ type Track struct {
 	EncodedDate              string    `json:"Encoded_Date,omitempty"`
 	TaggedDate               string    `json:"Tagged_Date,omitempty"`
 	EncodedLibrary           string    `json:"Encoded_Library,omitempty"`
+	EncodedLibrarySettings   string    `json:"Encoded_Library_Settings,omitempty"`
 	StreamSize               *int64    `json:"StreamSize,string,omitempty"`
 	Default                  MediaBool `json:"Default,omitempty"`
 	Forced                   MediaBool `json:"Forced,omitempty"`
@@ -179,6 +183,40 @@ type Track struct {
 	FileSize       int64  `json:"FileSize,string,omitempty"`
 	FileExtension  string `json:"FileExtension,omitempty"`
 	OverallBitRate int    `json:"OverallBitRate,string,omitempty"`
+
+	// Additional mapped fields from JSON output
+	BufferSize                     string `json:"BufferSize,omitempty"`
+	ChannelLayout                  string `json:"ChannelLayout,omitempty"`
+	ChannelPositions               string `json:"ChannelPositions,omitempty"`
+	ColorSpace                     string `json:"ColorSpace,omitempty"`
+	ColourDescriptionPresent       string `json:"colour_description_present,omitempty"`
+	ColourDescriptionPresentSource string `json:"colour_description_present_Source,omitempty"`
+	ColourPrimariesSource          string `json:"colour_primaries_Source,omitempty"`
+	ColourRange                    string `json:"colour_range,omitempty"`
+	ColourRangeSource              string `json:"colour_range_Source,omitempty"`
+	CompressionMode                string `json:"Compression_Mode,omitempty"`
+	Delay                          string `json:"Delay,omitempty"`
+	DelaySource                    string `json:"Delay_Source,omitempty"`
+	EncodedApplication             string `json:"Encoded_Application,omitempty"`
+	EncodedLibraryName             string `json:"Encoded_Library_Name,omitempty"`
+	EncodedLibraryVersion          string `json:"Encoded_Library_Version,omitempty"`
+	FileModifiedDate               string `json:"File_Modified_Date,omitempty"`
+	FileModifiedDateLocal          string `json:"File_Modified_Date_Local,omitempty"`
+	FrameRateDen                   string `json:"FrameRate_Den,omitempty"`
+	FrameRateMode                  string `json:"FrameRate_Mode,omitempty"`
+	FrameRateNum                   string `json:"FrameRate_Num,omitempty"`
+	IsStreamable                   string `json:"IsStreamable,omitempty"`
+	MatrixCoefficients             string `json:"matrix_coefficients,omitempty"`
+	MatrixCoefficientsSource       string `json:"matrix_coefficients_Source,omitempty"`
+	PixelAspectRatio               string `json:"PixelAspectRatio,omitempty"`
+	SampledHeight                  string `json:"Sampled_Height,omitempty"`
+	SampledWidth                   string `json:"Sampled_Width,omitempty"`
+	SamplesPerFrame                string `json:"SamplesPerFrame,omitempty"`
+	SamplingCount                  string `json:"SamplingCount,omitempty"`
+	StoredHeight                   string `json:"Stored_Height,omitempty"`
+	StreamOrder                    string `json:"StreamOrder,omitempty"`
+	TransferCharacteristicsSource  string `json:"transfer_characteristics_Source,omitempty"`
+	VideoDelay                     string `json:"Video_Delay,omitempty"`
 
 	// Add more fields as needed, matching the JSON keys
 	Extra Extra `json:"extra,omitempty"`
