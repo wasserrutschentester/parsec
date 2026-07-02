@@ -209,14 +209,27 @@ func PrintEpisodeResult(result EpisodeResult) {
 
 	footer := ""
 
+	var footerParts []string
+
+	idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+
+	if result.ImdbID != "" {
+		labelPart := ui.Muted.Render("IMDb ID:")
+		idPart := idStyle.Render(result.ImdbID)
+		urlLabel := ui.Muted.Render("URL:")
+		link := ui.Link.Render("https://www.imdb.com/title/" + result.ImdbID)
+		footerParts = append(footerParts, fmt.Sprintf("%s %s   %s %s", labelPart, idPart, urlLabel, link))
+	}
+
 	if result.TvdbID > 0 {
-		idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 		labelPart := ui.Muted.Render("TVDB ID:")
 		idPart := idStyle.Render(strconv.Itoa(result.TvdbID))
 		urlLabel := ui.Muted.Render("URL:")
 		link := ui.Link.Render(fmt.Sprintf("https://thetvdb.com/?tab=episode&id=%d", result.TvdbID))
-		footer = fmt.Sprintf("%s %s   %s %s", labelPart, idPart, urlLabel, link)
+		footerParts = append(footerParts, fmt.Sprintf("%s %s   %s %s", labelPart, idPart, urlLabel, link))
 	}
+
+	footer = strings.Join(footerParts, "\n")
 
 	ui.Println(ui.Card(title, subtitle, body, footer))
 }
