@@ -19,6 +19,7 @@ import (
 
 var (
 	writeTagsFlag bool
+	commentFlag   string
 	errSearch     = errors.New("search failed")
 )
 
@@ -104,30 +105,36 @@ func processIdentificationResult(filePath string, result *mdb.SearchResult, meta
 		mdb.PrintResult(*result)
 	}
 
-	tags := mdb.GetMatroskaTags(*result)
-
+	ctx := mdb.TagTemplateContext{Media: *result, Comment: commentFlag}
 	if meta.IsTV {
-		handleTVEpisode(result, meta, &tags)
+		epRes := getEpisodeResult(result, meta)
+		if epRes.Name != "" {
+			ctx.Episode = &epRes
+		}
+	}
+
+	tags, err := mdb.GetMatroskaTags(ctx)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to generate tags: %v", err))
+		// We could still continue or return, but let's just proceed without tags or return early.
+		tags = []mdb.MatroskaTagSet{}
 	}
 
 	if releasesFlag {
 		prowlarr.PrintReleases(result, meta, bestFlag)
 	}
 
+	maybeWriteTags(filePath, tags)
+}
+
+func maybeWriteTags(filePath string, tags []mdb.MatroskaTagSet) {
 	shouldWriteTags := writeTagsFlag
 	if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
 		shouldWriteTags = shouldWriteTagsInteractively()
 	}
 
-	if shouldWriteTags && filePath != "" {
+	if shouldWriteTags && filePath != "" && len(tags) > 0 {
 		writeTags(filePath, tags)
-	}
-}
-
-func handleTVEpisode(result *mdb.SearchResult, meta *metadata.Metadata, tags *mdb.MatroskaTags) {
-	episodeResult := getEpisodeResult(result, meta)
-	if episodeResult.Name != "" {
-		tags.SetEpisodeTags(episodeResult)
 	}
 }
 
@@ -147,7 +154,7 @@ func shouldWriteTagsInteractively() bool {
 	return false
 }
 
-func writeTags(filePath string, tags mdb.MatroskaTags) {
+func writeTags(filePath string, tags []mdb.MatroskaTagSet) {
 	err := matroska.SetGlobalTags(filePath, tags)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
@@ -175,8 +182,9 @@ func init() {
 	identifyCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
 	identifyCmd.Flags().StringVarP(&sourceFlag, "source", "O", "", "source (e.g. BluRay, Web-DL)")
 	identifyCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
-	// Other
+	// Tag flags
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
+	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
 	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
 	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
 	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")

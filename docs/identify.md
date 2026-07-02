@@ -59,8 +59,9 @@ Additional metadata that can be written to tags.
 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
-| `--write-tags`| | boolean | Automatically write metadata tags to the file without prompting. |
-| `--unattended`| `-u` | boolean | Run in unattended mode (selects the first search result if it's a high-confidence match). |
+| `--write-tags` | | boolean| Write metadata tags to the file. |
+| `--comment` | | string| A comment exposed to tag templates (e.g. repack reason). |
+| `--unattended` | `-u` | boolean| Run in unattended mode (selects the first search result if it's a high-confidence match). |
 | `--releases` | `-r` | boolean | Search for releases via Prowlarr for the identified entity. |
 | `--best-release`| `-b` | boolean | Only show the best release (same resolution and most seeders) when searching for releases. |
 

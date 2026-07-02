@@ -2,14 +2,17 @@
 package mdb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"charm.land/lipgloss/v2"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -37,21 +40,27 @@ var ErrNotFound = errors.New("no result found")
 
 // EpisodeResult represents a TV episode found in an online database.
 type EpisodeResult struct {
-	Name     string
-	Airdate  string
-	Overview string
-	Season   int
-	Episode  int
-	TvdbID   int
+	Name          string
+	Airdate       string
+	Overview      string
+	Season        int
+	Episode       int
+	TvdbID        int
+	TotalEpisodes int
+	ImdbID        string
 }
 
-// MatroskaTags represents metadata tags that can be written to a Matroska file.
-type MatroskaTags struct {
-	Title string
-	Imdb  string
-	Tmdb  string
-	Tvdb  int
-	Tvdb2 string
+// TagTemplateContext provides metadata to the tag rendering engine.
+type TagTemplateContext struct {
+	Media   SearchResult
+	Episode *EpisodeResult
+	Comment string
+}
+
+// MatroskaTagSet represents metadata tags that can be written to a Matroska file for a specific target.
+type MatroskaTagSet struct {
+	TargetTypeValue int
+	Fields          map[string]string
 }
 
 // FormatLanguage returns a human-readable language string.
@@ -229,43 +238,37 @@ func PrintCompactEpisodeResult(result EpisodeResult) {
 	ui.Println(fmt.Sprintf("       %s (S%02dE%02d) %s", result.Name, result.Season, result.Episode, result.Airdate))
 }
 
-// GetMatroskaTags creates a MatroskaTags struct from a SearchResult.
-func GetMatroskaTags(result SearchResult) MatroskaTags {
-	tags := MatroskaTags{}
-	if result.Title != "" {
-		tags.Title = result.Title
+// GetMatroskaTags creates a slice of MatroskaTagSet from a TagTemplateContext using templates.
+func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
+	configs, err := config.GetTagProfile()
+	if err != nil {
+		return nil, err
 	}
 
-	if result.ImdbID != "" {
-		tags.Imdb = result.ImdbID
-	}
+	var tagSets []MatroskaTagSet
 
-	if result.TmdbID > 0 && result.TmdbType != "" {
-		tags.Tmdb = fmt.Sprintf("%s/%d", result.TmdbType, result.TmdbID)
-	}
+	for _, cfg := range configs {
+		tagSet := MatroskaTagSet{TargetTypeValue: cfg.TargetValue, Fields: make(map[string]string)}
+		for k, v := range cfg.Fields {
+			tmpl, err := template.New(k).Parse(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid tag template for %s: %w", k, err)
+			}
 
-	if result.TvdbID > 0 {
-		if result.IsTV {
-			tags.Tvdb = result.TvdbID
+			var buf bytes.Buffer
+			if err := tmpl.Execute(&buf, ctx); err != nil {
+				return nil, fmt.Errorf("failed to execute tag template for %s: %w", k, err)
+			}
+
+			if buf.String() != "" {
+				tagSet.Fields[k] = buf.String()
+			}
 		}
 
-		if result.TvdbType != "" {
-			tags.Tvdb2 = fmt.Sprintf("%s/%d", result.TvdbType, result.TvdbID)
-		}
+		tagSets = append(tagSets, tagSet)
 	}
 
-	return tags
-}
-
-// SetEpisodeTags updates MatroskaTags with episode information.
-func (tags *MatroskaTags) SetEpisodeTags(result EpisodeResult) {
-	if result.Name != "" {
-		tags.Title = result.Name
-	}
-
-	if result.TvdbID > 0 {
-		tags.Tvdb2 = fmt.Sprintf("episodes/%d", result.TvdbID)
-	}
+	return tagSets, nil
 }
 
 // CalculateSimilarity calculates the Levenshtein similarity between two strings (0.0 to 1.0).

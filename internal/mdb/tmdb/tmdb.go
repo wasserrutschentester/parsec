@@ -88,6 +88,9 @@ type tmdbEpisodeResponse struct {
 	SeasonNumber  int    `json:"season_number"`
 	EpisodeNumber int    `json:"episode_number"`
 	Overview      string `json:"overview"`
+	ExternalIDs   struct {
+		ImdbID string `json:"imdb_id"`
+	} `json:"external_ids"`
 }
 
 func getFromCache(key string, target any) (bool, error) {
@@ -334,6 +337,8 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 	var data tmdbEpisodeResponse
 
 	params := url.Values{}
+	params.Set("append_to_response", "external_ids")
+
 	if lang != "" {
 		params.Set("language", lang)
 	}
@@ -349,6 +354,7 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 		Overview: data.Overview,
 		Season:   season,
 		Episode:  episode,
+		ImdbID:   data.ExternalIDs.ImdbID,
 	}, nil
 }
 

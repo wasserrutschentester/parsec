@@ -593,6 +593,12 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 
 		if ep != nil {
 			res := ep.ToEpisodeResult()
+			for _, e := range episodes {
+				if e.SeasonNumber == res.Season {
+					res.TotalEpisodes++
+				}
+			}
+
 			ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
 
 			for _, l := range uniqueLangs {
@@ -602,6 +608,8 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 
 				fillEpisodeTranslation(&res, ep.ID, l)
 			}
+
+			fillEpisodeImdbID(&res, ep.ID)
 
 			return res, nil
 		}
@@ -727,4 +735,32 @@ func isLanguageMatch(lang string, targets ...string) bool {
 	}
 
 	return false
+}
+
+type tvdbEpisodeExtendedResponse struct {
+	Data struct {
+		RemoteIDs []remoteID `json:"remoteIds"`
+	} `json:"data"`
+}
+
+func fillEpisodeImdbID(res *mdb.EpisodeResult, tvdbID int) {
+	if res.ImdbID != "" {
+		return
+	}
+
+	var data tvdbEpisodeExtendedResponse
+	if err := get(fmt.Sprintf("episodes/%d/extended", tvdbID), &data); err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to fetch extended episode for remote ids: %v", err))
+
+		return
+	}
+
+	for _, rid := range data.Data.RemoteIDs {
+		// Type 2 is usually IMDB in TVDB v4
+		if rid.SourceName == "Imdb" || rid.ID != "" && strings.HasPrefix(rid.ID, "tt") {
+			res.ImdbID = rid.ID
+
+			break
+		}
+	}
 }

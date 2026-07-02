@@ -641,9 +641,15 @@ func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSp
 
 // GetSeasonEpisodes retrieves all episodes for a specific season from TVDB or TMDB.
 func GetSeasonEpisodes(result mdb.SearchResult, season int) ([]mdb.EpisodeResult, error) {
+	var (
+		results []mdb.EpisodeResult
+		err     error
+	)
+
 	if result.TvdbID > 0 {
-		if res, err := getSeasonEpisodesFromTvdb(result.TvdbID, season); err == nil {
-			return res, nil
+		results, err = getSeasonEpisodesFromTvdb(result.TvdbID, season)
+		if err == nil {
+			goto setTotal
 		}
 	}
 
@@ -653,10 +659,22 @@ func GetSeasonEpisodes(result mdb.SearchResult, season int) ([]mdb.EpisodeResult
 
 		prefLang := config.GetPreferredLanguage()
 
-		return tmdb.GetSeasonMetadata(result.TmdbID, season, prefLang)
+		results, err = tmdb.GetSeasonMetadata(result.TmdbID, season, prefLang)
+		if err == nil {
+			goto setTotal
+		}
 	}
 
 	return nil, mdb.ErrNotFound
+
+setTotal:
+	total := len(results)
+
+	for i := range results {
+		results[i].TotalEpisodes = total
+	}
+
+	return results, nil
 }
 
 func getSeasonEpisodesFromTvdb(tvdbID, season int) ([]mdb.EpisodeResult, error) {

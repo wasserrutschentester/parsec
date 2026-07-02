@@ -3,8 +3,12 @@ package config
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -340,4 +344,58 @@ func GetConfigFileUsed() string {
 // GetDefaultConfig returns the default configuration as a TOML string.
 func GetDefaultConfig() string {
 	return defaultConfig
+}
+
+//go:embed default_tags.toml
+var defaultTags string
+
+// TagConfig represents a mapped Matroska tagging configuration.
+type TagConfig struct {
+	TargetValue int               `mapstructure:"target_value" toml:"target_value"`
+	Fields      map[string]string `mapstructure:"fields" toml:"fields"`
+}
+
+// ErrAbsoluteTagProfilePath is returned when an absolute path is used for a tag template profile.
+var ErrAbsoluteTagProfilePath = errors.New("absolute paths for tag_template are not supported")
+
+// GetTagProfile loads the current tag template profile based on configuration.
+func GetTagProfile() ([]TagConfig, error) {
+	profileName := viper.GetString(getPresetKey("tag_template"))
+	if profileName == "" {
+		profileName = "default"
+	}
+
+	if filepath.IsAbs(profileName) {
+		return nil, ErrAbsoluteTagProfilePath
+	}
+
+	tagViper := viper.New()
+	tagViper.SetConfigName(profileName)
+	tagViper.SetConfigType("toml")
+
+	mainConfigPath := viper.ConfigFileUsed()
+	if mainConfigPath != "" {
+		tagViper.AddConfigPath(filepath.Join(filepath.Dir(mainConfigPath), "tags"))
+	}
+
+	confDir, err := os.UserConfigDir()
+	if err == nil {
+		tagViper.AddConfigPath(filepath.Join(confDir, "parsec", "tags"))
+	}
+
+	if err := tagViper.ReadInConfig(); err != nil {
+		if profileName == "default" {
+			tagViper.SetConfigType("toml")
+			_ = tagViper.ReadConfig(strings.NewReader(defaultTags))
+		} else {
+			return nil, fmt.Errorf("could not find tag template '%s': %w", profileName, err)
+		}
+	}
+
+	var tags []TagConfig
+	if err := tagViper.UnmarshalKey("tags", &tags); err != nil {
+		return nil, fmt.Errorf("invalid tag template format: %w", err)
+	}
+
+	return tags, nil
 }

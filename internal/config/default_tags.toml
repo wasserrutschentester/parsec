@@ -1,0 +1,8 @@
+[[tags]]
+target_value = 50
+[tags.fields]
+TITLE = "{{if .Episode}}{{.Episode.Name}}{{else}}{{.Media.Title}}{{end}}"
+IMDB = "{{.Media.ImdbID}}"
+TMDB = "{{if .Media.TmdbID}}{{if .Media.IsTV}}tv{{else}}movie{{end}}/{{.Media.TmdbID}}{{end}}"
+TVDB = "{{if .Media.IsTV}}{{if .Media.TvdbID}}{{.Media.TvdbID}}{{end}}{{end}}"
+TVDB2 = "{{if .Episode}}{{if .Episode.TvdbID}}episodes/{{.Episode.TvdbID}}{{end}}{{else}}{{if and .Media.TvdbID .Media.TvdbType}}{{.Media.TvdbType}}/{{.Media.TvdbID}}{{end}}{{end}}"

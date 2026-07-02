@@ -79,6 +79,7 @@ func removeOldExecutable() {
 		if realPath, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = realPath
 		}
+
 		_ = os.Remove(exe + ".old")
 	}
 }

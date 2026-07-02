@@ -894,13 +894,13 @@ func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 }
 
 // SetGlobalTags uses mkvpropedit to set global tags (TITLE, IMDB, TMDB, TVDB) on a Matroska file.
-func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
+func SetGlobalTags(filePath string, tagSets []mdb.MatroskaTagSet) error {
 	err := CheckForMatroska(filePath)
 	if err != nil {
 		return err
 	}
 
-	tagsXML, err := createTagsXML(tags)
+	tagsXML, err := createTagsXML(tagSets)
 	if err != nil {
 		return err
 	}
@@ -920,34 +920,26 @@ func SetGlobalTags(filePath string, tags mdb.MatroskaTags) error {
 	return nil
 }
 
-func createTagsXML(tags mdb.MatroskaTags) (string, error) {
+func createTagsXML(tagSets []mdb.MatroskaTagSet) (string, error) {
 	mkvTags := mkvTags{
-		Tags: []mkvTag{
-			{
-				Targets: target{TargetTypeValue: 50},
-				Simple:  []simple{},
-			},
-		},
+		Tags: []mkvTag{},
 	}
 
-	if tags.Title != "" {
-		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TITLE", String: tags.Title})
-	}
+	for _, tagSet := range tagSets {
+		if len(tagSet.Fields) == 0 {
+			continue
+		}
 
-	if tags.Imdb != "" {
-		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "IMDB", String: tags.Imdb})
-	}
+		t := mkvTag{
+			Targets: target{TargetTypeValue: tagSet.TargetTypeValue},
+			Simple:  []simple{},
+		}
 
-	if tags.Tmdb != "" {
-		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TMDB", String: tags.Tmdb})
-	}
+		for name, val := range tagSet.Fields {
+			t.Simple = append(t.Simple, simple{Name: name, String: val})
+		}
 
-	if tags.Tvdb != 0 {
-		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TVDB", String: strconv.Itoa(tags.Tvdb)})
-	}
-
-	if tags.Tvdb2 != "" {
-		mkvTags.Tags[0].Simple = append(mkvTags.Tags[0].Simple, simple{Name: "TVDB2", String: tags.Tvdb2})
+		mkvTags.Tags = append(mkvTags.Tags, t)
 	}
 
 	output, err := xml.MarshalIndent(mkvTags, "", "  ")
