@@ -12,6 +12,7 @@ const (
 	CheckMatroskaChaptersKeyframeAlignment = "matroska_chapters_keyframe_alignment"
 	CheckMatroskaCommentaryPairing         = "matroska_commentary_pairing"
 	CheckMatroskaCommentaryPrefix          = "matroska_commentary_prefix"
+	CheckMatroskaCreationTimePrivacy       = "matroska_creation_time_privacy"
 	CheckMatroskaDefaultFlags              = "matroska_default_flags"
 	CheckMatroskaFontFilenameCompliance    = "matroska_font_filename_compliance"
 	CheckMatroskaLanguageTag               = "matroska_language_tag"
@@ -27,4 +28,5 @@ const (
 	CheckMatroskaZlibCompression           = "matroska_zlib_compression"
 	CheckMdbUnwantedAudioLang              = "mdb_unwanted_audio_lang"
 	CheckMediainfoEmptyTracks              = "mediainfo_empty_tracks"
+	CheckMediainfoMissingStatistics        = "mediainfo_missing_statistics"
 )

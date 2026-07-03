@@ -246,6 +246,17 @@ func FontFilenameCompliant(fileName string, internalNames []string) bool {
 	return isAttachmentNameCompliant(fileName, internalNames)
 }
 
+// ProposedFontFilename returns the compliant filename matroska_font_filename_compliance
+// proposes for a non-compliant font attachment: PostScript name, then the
+// first full name, then the family name (each cleaned via
+// cleanFallbackFontName), keeping attFileName's original extension. Returns
+// "" if attID has no usable internal name. correct's rename fix must use
+// this rather than deriving its own target, so the name it actually writes
+// can never drift from what the check displays as "Proposed Name".
+func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
+	return getProposedFontFilename(attFileName, attID, attachmentFonts)
+}
+
 // FontNameMatches reports whether name matches one of a font file's internal names.
 func FontNameMatches(name string, internalNames []string) bool {
 	normalizedName := normalizeFontName(name)

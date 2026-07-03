@@ -399,6 +399,63 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
+// CreationTimeTagKeys lists the raw Matroska tag Name values that
+// matroska_creation_time_privacy treats as an encode/creation-time privacy
+// concern when found in a track's or the file's global Tags. Shared with
+// internal/correct's tag-stripping fix so the two can never disagree about
+// which tag names carry creation-time metadata.
+var CreationTimeTagKeys = []string{
+	"creation_time",
+	"ENCODED_DATE",
+	"DATE_ENCODED",
+	"DATE_TAGGED",
+	"_STATISTICS_WRITING_DATE_UTC",
+	"DATE",
+}
+
+// ContainerCreationTimeNeedsFix reports whether the Segment-level DateUTC
+// (and its derived DateLocal display value) should be cleared, matching
+// matroska_creation_time_privacy's container-level criteria.
+func ContainerCreationTimeNeedsFix(ebml *matroska.EbmlMetadata) bool {
+	return ebml.Container.Properties.DateUtc != "" || ebml.Container.Properties.DateLocal != ""
+}
+
+// emptyTagRegex matches a <Tag> element left with a Targets child and no
+// remaining Simple entries, non-greedy up to the first closing Targets tag
+// (Targets elements don't nest, so this is unambiguous).
+var emptyTagRegex = regexp.MustCompile(`(?is)<Tag>\s*(<Targets\s*/>|<Targets>.*?</Targets>)\s*</Tag>`)
+
+// StripCreationTimeTags removes <Simple> tag entries (global or per-track)
+// whose <Name> is one of CreationTimeTagKeys from tagsXML (as extracted by
+// matroska.ExtractTagsXML), along with any <Tag> block left with no Simple
+// children as a result. Matching is done on the raw XML text rather than a
+// full parse and remarshal: the Tags schema's Targets element can carry
+// TrackUID/EditionUID/ChapterUID/AttachmentUID children this package
+// otherwise doesn't model, and a lossy round trip through an incomplete
+// struct could silently drop a tag's association with its track. Returns
+// the original content unchanged and a nil name list when nothing matched.
+func StripCreationTimeTags(tagsXML []byte) ([]byte, []string) {
+	content := tagsXML
+
+	var removed []string
+
+	for _, key := range CreationTimeTagKeys {
+		re := regexp.MustCompile(`(?is)\s*<Simple>\s*<Name>` + regexp.QuoteMeta(key) + `</Name>.*?</Simple>`)
+		if re.Match(content) {
+			removed = append(removed, key)
+			content = re.ReplaceAll(content, nil)
+		}
+	}
+
+	if len(removed) == 0 {
+		return tagsXML, nil
+	}
+
+	content = emptyTagRegex.ReplaceAll(content, nil)
+
+	return content, removed
+}
+
 func checkCreationTimePrivacy(filePath string, ebml *matroska.EbmlMetadata) *CheckResult {
 	res := &CheckResult{
 		Identifier: "matroska_creation_time_privacy",
@@ -437,14 +494,12 @@ func appendMediaInfoCreationTimePrivacy(mi *mediainfo.MediaInfo, res *CheckResul
 		t := &mi.Media.Tracks[i]
 
 		fields := map[string]string{
-			"Encoded_Date":                 t.EncodedDate,
-			"Tagged_Date":                  t.TaggedDate,
-			"creation_time":                t.Extra.GetString("creation_time"),
-			"ENCODED_DATE":                 t.Extra.GetString("ENCODED_DATE"),
-			"DATE_ENCODED":                 t.Extra.GetString("DATE_ENCODED"),
-			"DATE_TAGGED":                  t.Extra.GetString("DATE_TAGGED"),
-			"_STATISTICS_WRITING_DATE_UTC": t.Extra.GetString("_STATISTICS_WRITING_DATE_UTC"),
-			"DATE":                         t.Extra.GetString("DATE"),
+			"Encoded_Date": t.EncodedDate,
+			"Tagged_Date":  t.TaggedDate,
+		}
+
+		for _, key := range CreationTimeTagKeys {
+			fields[key] = t.Extra.GetString(key)
 		}
 
 		for k, v := range fields {

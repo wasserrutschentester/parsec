@@ -476,6 +476,47 @@ func getEmptyTrackReasons(track *mediainfo.Track) []string {
 	return reasons
 }
 
+// TrackMissingStatistics reports which statistics tags (DURATION,
+// NUMBER_OF_BYTES, and for Text tracks ElementCount) mediainfo did not find
+// on track. Returns nil for General/Menu tracks (which don't carry these
+// tags) or when nothing is missing.
+func TrackMissingStatistics(track *mediainfo.Track) []string {
+	if track.Type == "General" || track.Type == "Menu" {
+		return nil
+	}
+
+	var missingStats []string
+
+	if track.Duration == nil {
+		missingStats = append(missingStats, "DURATION")
+	}
+
+	if track.StreamSize == nil {
+		missingStats = append(missingStats, "NUMBER_OF_BYTES")
+	}
+
+	if track.Type == "Text" && track.GetElementCount() == -1 {
+		missingStats = append(missingStats, "ElementCount")
+	}
+
+	return missingStats
+}
+
+// MissingStatisticsNeedsFix reports whether any track is missing statistics
+// tags, matching the mediainfo_missing_statistics check's criteria. The fix
+// (mkvpropedit --add-track-statistics-tags) recomputes every track's
+// statistics tags in one shot, so the fix policy only needs to know whether
+// any track needs it, not which ones or what's missing.
+func MissingStatisticsNeedsFix(mi *mediainfo.MediaInfo) bool {
+	for i := range mi.Media.Tracks {
+		if len(TrackMissingStatistics(&mi.Media.Tracks[i])) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func checkMissingStatistics(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
 		Identifier: "mediainfo_missing_statistics",
@@ -485,26 +526,7 @@ func checkMissingStatistics(mi *mediainfo.MediaInfo) []CheckResult {
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
 
-		if track.Type == "General" || track.Type == "Menu" {
-			continue
-		}
-
-		missingStats := []string{}
-
-		if track.Duration == nil {
-			missingStats = append(missingStats, "DURATION")
-		}
-
-		if track.StreamSize == nil {
-			missingStats = append(missingStats, "NUMBER_OF_BYTES")
-		}
-
-		if track.Type == "Text" {
-			if track.GetElementCount() == -1 {
-				missingStats = append(missingStats, "ElementCount")
-			}
-		}
-
+		missingStats := TrackMissingStatistics(track)
 		if len(missingStats) > 0 {
 			res.Passed = false
 			res.Severity = "warning"

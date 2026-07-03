@@ -46,10 +46,11 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 }
 
 // ComputeContainerFixes returns the segment-level ("info") property edits
-// needed to satisfy the title- and writing-application-hygiene checks. A
-// matching property is cleared rather than rewritten with a guessed
-// replacement, mirroring the conservative junk-removal approach used for
-// track names. Checks that are disabled in the configuration are skipped.
+// needed to satisfy the title-, writing-application-, and creation-time
+// privacy checks. A matching property is cleared rather than rewritten with
+// a guessed replacement, mirroring the conservative junk-removal approach
+// used for track names. Checks that are disabled in the configuration are
+// skipped.
 func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) map[string]string {
 	props := make(map[string]string)
 
@@ -59,6 +60,10 @@ func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata)
 
 	if config.IsCheckEnabled(config.CheckMatroskaAppHygiene) && checks.AppHygieneNeedsFix(ebml.Container.Properties.WritingApplication) {
 		props["writing-application"] = ""
+	}
+
+	if config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) && checks.ContainerCreationTimeNeedsFix(ebml) {
+		props["date"] = ""
 	}
 
 	return props
@@ -223,7 +228,7 @@ func ComputeFontRenames(ebml *matroska.EbmlMetadata, attachmentNames map[int][]s
 
 	unused := checks.UnusedFontAttachments(ebml.Attachments, attachmentFonts, usedFonts)
 
-	return computeFontRenames(excludeAttachments(ebml.Attachments, unused), attachmentNames)
+	return computeFontRenames(excludeAttachments(ebml.Attachments, unused), attachmentNames, attachmentFonts)
 }
 
 // excludeAttachments returns the attachments in all that aren't present in
@@ -250,7 +255,13 @@ func excludeAttachments(all, exclude []matroska.EbmlAttachment) []matroska.EbmlA
 // it. Renames that would collide on the same target filename (e.g. several
 // distinct attachments all embedding "Times New Roman") are disambiguated
 // with a " (2)", " (3)", ... suffix rather than silently colliding.
-func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string) []FontRename {
+// attachmentNames is used for the compliance check and the display-only
+// InternalNames field; the rename target itself always comes from
+// checks.ProposedFontFilename (attachmentFonts), the exact same priority
+// (PostScript name, then full name, then family name) and cleanup the check
+// shows as its own "Proposed Name" column, so the two can never disagree
+// about what a font should be renamed to.
+func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo) []FontRename {
 	var renames []FontRename
 
 	for _, att := range attachments {
@@ -263,10 +274,15 @@ func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames m
 			continue
 		}
 
+		newName := checks.ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
+		if newName == "" {
+			continue
+		}
+
 		renames = append(renames, FontRename{
 			ID:            att.ID,
 			OldName:       att.FileName,
-			NewName:       fontRenameTarget(att.FileName, names[0]),
+			NewName:       newName,
 			InternalNames: names,
 		})
 	}
@@ -300,8 +316,13 @@ func suffixFontName(name string, n int) string {
 	return fmt.Sprintf("%s (%d)%s", base, n, ext)
 }
 
-// fontRenameTarget builds the compliant filename for a font attachment,
-// keeping the original extension and using the font's primary internal name.
+// fontRenameTarget builds a filename from internalName, keeping oldName's
+// extension. Used for naming a newly-attached font (attachmentNameForFont in
+// fonts.go), which has no parsed AttachmentFontInfo yet to run through
+// checks.ProposedFontFilename's PostScript/full-name/family-name priority -
+// not for renaming an existing attachment, which must use
+// checks.ProposedFontFilename so it can never drift from what the
+// matroska_font_filename_compliance check proposes.
 func fontRenameTarget(oldName, internalName string) string {
 	ext := ""
 	if idx := strings.LastIndex(oldName, "."); idx != -1 {

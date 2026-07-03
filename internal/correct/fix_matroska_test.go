@@ -339,13 +339,22 @@ func TestComputeFontRenames(t *testing.T) {
 		2: {"Calibri Bold"},
 	}
 
-	got := computeFontRenames(attachments, attachmentNames)
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FamilyName: "Open Sans"},
+		{AttachmentID: 2, FamilyName: "Calibri Bold"},
+	}
+
+	got := computeFontRenames(attachments, attachmentNames, attachmentFonts)
 
 	if len(got) != 1 {
 		t.Fatalf("expected 1 rename, got %d: %+v", len(got), got)
 	}
 
-	want := FontRename{ID: 1, OldName: "font1.ttf", NewName: "Open Sans.ttf", InternalNames: []string{"Open Sans"}}
+	// NewName matches checks.ProposedFontFilename exactly (family-only
+	// fallback strips spaces via cleanFallbackFontName), not the raw
+	// internal name, so correct's rename target can never drift from what
+	// matroska_font_filename_compliance shows as its "Proposed Name".
+	want := FontRename{ID: 1, OldName: "font1.ttf", NewName: "OpenSans.ttf", InternalNames: []string{"Open Sans"}}
 	if got[0].ID != want.ID || got[0].OldName != want.OldName || got[0].NewName != want.NewName || !slices.Equal(got[0].InternalNames, want.InternalNames) {
 		t.Errorf("expected %+v, got %+v", want, got[0])
 	}
@@ -367,17 +376,51 @@ func TestComputeFontRenamesDisambiguatesCollisions(t *testing.T) {
 		3: {"Times New Roman"},
 	}
 
-	got := computeFontRenames(attachments, attachmentNames)
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FamilyName: "Times New Roman"},
+		{AttachmentID: 2, FamilyName: "Times New Roman"},
+		{AttachmentID: 3, FamilyName: "Times New Roman"},
+	}
+
+	got := computeFontRenames(attachments, attachmentNames, attachmentFonts)
 
 	if len(got) != 3 {
 		t.Fatalf("expected 3 renames, got %d: %+v", len(got), got)
 	}
 
-	wantNames := []string{"Times New Roman.ttf", "Times New Roman (2).ttf", "Times New Roman (3).ttf"}
+	wantNames := []string{"TimesNewRoman.ttf", "TimesNewRoman (2).ttf", "TimesNewRoman (3).ttf"}
 	for i, want := range wantNames {
 		if got[i].NewName != want {
 			t.Errorf("rename %d: NewName = %q, want %q", i, got[i].NewName, want)
 		}
+	}
+}
+
+// Regression test: when a font has a PostScript name, the rename target
+// must use it (matching checks.ProposedFontFilename's priority), not the
+// family name. Before this alignment, correct picked whichever name
+// GetFontMapping listed first for the attachment, which put the family name
+// ahead of the PostScript name - drifting from what the check itself
+// proposed in its "Proposed Name" column.
+func TestComputeFontRenamesPrefersPostScriptName(t *testing.T) {
+	t.Parallel()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+	}
+
+	attachmentNames := map[int][]string{
+		1: {"Open Sans", "OpenSans-Bold"},
+	}
+
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FamilyName: "Open Sans", PostScriptName: "OpenSans-Bold"},
+	}
+
+	got := computeFontRenames(attachments, attachmentNames, attachmentFonts)
+
+	if len(got) != 1 || got[0].NewName != "OpenSans-Bold.ttf" {
+		t.Errorf("expected rename to use the PostScript name, got %+v", got)
 	}
 }
 

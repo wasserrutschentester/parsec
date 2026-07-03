@@ -176,7 +176,7 @@ var validCheckIdentifiers = map[string]bool{
 	"mediainfo_dialogue_normalization": true,
 	"mediainfo_stereo_lossless":        true,
 	CheckMediainfoEmptyTracks:          true,
-	"mediainfo_missing_statistics":     true,
+	CheckMediainfoMissingStatistics:    true,
 	CheckMatroskaLanguageTag:           true,
 
 	CheckMatroskaMultiLang:                 true,
@@ -202,7 +202,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_video_cropping":              true,
 	CheckMatroskaTitleHygiene:              true,
 	CheckMatroskaAppHygiene:                true,
-	"matroska_creation_time_privacy":       true,
+	CheckMatroskaCreationTimePrivacy:       true,
 	"matroska_truehd_compatibility":        true,
 	"matroska_commentary_channels":         true,
 	"matroska_commentary_bitrate":          true,

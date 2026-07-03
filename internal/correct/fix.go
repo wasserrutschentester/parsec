@@ -15,6 +15,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -91,7 +92,18 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return err
 	}
 
-	return removeUnusedFonts(filePath, ebml, attachmentNames, attachmentFonts, usedFonts, opts)
+	if err := removeUnusedFonts(filePath, ebml, attachmentNames, attachmentFonts, usedFonts, opts); err != nil {
+		return err
+	}
+
+	if err := fixMissingStatistics(filePath, opts); err != nil {
+		return err
+	}
+
+	// Must run after fixMissingStatistics: --add-track-statistics-tags writes
+	// its own _STATISTICS_WRITING_DATE_UTC tag, which this step should then
+	// be able to strip in the same run.
+	return fixCreationTimeTags(filePath, opts)
 }
 
 // confirmApply prints the dry-run notice and reports false when opts.DryRun is
@@ -245,6 +257,7 @@ var containerPropertyInfo = map[string]struct {
 }{
 	"title":               {label: "Title", value: func(ebml *matroska.EbmlMetadata) string { return ebml.Container.Properties.Title }},
 	"writing-application": {label: "Writing Application", value: func(ebml *matroska.EbmlMetadata) string { return ebml.Container.Properties.WritingApplication }},
+	"date":                {label: "Creation Time", value: func(ebml *matroska.EbmlMetadata) string { return ebml.Container.Properties.DateUtc }},
 }
 
 func containerPropertyValue(ebml *matroska.EbmlMetadata, key string) string {
@@ -305,6 +318,89 @@ func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, attachmentN
 	}
 
 	ui.PrintSuccess("Unused font attachments removed.")
+
+	return nil
+}
+
+// fixMissingStatistics recomputes and writes track statistics tags (DURATION,
+// NUMBER_OF_BYTES, etc.) when mediainfo reports any track missing them.
+// mkvpropedit --add-track-statistics-tags recomputes every track in one
+// shot, so there's nothing to preview per-track; this is a single confirmed
+// action for the whole file. Must run before fixCreationTimeTags: it writes
+// its own _STATISTICS_WRITING_DATE_UTC tag, which the privacy fix should
+// then be able to strip in the same run rather than leaving it behind until
+// the next correct invocation.
+func fixMissingStatistics(filePath string, opts Options) error {
+	if !config.IsCheckEnabled(config.CheckMediainfoMissingStatistics) {
+		return nil
+	}
+
+	mi, err := mediainfo.Get(filePath)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("skipping missing-statistics fix for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return nil
+	}
+
+	if !checks.MissingStatisticsNeedsFix(mi) {
+		return nil
+	}
+
+	ui.Println(ui.ReportSection("Missing Statistics Tags"))
+	ui.Println("  Recompute and write DURATION/NUMBER_OF_BYTES/element-count statistics for all tracks.")
+
+	if !confirmApply(opts, "Add track statistics tags?", "Skipping track statistics tags...") {
+		return nil
+	}
+
+	if err := matroska.AddTrackStatisticsTags(filePath); err != nil {
+		ui.PrintError(fmt.Sprintf("Error adding track statistics tags for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Track statistics tags added.")
+
+	return nil
+}
+
+// fixCreationTimeTags strips creation/encode-time tag entries (global or
+// per-track, e.g. ENCODED_DATE, _STATISTICS_WRITING_DATE_UTC) flagged by
+// matroska_creation_time_privacy. Unlike the Segment-level date (handled by
+// ComputeContainerFixes/applyContainerProperty as an ordinary info-property
+// clear), these live in Tags, so they need their own extract/strip/write-back
+// step. Must run after fixMissingStatistics; see its doc comment.
+func fixCreationTimeTags(filePath string, opts Options) error {
+	if !config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) {
+		return nil
+	}
+
+	tagsXML, err := matroska.ExtractTagsXML(filePath)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("skipping creation-time tag fix for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return nil
+	}
+
+	stripped, removed := checks.StripCreationTimeTags(tagsXML)
+	if len(removed) == 0 {
+		return nil
+	}
+
+	ui.Println(ui.ReportSection("Creation Time Tags"))
+	ui.Println("  " + strings.Join(removed, ", "))
+
+	if !confirmApplyWithPolicy(opts, "  Remove these creation/encode-time tags?", "Skipping creation-time tag removal...", false) {
+		return nil
+	}
+
+	if err := matroska.SetTagsXML(filePath, stripped); err != nil {
+		ui.PrintError(fmt.Sprintf("Error removing creation-time tags for %s: %v", ui.AnonymizePath(filePath), err))
+
+		return errTrackFix
+	}
+
+	ui.PrintSuccess("Creation-time tags removed.")
 
 	return nil
 }

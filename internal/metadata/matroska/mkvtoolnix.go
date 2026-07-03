@@ -946,6 +946,94 @@ func SetGlobalTags(filePath string, tagSets []mdb.MatroskaTagSet) error {
 	return runMkvpropedit(filePath, []string{filePath, "--tags", "global:" + tagsXML}, "set global tags")
 }
 
+// AddTrackStatisticsTags recomputes and writes statistics tags (DURATION,
+// NUMBER_OF_BYTES, etc.) for every track in the file using mkvpropedit.
+func AddTrackStatisticsTags(filePath string) error {
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	return runMkvpropedit(filePath, []string{filePath, "--add-track-statistics-tags"}, "add track statistics tags")
+}
+
+// ExtractTagsXML uses mkvextract to extract the raw tags XML (global and
+// per-track) from a Matroska file, in the same format mkvpropedit's --tags
+// all: expects for writing them back.
+func ExtractTagsXML(filePath string) ([]byte, error) {
+	if err := CheckForMatroska(filePath); err != nil {
+		return nil, err
+	}
+
+	tmpFilePath, err := runMkvextractTags(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = os.Remove(tmpFilePath) }()
+
+	xmlContent, err := os.ReadFile(tmpFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read extracted tags: %w", err)
+	}
+
+	return xmlContent, nil
+}
+
+func runMkvextractTags(filePath string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "parsec-tags-extract-*.xml")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpFilePath := tmpFile.Name()
+	_ = tmpFile.Close()
+
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tags %s", ui.AnonymizePath(filePath), tmpFilePath))
+
+	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tags", tmpFilePath)
+	if _, err := cmd.Output(); err != nil {
+		_ = os.Remove(tmpFilePath)
+
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
+		}
+
+		return "", fmt.Errorf("failed to extract tags: %w", err)
+	}
+
+	return tmpFilePath, nil
+}
+
+// SetTagsXML replaces a Matroska file's tags (global and per-track) in place
+// from xmlContent, which must be the full tags document (e.g. from
+// ExtractTagsXML with some entries removed) since this replaces all tags at
+// once via mkvpropedit's --tags all: selector.
+func SetTagsXML(filePath string, xmlContent []byte) error {
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	tmpFile, err := os.CreateTemp("", "parsec-tags-write-*.xml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpPath := tmpFile.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if _, err := tmpFile.Write(xmlContent); err != nil {
+		_ = tmpFile.Close()
+
+		return fmt.Errorf("failed to write tags XML: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to write tags XML: %w", err)
+	}
+
+	return runMkvpropedit(filePath, []string{filePath, "--tags", "all:" + tmpPath}, "set tags")
+}
+
 // TrackEdit describes a set of property changes for a single track, identified
 // by its track number (the "number" property reported by mkvmerge -J).
 type TrackEdit struct {
@@ -991,7 +1079,10 @@ func buildPropeditArgs(filePath string, edits []TrackEdit) []string {
 }
 
 // SetContainerProperties applies segment-level ("info") property edits in
-// place using mkvpropedit.
+// place using mkvpropedit. An empty value deletes the property instead of
+// setting it (matching TrackEdit's convention); this is required for typed
+// properties like "date" (DateUTC), which mkvpropedit refuses to --set to an
+// empty string but will happily --delete.
 func SetContainerProperties(filePath string, props map[string]string) error {
 	if len(props) == 0 {
 		return nil
@@ -1002,8 +1093,13 @@ func SetContainerProperties(filePath string, props map[string]string) error {
 	}
 
 	args := []string{filePath, "--edit", "info"}
+
 	for _, key := range slices.Sorted(maps.Keys(props)) {
-		args = append(args, "--set", key+"="+props[key])
+		if value := props[key]; value == "" {
+			args = append(args, "--delete", key)
+		} else {
+			args = append(args, "--set", key+"="+value)
+		}
 	}
 
 	return runMkvpropedit(filePath, args, "set container properties")
