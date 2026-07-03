@@ -53,11 +53,11 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) map[string]string {
 	props := make(map[string]string)
 
-	if config.IsCheckEnabled("matroska_title_hygiene") && checks.TitleHygieneNeedsFix(ebml.Container.Properties.Title, meta) {
+	if config.IsCheckEnabled(config.CheckMatroskaTitleHygiene) && checks.TitleHygieneNeedsFix(ebml.Container.Properties.Title, meta) {
 		props["title"] = ""
 	}
 
-	if config.IsCheckEnabled("matroska_app_hygiene") && checks.AppHygieneNeedsFix(ebml.Container.Properties.WritingApplication) {
+	if config.IsCheckEnabled(config.CheckMatroskaAppHygiene) && checks.AppHygieneNeedsFix(ebml.Container.Properties.WritingApplication) {
 		props["writing-application"] = ""
 	}
 
@@ -79,14 +79,13 @@ type ChapterAlignmentFix struct {
 // align each misaligned chapter with its nearest video keyframe. Returns a
 // zero-value ChapterAlignmentFix (Changed == 0) when the check is disabled,
 // the file has no chapters, the video keyframe index can't be read, or
-// nothing needs to change. Only the first edition is considered, matching the
-// check's own parsed chapter model; a file with additional editions is left alone.
+// nothing needs to change.
 func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) ChapterAlignmentFix {
-	if !config.IsCheckEnabled("matroska_chapters_keyframe_alignment") {
+	if !config.IsCheckEnabled(config.CheckMatroskaChaptersKeyframeAlignment) {
 		return ChapterAlignmentFix{}
 	}
 
-	if len(ebml.Chapters) != 1 || len(ebml.Chapters[0].Editions) != 1 {
+	if len(ebml.Chapters) != 1 {
 		return ChapterAlignmentFix{}
 	}
 
@@ -113,10 +112,16 @@ func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) C
 	return ChapterAlignmentFix{Times: times, Changed: changed}
 }
 
+// extractChapterAtoms returns the chapter atoms to align. Real mkvmerge -J
+// output never populates ebml.Chapters[0].Editions (it only reports
+// num_entries), so in production this always extracts via mkvextract; the
+// ebml-provided path exists so tests can inject known atoms without a real
+// mkvextract round trip.
 func extractChapterAtoms(filePath string, ebml *matroska.EbmlMetadata) []matroska.EbmlChapterAtom {
-	chapters := ebml.Chapters[0].Editions[0].Chapters
-	if len(chapters) > 0 {
-		return chapters
+	if len(ebml.Chapters[0].Editions) > 0 {
+		if chapters := ebml.Chapters[0].Editions[0].Chapters; len(chapters) > 0 {
+			return chapters
+		}
 	}
 
 	extracted, err := matroska.ExtractChapters(filePath)
@@ -175,16 +180,18 @@ func absInt64(v int64) int64 {
 // ComputeUnusedFontAttachments returns the font attachments that satisfy the
 // matroska_unused_fonts check's removal criteria: not referenced by any
 // subtitle track's Styles or inline tags. Returns nil when the check is
-// disabled in the configuration.
-func ComputeUnusedFontAttachments(filePath string, ebml *matroska.EbmlMetadata) []matroska.EbmlAttachment {
-	if !config.IsCheckEnabled("matroska_unused_fonts") {
+// disabled in the configuration. attachmentFonts and usedFonts are the
+// caller's already-computed checks.GetAttachmentFonts/checks.ComputeUsedFonts
+// results: both are pure functions of ebml (which is a single fixed snapshot
+// for a whole correct run), so recomputing them per fix step would only
+// reparse identical data after an unrelated mkvpropedit edit bumps the
+// file's mtime and busts their disk cache.
+func ComputeUnusedFontAttachments(ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []matroska.EbmlAttachment {
+	if !config.IsCheckEnabled(config.CheckMatroskaUnusedFonts) {
 		return nil
 	}
 
-	fontMap, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
-	allUsedFonts := checks.ComputeUsedFonts(filePath, ebml.Tracks, fontMap)
-
-	return checks.UnusedFontAttachments(ebml.Attachments, attachmentNames, allUsedFonts)
+	return checks.UnusedFontAttachments(ebml.Attachments, attachmentFonts, usedFonts)
 }
 
 // FontRename describes a font attachment filename correction needed to
@@ -206,15 +213,15 @@ type FontRename struct {
 // about to be flagged for removal is pointless, and it's exactly the unused
 // case that tends to produce duplicate copies of the same font under
 // different names. Returns nil when the check is disabled or no remaining
-// attachment carries a usable internal name.
-func ComputeFontRenames(filePath string, ebml *matroska.EbmlMetadata) []FontRename {
-	if !config.IsCheckEnabled("matroska_font_filename_compliance") {
+// attachment carries a usable internal name. See ComputeUnusedFontAttachments
+// for why attachmentNames/attachmentFonts/usedFonts are passed in rather
+// than recomputed here.
+func ComputeFontRenames(ebml *matroska.EbmlMetadata, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []FontRename {
+	if !config.IsCheckEnabled(config.CheckMatroskaFontFilenameCompliance) {
 		return nil
 	}
 
-	fontMap, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
-	usedFonts := checks.ComputeUsedFonts(filePath, ebml.Tracks, fontMap)
-	unused := checks.UnusedFontAttachments(ebml.Attachments, attachmentNames, usedFonts)
+	unused := checks.UnusedFontAttachments(ebml.Attachments, attachmentFonts, usedFonts)
 
 	return computeFontRenames(excludeAttachments(ebml.Attachments, unused), attachmentNames)
 }
@@ -336,7 +343,7 @@ func (b *fixBuilder) edits() []matroska.TrackEdit {
 }
 
 func (b *fixBuilder) computeDefaultFlagFixes(tracks []matroska.EbmlTrack) {
-	if !config.IsCheckEnabled("matroska_default_flags") {
+	if !config.IsCheckEnabled(config.CheckMatroskaDefaultFlags) {
 		return
 	}
 
@@ -365,7 +372,7 @@ func (b *fixBuilder) computeDefaultFlagFixes(tracks []matroska.EbmlTrack) {
 }
 
 func (b *fixBuilder) computeOriginalFlagFixes(tracks []matroska.EbmlTrack) {
-	if !config.IsCheckEnabled("matroska_original_language") {
+	if !config.IsCheckEnabled(config.CheckMatroskaOriginalLanguage) {
 		return
 	}
 
@@ -437,9 +444,9 @@ func fixedTrackName(track matroska.EbmlTrack) string {
 // cleanNameTokens splits a track name and drops the tokens flagged by the
 // enabled name checks, reporting whether anything was removed.
 func cleanNameTokens(name, lang string) (kept []string, removed bool) {
-	removeJunk := config.IsCheckEnabled("matroska_name_quality")
-	removeCodecs := config.IsCheckEnabled("matroska_name_codecs")
-	removeLang := config.IsCheckEnabled("matroska_name_redundant_lang")
+	removeJunk := config.IsCheckEnabled(config.CheckMatroskaNameQuality)
+	removeCodecs := config.IsCheckEnabled(config.CheckMatroskaNameCodecs)
+	removeLang := config.IsCheckEnabled(config.CheckMatroskaNameRedundantLang)
 
 	for _, token := range cleanSplitRegex.Split(name, -1) {
 		switch {
@@ -462,7 +469,7 @@ func cleanNameTokens(name, lang string) (kept []string, removed bool) {
 // maybeAppendKeywords appends the keywords required by the track's flags when
 // the name-keyword check is enabled, reporting whether the name changed.
 func maybeAppendKeywords(name string, props matroska.EbmlTrackProperties) (string, bool) {
-	if !config.IsCheckEnabled("matroska_name_keywords") {
+	if !config.IsCheckEnabled(config.CheckMatroskaNameKeywords) {
 		return name, false
 	}
 
@@ -472,7 +479,7 @@ func maybeAppendKeywords(name string, props matroska.EbmlTrackProperties) (strin
 }
 
 func maybePrefixCommentaryName(name string, props matroska.EbmlTrackProperties) (string, bool) {
-	if !config.IsCheckEnabled("matroska_commentary_prefix") || !props.Commentary || strings.TrimSpace(name) == "" {
+	if !config.IsCheckEnabled(config.CheckMatroskaCommentaryPrefix) || !props.Commentary || strings.TrimSpace(name) == "" {
 		return name, false
 	}
 
@@ -499,7 +506,10 @@ func addCommentaryPrefix(name string) string {
 	prefix, core := splitCommentaryPrefixContext(name)
 	core = strings.TrimSpace(core)
 
-	if core == "" {
+	// A core of just "commentary" carries no actual attribution (no name/role
+	// to put after "by"), so prefixing it would fabricate the meaningless
+	// "Commentary by Commentary". Leave the name as-is for a human to fix.
+	if core == "" || strings.EqualFold(core, "commentary") {
 		return name
 	}
 
@@ -515,7 +525,7 @@ func splitCommentaryPrefixContext(name string) (prefix, core string) {
 }
 
 func (b *fixBuilder) computeCommentaryPairingNameFixes(tracks []matroska.EbmlTrack, fixedNames map[int]string) {
-	if !config.IsCheckEnabled("matroska_commentary_pairing") {
+	if !config.IsCheckEnabled(config.CheckMatroskaCommentaryPairing) {
 		return
 	}
 
@@ -621,7 +631,7 @@ func boolFlag(value bool) string {
 // the corresponding check is enabled. The correct value is unknown, so the
 // caller must obtain it from the user.
 func NeedsLanguageFix(track matroska.EbmlTrack) bool {
-	if !config.IsCheckEnabled("matroska_language_tag") || !checks.IsRelevantTrack(track) {
+	if !config.IsCheckEnabled(config.CheckMatroskaLanguageTag) || !checks.IsRelevantTrack(track) {
 		return false
 	}
 
@@ -640,11 +650,11 @@ func NeedsMultiLangName(track matroska.EbmlTrack) bool {
 
 	name := track.Properties.Name
 
-	if config.IsCheckEnabled("matroska_multi_lang") && name == "" {
+	if config.IsCheckEnabled(config.CheckMatroskaMultiLang) && name == "" {
 		return true
 	}
 
-	return config.IsCheckEnabled("matroska_name_keywords") && checks.CountLanguagesInString(name) < 2
+	return config.IsCheckEnabled(config.CheckMatroskaNameKeywords) && checks.CountLanguagesInString(name) < 2
 }
 
 // KeywordFlagFix describes a track whose name contains a keyword whose matching
@@ -661,7 +671,7 @@ type KeywordFlagFix struct {
 // name advertises a property (SDH, Forced, Commentary, descriptive) whose flag
 // is not actually set. It returns nil when the name-keywords check is disabled.
 func ReverseKeywordFlagFixes(track matroska.EbmlTrack) []KeywordFlagFix {
-	if !config.IsCheckEnabled("matroska_name_keywords") || !checks.IsRelevantTrack(track) {
+	if !config.IsCheckEnabled(config.CheckMatroskaNameKeywords) || !checks.IsRelevantTrack(track) {
 		return nil
 	}
 
@@ -748,7 +758,7 @@ func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) Matr
 // tracks as video, audio, subtitles and other while sorting audio and subtitle
 // tracks by priority. It returns nil when the current order is already correct.
 func computeTrackOrder(tracks []matroska.EbmlTrack) []int {
-	if !config.IsCheckEnabled("matroska_track_order") {
+	if !config.IsCheckEnabled(config.CheckMatroskaTrackOrder) {
 		return nil
 	}
 
@@ -793,7 +803,7 @@ func computeTrackOrder(tracks []matroska.EbmlTrack) []int {
 }
 
 func computeCompressionStrips(tracks []matroska.EbmlTrack) []int {
-	if !config.IsCheckEnabled("matroska_zlib_compression") {
+	if !config.IsCheckEnabled(config.CheckMatroskaZlibCompression) {
 		return nil
 	}
 
@@ -842,7 +852,7 @@ func computeRemovalCandidates(tracks []matroska.EbmlTrack, originalLang string) 
 // EBML track properties alone (mkvmerge always reports audio_channels for a
 // genuine audio track).
 func collectEmptyAudioTracks(collector *removalCollector, tracks []matroska.EbmlTrack) {
-	if !config.IsCheckEnabled("mediainfo_empty_tracks") {
+	if !config.IsCheckEnabled(config.CheckMediainfoEmptyTracks) {
 		return
 	}
 
@@ -856,24 +866,20 @@ func collectEmptyAudioTracks(collector *removalCollector, tracks []matroska.Ebml
 func collectUnwantedLanguageAudio(collector *removalCollector, tracks []matroska.EbmlTrack, originalLang string) {
 	// Without the original language we cannot tell which non-preferred track is
 	// the legitimate original, so we skip pruning entirely to stay safe.
-	if originalLang == "" || !config.IsCheckEnabled("mdb_unwanted_audio_lang") {
+	if originalLang == "" || !config.IsCheckEnabled(config.CheckMdbUnwantedAudioLang) {
 		return
 	}
 
-	wanted := map[language.Tag]bool{
-		language.Make(config.GetPreferredLanguage()): true,
-		language.Make(originalLang):                  true,
-		language.Und:                                 true,
-		language.Make("mul"):                         true,
-		language.Make("zxx"):                         true, // no linguistic content (e.g. music-only); never unwanted
-	}
+	prefTag := language.Make(config.GetPreferredLanguage())
+	origTag := language.Make(originalLang)
 
 	for _, track := range tracks {
 		if track.Type != "audio" {
 			continue
 		}
 
-		if !wanted[language.Make(track.Properties.Language)] {
+		langTag := language.Make(track.Properties.Language)
+		if !checks.IsWantedAudioLang(langTag, prefTag, origTag) {
 			collector.add(track, RemovalUnwantedAudioLang, "unwanted audio language '"+track.Properties.Language+"'")
 		}
 	}

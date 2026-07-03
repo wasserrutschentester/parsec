@@ -43,20 +43,44 @@ Flags can be used to override or provide missing information.`),
 			return err
 		}
 
-		expandedArgs := expandArgs(args)
+		return runIdentifyBatch(cmd, expandArgs(args))
+	},
+}
 
-		var prevResult *mdb.SearchResult
-		for _, filePath := range expandedArgs {
-			result, err := identifyFile(cmd, filePath, prevResult)
-			if err != nil {
-				return err
-			}
+// runIdentifyBatch identifies each file independently. A failure on one file
+// (including the user answering an interactive disambiguation prompt badly)
+// is reported by identifyFile and skipped rather than aborting the rest of
+// the batch; only when every file in the batch fails does this return an
+// error, so the process still exits non-zero when nothing succeeded.
+func runIdentifyBatch(cmd *cobra.Command, filePaths []string) error {
+	var prevResult *mdb.SearchResult
 
+	errs := make([]error, 0, len(filePaths))
+
+	for _, filePath := range filePaths {
+		result, err := identifyFile(cmd, filePath, prevResult)
+		errs = append(errs, err)
+
+		if err == nil {
 			prevResult = result
 		}
+	}
 
+	return batchIdentifyError(errs)
+}
+
+func batchIdentifyError(errs []error) error {
+	for _, err := range errs {
+		if err == nil {
+			return nil
+		}
+	}
+
+	if len(errs) == 0 {
 		return nil
-	},
+	}
+
+	return errSearch
 }
 
 func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, error) {

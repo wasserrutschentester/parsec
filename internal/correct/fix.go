@@ -68,7 +68,18 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return err
 	}
 
-	if err := renameNonCompliantFonts(filePath, ebml, opts); err != nil {
+	// Font data (per-attachment family/weight/italic parsed from each font's
+	// binary, and the fonts subtitle tracks reference) is computed once here
+	// rather than by each font fix step below. ebml is a single fixed
+	// snapshot for this whole call, so every step would otherwise reparse
+	// the exact same, unchanged font data - each paying for a disk-cache miss
+	// caused by an unrelated mkvpropedit edit (title, chapters, a prior
+	// rename) bumping the file's mtime and busting the mtime-keyed cache.
+	attachmentFonts := checks.GetAttachmentFonts(filePath, ebml.Attachments)
+	_, attachmentNames := checks.FontMappingFromFonts(attachmentFonts)
+	usedFonts := checks.ComputeUsedFonts(filePath, ebml.Tracks)
+
+	if err := renameNonCompliantFonts(filePath, ebml, attachmentNames, attachmentFonts, usedFonts, opts); err != nil {
 		return err
 	}
 
@@ -76,11 +87,11 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return err
 	}
 
-	if err := attachMissingFonts(filePath, ebml, opts); err != nil {
+	if err := attachMissingFonts(filePath, ebml, attachmentFonts, opts); err != nil {
 		return err
 	}
 
-	return removeUnusedFonts(filePath, ebml, opts)
+	return removeUnusedFonts(filePath, ebml, attachmentNames, attachmentFonts, usedFonts, opts)
 }
 
 // confirmApply prints the dry-run notice and reports false when opts.DryRun is
@@ -155,8 +166,8 @@ func fixChapterAlignment(filePath string, ebml *matroska.EbmlMetadata, opts Opti
 // match their internal font name, so naming tools (e.g. fonts that won't
 // match a subtitle's \fn reference by filename) stay consistent with the
 // font's actual name. Content is untouched, so this is non-destructive.
-func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	renames := ComputeFontRenames(filePath, ebml)
+func renameNonCompliantFonts(filePath string, ebml *matroska.EbmlMetadata, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool, opts Options) error {
+	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts, usedFonts)
 	if len(renames) == 0 {
 		return nil
 	}
@@ -224,15 +235,24 @@ func applyContainerProperty(filePath string, ebml *matroska.EbmlMetadata, opts O
 	return nil
 }
 
+// containerPropertyInfo is the single source of truth for how each
+// fixable container property is labeled and read, so the label and value
+// lookups (used together when rendering a proposed change) can never drift
+// out of sync with each other.
+var containerPropertyInfo = map[string]struct {
+	label string
+	value func(*matroska.EbmlMetadata) string
+}{
+	"title":               {label: "Title", value: func(ebml *matroska.EbmlMetadata) string { return ebml.Container.Properties.Title }},
+	"writing-application": {label: "Writing Application", value: func(ebml *matroska.EbmlMetadata) string { return ebml.Container.Properties.WritingApplication }},
+}
+
 func containerPropertyValue(ebml *matroska.EbmlMetadata, key string) string {
-	switch key {
-	case "title":
-		return ebml.Container.Properties.Title
-	case "writing-application":
-		return ebml.Container.Properties.WritingApplication
-	default:
-		return ""
+	if info, ok := containerPropertyInfo[key]; ok {
+		return info.value(ebml)
 	}
+
+	return ""
 }
 
 func formatContainerChange(key, oldValue, newValue string) string {
@@ -242,28 +262,23 @@ func formatContainerChange(key, oldValue, newValue string) string {
 }
 
 func containerKeyLabel(key string) string {
-	switch key {
-	case "title":
-		return "Title"
-	case "writing-application":
-		return "Writing Application"
-	default:
-		return key
+	if info, ok := containerPropertyInfo[key]; ok {
+		return info.label
 	}
+
+	return key
 }
 
 // removeUnusedFonts prompts to delete font attachments unused by any
 // subtitle track. It is skipped in dry-run, unattended, or non-interactive
 // runs since attachment removal is destructive and requires confirmation.
-func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	unused := ComputeUnusedFontAttachments(filePath, ebml)
+func removeUnusedFonts(filePath string, ebml *matroska.EbmlMetadata, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool, opts Options) error {
+	unused := ComputeUnusedFontAttachments(ebml, attachmentFonts, usedFonts)
 	if len(unused) == 0 {
 		return nil
 	}
 
 	ui.Println(ui.ReportSection("Unused Font Attachments"))
-
-	_, attachmentNames := checks.GetFontMapping(filePath, ebml.Attachments)
 
 	for _, att := range unused {
 		names := attachmentNames[att.ID]
@@ -501,7 +516,7 @@ func remuxMatroska(filePath string, opts Options) error {
 
 	if confirmCompressionStrip(ebml, plan, opts) {
 		remuxOpts.StripCompressionIDs = plan.StripCompressionIDs
-		remuxOpts.DisableTrackCompression = config.IsCheckEnabled("matroska_zlib_compression")
+		remuxOpts.DisableTrackCompression = config.IsCheckEnabled(config.CheckMatroskaZlibCompression)
 	}
 
 	remuxOpts.RemoveTrackIDs = selectRemovals(ebml, plan.RemovalCandidates, opts)

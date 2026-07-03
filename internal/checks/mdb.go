@@ -171,6 +171,32 @@ func checkUnknownOriginalLang(result *mdb.SearchResult) []CheckResult {
 	return results
 }
 
+// IsWantedAudioLang reports whether an audio track's language tag should be
+// kept, given the preferred and MDB original language tags. Matching is by
+// base ISO 639 subtag (via metadata.MatchLanguage), so e.g. a track tagged
+// "de-DE" is wanted when the preferred language is "de". This is the single
+// source of truth for wanted/unwanted audio language classification, shared
+// by the mdb_unwanted_audio_lang check and internal/correct's remux pruning
+// so the two never disagree on which tracks are safe to remove.
+func IsWantedAudioLang(langTag, prefTag, origTag language.Tag) bool {
+	mulTag := language.Make("mul")
+	zxxTag := language.Make("zxx")
+
+	switch {
+	case langTag == language.Und || metadata.MatchLanguage(langTag, mulTag):
+		return true
+	case metadata.MatchLanguage(langTag, zxxTag):
+		// no linguistic content (e.g. music-only); never unwanted
+		return true
+	case metadata.MatchLanguage(langTag, prefTag):
+		return true
+	case origTag != language.Und && metadata.MatchLanguage(langTag, origTag):
+		return true
+	default:
+		return false
+	}
+}
+
 func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []CheckResult {
 	var results []CheckResult
 
@@ -181,27 +207,11 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 	unwantedLangs := []language.Tag{}
 	prefTag := language.Make(prefLang)
 	origTag := language.Make(origLang)
-	mulTag := language.Make("mul")
-	zxxTag := language.Make("zxx")
 
 	for _, lang := range audioLangs {
 		langTag := language.Make(lang)
 
-		isWanted := false
-
-		switch {
-		case langTag == language.Und || metadata.MatchLanguage(langTag, mulTag):
-			isWanted = true
-		case metadata.MatchLanguage(langTag, zxxTag):
-			// no linguistic content (e.g. music-only); never unwanted
-			isWanted = true
-		case metadata.MatchLanguage(langTag, prefTag):
-			isWanted = true
-		case origLang != "" && metadata.MatchLanguage(langTag, origTag):
-			isWanted = true
-		}
-
-		if !isWanted {
+		if !IsWantedAudioLang(langTag, prefTag, origTag) {
 			unwantedLangs = append(unwantedLangs, langTag)
 		}
 	}

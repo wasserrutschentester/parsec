@@ -42,7 +42,7 @@ func TestValidate(t *testing.T) {
 group = 123
 source = "WEB-DL"
 repack = "true"
-preferred_language = "123"
+preferred_language = "not-a-lang"
 template = "{title}.{invalid_key}"
 unknown_key = "value"
 
@@ -68,10 +68,10 @@ replacement = ""
 		errors := validateMapTypes(configMap, "", expectedTypes)
 
 		expectedErrors := map[string]bool{
-			"Invalid type for 'group': expected string, got int64": true,
-			"Invalid type for 'repack': expected bool, got string": true,
-			"Invalid language tag in 'preferred_language': 123":    true,
-			"Invalid template key in 'template': {invalid_key}":    true,
+			"Invalid type for 'group': expected string, got int64":     true,
+			"Invalid type for 'repack': expected bool, got string":     true,
+			"Invalid language tag in 'preferred_language': not-a-lang": true,
+			"Invalid template key in 'template': {invalid_key}":        true,
 
 			"Unknown configuration key: 'unknown_key'": true,
 
@@ -96,4 +96,37 @@ replacement = ""
 			t.Errorf("Expected error not found: %s", err)
 		}
 	})
+}
+
+func TestValidateLanguage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		lang    string
+		wantErr bool
+	}{
+		{lang: "de", wantErr: false},
+		{lang: "de-DE", wantErr: false},
+		{lang: "chi", wantErr: false}, // 3-letter ISO 639-2/3 code
+		{lang: "zh-Hant", wantErr: false},
+		// Regression: language.Parse accepts this without error (base
+		// language "not", a real obscure ISO 639-3 code, plus a private
+		// "a-lang" BCP 47 extension it silently tolerates). Must still be
+		// rejected since it's not a plain media language tag.
+		{lang: "not-a-lang", wantErr: true},
+		{lang: "de-1901", wantErr: true}, // variant subtag, not supported
+		{lang: "xx", wantErr: true},
+		{lang: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.lang, func(t *testing.T) {
+			t.Parallel()
+
+			got := validateLanguage(tt.lang, "preferred_language")
+			if (len(got) > 0) != tt.wantErr {
+				t.Errorf("validateLanguage(%q) = %v, wantErr %v", tt.lang, got, tt.wantErr)
+			}
+		})
+	}
 }

@@ -750,11 +750,13 @@ func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts [
 	return rows
 }
 
-func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
-	if len(attachments) == 0 {
-		return nil
-	}
-
+// findUnusedFontAttachments returns the font attachments not referenced by
+// any subtitle track, matching by PostScript name or by family+italic+weight
+// (variable fonts match any weight). This is the single source of truth for
+// "is this font attachment used": both the matroska_unused_fonts check and
+// internal/correct's removal/rename fix computations call this same
+// function, so they can never disagree about which attachments are unused.
+func findUnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) []matroska.EbmlAttachment {
 	var unused []matroska.EbmlAttachment
 
 	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
@@ -783,6 +785,16 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 			unused = append(unused, att)
 		}
 	}
+
+	return unused
+}
+
+func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	unused := findUnusedFontAttachments(attachments, attachmentFonts, allUsedFonts)
 
 	if len(unused) > 0 {
 		warning := "Font attachments not used by any subtitle track"

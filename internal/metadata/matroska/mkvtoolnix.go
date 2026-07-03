@@ -896,6 +896,40 @@ func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 	return false
 }
 
+// runMkvpropedit logs args at debug level (with args[0], the file path,
+// anonymized) then delegates to execMkvpropedit. Use this when no argument
+// besides the file path needs anonymizing; use execMkvpropedit directly with
+// custom debug logging otherwise (e.g. AddAttachments, whose args include
+// local file paths of their own).
+func runMkvpropedit(filePath string, args []string, actionMsg string) error {
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	return execMkvpropedit(args, actionMsg)
+}
+
+// execMkvpropedit runs mkvpropedit with args and wraps a not-found or
+// failure error with actionMsg and the command's combined output. This is
+// the single place that knows how to invoke mkvpropedit, shared by every
+// mutation below (tags, track/container properties, attachments, chapters)
+// so they don't each repeat the same
+// exec.CommandContext/exec.ErrNotFound/error-wrapping code.
+func execMkvpropedit(args []string, actionMsg string) error {
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to %s: %w: %s", actionMsg, err, output)
+	}
+
+	return nil
+}
+
 // SetGlobalTags uses mkvpropedit to set global tags (TITLE, IMDB, TMDB, TVDB) on a Matroska file.
 func SetGlobalTags(filePath string, tagSets []mdb.MatroskaTagSet) error {
 	err := CheckForMatroska(filePath)
@@ -909,18 +943,7 @@ func SetGlobalTags(filePath string, tagSets []mdb.MatroskaTagSet) error {
 	}
 	defer func() { _ = os.Remove(tagsXML) }()
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --tags global:%s", ui.AnonymizePath(filePath), tagsXML))
-
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", filePath, "--tags", "global:"+tagsXML)
-	if err := cmd.Run(); err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to set global tags: %w", err)
-	}
-
-	return nil
+	return runMkvpropedit(filePath, []string{filePath, "--tags", "global:" + tagsXML}, "set global tags")
 }
 
 // TrackEdit describes a set of property changes for a single track, identified
@@ -945,22 +968,7 @@ func SetTrackProperties(filePath string, edits []TrackEdit) error {
 
 	args := buildPropeditArgs(filePath, edits)
 
-	debugArgs := slices.Clone(args)
-	debugArgs[0] = ui.AnonymizePath(filePath)
-	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
-
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to set track properties: %w: %s", err, output)
-	}
-
-	return nil
+	return runMkvpropedit(filePath, args, "set track properties")
 }
 
 // buildPropeditArgs builds the mkvpropedit argument list for the given edits.
@@ -998,22 +1006,7 @@ func SetContainerProperties(filePath string, props map[string]string) error {
 		args = append(args, "--set", key+"="+props[key])
 	}
 
-	debugArgs := slices.Clone(args)
-	debugArgs[0] = ui.AnonymizePath(filePath)
-	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
-
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to set container properties: %w: %s", err, output)
-	}
-
-	return nil
+	return runMkvpropedit(filePath, args, "set container properties")
 }
 
 // DeleteAttachments removes attachments by mkvmerge attachment ID.
@@ -1031,22 +1024,7 @@ func DeleteAttachments(filePath string, ids []int) error {
 		args = append(args, "--delete-attachment", strconv.Itoa(id))
 	}
 
-	debugArgs := slices.Clone(args)
-	debugArgs[0] = ui.AnonymizePath(filePath)
-	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
-
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to delete attachments: %w: %s", err, output)
-	}
-
-	return nil
+	return runMkvpropedit(filePath, args, "delete attachments")
 }
 
 // AttachmentAdd describes a new attachment to add to a Matroska file.
@@ -1091,18 +1069,7 @@ func AddAttachments(filePath string, attachments []AttachmentAdd) error {
 
 	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
 
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to add attachments: %w: %s", err, output)
-	}
-
-	return nil
+	return execMkvpropedit(args, "add attachments")
 }
 
 // RenameAttachments updates attachment display names without touching content.
@@ -1120,22 +1087,7 @@ func RenameAttachments(filePath string, renames map[int]string) error {
 		args = append(args, "--update-attachment", strconv.Itoa(id), "--attachment-name", renames[id])
 	}
 
-	debugArgs := slices.Clone(args)
-	debugArgs[0] = ui.AnonymizePath(filePath)
-	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
-
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to rename attachments: %w: %s", err, output)
-	}
-
-	return nil
+	return runMkvpropedit(filePath, args, "rename attachments")
 }
 
 // RemuxOptions describes a lossless remux via mkvmerge.
@@ -1575,20 +1527,7 @@ func SetChaptersXML(filePath string, xmlContent []byte) error {
 		return fmt.Errorf("failed to write chapters XML: %w", err)
 	}
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --chapters %s", ui.AnonymizePath(filePath), tmpPath))
-
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", filePath, "--chapters", tmpPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
-		}
-
-		return fmt.Errorf("failed to set chapters: %w: %s", err, output)
-	}
-
-	return nil
+	return runMkvpropedit(filePath, []string{filePath, "--chapters", tmpPath}, "set chapters")
 }
 
 func runMkvextractChapters(filePath string) (string, error) {

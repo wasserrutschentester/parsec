@@ -163,7 +163,7 @@ var validCheckIdentifiers = map[string]bool{
 	"mdb_series_year":                  true,
 	"mdb_track_languages":              true,
 	"mdb_unknown_original_lang":        true,
-	"mdb_unwanted_audio_lang":          true,
+	CheckMdbUnwantedAudioLang:          true,
 	"mdb_episode_existence":            true,
 	"mdb_episode_title":                true,
 	"mdb_episode_date":                 true,
@@ -175,18 +175,18 @@ var validCheckIdentifiers = map[string]bool{
 	"mediainfo_resolution":             true,
 	"mediainfo_dialogue_normalization": true,
 	"mediainfo_stereo_lossless":        true,
-	"mediainfo_empty_tracks":           true,
+	CheckMediainfoEmptyTracks:          true,
 	"mediainfo_missing_statistics":     true,
-	"matroska_language_tag":            true,
+	CheckMatroskaLanguageTag:           true,
 
-	"matroska_multi_lang":                  true,
-	"matroska_name_quality":                true,
-	"matroska_name_codecs":                 true,
-	"matroska_name_redundant_lang":         true,
-	"matroska_original_language":           true,
+	CheckMatroskaMultiLang:                 true,
+	CheckMatroskaNameQuality:               true,
+	CheckMatroskaNameCodecs:                true,
+	CheckMatroskaNameRedundantLang:         true,
+	CheckMatroskaOriginalLanguage:          true,
 	"matroska_duplicate_tracks":            true,
-	"matroska_name_keywords":               true,
-	"matroska_default_flags":               true,
+	CheckMatroskaNameKeywords:              true,
+	CheckMatroskaDefaultFlags:              true,
 	"matroska_subtitle_format":             true,
 	"matroska_subtitle_fonts":              true,
 	"matroska_subtitle_inline_fonts":       true,
@@ -194,20 +194,20 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_ass_script_info":             true,
 	"matroska_ass_styles":                  true,
 	"matroska_ass_events":                  true,
-	"matroska_zlib_compression":            true,
-	"matroska_track_order":                 true,
-	"matroska_unused_fonts":                true,
-	"matroska_font_filename_compliance":    true,
+	CheckMatroskaZlibCompression:           true,
+	CheckMatroskaTrackOrder:                true,
+	CheckMatroskaUnusedFonts:               true,
+	CheckMatroskaFontFilenameCompliance:    true,
 	"matroska_track_delay":                 true,
 	"matroska_video_cropping":              true,
-	"matroska_title_hygiene":               true,
-	"matroska_app_hygiene":                 true,
+	CheckMatroskaTitleHygiene:              true,
+	CheckMatroskaAppHygiene:                true,
 	"matroska_creation_time_privacy":       true,
 	"matroska_truehd_compatibility":        true,
 	"matroska_commentary_channels":         true,
 	"matroska_commentary_bitrate":          true,
-	"matroska_commentary_prefix":           true,
-	"matroska_commentary_pairing":          true,
+	CheckMatroskaCommentaryPrefix:          true,
+	CheckMatroskaCommentaryPairing:         true,
 	"matroska_chapters_start_non_zero":     true,
 	"matroska_chapters_non_monotonic":      true,
 	"matroska_chapters_duplicate":          true,
@@ -215,7 +215,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_chapters_exceed_duration":    true,
 	"matroska_chapters_name_hygiene":       true,
 	"matroska_chapters_language_hygiene":   true,
-	"matroska_chapters_keyframe_alignment": true,
+	CheckMatroskaChaptersKeyframeAlignment: true,
 }
 
 func checkValueTypes() {
@@ -436,8 +436,16 @@ func validateLanguage(lang, keyPath string) []string {
 	// Reject tags where no base language can be determined with any confidence
 	// (e.g. purely private-use or synthetic tags). Accepts both 2-letter
 	// (ISO 639-1) and 3-letter (ISO 639-2/3) base codes.
+	//
+	// Also reject tags carrying BCP 47 extensions or variants: language.Parse
+	// is lenient enough to accept garbage like "not-a-lang" without error
+	// (parsed as base language "not" plus a private "a-lang" extension,
+	// since "not" happens to be a real, obscure ISO 639-3 code), but this
+	// config value is only ever matched against a plain base[-script][-region]
+	// media language tag, so anything with extra extension/variant subtags
+	// is not a value we actually support.
 	_, confidence := tag.Base()
-	if confidence == language.No {
+	if confidence == language.No || len(tag.Extensions()) > 0 || len(tag.Variants()) > 0 {
 		errors = append(errors, fmt.Sprintf("Invalid language tag in '%s': %s", keyPath, lang))
 	}
 

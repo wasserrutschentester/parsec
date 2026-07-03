@@ -6,7 +6,12 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
+
+// FontStyle identifies a font by family, weight and italic flag, the same
+// granularity matroska_unused_fonts and matroska_subtitle_fonts match on.
+type FontStyle = fontStyle
 
 var (
 	// ADRegex matches a standalone "AD" audio-description token in a track name.
@@ -55,7 +60,19 @@ func IsFontAttachment(att matroska.EbmlAttachment) bool {
 // GetFontMapping extracts font attachments and returns normalized name and
 // attachment-ID lookups for fix policy code.
 func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
-	attachmentFonts := getFontMapping(filePath, attachments)
+	return FontMappingFromFonts(getFontMapping(filePath, attachments))
+}
+
+// FontMappingFromFonts derives the same normalized name and attachment-ID
+// lookups as GetFontMapping, but from an already-parsed font list. Callers
+// that already hold a GetAttachmentFonts result (the common case: parsing
+// every attachment's font binary is the expensive part, and its result stays
+// valid across a whole correct run since renaming/attaching/removing
+// attachments never changes another attachment's font binary) should use
+// this instead of calling GetFontMapping again, which would reparse from
+// scratch after any mkvpropedit edit bumps the file's mtime and busts
+// getFontMapping's cache key.
+func FontMappingFromFonts(attachmentFonts []matroska.AttachmentFontInfo) (map[string]string, map[int][]string) {
 	fontMap := make(map[string]string)
 	attachmentNames := make(map[int][]string)
 
@@ -74,12 +91,46 @@ func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map
 	return fontMap, attachmentNames
 }
 
-// ComputeUsedFonts gathers font names referenced by ASS/SSA subtitle tracks.
-// Both style-block and inline tag sources are always scanned regardless of check
-// config, so the fix never incorrectly flags a font as unused because a check
-// happens to be disabled.
-func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, _ map[string]string) map[string]bool {
-	allUsedFonts := make(map[string]bool)
+// extractASSTrackContents extracts every ASS/SSA subtitle track in one
+// mkvextract invocation (matroska.ExtractTracks) rather than one process per
+// track, mirroring the check pipeline's batchExtractTracksIfNeeded. Tracks
+// missing from the result (extraction failed, or wasn't attempted because no
+// ASS tracks exist) simply contribute no inline fonts.
+func extractASSTrackContents(filePath string, tracks []matroska.EbmlTrack) map[int][]byte {
+	var ids []int
+
+	for _, track := range tracks {
+		if isASSSubtitles(track) {
+			ids = append(ids, track.ID)
+		}
+	}
+
+	if len(ids) == 0 {
+		return nil
+	}
+
+	extracted, err := matroska.ExtractTracks(filePath, ids)
+	if err != nil {
+		ui.PrintDebug("Failed to extract tracks for inline font scan: " + err.Error())
+
+		return nil
+	}
+
+	return extracted
+}
+
+// ComputeUsedFonts gathers the fonts (family, weight, italic) referenced by
+// ASS/SSA subtitle tracks, at the same granularity the matroska_unused_fonts
+// and matroska_subtitle_fonts checks match on (see findUnusedFontAttachments
+// and findMissingFonts) so fix and check can never disagree about which
+// fonts are in use. Both style-block and inline tag sources are always
+// scanned regardless of check config, so the fix never incorrectly flags a
+// font as unused because a check happens to be disabled. A track whose
+// content can't be extracted contributes no inline fonts for that track
+// only; it does not affect the rest.
+func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack) map[FontStyle]bool {
+	allUsedFonts := make(map[FontStyle]bool)
+	extracted := extractASSTrackContents(filePath, tracks)
 
 	for _, track := range tracks {
 		if !isASSSubtitles(track) {
@@ -87,23 +138,42 @@ func ComputeUsedFonts(filePath string, tracks []matroska.EbmlTrack, _ map[string
 		}
 
 		for font := range styleFontsFromTrack(track) {
-			allUsedFonts[font.Family] = true
+			allUsedFonts[font] = true
 		}
 
-		if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
-			for font := range inlineFontsFromContent(track, content) {
-				allUsedFonts[font.Family] = true
-			}
+		content, ok := extracted[track.ID]
+		if !ok {
+			continue
+		}
+
+		for font := range inlineFontsFromContent(track, content) {
+			allUsedFonts[font] = true
 		}
 	}
 
 	return allUsedFonts
 }
 
-// ComputeMissingFonts gathers ASS/SSA font names that lack a matching attachment.
-func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, fontMap map[string]string) []string {
+// ComputeMissingFonts gathers ASS/SSA font descriptions that lack a matching
+// attachment, matching by family+weight+italic via findMissingFonts (the
+// same function matroska_subtitle_fonts/matroska_subtitle_inline_fonts use).
+func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo) []string {
 	seen := make(map[string]bool)
 	missing := make([]string, 0)
+	extracted := extractASSTrackContents(filePath, tracks)
+
+	addMissing := func(descs []string) {
+		for _, desc := range descs {
+			normalized := normalizeFontName(desc)
+			if seen[normalized] {
+				continue
+			}
+
+			seen[normalized] = true
+
+			missing = append(missing, desc)
+		}
+	}
 
 	for _, track := range tracks {
 		if !isASSSubtitles(track) {
@@ -111,12 +181,12 @@ func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, fontMap m
 		}
 
 		if config.IsCheckEnabled("matroska_subtitle_fonts") {
-			missing = addMissingFonts(missing, seen, styleFontsFromTrack(track), fontMap)
+			addMissing(findMissingFonts(styleFontsFromTrack(track), attachmentFonts))
 		}
 
 		if config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
-			if content, err := matroska.ExtractTrack(filePath, track.ID); err == nil {
-				missing = addMissingFonts(missing, seen, inlineFontsFromContent(track, content), fontMap)
+			if content, ok := extracted[track.ID]; ok {
+				addMissing(findMissingFonts(inlineFontsFromContent(track, content), attachmentFonts))
 			}
 		}
 	}
@@ -155,57 +225,20 @@ func parseStyleConfigsFromTrack(track matroska.EbmlTrack) map[string]fontStyle {
 	return parseStyleConfigs(privateBytes)
 }
 
-func addMissingFonts(missing []string, seen map[string]bool, usedFonts map[fontStyle]bool, fontMap map[string]string) []string {
-	for font := range usedFonts {
-		if fontMap[normalizeFontName(font.Family)] != "" {
-			continue
-		}
-
-		desc := formatMissingFontDesc(font)
-		normalized := normalizeFontName(desc)
-
-		if seen[normalized] {
-			continue
-		}
-
-		seen[normalized] = true
-
-		missing = append(missing, desc)
-	}
-
-	return missing
+// GetAttachmentFonts returns the parsed font info (family, weight, italic,
+// internal names) for each font attachment in the file. It is the same data
+// matroska_unused_fonts and matroska_subtitle_fonts match against, so fix
+// computations that need family/weight/italic fidelity (as opposed to
+// GetFontMapping's flattened name lookup) should use this instead.
+func GetAttachmentFonts(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
+	return getFontMapping(filePath, attachments)
 }
 
-// UnusedFontAttachments returns font attachments not referenced by subtitles.
-func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, allUsedFonts map[string]bool) []matroska.EbmlAttachment {
-	normalizedUsedFonts := make(map[string]bool, len(allUsedFonts))
-	for font := range allUsedFonts {
-		normalizedUsedFonts[normalizeFontName(font)] = true
-	}
-
-	var unused []matroska.EbmlAttachment
-
-	for _, att := range attachments {
-		if !isFontAttachment(att) {
-			continue
-		}
-
-		found := false
-
-		for _, name := range attachmentNames[att.ID] {
-			if normalizedUsedFonts[normalizeFontName(name)] {
-				found = true
-
-				break
-			}
-		}
-
-		if !found {
-			unused = append(unused, att)
-		}
-	}
-
-	return unused
+// UnusedFontAttachments returns font attachments not referenced by any
+// subtitle track, matching by PostScript name or by family+italic+weight via
+// findUnusedFontAttachments, the same matching matroska_unused_fonts uses.
+func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[FontStyle]bool) []matroska.EbmlAttachment {
+	return findUnusedFontAttachments(attachments, attachmentFonts, allUsedFonts)
 }
 
 // FontFilenameCompliant reports whether a filename matches an internal font name.

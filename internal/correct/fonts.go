@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -93,9 +94,10 @@ func newDefaultFontResolver() defaultFontResolver {
 // ComputeMissingFontAttachments returns the missing ASS/SSA subtitle fonts
 // that can be resolved and attached. Downloads are skipped when allowDownload
 // is false, which lets dry-run previews avoid mutating the font cache.
-func ComputeMissingFontAttachments(filePath string, ebml *matroska.EbmlMetadata, allowDownload bool) MissingFontAttachmentPlan {
-	fontMap, _ := checks.GetFontMapping(filePath, ebml.Attachments)
-	missing := checks.ComputeMissingFonts(filePath, ebml.Tracks, fontMap)
+// attachmentFonts is the caller's already-computed checks.GetAttachmentFonts
+// result (see ComputeUnusedFontAttachments for why this isn't recomputed here).
+func ComputeMissingFontAttachments(filePath string, ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, allowDownload bool) MissingFontAttachmentPlan {
+	missing := checks.ComputeMissingFonts(filePath, ebml.Tracks, attachmentFonts)
 
 	return computeMissingFontAttachmentPlan(missing, ebml.Attachments, newDefaultFontResolver(), allowDownload)
 }
@@ -259,7 +261,7 @@ func (r defaultFontResolver) resolveGoogleFontsGitHub(fontName string) (Resolved
 		var contents []githubContent
 
 		apiURL := fmt.Sprintf("%s/%s/%s?ref=main", googleFontsGitHubAPI, licenseDir, dir)
-		if err := r.getJSON(apiURL, &contents); err != nil {
+		if err := r.getJSON("font-github:"+apiURL, apiURL, &contents); err != nil {
 			ui.PrintDebug(fmt.Sprintf("Google Fonts GitHub lookup failed for %s: %v", fontName, err))
 
 			continue
@@ -312,7 +314,7 @@ func (r defaultFontResolver) resolveGoogleFontsAPI(fontName, key string) (Resolv
 	}
 
 	var response googleFontsAPIResponse
-	if err := r.getJSON(apiURL, &response); err != nil {
+	if err := r.getJSON("font-google-api:"+fontName, apiURL, &response); err != nil {
 		ui.PrintDebug(fmt.Sprintf("Google Fonts Developer API lookup failed for %s: %v", fontName, err))
 
 		return ResolvedFont{}, false
@@ -364,7 +366,20 @@ func mapsKeys(m map[string]string) []string {
 	return keys
 }
 
-func (r defaultFontResolver) getJSON(requestURL string, target any) error {
+// getJSON fetches requestURL as JSON into target, serving from the shared
+// on-disk API cache (internal/cache, 6h TTL) when possible. cacheKey is kept
+// separate from requestURL so callers can key on stable inputs (e.g. font
+// name) rather than a URL that embeds a rotating API key, which would
+// otherwise orphan the cache entry every time the key changes. This avoids
+// hitting the Google Fonts GitHub API's unauthenticated 60/hour rate limit
+// on every font lookup in a batch.
+func (r defaultFontResolver) getJSON(cacheKey, requestURL string, target any) error {
+	if cached, err := cache.Get(cacheKey); err == nil {
+		if err := json.Unmarshal(cached, target); err == nil {
+			return nil
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -383,9 +398,16 @@ func (r defaultFontResolver) getJSON(requestURL string, target any) error {
 		return fmt.Errorf("%w: %s", errHTTPStatus, resp.Status)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read font metadata response: %w", err)
+	}
+
+	if err := json.Unmarshal(body, target); err != nil {
 		return fmt.Errorf("decode font metadata response: %w", err)
 	}
+
+	_ = cache.Set(cacheKey, body)
 
 	return nil
 }
@@ -481,8 +503,8 @@ func cachedFontPath(fontURL, fileName string) string {
 
 // attachMissingFonts locates missing ASS/SSA subtitle fonts and embeds the
 // matching font files as Matroska attachments.
-func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Options) error {
-	plan := ComputeMissingFontAttachments(filePath, ebml, false)
+func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, opts Options) error {
+	plan := ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, false)
 	if len(plan.Attachments) == 0 && len(plan.Unresolved) == 0 {
 		return nil
 	}
@@ -500,7 +522,7 @@ func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, opts Optio
 	}
 
 	if len(plan.Unresolved) > 0 {
-		plan = ComputeMissingFontAttachments(filePath, ebml, true)
+		plan = ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, true)
 		printMissingFontPlan(plan, false, false)
 	}
 

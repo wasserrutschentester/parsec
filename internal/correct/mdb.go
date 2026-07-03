@@ -52,7 +52,7 @@ func lookupOriginalLanguage(filePath string, tracks []matroska.EbmlTrack, opts O
 }
 
 func needsOriginalLanguageForUnwantedAudio(tracks []matroska.EbmlTrack) bool {
-	if !config.IsCheckEnabled("mdb_unwanted_audio_lang") {
+	if !config.IsCheckEnabled(config.CheckMdbUnwantedAudioLang) {
 		return false
 	}
 

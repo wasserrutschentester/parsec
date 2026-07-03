@@ -54,7 +54,7 @@ func TestNeedsMultiLangName(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // depends on shared global config state
+//nolint:funlen,paralleltest // comprehensive table of name-cleaning cases; depends on shared global config state
 func TestFixedTrackName(t *testing.T) {
 	config.InitDefaults()
 
@@ -102,6 +102,11 @@ func TestFixedTrackName(t *testing.T) {
 			name:  "prefixes commentary name after language context",
 			track: matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng", Name: "English / Jane Doe", Commentary: true}},
 			want:  "Commentary by Jane Doe",
+		},
+		{
+			name:  "leaves bare commentary name unprefixed instead of fabricating attribution",
+			track: matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "und", Name: "Commentary", Commentary: true}},
+			want:  "Commentary",
 		},
 	}
 
@@ -315,7 +320,7 @@ func TestComputeUnusedFontAttachmentsDisabled(t *testing.T) {
 		Attachments: []matroska.EbmlAttachment{{ID: 1, FileName: "Arial.ttf", ContentType: "font/ttf"}},
 	}
 
-	if got := ComputeUnusedFontAttachments("", ebml); got != nil {
+	if got := ComputeUnusedFontAttachments(ebml, nil, nil); got != nil {
 		t.Errorf("expected nil when matroska_unused_fonts is disabled, got %+v", got)
 	}
 }
@@ -382,14 +387,41 @@ func TestComputeFontRenamesExcludesUnusedAttachments(t *testing.T) {
 	attachments := []matroska.EbmlAttachment{
 		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
 	}
-	attachmentNames := map[int][]string{1: {"Open Sans"}}
+	attachmentFonts := []matroska.AttachmentFontInfo{{AttachmentID: 1, FamilyName: "Open Sans"}}
 
 	// font1.ttf isn't referenced by anything used, so it must be excluded
 	// from rename candidates by ComputeFontRenames itself (via
 	// excludeAttachments), matching matroska_unused_fonts' notion of unused.
-	got := excludeAttachments(attachments, checks.UnusedFontAttachments(attachments, attachmentNames, map[string]bool{}))
+	got := excludeAttachments(attachments, checks.UnusedFontAttachments(attachments, attachmentFonts, map[checks.FontStyle]bool{}))
 	if len(got) != 0 {
 		t.Errorf("expected unused attachment to be excluded, got %+v", got)
+	}
+}
+
+// Regression test: the exported UnusedFontAttachments must match by
+// family+weight+italic like the matroska_unused_fonts check does, not by
+// family alone. A prior version of the fix-side export collapsed to
+// family-only matching, which meant a Bold-only attachment was treated as
+// "used" merely because some Regular-weight text referenced the same family,
+// so correct silently disagreed with what check flagged as unused.
+func TestUnusedFontAttachmentsMatchesByWeightAndItalic(t *testing.T) {
+	t.Parallel()
+
+	attachments := []matroska.EbmlAttachment{
+		{ID: 1, FileName: "OpenSans-Bold.ttf", ContentType: "font/ttf"},
+	}
+	attachmentFonts := []matroska.AttachmentFontInfo{
+		{AttachmentID: 1, FamilyName: "OpenSans", Weight: 700, Italic: false},
+	}
+
+	// Only the Regular (400) weight is actually used by any subtitle.
+	usedFonts := map[checks.FontStyle]bool{
+		{Family: "OpenSans", Weight: 400, Italic: false}: true,
+	}
+
+	got := checks.UnusedFontAttachments(attachments, attachmentFonts, usedFonts)
+	if len(got) != 1 || got[0].ID != 1 {
+		t.Errorf("expected the Bold attachment to be flagged unused despite matching family, got %+v", got)
 	}
 }
 
@@ -402,7 +434,7 @@ func TestComputeFontRenamesDisabled(t *testing.T) {
 		Attachments: []matroska.EbmlAttachment{{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"}},
 	}
 
-	if got := ComputeFontRenames("", ebml); got != nil {
+	if got := ComputeFontRenames(ebml, nil, nil, nil); got != nil {
 		t.Errorf("expected nil when matroska_font_filename_compliance is disabled, got %+v", got)
 	}
 }
@@ -658,6 +690,26 @@ func TestComputeMatroskaRemuxUnwantedLanguage(t *testing.T) {
 
 	if plan.RemovalCandidates[0].Kind != RemovalUnwantedAudioLang {
 		t.Errorf("expected unwanted audio language removal kind, got %q", plan.RemovalCandidates[0].Kind)
+	}
+}
+
+// A track tagged with a region subtag (e.g. "de-DE") must still be recognized
+// as the preferred/original language, matching by base subtag exactly like
+// the mdb_unwanted_audio_lang check does (checks.IsWantedAudioLang). Regression
+// test for a prior exact-tag comparison that disagreed with the check and
+// proposed the preferred-language track itself for removal.
+//
+//nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxKeepsRegionTaggedPreferredLanguage(t *testing.T) {
+	config.InitDefaults() // preferred language is "de"
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "de-DE", Default: true, AudioChannels: 6}},
+	}
+
+	if got := ComputeMatroskaRemux(tracks, "jpn").RemovalCandidates; len(got) != 0 {
+		t.Errorf("expected region-tagged preferred-language track to be kept, got %+v", got)
 	}
 }
 
