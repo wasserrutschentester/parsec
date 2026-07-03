@@ -1,6 +1,12 @@
 // Package types defines common types used across the parsec codebase.
 package types
 
+// TableData represents generic tabular data to be presented in reports.
+type TableData struct {
+	Headers []string   `json:"headers"`
+	Rows    [][]string `json:"rows"`
+}
+
 // CheckResult represents the result of a single check.
 type CheckResult struct {
 	Identifier string             `json:"identifier"`
@@ -10,19 +16,23 @@ type CheckResult struct {
 	Tracks     []TrackCheckResult `json:"tracks,omitempty"`
 	Expected   string             `json:"expected,omitempty"`
 	Actual     string             `json:"actual,omitempty"`
+	List       []string           `json:"list,omitempty"`
+	Table      *TableData         `json:"table,omitempty"`
 }
 
 // TrackCheckResult represents the result of a check on a specific track.
 type TrackCheckResult struct {
-	ID        string   `json:"id"`
-	Type      string   `json:"type"`
-	Passed    bool     `json:"passed"`
-	TypeOrder int      `json:"type_order"`
-	Codec     string   `json:"codec,omitempty"`
-	Name      string   `json:"name,omitempty"`
-	Language  string   `json:"language,omitempty"`
-	Flags     []string `json:"flags,omitempty"`
-	Warning   string   `json:"warning,omitempty"`
+	ID        string     `json:"id"`
+	Type      string     `json:"type"`
+	Passed    bool       `json:"passed"`
+	TypeOrder int        `json:"type_order"`
+	Codec     string     `json:"codec,omitempty"`
+	Name      string     `json:"name,omitempty"`
+	Language  string     `json:"language,omitempty"`
+	Flags     []string   `json:"flags,omitempty"`
+	Warning   string     `json:"warning,omitempty"`
+	List      []string   `json:"list,omitempty"`
+	Table     *TableData `json:"table,omitempty"`
 }
 
 // IssueGroup represents a group of check results under a specific category.

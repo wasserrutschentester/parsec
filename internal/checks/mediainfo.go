@@ -77,6 +77,11 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 		results = append(results, checkEmptyTracks(mi)...)
 	}
 
+	// 10. Missing Statistics
+	if config.IsCheckEnabled("mediainfo_missing_statistics") {
+		results = append(results, checkMissingStatistics(mi)...)
+	}
+
 	return results
 }
 
@@ -321,11 +326,11 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
-		if (track.Type != "Audio" && track.Type != "Text" && track.Type != "General") || track.Duration == 0 {
+		if (track.Type != "Audio" && track.Type != "Text" && track.Type != "General") || track.Duration == nil || *track.Duration == 0 {
 			continue
 		}
 
-		dur := track.Duration
+		dur := *track.Duration
 		diff := dur - videoDur
 		percentDiff := diff / videoDur * -100
 
@@ -347,8 +352,8 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 
 func getVideoDuration(mi *mediainfo.MediaInfo) float64 {
 	for i := range mi.Media.Tracks {
-		if mi.Media.Tracks[i].Type == "Video" && mi.Media.Tracks[i].Duration != 0 {
-			return mi.Media.Tracks[i].Duration
+		if mi.Media.Tracks[i].Type == "Video" && mi.Media.Tracks[i].Duration != nil && *mi.Media.Tracks[i].Duration != 0 {
+			return *mi.Media.Tracks[i].Duration
 		}
 	}
 
@@ -416,23 +421,101 @@ func checkEmptyTracks(mi *mediainfo.MediaInfo) []CheckResult {
 
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
-		switch track.Type {
-		case "Audio":
-			if track.Channels <= 0 {
-				res.Passed = false
-				res.Severity = "error"
-				res.Warning = "Audio track has zero channels"
-				res.Tracks = append(res.Tracks, miTrackToResult(track, "audio track has 0 channels"))
+
+		if track.Type == "General" || track.Type == "Menu" {
+			continue
+		}
+
+		reasons := getEmptyTrackReasons(track)
+
+		if len(reasons) > 0 {
+			res.Passed = false
+			res.Severity = "error"
+			res.Warning = "Empty tracks detected"
+
+			var warningMsg string
+
+			switch len(reasons) {
+			case 1:
+				warningMsg = "track " + reasons[0] + " is 0"
+			case 2:
+				warningMsg = "track " + reasons[0] + " and " + reasons[1] + " is 0"
+			default:
+				warningMsg = "track " + strings.Join(reasons[:len(reasons)-1], ", ") + " and " + reasons[len(reasons)-1] + " is 0"
 			}
-		case "Text":
-			if track.GetElementCount() <= 0 {
-				res.Passed = false
-				res.Severity = "error"
-				res.Warning = "Subtitle track has zero elements"
-				res.Tracks = append(res.Tracks, miTrackToResult(track, "subtitle track has 0 elements"))
-			}
+
+			res.Tracks = append(res.Tracks, miTrackToResult(track, warningMsg))
 		}
 	}
 
 	return []CheckResult{res}
+}
+
+func getEmptyTrackReasons(track *mediainfo.Track) []string {
+	var reasons []string
+
+	if track.Duration != nil && *track.Duration == 0 {
+		reasons = append(reasons, "duration")
+	}
+
+	if track.StreamSize != nil && *track.StreamSize == 0 {
+		reasons = append(reasons, "size")
+	}
+
+	switch track.Type {
+	case "Audio":
+		if track.Channels <= 0 {
+			reasons = append(reasons, "channels")
+		}
+	case "Text":
+		if track.GetElementCount() == 0 {
+			reasons = append(reasons, "element count")
+		}
+	}
+
+	return reasons
+}
+
+func checkMissingStatistics(mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: "mediainfo_missing_statistics",
+		Passed:     true,
+	}
+
+	for i := range mi.Media.Tracks {
+		track := &mi.Media.Tracks[i]
+
+		if track.Type == "General" || track.Type == "Menu" {
+			continue
+		}
+
+		missingStats := []string{}
+
+		if track.Duration == nil {
+			missingStats = append(missingStats, "DURATION")
+		}
+
+		if track.StreamSize == nil {
+			missingStats = append(missingStats, "NUMBER_OF_BYTES")
+		}
+
+		if track.Type == "Text" {
+			if track.GetElementCount() == -1 {
+				missingStats = append(missingStats, "ElementCount")
+			}
+		}
+
+		if len(missingStats) > 0 {
+			res.Passed = false
+			res.Severity = "warning"
+			res.Warning = "Track is missing statistics tags"
+			res.Tracks = append(res.Tracks, miTrackToResult(track, "missing statistics tags: "+strings.Join(missingStats, ", ")))
+		}
+	}
+
+	if !res.Passed {
+		return []CheckResult{res}
+	}
+
+	return nil
 }

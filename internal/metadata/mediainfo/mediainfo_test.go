@@ -99,7 +99,7 @@ func TestMediaInfo_UnmarshalFields(t *testing.T) {
 	}
 
 	video := mi.Media.Tracks[1]
-	if video.FormatProfile != "High@L4.1" || video.BitDepth != 8 || video.ChromaSubsampling != "4:2:0" || video.StreamSize != 1000000 || video.FrameCount != 24000 || video.EncodedLibrary != "x264" {
+	if video.FormatProfile != "High@L4.1" || video.BitDepth != 8 || video.ChromaSubsampling != "4:2:0" || video.StreamSize == nil || *video.StreamSize != 1000000 || video.FrameCount == nil || *video.FrameCount != 24000 || video.EncodedLibrary != "x264" {
 		t.Errorf("Video track fields mismatch: %+v", video)
 	}
 

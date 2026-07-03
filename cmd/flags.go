@@ -14,7 +14,7 @@ var (
 	titleFlag        string
 	yearFlag         int
 	seasonFlag       int
-	episodeFlag      int
+	episodeFlag      []int
 	dateFlag         string
 	episodeTitleFlag string
 	cutEditionFlag   string
@@ -59,8 +59,8 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 		meta.Season = seasonFlag
 	}
 
-	if episodeFlag != 0 {
-		meta.Episodes = []int{episodeFlag}
+	if len(episodeFlag) > 0 {
+		meta.Episodes = episodeFlag
 	}
 
 	if dateFlag != "" {
@@ -68,7 +68,7 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	}
 
 	if episodeTitleFlag != "" {
-		meta.EpisodeTitle = episodeTitleFlag
+		meta.EpisodeTitles = []string{episodeTitleFlag}
 	}
 
 	if cutEditionFlag != "" {

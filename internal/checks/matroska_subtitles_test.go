@@ -9,7 +9,20 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/types"
 )
+
+func getUnusedFontsResult(res []CheckResult) *CheckResult {
+	for _, r := range res {
+		if r.Identifier == "matroska_unused_fonts" {
+			rCopy := r
+
+			return &rCopy
+		}
+	}
+
+	return nil
+}
 
 //nolint:paralleltest // depends on shared global state
 func TestRunTrackChecksUnusedFonts(t *testing.T) {
@@ -40,31 +53,84 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	}
 
 	res := runTrackChecks("", ebml, nil, attachmentFonts, nil)
-	found := false
+	targetRes := getUnusedFontsResult(res)
 
-	for _, r := range res {
-		if r.Identifier == "matroska_unused_fonts" {
-			found = true
+	if targetRes == nil {
+		t.Fatal("Did not find unused fonts check result")
+	}
 
-			if !strings.Contains(r.Warning, "UnusedFont.ttf") {
-				t.Errorf("Expected warning to contain UnusedFont.ttf, got '%s'", r.Warning)
-			}
+	if targetRes.Table == nil {
+		t.Fatalf("Expected Table to be populated")
+	}
 
-			if strings.Contains(r.Warning, "Arial.ttf") {
-				t.Errorf("Warning should not contain Arial.ttf, got '%s'", r.Warning)
-			}
+	foundUnused := false
+	foundArial := false
+
+	for _, row := range targetRes.Table.Rows {
+		if len(row) > 0 && row[0] == "UnusedFont.ttf" {
+			foundUnused = true
+		}
+
+		if len(row) > 0 && row[0] == "Arial.ttf" {
+			foundArial = true
 		}
 	}
 
-	if !found {
-		t.Error("Did not find unused fonts check result")
+	if !foundUnused {
+		t.Errorf("Expected table to contain UnusedFont.ttf")
+	}
+
+	if foundArial {
+		t.Errorf("Table should not contain Arial.ttf")
 	}
 }
 
-//nolint:paralleltest // depends on shared global state
+func getFontComplianceResult(res []CheckResult) *CheckResult {
+	for _, r := range res {
+		if r.Identifier == "matroska_font_filename_compliance" {
+			rCopy := r
+
+			return &rCopy
+		}
+	}
+
+	return nil
+}
+
+func assertFontComplianceTable(t *testing.T, table *types.TableData) {
+	t.Helper()
+
+	if table == nil {
+		t.Fatal("Expected TableData to be populated")
+	}
+
+	var contentBuilder strings.Builder
+
+	for _, row := range table.Rows {
+		contentBuilder.WriteString(strings.Join(row, " ") + "\n")
+	}
+
+	content := contentBuilder.String()
+
+	if !strings.Contains(content, "WrongName.ttf") {
+		t.Errorf("Expected table to contain WrongName.ttf")
+	}
+
+	if !strings.Contains(content, "CorrectName.ttf") {
+		t.Errorf("Expected table to contain proposed CorrectName.ttf")
+	}
+
+	if strings.Contains(content, "Arial.ttf") {
+		t.Errorf("Table should not contain Arial.ttf")
+	}
+}
+
+//nolint:paralleltest // mutates global state via viper.Set
 func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 	config.InitDefaults()
 	viper.Set("enabled_checks", []string{"all"})
+
+	defer viper.Reset()
 
 	ebml := &matroska.EbmlMetadata{
 		Tracks: []matroska.EbmlTrack{},
@@ -80,36 +146,20 @@ func TestRunTrackChecksFontFilenameCompliance(t *testing.T) {
 	}
 
 	res := runTrackChecks("", ebml, nil, attachmentFonts, nil)
-	found := false
 
-	for _, r := range res {
-		if r.Identifier == "matroska_font_filename_compliance" {
-			found = true
-
-			if r.Severity != "info" {
-				t.Errorf("Expected severity to be info, got '%s'", r.Severity)
-			}
-
-			if !strings.Contains(r.Warning, "WrongName.ttf") {
-				t.Errorf("Expected warning to contain WrongName.ttf, got '%s'", r.Warning)
-			}
-
-			if !strings.Contains(r.Warning, "CorrectName.ttf") {
-				t.Errorf("Expected warning to contain proposed CorrectName.ttf, got '%s'", r.Warning)
-			}
-
-			if strings.Contains(r.Warning, "Arial.ttf") {
-				t.Errorf("Warning should not contain Arial.ttf, got '%s'", r.Warning)
-			}
-		}
+	targetRes := getFontComplianceResult(res)
+	if targetRes == nil {
+		t.Fatal("Did not find font filename compliance check result")
 	}
 
-	if !found {
-		t.Error("Did not find font filename compliance check result")
+	if targetRes.Severity != "info" {
+		t.Errorf("Expected severity to be info, got '%s'", targetRes.Severity)
 	}
+
+	assertFontComplianceTable(t, targetRes.Table)
 }
 
-//nolint:paralleltest // mutates global state via config.InitDefaults()
+//nolint:paralleltest // depends on global state via config.InitDefaults()
 func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 	config.InitDefaults()
 
@@ -155,7 +205,7 @@ func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // mutates global state via config.InitDefaults()
+//nolint:paralleltest // depends on global state via config.InitDefaults()
 func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
 	config.InitDefaults()
 
@@ -192,7 +242,7 @@ func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // mutates global state via config.InitDefaults()
+//nolint:paralleltest // depends on global state via config.InitDefaults()
 func TestCheckUnusedFontsStyleAware(t *testing.T) {
 	config.InitDefaults()
 
@@ -248,7 +298,7 @@ func getSRTTestCases() []srtTestCase {
 			content:          "1\n00:00:01,000 --> 00:00:04,500\n{\\an8}Welcome to the top center!\n",
 			expectedPassed:   false,
 			expectedSeverity: "info",
-			containsWarning:  "Alignment/positioning detected (should use ASS)",
+			containsWarning:  "Alignment/positioning detected",
 		},
 		{
 			name:             "SRT with coordinate metadata on timestamp line throws info level warning",
@@ -320,14 +370,26 @@ func assertSRTTestCase(t *testing.T, tt srtTestCase, res *CheckResult) {
 		t.Errorf("Expected Severity=%q, got %q", tt.expectedSeverity, res.Severity)
 	}
 
-	actualWarning := ""
-	if len(res.Tracks) > 0 {
-		actualWarning = res.Tracks[0].Warning
-	} else {
-		actualWarning = res.Warning
-	}
+	actualWarning := getActualWarning(res)
 
 	if tt.containsWarning != "" && !strings.Contains(actualWarning, tt.containsWarning) {
 		t.Errorf("Expected warning to contain %q, got %q", tt.containsWarning, actualWarning)
 	}
+}
+
+func getActualWarning(res *CheckResult) string {
+	actualWarning := ""
+	if len(res.Tracks) > 0 {
+		actualWarning = res.Tracks[0].Warning
+		if len(res.Tracks[0].List) > 0 {
+			actualWarning += strings.Join(res.Tracks[0].List, "\n")
+		}
+	} else {
+		actualWarning = res.Warning
+		if len(res.List) > 0 {
+			actualWarning += strings.Join(res.List, "\n")
+		}
+	}
+
+	return actualWarning
 }

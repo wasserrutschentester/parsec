@@ -38,6 +38,7 @@ func (a *trackResultAggregator) Add(res *CheckResult) {
 			Passed:     true,
 			Actual:     res.Actual,
 			Expected:   res.Expected,
+			Table:      res.Table,
 		}
 		a.aggregated[res.Identifier] = target
 	} else {
@@ -115,6 +116,7 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_chapters_language_hygiene",
 		"matroska_chapters_keyframe_alignment",
 		"matroska_app_hygiene",
+		"matroska_creation_time_privacy",
 	}
 
 	for _, id := range ids {
@@ -241,6 +243,10 @@ func runGlobalMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, meta 
 		agg.Add(checkAppHygiene(ebml))
 	}
 
+	if config.IsCheckEnabled("matroska_creation_time_privacy") {
+		agg.Add(checkCreationTimePrivacy(filePath, ebml))
+	}
+
 	if config.IsCheckEnabled("matroska_truehd_compatibility") {
 		agg.Add(checkTrueHDCompatibility(ebml.Tracks))
 	}
@@ -253,20 +259,24 @@ func runGlobalMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, meta 
 		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentFonts))
 	}
 
+	runCommentaryChecks(filePath, ebml.Tracks, agg)
+}
+
+func runCommentaryChecks(filePath string, tracks []matroska.EbmlTrack, agg *trackResultAggregator) {
 	if config.IsCheckEnabled("matroska_commentary_channels") {
-		agg.Add(checkCommentaryChannels(ebml.Tracks))
+		agg.Add(checkCommentaryChannels(tracks))
 	}
 
 	if config.IsCheckEnabled("matroska_commentary_bitrate") {
-		agg.Add(checkCommentaryBitrate(filePath, ebml.Tracks))
+		agg.Add(checkCommentaryBitrate(filePath, tracks))
 	}
 
 	if config.IsCheckEnabled("matroska_commentary_prefix") {
-		agg.Add(checkCommentaryPrefix(ebml.Tracks))
+		agg.Add(checkCommentaryPrefix(tracks))
 	}
 
 	if config.IsCheckEnabled("matroska_commentary_pairing") {
-		agg.Add(checkCommentaryPairing(ebml.Tracks))
+		agg.Add(checkCommentaryPairing(tracks))
 	}
 }
 

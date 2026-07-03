@@ -37,6 +37,9 @@ type tmdbMedia struct {
 	FirstAirDate     string  `json:"first_air_date"` // For TV shows
 	Popularity       float64 `json:"popularity"`
 	Overview         string  `json:"overview"`
+	Genres           []struct {
+		Name string `json:"name"`
+	} `json:"genres"`
 }
 
 func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
@@ -60,6 +63,14 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		origLang = "zxx"
 	}
 
+	var genres []string
+
+	for _, g := range m.Genres {
+		if g.Name != "" {
+			genres = append(genres, g.Name)
+		}
+	}
+
 	return mdb.SearchResult{
 		TmdbID:           m.ID,
 		TmdbType:         mediaType,
@@ -70,6 +81,7 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		IsTV:             mediaType == "tv",
 		Popularity:       m.Popularity,
 		Overview:         m.Overview,
+		Genres:           genres,
 	}
 }
 
@@ -88,6 +100,9 @@ type tmdbEpisodeResponse struct {
 	SeasonNumber  int    `json:"season_number"`
 	EpisodeNumber int    `json:"episode_number"`
 	Overview      string `json:"overview"`
+	ExternalIDs   struct {
+		ImdbID string `json:"imdb_id"`
+	} `json:"external_ids"`
 }
 
 func getFromCache(key string, target any) (bool, error) {
@@ -334,6 +349,8 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 	var data tmdbEpisodeResponse
 
 	params := url.Values{}
+	params.Set("append_to_response", "external_ids")
+
 	if lang != "" {
 		params.Set("language", lang)
 	}
@@ -349,6 +366,7 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 		Overview: data.Overview,
 		Season:   season,
 		Episode:  episode,
+		ImdbID:   data.ExternalIDs.ImdbID,
 	}, nil
 }
 

@@ -237,12 +237,20 @@ func ExtractCommentaryCore(name string) string {
 	return extractCoreCommentaryName(name)
 }
 
-// GetVideoTrackNumberFromEBML returns the first video track's Matroska number.
+// GetVideoTrackNumberFromEBML returns the first video track's Matroska
+// number, or 0 when there is no video track.
 func GetVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
-	return getVideoTrackNumberFromEBML(ebml)
+	track := getVideoTrackFromEBML(ebml)
+	if track == nil {
+		return 0
+	}
+
+	return uint64(track.Properties.Number)
 }
 
 // IsAligned reports whether a chapter timestamp is close enough to a keyframe.
 func IsAligned(timeStart int64, keyframes []int64) (bool, int64) {
-	return isAligned(timeStart, keyframes)
+	aligned, closestDiff, _, _ := isAligned(timeStart, keyframes)
+
+	return aligned, closestDiff
 }

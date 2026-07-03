@@ -3,8 +3,12 @@ package config
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -14,7 +18,6 @@ var defaultConfig string
 
 // InitDefaults initializes the default configuration values in viper.
 func InitDefaults() {
-	viper.Reset()
 	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("original_language", "")
@@ -24,7 +27,9 @@ func InitDefaults() {
 	viper.SetDefault("group", "PAARSEX")
 	viper.SetDefault("video_codec_avc", "H.264")
 	viper.SetDefault("video_codec_hevc", "H.265")
-	viper.SetDefault("disable_update_check", false)
+	viper.SetDefault("update.check", true)
+	viper.SetDefault("update.auto", false)
+	viper.SetDefault("update.prerelease", false)
 	viper.SetDefault("title_cleaning_regex", "")
 	viper.SetDefault("word_separator", ".")
 	viper.SetDefault("normalize_diacritics", true)
@@ -42,7 +47,7 @@ func InitDefaults() {
 	})
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
-	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events", "matroska_srt_validation"})
+	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events", "matroska_srt_validation", "matroska_creation_time_privacy"})
 }
 
 var (
@@ -128,9 +133,16 @@ func GetSeason() int {
 	return getInt("season")
 }
 
-// GetEpisode returns the episode override from the configuration.
-func GetEpisode() int {
-	return getInt("episode")
+// GetEpisodes returns the episode overrides from the configuration.
+func GetEpisodes() []int {
+	episodes := viper.GetIntSlice("metadata.episode")
+	if len(episodes) == 0 {
+		if ep := viper.GetInt("metadata.episode"); ep > 0 {
+			episodes = []int{ep}
+		}
+	}
+
+	return episodes
 }
 
 // GetDate returns the date override from the configuration.
@@ -261,9 +273,19 @@ func GetTitleReplacements() []Replacement {
 	return replacements
 }
 
-// GetDisableUpdateCheck returns true if background update checks are disabled.
-func GetDisableUpdateCheck() bool {
-	return getBool("disable_update_check")
+// GetCheckUpdates returns whether to check for updates.
+func GetCheckUpdates() bool {
+	return getBool("update.check")
+}
+
+// GetAutoUpdate returns whether to apply updates automatically.
+func GetAutoUpdate() bool {
+	return getBool("update.auto")
+}
+
+// GetCheckPrereleaseUpdates returns whether to check for prerelease updates.
+func GetCheckPrereleaseUpdates() bool {
+	return getBool("update.prerelease")
 }
 
 // GetNormalizeDiacritics returns true if diacritics should be normalized.
@@ -335,4 +357,59 @@ func GetConfigFileUsed() string {
 // GetDefaultConfig returns the default configuration as a TOML string.
 func GetDefaultConfig() string {
 	return defaultConfig
+}
+
+//go:embed default_tags.toml
+var defaultTags string
+
+// TagConfig represents a mapped Matroska tagging configuration.
+type TagConfig struct {
+	TargetValue string            `mapstructure:"target_value" toml:"target_value"`
+	Iterator    string            `mapstructure:"iterator" toml:"iterator"`
+	Fields      map[string]string `mapstructure:"fields" toml:"fields"`
+}
+
+// ErrAbsoluteTagProfilePath is returned when an absolute path is used for a tag template profile.
+var ErrAbsoluteTagProfilePath = errors.New("absolute paths for tag_template are not supported")
+
+// GetTagProfile loads the current tag template profile based on configuration.
+func GetTagProfile() ([]TagConfig, error) {
+	profileName := viper.GetString(getPresetKey("tag_template"))
+	if profileName == "" {
+		profileName = "default"
+	}
+
+	if filepath.IsAbs(profileName) {
+		return nil, ErrAbsoluteTagProfilePath
+	}
+
+	tagViper := viper.New()
+	tagViper.SetConfigName(profileName)
+	tagViper.SetConfigType("toml")
+
+	mainConfigPath := viper.ConfigFileUsed()
+	if mainConfigPath != "" {
+		tagViper.AddConfigPath(filepath.Join(filepath.Dir(mainConfigPath), "tags"))
+	}
+
+	confDir, err := os.UserConfigDir()
+	if err == nil {
+		tagViper.AddConfigPath(filepath.Join(confDir, "parsec", "tags"))
+	}
+
+	if err := tagViper.ReadInConfig(); err != nil {
+		if profileName == "default" {
+			tagViper.SetConfigType("toml")
+			_ = tagViper.ReadConfig(strings.NewReader(defaultTags))
+		} else {
+			return nil, fmt.Errorf("could not find tag template '%s': %w", profileName, err)
+		}
+	}
+
+	var tags []TagConfig
+	if err := tagViper.UnmarshalKey("tags", &tags); err != nil {
+		return nil, fmt.Errorf("invalid tag template format: %w", err)
+	}
+
+	return tags, nil
 }

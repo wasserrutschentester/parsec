@@ -94,6 +94,16 @@ These settings are used for release searching via Prowlarr.
 | `prowlarr.movie_categories` | array of integers | Prowlarr categories to search for movies (default: `[2000]`). |
 | `prowlarr.tv_categories` | array of integers | Prowlarr categories to search for TV shows (default: `[5000]`). |
 
+#### Update Settings
+
+These settings control the automatic update behavior of Parsec.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `update.check` | boolean | Automatically check for updates in the background (default: `true`). |
+| `update.auto` | boolean | Automatically download and install updates silently in the background (default: `false`). |
+| `update.prerelease` | boolean | Check for prerelease/nightly updates instead of just stable releases (default: `false`). |
+
 ### Preset-aware Options
 
 These options can be set globally OR within a `[preset.NAME]` block.
@@ -106,7 +116,6 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `preferred_language` | string | Preferred language code (default: `de`). |
 | `original_language` | string | Override original language of the media file used in integrity checks (default: `""`). |
 | `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |
-| `disable_update_check` | boolean | Disable automatic update checks in the background and the warning notice if the version is outdated |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
 | `word_separator` | string | The character used to replace spaces in the generated filename, such as in the Title, Episode Title, and Audio Codec names. Use `" "` to preserve spaces (default: `.` ). |

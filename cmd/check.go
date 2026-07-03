@@ -64,6 +64,13 @@ You can also pass a JSON check report file to render it.`),
 		expandedArgs := expandArgs(args)
 		batchMode := !individualReportsFlag && len(expandedArgs) > 1
 
+		if len(expandedArgs) == 1 {
+			isJSON, jsonReports := loadJSONReport(expandedArgs[0])
+			if isJSON && len(jsonReports) > 1 {
+				batchMode = !individualReportsFlag
+			}
+		}
+
 		seasonEpisodes := make(map[seasonKey][]int)
 		seasonMetas := make(map[seasonKey]*metadata.Metadata)
 

@@ -12,7 +12,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -42,36 +44,60 @@ var (
 
 // CheckForUpdateBackground checks if a new version is available in the background
 func CheckForUpdateBackground(currentVersion string) {
-	if config.GetDisableUpdateCheck() {
+	if !config.GetCheckUpdates() {
 		return
 	}
 
 	const cacheKey = "latest_release_tag"
 
-	cachedData, err := cache.Get(cacheKey)
-	if err == nil {
-		latestTag := string(cachedData)
-		ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
+	cacheDur := 6 * time.Hour
+	if config.GetCheckPrereleaseUpdates() {
+		cacheDur = 1 * time.Hour
+	}
 
-		if IsNewer(latestTag, currentVersion) {
-			ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
-		}
-	} else {
+	cachedData, err := cache.GetWithDuration(cacheKey, cacheDur)
+	if err != nil {
 		// Cache miss or expired, fetch in background for next time
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			if rel, err := FetchLatestRelease(ctx); err == nil {
+			if rel, err := FetchLatestRelease(ctx, config.GetCheckPrereleaseUpdates()); err == nil {
 				_ = cache.Set(cacheKey, []byte(rel.TagName))
 			}
 		}()
+
+		return
+	}
+
+	latestTag := string(cachedData)
+	ui.PrintDebug(fmt.Sprintf("cached latest tag: %s, current version: %s", latestTag, currentVersion))
+
+	if !IsNewer(latestTag, currentVersion) {
+		return
+	}
+
+	if !config.GetAutoUpdate() {
+		ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
+
+		return
+	}
+
+	ui.PrintWarning(fmt.Sprintf("A new version of parsec is available (%s). It is downloading in the background...", latestTag))
+
+	exe, err := os.Executable()
+	if err == nil {
+		cmd := exec.CommandContext(context.Background(), exe, "update", "--silent")
+		setSysProcAttr(cmd)
+		_ = cmd.Start() // Start in background and detach
 	}
 }
 
 // Release represents a GitHub-like release from Codeberg.
 type Release struct {
 	TagName string  `json:"tag_name"`
+	Name    string  `json:"name"`
+	Body    string  `json:"body"`
 	Assets  []Asset `json:"assets"`
 }
 
@@ -81,10 +107,80 @@ type Asset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
-// FetchLatestRelease retrieves the latest release information from the Codeberg API.
-func FetchLatestRelease(ctx context.Context) (*Release, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
+var errNotFound = errors.New("release not found")
 
+// FetchLatestRelease retrieves the latest release information from the Codeberg API.
+func FetchLatestRelease(ctx context.Context, checkPrerelease bool) (*Release, error) {
+	stableURL := fmt.Sprintf("%s/repos/%s/%s/releases/latest", baseURL, owner, repo)
+
+	stableRel, err := fetchRelease(ctx, stableURL)
+	if err != nil && !errors.Is(err, errNotFound) {
+		return nil, err
+	}
+
+	if !checkPrerelease {
+		if stableRel == nil {
+			return nil, errNotFound
+		}
+
+		return stableRel, nil
+	}
+
+	nightlyRel, err := fetchNightlyRelease(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return pickBestRelease(stableRel, nightlyRel)
+}
+
+func fetchNightlyRelease(ctx context.Context) (*Release, error) {
+	nightlyURL := fmt.Sprintf("%s/repos/%s/%s/releases/tags/nightly", baseURL, owner, repo)
+
+	nightlyRel, err := fetchRelease(ctx, nightlyURL)
+	if err != nil && !errors.Is(err, errNotFound) {
+		return nil, err
+	}
+
+	if nightlyRel != nil {
+		extractNightlyVersion(nightlyRel)
+	}
+
+	return nightlyRel, nil
+}
+
+func pickBestRelease(stableRel, nightlyRel *Release) (*Release, error) {
+	if stableRel == nil && nightlyRel == nil {
+		return nil, errNotFound
+	}
+
+	if stableRel == nil {
+		return nightlyRel, nil
+	}
+
+	if nightlyRel == nil {
+		return stableRel, nil
+	}
+
+	if IsNewer(nightlyRel.TagName, stableRel.TagName) {
+		return nightlyRel, nil
+	}
+
+	return stableRel, nil
+}
+
+func extractNightlyVersion(nightlyRel *Release) {
+	// Extract the true semantic version from the git-cliff changelog body
+	// It outputs: ## [v0.4.1-dev.12+4508cc6] - 2026-07-01
+	matches := regexp.MustCompile(`(?m)^## \[(v[0-9]+\.[0-9]+\.[0-9]+.*?)\]`).FindStringSubmatch(nightlyRel.Body)
+	if len(matches) > 1 {
+		nightlyRel.TagName = matches[1]
+	} else if nightlyRel.Name != "" && nightlyRel.Name != "nightly" {
+		nightlyRel.TagName = nightlyRel.Name
+	}
+}
+
+func fetchRelease(ctx context.Context, url string) (*Release, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -92,9 +188,13 @@ func FetchLatestRelease(ctx context.Context) (*Release, error) {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch latest release: %w", err)
+		return nil, fmt.Errorf("failed to fetch release: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, errNotFound
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%w %s", errCodebergStatus, resp.Status)
@@ -272,7 +372,7 @@ func ReplaceExecutable(tempFile string) error {
 	oldFile := executablePath + ".old"
 	_ = os.Remove(oldFile) // Ignore error if file doesn't exist
 
-	if err := os.Rename(executablePath, oldFile); err != nil {
+	if err := renameWithRetry(executablePath, oldFile); err != nil {
 		if runtime.GOOS == "windows" {
 			return fmt.Errorf("could not replace running binary on Windows: %w\nPlease download the new version manually from Codeberg", err)
 		}
@@ -280,13 +380,33 @@ func ReplaceExecutable(tempFile string) error {
 		return fmt.Errorf("could not rename current binary: %w", err)
 	}
 
-	if err := os.Rename(tempFile, executablePath); err != nil {
-		_ = os.Rename(oldFile, executablePath) // Try to restore old file on failure
+	if err := renameWithRetry(tempFile, executablePath); err != nil {
+		_ = renameWithRetry(oldFile, executablePath) // Try to restore old file on failure
 
 		return fmt.Errorf("could not replace current binary: %w", err)
 	}
 
 	_ = os.Remove(oldFile) // Clean up old file
+
+	return nil
+}
+
+// renameWithRetry attempts to rename a file, retrying up to 5 times if it fails.
+// This is necessary on Windows where AntiVirus software might temporarily lock a newly downloaded executable.
+func renameWithRetry(oldpath, newpath string) error {
+	var err error
+	for range 5 {
+		err = os.Rename(oldpath, newpath)
+		if err == nil {
+			return nil
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if err != nil {
+		return fmt.Errorf("rename failed: %w", err)
+	}
 
 	return nil
 }

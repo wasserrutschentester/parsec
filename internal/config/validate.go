@@ -113,6 +113,12 @@ var prowlarrExpectedTypes = map[string]string{
 	"tv_categories":    "[]interface {}",
 }
 
+var updateExpectedTypes = map[string]string{
+	"check":      "bool",
+	"auto":       "bool",
+	"prerelease": "bool",
+}
+
 var validTemplateKeys = map[string]bool{
 	"title":          true,
 	"date":           true,
@@ -170,6 +176,7 @@ var validCheckIdentifiers = map[string]bool{
 	"mediainfo_dialogue_normalization": true,
 	"mediainfo_stereo_lossless":        true,
 	"mediainfo_empty_tracks":           true,
+	"mediainfo_missing_statistics":     true,
 	"matroska_language_tag":            true,
 
 	"matroska_multi_lang":                  true,
@@ -195,6 +202,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_video_cropping":              true,
 	"matroska_title_hygiene":               true,
 	"matroska_app_hygiene":                 true,
+	"matroska_creation_time_privacy":       true,
 	"matroska_truehd_compatibility":        true,
 	"matroska_commentary_channels":         true,
 	"matroska_commentary_bitrate":          true,
@@ -294,6 +302,10 @@ func validateStructuralSections(k string, v any, prefix, fullKey string) ([]stri
 	case "prowlarr":
 		if subMap, ok := v.(map[string]any); ok {
 			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
+		}
+	case "update":
+		if subMap, ok := v.(map[string]any); ok {
+			return validateMapTypes(subMap, fullKey, updateExpectedTypes), true
 		}
 	case "preset":
 		return validatePresetConfig(v), true

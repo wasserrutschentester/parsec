@@ -398,3 +398,69 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 
 	return nil
 }
+
+func checkCreationTimePrivacy(filePath string, ebml *matroska.EbmlMetadata) *CheckResult {
+	res := &CheckResult{
+		Identifier: "matroska_creation_time_privacy",
+		Warning:    "Privacy concern: file contains creation/encode time metadata",
+		Passed:     true,
+		Severity:   "info",
+	}
+
+	if ebml.Container.Properties.DateUtc != "" {
+		res.Passed = false
+		res.Actual = "DateUTC: " + ebml.Container.Properties.DateUtc
+	}
+
+	if ebml.Container.Properties.DateLocal != "" {
+		res.Passed = false
+		if res.Actual != "" {
+			res.Actual += "; "
+		}
+
+		res.Actual += "DateLocal: " + ebml.Container.Properties.DateLocal
+	}
+
+	if mi, err := getMediaInfo(filePath); err == nil {
+		appendMediaInfoCreationTimePrivacy(mi, res)
+	}
+
+	if !res.Passed {
+		return res
+	}
+
+	return nil
+}
+
+func appendMediaInfoCreationTimePrivacy(mi *mediainfo.MediaInfo, res *CheckResult) {
+	for i := range mi.Media.Tracks {
+		t := &mi.Media.Tracks[i]
+
+		fields := map[string]string{
+			"Encoded_Date":                 t.EncodedDate,
+			"Tagged_Date":                  t.TaggedDate,
+			"creation_time":                t.Extra.GetString("creation_time"),
+			"ENCODED_DATE":                 t.Extra.GetString("ENCODED_DATE"),
+			"DATE_ENCODED":                 t.Extra.GetString("DATE_ENCODED"),
+			"DATE_TAGGED":                  t.Extra.GetString("DATE_TAGGED"),
+			"_STATISTICS_WRITING_DATE_UTC": t.Extra.GetString("_STATISTICS_WRITING_DATE_UTC"),
+			"DATE":                         t.Extra.GetString("DATE"),
+		}
+
+		for k, v := range fields {
+			if v != "" {
+				res.Passed = false
+				if res.Actual != "" {
+					res.Actual += "; "
+				}
+
+				prefix := ""
+				if t.Type != "General" {
+					prefix = t.Type + " "
+				}
+
+				res.Actual += prefix + k + ": " + v
+			}
+		}
+	}
+}

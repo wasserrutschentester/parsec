@@ -6,6 +6,14 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
+func ptr(i int) *int {
+	return &i
+}
+
+func ptrFloat(f float64) *float64 {
+	return &f
+}
+
 //nolint:paralleltest // depends on shared global state
 func TestCheckRedundantAudio(t *testing.T) {
 	tests := []struct {
@@ -222,31 +230,31 @@ func TestCheckDurations(t *testing.T) {
 		{
 			name: "Perfect match",
 			tracks: []mediainfo.Track{
-				{Type: "Video", Duration: 100.0},
-				{Type: "Audio", Duration: 100.0, TypeOrder: &order1, ID: "1"},
+				{Type: "Video", Duration: ptrFloat(100.0)},
+				{Type: "Audio", Duration: ptrFloat(100.0), TypeOrder: &order1, ID: "1"},
 			},
 			wantWarn: false,
 		},
 		{
 			name: "Audio slightly longer",
 			tracks: []mediainfo.Track{
-				{Type: "Video", Duration: 100.0},
-				{Type: "Audio", Duration: 106.0, TypeOrder: &order1, ID: "1"},
+				{Type: "Video", Duration: ptrFloat(100.0)},
+				{Type: "Audio", Duration: ptrFloat(106.0), TypeOrder: &order1, ID: "1"},
 			},
 			wantWarn: true,
 		},
 		{
 			name: "Audio slightly shorter",
 			tracks: []mediainfo.Track{
-				{Type: "Video", Duration: 100.0},
-				{Type: "Audio", Duration: 70.0, TypeOrder: &order1, ID: "1"},
+				{Type: "Video", Duration: ptrFloat(100.0)},
+				{Type: "Audio", Duration: ptrFloat(70.0), TypeOrder: &order1, ID: "1"},
 			},
 			wantWarn: true,
 		},
 		{
 			name: "Video missing",
 			tracks: []mediainfo.Track{
-				{Type: "Audio", Duration: 100.0, TypeOrder: &order1, ID: "1"},
+				{Type: "Audio", Duration: ptrFloat(100.0), TypeOrder: &order1, ID: "1"},
 			},
 			wantWarn: true,
 		},
@@ -503,7 +511,7 @@ func TestCheckZeroChannelsElements(t *testing.T) {
 			track: mediainfo.Track{
 				Type:         "Text",
 				Format:       "SRT",
-				ElementCount: 150,
+				ElementCount: ptr(150),
 			},
 			wantWarn: false,
 		},
@@ -512,7 +520,7 @@ func TestCheckZeroChannelsElements(t *testing.T) {
 			track: mediainfo.Track{
 				Type:         "Text",
 				Format:       "SRT",
-				ElementCount: 0,
+				ElementCount: ptr(0),
 			},
 			wantWarn: true,
 		},

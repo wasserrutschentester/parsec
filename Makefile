@@ -1,13 +1,8 @@
 GOFILES_NOVENDOR = $(shell find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./.git/*")
 GO_PACKAGES ?= $(shell go list ./... | grep -v /vendor/)
 
-# Get raw version from git
-GIT_VER := $(shell git describe --tags --always --match "v[0-9]*.[0-9]*.[0-9]*" --dirty 2>/dev/null || echo "v0.0.0-unknown")
-
-# Format the version string (untrimmed hash is fine):
-# 1. If it doesn't start with 'v' (just a commit hash), prepend 'v0.0.0-'
-# 2. Replace '-dirty' with '+dirty' for semver compliance
-VERSION ?= $(shell echo $(GIT_VER) | sed -e '/^v/! s/^/v0.0.0-/' -e 's/-dirty/+dirty/')
+# Format the version string using the semver-compliant version script
+VERSION ?= $(shell ./scripts/version.sh)
 
 LDFLAGS = -X codeberg.org/upPollo/parsec/cmd.Version=$(VERSION)
 

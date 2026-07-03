@@ -81,7 +81,8 @@ This document lists all individual checks performed by the `parsec check` comman
 | Resolution | `checkResolution` | `mediainfo_resolution` | Yes | Checks for odd resolution, standard widths, and sane aspect ratios. |
 | Dialogue Normalization | `checkDialogueNormalization` | `mediainfo_dialogue_normalization` | Yes | Verifies that dialogue normalization is removed for lossless (TrueHD, DTS-HD MA) and DTS-HD HRA tracks. |
 | Stereo/Mono Lossless Codec | `checkStereoLossless` | `mediainfo_stereo_lossless` | Yes | Warns if an audio track with 2 or less channels uses a different lossless codec than FLAC (e.g., TrueHD, DTS-HD MA, or PCM). |
-| Empty Tracks | `checkEmptyTracks` | `mediainfo_empty_tracks` | Yes | Issues an error if an audio track has zero channels or a subtitle track has zero elements. |
+| Empty Tracks | `checkEmptyTracks` | `mediainfo_empty_tracks` | Yes | Issues an error if a track is determined to be empty (e.g., duration is 0, size is 0 bytes, audio has 0 channels, or subtitles have 0 elements). |
+| Missing Statistics | `checkMissingStatistics` | `mediainfo_missing_statistics` | Yes | Warns if a track is missing statistics tags (e.g., DURATION, NUMBER_OF_BYTES, or ElementCount), making it difficult to determine if it is empty. |
 
 ### Matroska / EBML Checks
 
@@ -94,6 +95,7 @@ These checks ensure the Matroska container and its components meet quality stand
 | Matroska Format | `checkMatroskaFormat` | `matroska_ebml_error` | No | Verifies that the file is a valid Matroska (MKV) container. |
 | Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
 | Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
+| Creation Time Privacy | `checkCreationTimePrivacy` | `matroska_creation_time_privacy` | Yes | Warns if the file contains creation/encode time metadata such as `DateUTC`, `DateLocal`, or track-level encoded dates, which might be a privacy concern. Disabled by default. |
 | Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
 | Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
 | TrueHD Compatibility | `checkTrueHDCompatibility` | `matroska_truehd_compatibility` | Yes | Verifies that any Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/E-AC3) of the same language. |
@@ -237,7 +239,9 @@ The interactive output contains the same information as the JSON output, but in 
 | `warning` | string | Human-readable description of the problem. |
 | `expected` | string | The expected value (optional, depends on the check). |
 | `actual` | string | The actual value found (optional, depends on the check). |
+| `list` | array | A list of string bullet points (optional, used for multi-line formatting). |
 | `tracks` | array | List of track-specific results (optional, for checks that evaluate individual tracks). |
+| `table` | object | Table-formatted data (optional, see [TableData Object](#tabledata-object)). |
 
 **Example:**
 ```json
@@ -265,6 +269,8 @@ The interactive output contains the same information as the JSON output, but in 
 | `language` | string | The track's ISO 639-2/T language tag (e.g., `ger`, `eng`). |
 | `flags` | array | List of applied track flags. See [Track Flags](#track-flags). |
 | `warning` | string | Human-readable description of the track-specific issue. |
+| `list` | array | A list of string bullet points (optional, used for multi-line formatting). |
+| `table` | object | Table-formatted data for this track (optional, see [TableData Object](#tabledata-object)). |
 
 **Example:**
 ```json
@@ -293,6 +299,33 @@ Possible values in the `flags` array:
 * `Visual Impaired`: Track is marked for visual impaired (Descriptive Audio).
 * `Commentary`: Track is marked as commentary.
 * `Original`: Track is marked as being in the original language.
+
+### TableData Object
+
+Used to display structured, multi-dimensional tabular data.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `headers` | array | List of column header names (strings). |
+| `rows` | array | List of row entries, where each entry is a list of strings corresponding to the headers. |
+
+**Example:**
+```json
+{
+  "headers": [
+    "Line #",
+    "Style Name",
+    "Validation Issue"
+  ],
+  "rows": [
+    [
+      "18",
+      "Default",
+      "Encoding should be 1, got 0"
+    ]
+  ]
+}
+```
 
 ### Full Example
 ```bash

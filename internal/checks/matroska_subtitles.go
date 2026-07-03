@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/types"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -111,7 +112,10 @@ func checkASSScriptInfo(track matroska.EbmlTrack, videoWidth, videoHeight int) *
 	errors := validateScriptInfo(info, videoWidth, videoHeight)
 
 	if len(errors) > 0 {
-		return newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, strings.Join(errors, "\n"))
+		res := newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, "")
+		res.Tracks[0].List = errors
+
+		return res
 	}
 
 	return nil
@@ -240,22 +244,37 @@ func checkASSStyles(track matroska.EbmlTrack) *CheckResult {
 	}
 
 	lines := strings.Split(string(privateBytes), "\n")
-	errors := validateStyles(lines)
+	rows := validateStyles(lines)
 
-	if len(errors) > 0 {
-		warning := strings.Join(errors, "\n")
+	if len(rows) > 0 {
+		res := newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, "See table below")
+		res.Tracks[0].Table = &types.TableData{
+			Headers: []string{"Line #", "Style Name", "Validation Issue"},
+			Rows:    rows,
+		}
 
-		return newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, warning)
+		return res
 	}
 
 	return nil
 }
 
-func validateStyles(lines []string) []string {
+func getStyleName(rest string, formatFields []string) string {
+	values := strings.Split(rest, ",")
+	for i, field := range formatFields {
+		if strings.ToLower(strings.TrimSpace(field)) == "name" && i < len(values) {
+			return strings.TrimSpace(values[i])
+		}
+	}
+
+	return "-"
+}
+
+func validateStyles(lines []string) [][]string {
 	inStyles := false
 	formatFields := []string{}
 
-	var errors []string
+	var rows [][]string
 
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
@@ -277,13 +296,18 @@ func validateStyles(lines []string) []string {
 		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
 			formatFields = parseStyleFormat(rest)
 		} else if rest, ok := strings.CutPrefix(line, "Style:"); ok {
+			styleName := getStyleName(rest, formatFields)
 			for _, err := range validateStyleLine(rest, formatFields) {
-				errors = append(errors, fmt.Sprintf("%s (Line %d: Style: %s )", ui.Warning.Render(err), i+1, rest))
+				rows = append(rows, []string{
+					strconv.Itoa(i + 1),
+					styleName,
+					err,
+				})
 			}
 		}
 	}
 
-	return errors
+	return rows
 }
 
 func validateStyleLine(rest string, formatFields []string) []string {
@@ -386,9 +410,10 @@ func checkASSEvents(track matroska.EbmlTrack, content []byte) *CheckResult {
 	errors := validateEvents(lines, definedStyles)
 
 	if len(errors) > 0 {
-		warning := strings.Join(errors, "\n")
+		res := newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, "")
+		res.Tracks[0].List = errors
 
-		return newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, warning)
+		return res
 	}
 
 	return nil
@@ -688,12 +713,49 @@ func isAttachmentUsedNorm(attID int, normAtts []normalizedAttachmentFontID, norm
 	return false
 }
 
+func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) [][]string {
+	rows := make([][]string, 0, len(unused))
+
+	for _, u := range unused {
+		fontName := "-"
+
+		for _, fInfo := range attachmentFonts {
+			if fInfo.AttachmentID == u.ID {
+				if len(fInfo.FullNames) > 0 {
+					fontName = strings.Join(fInfo.FullNames, ", ")
+				} else if fInfo.FamilyName != "" {
+					fontName = fInfo.FamilyName
+				}
+
+				break
+			}
+		}
+
+		sizeStr := ""
+
+		const unit = 1024
+
+		switch {
+		case u.Size < unit:
+			sizeStr = fmt.Sprintf("%d B", u.Size)
+		case u.Size < unit*unit:
+			sizeStr = fmt.Sprintf("%.1f KB", float64(u.Size)/float64(unit))
+		default:
+			sizeStr = fmt.Sprintf("%.1f MB", float64(u.Size)/float64(unit*unit))
+		}
+
+		rows = append(rows, []string{u.FileName, fontName, sizeStr})
+	}
+
+	return rows
+}
+
 func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
 	if len(attachments) == 0 {
 		return nil
 	}
 
-	var unused []string
+	var unused []matroska.EbmlAttachment
 
 	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
 	for font := range allUsedFonts {
@@ -718,7 +780,7 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 
 	for _, att := range attachments {
 		if isFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
-			unused = append(unused, att.FileName)
+			unused = append(unused, att)
 		}
 	}
 
@@ -728,13 +790,15 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 			warning += " (some might be used by inline styles since matroska_subtitle_inline_fonts is disabled)"
 		}
 
-		warning += ": " + strings.Join(unused, ", ")
-
 		return &CheckResult{
 			Identifier: "matroska_unused_fonts",
 			Warning:    warning,
 			Passed:     false,
 			Severity:   "warning",
+			Table: &types.TableData{
+				Headers: []string{"Attachment Name", "Full Name", "Size"},
+				Rows:    getUnusedFontsTableRows(unused, attachmentFonts),
+			},
 		}
 	}
 
@@ -754,6 +818,23 @@ func getAttachmentFontNames(attID int, attachmentFonts []matroska.AttachmentFont
 	return uniqueStrings(names)
 }
 
+func cleanFallbackFontName(fullName string, familyName string) string {
+	if familyName != "" && fullName != familyName && strings.HasPrefix(strings.ToLower(fullName), strings.ToLower(familyName)) {
+		// e.g. fullName: "Times New Roman Bold", familyName: "Times New Roman"
+		style := fullName[len(familyName):]
+		style = strings.TrimSpace(style)
+
+		familyClean := strings.ReplaceAll(familyName, " ", "")
+		styleClean := strings.ReplaceAll(style, " ", "")
+
+		if styleClean != "" {
+			return familyClean + "-" + styleClean
+		}
+	}
+
+	return strings.ReplaceAll(fullName, " ", "")
+}
+
 func getProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
 	var ext string
 
@@ -768,11 +849,11 @@ func getProposedFontFilename(attFileName string, attID int, attachmentFonts []ma
 			}
 
 			if len(fInfo.FullNames) > 0 && fInfo.FullNames[0] != "" {
-				return fInfo.FullNames[0] + ext
+				return cleanFallbackFontName(fInfo.FullNames[0], fInfo.FamilyName) + ext
 			}
 
 			if fInfo.FamilyName != "" {
-				return fInfo.FamilyName + ext
+				return cleanFallbackFontName(fInfo.FamilyName, "") + ext
 			}
 		}
 	}
@@ -798,14 +879,14 @@ func isAttachmentNameCompliant(attFileName string, names []string) bool {
 	return false
 }
 
-func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
-	type complianceRow struct {
-		current  string
-		proposed string
-		internal string
-	}
+type fontComplianceRow struct {
+	attID    int
+	current  string
+	proposed string
+}
 
-	var nonCompliant []complianceRow
+func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []fontComplianceRow {
+	var nonCompliant []fontComplianceRow
 
 	for _, att := range attachments {
 		if !isFontAttachment(att) {
@@ -823,33 +904,73 @@ func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachme
 				proposed = "-"
 			}
 
-			nonCompliant = append(nonCompliant, complianceRow{
+			nonCompliant = append(nonCompliant, fontComplianceRow{
+				attID:    att.ID,
 				current:  att.FileName,
 				proposed: proposed,
-				internal: strings.Join(names, ", "),
 			})
 		}
 	}
 
-	if len(nonCompliant) > 0 {
-		headers := []string{"Current Filename", "Internal Fonts", "Proposed Filename"}
-		rows := make([][]string, 0, len(nonCompliant))
+	return nonCompliant
+}
 
-		for _, row := range nonCompliant {
-			rows = append(rows, []string{row.current, row.internal, row.proposed})
+func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
+	headers := []string{"Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
+
+	var rows [][]string
+
+	for _, row := range nonCompliant {
+		var fInfo *matroska.AttachmentFontInfo
+
+		for _, f := range attachmentFonts {
+			if f.AttachmentID == row.attID {
+				fCopy := f
+				fInfo = &fCopy
+
+				break
+			}
 		}
 
-		tableStr := ui.FontComplianceTable(headers, rows)
+		if fInfo != nil {
+			psName := fInfo.PostScriptName
+			if psName == "" {
+				psName = "-"
+			}
 
-		return &CheckResult{
-			Identifier: "matroska_font_filename_compliance",
-			Warning:    "Font attachment filenames do not match internal font names:\n" + tableStr,
-			Passed:     false,
-			Severity:   "info",
+			fullName := strings.Join(fInfo.FullNames, ", ")
+			if fullName == "" {
+				fullName = "-"
+			}
+
+			rows = append(rows, []string{
+				row.current,
+				fullName,
+				psName,
+				row.proposed,
+			})
 		}
 	}
 
-	return nil
+	return &CheckResult{
+		Identifier: "matroska_font_filename_compliance",
+		Warning:    "Font attachment filenames do not match internal font names",
+		Passed:     false,
+		Severity:   "info",
+		Table: &types.TableData{
+			Headers: headers,
+			Rows:    rows,
+		},
+	}
+}
+
+func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
+	nonCompliant := findNonCompliantFonts(attachments, attachmentFonts)
+	if len(nonCompliant) == 0 {
+		return nil
+	}
+
+	return buildFontComplianceResult(nonCompliant, attachmentFonts)
 }
 
 func parseSingleStyleLine(line string, formatFields []string) (string, fontStyle, bool) {
@@ -1206,31 +1327,43 @@ func checkSRTValidation(track matroska.EbmlTrack, content []byte) *CheckResult {
 	return buildSRTCheckResult(&track, parser)
 }
 
+func appendFormattedErrors(msgs []string, prefix string, errs []string) []string {
+	for _, err := range limitErrorList(errs) {
+		msgs = append(msgs, prefix+err)
+	}
+
+	return msgs
+}
+
 func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckResult {
 	if len(parser.syntaxErrors) > 0 || len(parser.tagErrors) > 0 {
 		var msgs []string
 
 		if len(parser.syntaxErrors) > 0 {
-			msgs = append(msgs, "SRT syntax errors:\n  "+strings.Join(limitErrorList(parser.syntaxErrors), "\n  "))
+			msgs = appendFormattedErrors(msgs, "Syntax Error: ", parser.syntaxErrors)
 		}
 
 		if len(parser.tagErrors) > 0 {
-			msgs = append(msgs, "Invalid HTML tags:\n  "+strings.Join(limitErrorList(parser.tagErrors), "\n  "))
+			msgs = appendFormattedErrors(msgs, "Invalid HTML tag: ", parser.tagErrors)
 		}
 
 		if len(parser.posWarnings) > 0 {
-			msgs = append(msgs, "Alignment/positioning detected (should use ASS):\n  "+strings.Join(limitErrorList(parser.posWarnings), "\n  "))
+			msgs = appendFormattedErrors(msgs, "Alignment/positioning detected: ", parser.posWarnings)
 		}
 
-		warning := strings.Join(msgs, "\n")
+		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, "")
+		res.Tracks[0].List = msgs
 
-		return newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, warning)
+		return res
 	}
 
 	if len(parser.posWarnings) > 0 {
-		warning := "Alignment/positioning detected (should use ASS):\n  " + strings.Join(limitErrorList(parser.posWarnings), "\n  ")
+		msgs := appendFormattedErrors(nil, "Alignment/positioning detected: ", parser.posWarnings)
 
-		return newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, warning)
+		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, "")
+		res.Tracks[0].List = msgs
+
+		return res
 	}
 
 	return nil

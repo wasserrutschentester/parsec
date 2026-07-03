@@ -16,17 +16,17 @@ func TestReproMultiEpisode(t *testing.T) {
 	got := Parse(input)
 
 	want := &metadata.Metadata{
-		Title:        "Kaeptn.Blaubaers.Seemannsgarn",
-		Season:       1,
-		Episodes:     []int{1, 2, 3, 4, 5, 6},
-		EpisodeTitle: "Wie.das.Schiff.zur.Klippe.kam.uvm",
-		Language:     "GERMAN",
-		Resolution:   "1080p",
-		Service:      "ATV",
-		Source:       "WEB-DL",
-		VideoCodec:   "h264",
-		Group:        "SLiDE",
-		IsTV:         true,
+		Title:         "Kaeptn.Blaubaers.Seemannsgarn",
+		Season:        1,
+		Episodes:      []int{1, 2, 3, 4, 5, 6},
+		EpisodeTitles: []string{"Wie.das.Schiff.zur.Klippe.kam.uvm"},
+		Language:      "GERMAN",
+		Resolution:    "1080p",
+		Service:       "ATV",
+		Source:        "WEB-DL",
+		VideoCodec:    "h264",
+		Group:         "SLiDE",
+		IsTV:          true,
 	}
 
 	if !reflect.DeepEqual(got, want) {

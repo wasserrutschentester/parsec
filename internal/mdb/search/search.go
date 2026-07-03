@@ -83,13 +83,27 @@ func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.Se
 		return nil, mdb.ErrNotFound
 	}
 
+	var selectedResult *mdb.SearchResult
+
 	if len(results) == 1 || unattended {
 		ui.PrintDebug(fmt.Sprintf("InteractiveSearch auto-selected: %+v", results[0]))
+		selectedResult = &results[0]
+	} else {
+		res, err := promptForResultSelection(results)
+		if err != nil {
+			return nil, err
+		}
 
-		return &results[0], nil
+		selectedResult = res
 	}
 
-	return promptForResultSelection(results)
+	// Fetch full details to get Genres and other extended metadata
+	fullResult, err := tmdb.GetByID(selectedResult.TmdbID, selectedResult.TmdbType)
+	if err == nil && fullResult != nil {
+		selectedResult = fullResult
+	}
+
+	return selectedResult, nil
 }
 
 func promptForResultSelection(results []mdb.SearchResult) (*mdb.SearchResult, error) {
@@ -569,40 +583,30 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 	}
 }
 
-// FindEpisode attempts to identify an episode on TVDB or TMDB based on search results and metadata.
-func FindEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
+// FindEpisodes attempts to identify an episode on TVDB or TMDB based on search results and metadata.
+func FindEpisodes(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) []mdb.EpisodeResult {
 	if len(meta.Episodes) == 0 {
-		return findSingleEpisode(result, meta, allowSpecials)
+		ep := findSingleEpisode(result, meta, allowSpecials)
+		if ep.Name != "" {
+			return []mdb.EpisodeResult{ep}
+		}
+
+		return nil
 	}
 
-	var (
-		combined mdb.EpisodeResult
-		titles   []string
-	)
+	var episodes []mdb.EpisodeResult
 
-	for i, epNum := range meta.Episodes {
-		// Create a copy of meta for the single episode search
+	for _, epNum := range meta.Episodes {
 		singleMeta := *meta
 		singleMeta.Episodes = []int{epNum}
 
 		epRes := findSingleEpisode(result, &singleMeta, allowSpecials)
 		if epRes.Name != "" {
-			name := strings.TrimSpace(epRes.Name)
-			titles = append(titles, name)
-
-			if i == 0 {
-				combined = epRes
-			}
+			episodes = append(episodes, epRes)
 		}
 	}
 
-	if len(titles) > 0 {
-		combined.Name = strings.Join(titles, " / ")
-
-		return combined
-	}
-
-	return mdb.EpisodeResult{}
+	return episodes
 }
 
 func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
@@ -641,9 +645,15 @@ func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSp
 
 // GetSeasonEpisodes retrieves all episodes for a specific season from TVDB or TMDB.
 func GetSeasonEpisodes(result mdb.SearchResult, season int) ([]mdb.EpisodeResult, error) {
+	var (
+		results []mdb.EpisodeResult
+		err     error
+	)
+
 	if result.TvdbID > 0 {
-		if res, err := getSeasonEpisodesFromTvdb(result.TvdbID, season); err == nil {
-			return res, nil
+		results, err = getSeasonEpisodesFromTvdb(result.TvdbID, season)
+		if err == nil {
+			goto setTotal
 		}
 	}
 
@@ -653,10 +663,22 @@ func GetSeasonEpisodes(result mdb.SearchResult, season int) ([]mdb.EpisodeResult
 
 		prefLang := config.GetPreferredLanguage()
 
-		return tmdb.GetSeasonMetadata(result.TmdbID, season, prefLang)
+		results, err = tmdb.GetSeasonMetadata(result.TmdbID, season, prefLang)
+		if err == nil {
+			goto setTotal
+		}
 	}
 
 	return nil, mdb.ErrNotFound
+
+setTotal:
+	total := len(results)
+
+	for i := range results {
+		results[i].TotalEpisodes = total
+	}
+
+	return results, nil
 }
 
 func getSeasonEpisodesFromTvdb(tvdbID, season int) ([]mdb.EpisodeResult, error) {

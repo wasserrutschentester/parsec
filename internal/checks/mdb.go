@@ -30,6 +30,20 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		return checkNoMatch()
 	}
 
+	// Propagate discovered IDs back to the metadata object so they can be
+	// used by downstream checks (e.g., season completeness grouping)
+	if meta.TmdbID == 0 && searchResult.TmdbID > 0 {
+		meta.TmdbID = searchResult.TmdbID
+	}
+
+	if meta.TvdbID == 0 && searchResult.TvdbID > 0 {
+		meta.TvdbID = searchResult.TvdbID
+	}
+
+	if meta.ImdbID == "" && searchResult.ImdbID != "" {
+		meta.ImdbID = searchResult.ImdbID
+	}
+
 	if origLangOverride := config.GetOriginalLanguage(); origLangOverride != "" {
 		searchResult.OriginalLanguage = origLangOverride
 	}
@@ -105,7 +119,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		found := false
 
 		for _, l := range langs {
-			if language.Make(l) == targetTag {
+			if metadata.MatchLanguage(language.Make(l), targetTag) {
 				found = true
 
 				break
@@ -130,7 +144,7 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 	check("Audio", audioLangs, prefTag, prefLang, "preferred")
 	check("Subtitle", subLangs, prefTag, prefLang, "preferred")
 
-	if origLang != "" && origTag != prefTag {
+	if origLang != "" && !metadata.MatchLanguage(origTag, prefTag) {
 		check("Audio", audioLangs, origTag, origLang, "original")
 		check("Subtitle", subLangs, origTag, origLang, "original")
 	}
@@ -145,14 +159,13 @@ func checkUnknownOriginalLang(result *mdb.SearchResult) []CheckResult {
 
 	origTag := language.Make(origLang)
 	if origLang == "" || origTag == language.Und {
-		res := CheckResult{
+		results = append(results, CheckResult{
 			Identifier: "mdb_unknown_original_lang",
 			Passed:     false,
-			Severity:   "warning",
+			Severity:   "info",
 			Warning:    fmt.Sprintf("original language '%s' is not recognized or missing from TMDB/TVDB", origLang),
 			Actual:     origLang,
-		}
-		results = append(results, res)
+		})
 	}
 
 	return results
@@ -165,19 +178,30 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 	origLang := result.OriginalLanguage
 	audioLangs := mi.GetAudioLanguages()
 
-	wantedLangs := map[language.Tag]bool{
-		language.Make(prefLang): true,
-		language.Make(origLang): true,
-		language.Und:            true,
-		language.Make("mul"):    true,
-		language.Make("zxx"):    true, // no linguistic content (e.g. music-only); never unwanted
-	}
-
 	unwantedLangs := []language.Tag{}
+	prefTag := language.Make(prefLang)
+	origTag := language.Make(origLang)
+	mulTag := language.Make("mul")
+	zxxTag := language.Make("zxx")
 
 	for _, lang := range audioLangs {
 		langTag := language.Make(lang)
-		if !wantedLangs[langTag] {
+
+		isWanted := false
+
+		switch {
+		case langTag == language.Und || metadata.MatchLanguage(langTag, mulTag):
+			isWanted = true
+		case metadata.MatchLanguage(langTag, zxxTag):
+			// no linguistic content (e.g. music-only); never unwanted
+			isWanted = true
+		case metadata.MatchLanguage(langTag, prefTag):
+			isWanted = true
+		case origLang != "" && metadata.MatchLanguage(langTag, origTag):
+			isWanted = true
+		}
+
+		if !isWanted {
 			unwantedLangs = append(unwantedLangs, langTag)
 		}
 	}
@@ -240,14 +264,14 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 
 	var results []CheckResult
 
-	epResult := mdbSearch.FindEpisode(*result, meta, false)
+	episodes := mdbSearch.FindEpisodes(*result, meta, false)
 
 	existenceCheck := CheckResult{
 		Identifier: "mdb_episode_existence",
 		Passed:     true,
 	}
 
-	if epResult.Name == "" {
+	if len(episodes) == 0 {
 		if config.IsCheckEnabled("mdb_episode_existence") {
 			existenceCheck.Passed = false
 			existenceCheck.Severity = "warning"
@@ -256,6 +280,14 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 		}
 
 		return results
+	}
+
+	// build combined dummy episode result for checks
+	epResult := mdb.EpisodeResult{
+		Name:    mdb.CombineEpisodeNames(episodes),
+		Airdate: episodes[0].Airdate,
+		Season:  episodes[0].Season,
+		Episode: episodes[0].Episode,
 	}
 
 	results = append(results, existenceCheck)
@@ -275,10 +307,10 @@ func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 		Identifier: "mdb_episode_title",
 		Passed:     true,
 	}
-	if meta.EpisodeTitle != "" {
+	if len(meta.EpisodeTitles) > 0 {
 		res.Expected = epResult.Name
-		res.Actual = meta.EpisodeTitle
-		normParsed := normalizeForComparison(filename.DeobfuscateTitle(meta.EpisodeTitle))
+		res.Actual = strings.Join(meta.EpisodeTitles, " / ")
+		normParsed := normalizeForComparison(filename.DeobfuscateTitle(res.Actual))
 
 		normOfficial := normalizeForComparison(filename.ApplyTitleReplacements(epResult.Name))
 		if normParsed != normOfficial {

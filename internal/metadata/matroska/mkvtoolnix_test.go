@@ -13,12 +13,17 @@ import (
 func TestCreateTagsXML(t *testing.T) {
 	t.Parallel()
 
-	tags := mdb.MatroskaTags{
-		Title: "Test Movie",
-		Imdb:  "tt1234567",
-		Tmdb:  "movie/123",
-		Tvdb:  456,
-		Tvdb2: "series/456",
+	tags := []mdb.MatroskaTagSet{
+		{
+			TargetTypeValue: 50,
+			Fields: map[string]string{
+				"TITLE": "Test Movie",
+				"IMDB":  "tt1234567",
+				"TMDB":  "movie/123",
+				"TVDB":  "456",
+				"TVDB2": "series/456",
+			},
+		},
 	}
 
 	xmlPath, err := createTagsXML(tags)

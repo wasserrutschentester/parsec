@@ -113,6 +113,18 @@ func printSingleResult(res types.CheckResult, sharedWidths map[int]int) {
 		PrintWarning(res.Warning)
 	}
 
+	if len(res.List) > 0 {
+		for _, item := range res.List {
+			Println("   - " + item)
+		}
+	}
+
+	if res.Table != nil {
+		Println(DataTable(res.Table.Headers, res.Table.Rows))
+
+		return
+	}
+
 	if len(res.Tracks) == 0 {
 		printUnexpectedDiff(res)
 
@@ -171,10 +183,20 @@ func getMatroskaSubGroupName(id string) string {
 }
 
 func printListTrackReport(res types.CheckResult) {
-	printListTrackReportWithIndent(res.Identifier, res.Tracks, "      ")
+	printListTrackReportWithIndent(res.Tracks, "      ")
 }
 
-func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheckResult, indent string) {
+func printListTrackWarning(indent, warning string) {
+	if warning == "" || warning == "See table below" {
+		return
+	}
+
+	for line := range strings.SplitSeq(warning, "\n") {
+		Println(indent + "- " + line)
+	}
+}
+
+func printListTrackReportWithIndent(tracks []types.TrackCheckResult, indent string) {
 	for _, t := range tracks {
 		header := fmt.Sprintf("%sTrack %s (%s/%s)", indent, t.ID, t.Type, t.Codec)
 		if t.Language != "" {
@@ -183,17 +205,17 @@ func printListTrackReportWithIndent(identifier string, tracks []types.TrackCheck
 
 		Println(Muted.Render(header + ":"))
 
-		for line := range strings.SplitSeq(t.Warning, "\n") {
-			if identifier == "matroska_srt_validation" {
-				if !strings.HasPrefix(line, "  ") && strings.HasSuffix(line, ":") {
-					Println(indent + Warning.Render(line))
-				} else {
-					Println(indent + "  - " + strings.TrimSpace(line))
-				}
-			} else {
-				Println(indent + "- " + line)
+		if t.Table != nil {
+			Println(indent + "  " + strings.ReplaceAll(DataTable(t.Table.Headers, t.Table.Rows), "\n", "\n"+indent+"  "))
+		}
+
+		if len(t.List) > 0 {
+			for _, item := range t.List {
+				Println(indent + "- " + item)
 			}
 		}
+
+		printListTrackWarning(indent, t.Warning)
 	}
 }
 
@@ -240,6 +262,7 @@ type fileDetail struct {
 	expected string
 	actual   string
 	tracks   []types.TrackCheckResult
+	table    *types.TableData
 }
 
 type aggIssue struct {
@@ -376,6 +399,7 @@ func groupIssues(reports []types.CheckReport) ([]issueKey, map[issueKey]*aggIssu
 					expected: res.Expected,
 					actual:   res.Actual,
 					tracks:   res.Tracks,
+					table:    res.Table,
 				}
 
 				if agg, exists := aggIssuesMap[k]; exists {
@@ -439,11 +463,17 @@ func printOutlierIssues(issues []*aggIssue, totalFiles int, unattended bool) {
 		for _, detail := range agg.details {
 			Println(fmt.Sprintf("    • %s:", detail.fileName))
 
-			// Print diff details if any
-			printUnexpectedDiffIndented(agg.key.identifier, detail.expected, detail.actual, "        ")
+			if detail.table != nil {
+				tableStr := DataTable(detail.table.Headers, detail.table.Rows)
+				indentedTable := "        " + strings.ReplaceAll(tableStr, "\n", "\n        ")
+				Println(indentedTable)
+			} else {
+				// Print diff details if any
+				printUnexpectedDiffIndented(agg.key.identifier, detail.expected, detail.actual, "        ")
 
-			// Print tracks table if any
-			printTracksDetailsIndented(agg.key.identifier, detail.tracks)
+				// Print tracks table if any
+				printTracksDetailsIndented(agg.key.identifier, detail.tracks)
+			}
 		}
 	}
 }
@@ -454,7 +484,7 @@ func printTracksDetailsIndented(identifier string, tracks []types.TrackCheckResu
 	}
 
 	if isListTrackReport(identifier) {
-		printListTrackReportWithIndent(identifier, tracks, "          ")
+		printListTrackReportWithIndent(tracks, "          ")
 	} else {
 		widths := calculateTrackTableWidths(tracks)
 		tableStr := formatTrackTable(tracks, widths)

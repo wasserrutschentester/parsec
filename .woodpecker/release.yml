@@ -2,7 +2,7 @@ when:
     - event: tag
       branch: main
       ref:
-          include: ["refs/tags/v0.[1-9]*", "refs/tags/v[1-9]*"]
+          include: ["refs/tags/v0.[1-9]*", "refs/tags/v[1-9]*", "refs/tags/nightly"]
 
 variables:
     - &build_platforms "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
@@ -19,6 +19,16 @@ clone:
             depth: 0
 
 steps:
+    generate-version:
+        image: alpine/git
+        commands:
+            - |
+              if [ -n "$CI_COMMIT_TAG" ] && [ "$CI_COMMIT_TAG" != "nightly" ]; then
+                echo "$CI_COMMIT_TAG" > .version
+              else
+                sh ./scripts/version.sh > .version
+              fi
+
     vendor:
         image: *golang
         commands: go mod vendor
@@ -34,12 +44,18 @@ steps:
     changelog:
         image: orhunp/git-cliff:latest
         environment:
-            GITEA_REPO: n0ne/parsec
+            GITEA_REPO: upPollo/parsec
             GITEA_API_URL: https://codeberg.org
             GITEA_TOKEN:
                 from_secret: PARSEC_FORGE_TOKEN
         commands:
-            - git-cliff --current --strip all --output RELEASE_NOTES.md
+            - |
+              VERSION=$(cat .version)
+              if [ "$CI_COMMIT_TAG" = "nightly" ]; then
+                git-cliff --unreleased --tag "$VERSION" --strip all --output RELEASE_NOTES.md
+              else
+                git-cliff --current --strip all --output RELEASE_NOTES.md
+              fi
 
     build:
         image: *golang
@@ -48,6 +64,7 @@ steps:
         commands:
             - mkdir -p dist
             - |
+                VERSION=$$(cat .version)
                 for PLATFORM in $$PLATFORMS; do
                   GOOS=$${PLATFORM%/*}
                   GOARCH=$${PLATFORM#*/}
@@ -55,13 +72,12 @@ steps:
                   if [ "$$GOOS" = "windows" ]; then EXT=".exe"; fi
 
                   echo "Building for $$GOOS/$$GOARCH..."
-                  VERSION=$${CI_COMMIT_TAG:-$$(git describe --tags --always --match 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/-[0-9]*-g/-/') }
                   GOOS=$$GOOS GOARCH=$$GOARCH go build \
                     -ldflags="-s -w -X codeberg.org/upPollo/parsec/cmd.Version=$$VERSION" \
                     -o "dist/parsec-$${GOOS}-$${GOARCH}$${EXT}"
                 done
 
-    release:
+    release-nightly:
         image: *release_plugin
         settings:
             api_key:
@@ -72,6 +88,32 @@ steps:
                 - sha256
             checksum_file: checksums.txt
             checksum_flatten: true
-            title: ${CI_COMMIT_TAG}
+            target_commitish: main
+            tag: nightly
+            title: nightly
+            prerelease: true
             note: RELEASE_NOTES.md
             overwrite: true
+        when:
+            ref: refs/tags/nightly
+
+    release-tag:
+        image: *release_plugin
+        settings:
+            api_key:
+                from_secret: PARSEC_FORGE_TOKEN
+            files:
+                - dist/*
+            checksum:
+                - sha256
+            checksum_file: checksums.txt
+            checksum_flatten: true
+            target_commitish: main
+            tag: ${CI_COMMIT_TAG}
+            title: ${CI_COMMIT_TAG}
+            prerelease: false
+            note: RELEASE_NOTES.md
+            overwrite: true
+        when:
+            ref:
+                include: ["refs/tags/v0.[1-9]*", "refs/tags/v[1-9]*"]
