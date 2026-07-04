@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
 )
 
@@ -366,6 +366,9 @@ type TagConfig struct {
 // ErrAbsoluteTagProfilePath is returned when an absolute path is used for a tag template profile.
 var ErrAbsoluteTagProfilePath = errors.New("absolute paths for tag_template are not supported")
 
+// ErrUnknownTagTemplateSource is returned when the template source cannot be found.
+var ErrUnknownTagTemplateSource = errors.New("could not resolve tag template source")
+
 // GetTagProfile loads the current tag template profile based on configuration.
 func GetTagProfile() ([]TagConfig, error) {
 	profileName := viper.GetString(getPresetKey("tag_template"))
@@ -392,18 +395,40 @@ func GetTagProfile() ([]TagConfig, error) {
 	}
 
 	if err := tagViper.ReadInConfig(); err != nil {
-		if profileName == "default" {
-			tagViper.SetConfigType("toml")
-			_ = tagViper.ReadConfig(strings.NewReader(defaultTags))
-		} else {
+		if profileName != "default" {
 			return nil, fmt.Errorf("could not find tag template '%s': %w", profileName, err)
 		}
 	}
 
-	var tags []TagConfig
-	if err := tagViper.UnmarshalKey("tags", &tags); err != nil {
+	tagContent, err := readTagContent(tagViper, profileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var configData struct {
+		Tags []TagConfig `toml:"tags"`
+	}
+
+	if err := toml.Unmarshal(tagContent, &configData); err != nil {
 		return nil, fmt.Errorf("invalid tag template format: %w", err)
 	}
 
-	return tags, nil
+	return configData.Tags, nil
+}
+
+func readTagContent(tagViper *viper.Viper, profileName string) ([]byte, error) {
+	if fileUsed := tagViper.ConfigFileUsed(); fileUsed != "" {
+		content, err := os.ReadFile(fileUsed)
+		if err != nil {
+			return nil, fmt.Errorf("could not read tag template file: %w", err)
+		}
+
+		return content, nil
+	}
+
+	if profileName == "default" {
+		return []byte(defaultTags), nil
+	}
+
+	return nil, ErrUnknownTagTemplateSource
 }
