@@ -149,7 +149,7 @@ func maybeWriteTags(filePath string, tags []mdb.MatroskaTagSet) {
 		return
 	}
 
-	shouldWriteTags := writeTagsFlag
+	shouldWriteTags := writeTagsFlag || unattendedFlag
 
 	if !unattendedFlag && matroska.CheckForMatroska(filePath) == nil {
 		printTagPreview(tags)
@@ -263,9 +263,11 @@ func init() {
 	identifyCmd.Flags().StringVarP(&sourceFlag, "source", "O", "", "source (e.g. BluRay, Web-DL)")
 	identifyCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
 	// Tag flags
+	identifyCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate identification and preview tags without writing to the file")
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
+	_ = identifyCmd.Flags().MarkDeprecated("write-tags", "use --unattended instead")
 	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
-	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
+	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode (implies writing tags)")
 	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
 	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")
 	// Group metadata flags
