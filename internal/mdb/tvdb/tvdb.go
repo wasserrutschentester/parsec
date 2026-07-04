@@ -127,6 +127,7 @@ type Episode struct {
 	SeasonNumber int    `json:"seasonNumber"`
 	Number       int    `json:"number"`
 	Overview     string `json:"overview"`
+	FinaleType   string `json:"finaleType"`
 }
 
 // ToEpisodeResult converts a TVDB Episode to an mdb.EpisodeResult.
@@ -138,6 +139,7 @@ func (e *Episode) ToEpisodeResult() mdb.EpisodeResult {
 		Season:   e.SeasonNumber,
 		Episode:  e.Number,
 		TvdbID:   e.ID,
+		IsFinale: e.FinaleType == "season" || e.FinaleType == "series",
 	}
 }
 
@@ -595,30 +597,45 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials)
 
 		if ep != nil {
-			res := ep.ToEpisodeResult()
-			for _, e := range episodes {
-				if e.SeasonNumber == res.Season {
-					res.TotalEpisodes++
-				}
-			}
-
-			ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
-
-			for _, l := range uniqueLangs {
-				if res.Name != "" && res.Overview != "" {
-					break
-				}
-
-				fillEpisodeTranslation(&res, ep.ID, l)
-			}
-
-			fillEpisodeImdbID(&res, ep.ID)
-
-			return res, nil
+			return finalizeEpisodeResult(ep, episodes, uniqueLangs), nil
 		}
 	}
 
 	return mdb.EpisodeResult{}, errNotFound
+}
+
+func finalizeEpisodeResult(ep *Episode, episodes []Episode, uniqueLangs []string) mdb.EpisodeResult {
+	res := ep.ToEpisodeResult()
+	hasFinale := false
+	totalEps := 0
+
+	for _, e := range episodes {
+		if e.SeasonNumber == res.Season {
+			totalEps++
+
+			if e.FinaleType == "season" || e.FinaleType == "series" {
+				hasFinale = true
+			}
+		}
+	}
+
+	if hasFinale {
+		res.TotalEpisodes = totalEps
+	}
+
+	ui.PrintDebug(fmt.Sprintf("found episode: %+v", res))
+
+	for _, l := range uniqueLangs {
+		if res.Name != "" && res.Overview != "" {
+			break
+		}
+
+		fillEpisodeTranslation(&res, ep.ID, l)
+	}
+
+	fillEpisodeImdbID(&res, ep.ID)
+
+	return res
 }
 
 func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *Episode {

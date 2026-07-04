@@ -57,6 +57,7 @@ type EpisodeResult struct {
 	TvdbID        int
 	TotalEpisodes int
 	ImdbID        string
+	IsFinale      bool
 }
 
 // TagTemplateContext provides metadata to the tag rendering engine.
