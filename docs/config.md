@@ -114,6 +114,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `preferred_language` | string | Preferred language code (default: `de`). |
 | `original_language` | string | Override original language of the media file used in integrity checks (default: `""`). |
 | `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |
+| `tag_preview` | boolean | Display a simplified preview of the Matroska tags before applying them (default: `true`). |
 | `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
 | `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
 | `word_separator` | string | The character used to replace spaces in the generated filename, such as in the Title, Episode Title, and Audio Codec names. Use `" "` to preserve spaces (default: `.` ). |

@@ -366,7 +366,9 @@ func evaluateTagConfig(cfg config.TagConfig, ctx TagTemplateContext) ([]Matroska
 }
 
 func evaluateSingleContext(cfg config.TagConfig, ctx TagTemplateContext) (*MatroskaTagSet, error) {
-	tmplTarget, err := template.New("target_value").Funcs(templateFuncs).Parse(cfg.TargetValue)
+	targetValStr := fmt.Sprintf("%v", cfg.TargetValue)
+
+	tmplTarget, err := template.New("target_value").Funcs(templateFuncs).Parse(targetValStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid template for target_value: %w", err)
 	}

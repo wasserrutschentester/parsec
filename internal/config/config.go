@@ -47,6 +47,7 @@ func InitDefaults() {
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
 	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events", "matroska_srt_validation", "matroska_creation_time_privacy"})
+	viper.SetDefault("tag_preview", true)
 }
 
 var (
@@ -115,6 +116,11 @@ func GetOutputPath() string {
 // GetSubbedTagging returns true if subbed tagging is enabled.
 func GetSubbedTagging() bool {
 	return getBool("subbed_tagging")
+}
+
+// GetTagPreview returns true if tag preview is enabled.
+func GetTagPreview() bool {
+	return getBool("tag_preview")
 }
 
 // GetTitle returns the title override from the configuration.
@@ -358,7 +364,7 @@ var defaultTags string
 
 // TagConfig represents a mapped Matroska tagging configuration.
 type TagConfig struct {
-	TargetValue string            `mapstructure:"target_value" toml:"target_value"`
+	TargetValue any               `mapstructure:"target_value" toml:"target_value"`
 	Iterator    string            `mapstructure:"iterator" toml:"iterator"`
 	Fields      map[string]string `mapstructure:"fields" toml:"fields"`
 }
