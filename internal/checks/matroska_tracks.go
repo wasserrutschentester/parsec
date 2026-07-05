@@ -158,7 +158,7 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	target := base.String()
 
 	for _, word := range tokenizeTrackName(name) {
-		if getLanguageCodeFromName(word) == target {
+		if GetLanguageCodeFromName(word) == target {
 			return true
 		}
 	}
@@ -188,10 +188,10 @@ func tokenizeTrackName(name string) []string {
 }
 
 func isLanguageName(word string) bool {
-	return getLanguageCodeFromName(word) != ""
+	return GetLanguageCodeFromName(word) != ""
 }
 
-func getLanguageCodeFromName(word string) string {
+func GetLanguageCodeFromName(word string) string {
 	if len(word) <= 3 {
 		return ""
 	}
@@ -227,7 +227,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 
 	shouldBeDefault := false
 	if !isSpecialized {
-		shouldBeDefault = determineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
+		shouldBeDefault = DetermineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
 	}
 
 	if props.Default != shouldBeDefault {
@@ -275,7 +275,7 @@ func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
+func DetermineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
 	switch track.Type {
 	case "audio":
 		return shouldTrackBeDefault(track, audioCounts, seenAudioLangs)
@@ -423,7 +423,7 @@ func getCommentarySubPriority(name string) int64 {
 	}
 }
 
-func getTrackPriority(track matroska.EbmlTrack) int64 {
+func GetTrackPriority(track matroska.EbmlTrack) int64 {
 	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
 	propertyScore := calculatePropertyScore(track) & maskProperty
 

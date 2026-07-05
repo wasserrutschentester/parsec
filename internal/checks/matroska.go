@@ -155,7 +155,7 @@ func RunMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, ebmlErr err
 		}
 	}
 
-	attachmentFonts := getFontMapping(filePath, ebml.Attachments)
+	attachmentFonts := GetAttachmentFonts(filePath, ebml.Attachments)
 
 	return runTrackChecks(filePath, ebml, xmlChapters, attachmentFonts, meta)
 }
@@ -186,8 +186,8 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *m
 	agg := newTrackResultAggregator()
 	allUsedFonts := make(map[fontStyle]bool)
 
-	audioCounts, subCounts := getTrackCounts(tracks)
-	langHasOriginalFlag := getOriginalLanguageMap(tracks)
+	audioCounts, subCounts := GetTrackCounts(tracks)
+	langHasOriginalFlag := GetOriginalLanguageMap(tracks)
 	videoWidth, videoHeight := getVideoDimensions(tracks)
 
 	extractedTracks := batchExtractTracksIfNeeded(filePath, tracks)
@@ -215,7 +215,7 @@ func batchExtractTracksIfNeeded(filePath string, tracks []matroska.EbmlTrack) ma
 	var extractTrackIDs []int
 
 	for _, track := range tracks {
-		if isRelevantTrack(track) {
+		if IsRelevantTrack(track) {
 			if isASSSubtitles(track) || isSRTSubtitles(track) {
 				extractTrackIDs = append(extractTrackIDs, track.ID)
 			}
@@ -334,7 +334,7 @@ func runSingleIterationChecks(
 		agg.Add(checkVideoCropping(*track))
 	}
 
-	if !isRelevantTrack(*track) {
+	if !IsRelevantTrack(*track) {
 		return
 	}
 
@@ -346,7 +346,7 @@ func runSingleIterationChecks(
 	}
 }
 
-func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
+func GetAttachmentFonts(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return nil
@@ -371,7 +371,7 @@ func getFontMapping(filePath string, attachments []matroska.EbmlAttachment) []ma
 	idToAtt := make(map[int]matroska.EbmlAttachment)
 
 	for _, att := range attachments {
-		if isFontAttachment(att) {
+		if IsFontAttachment(att) {
 			fontIDs = append(fontIDs, att.ID)
 			idToAtt[att.ID] = att
 		}
@@ -580,7 +580,7 @@ func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts ma
 }
 
 func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack **matroska.EbmlTrack, lastAudioPriority, lastSubPriority *int64, reportedOrderTracks map[int]bool, agg *trackResultAggregator) {
-	priority := getTrackPriority(*track)
+	priority := GetTrackPriority(*track)
 	switch track.Type {
 	case "audio":
 		agg.Add(checkTrackOrder(track, *lastAudioTrack, priority, lastAudioPriority, "some Audio tracks are out of order", reportedOrderTracks))
@@ -591,11 +591,11 @@ func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack 
 	}
 }
 
-func getOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
+func GetOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
 	langHasOriginalFlag := make(map[string]bool)
 
 	for _, track := range tracks {
-		if isRelevantTrack(track) && track.Properties.OriginalLanguage {
+		if IsRelevantTrack(track) && track.Properties.OriginalLanguage {
 			langHasOriginalFlag[track.Properties.Language] = true
 		}
 	}
@@ -646,12 +646,12 @@ func ebmlGetFlagsSlice(track *matroska.EbmlTrack) []string {
 	return flags
 }
 
-func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
+func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	audio = make(map[string]int)
 	sub = make(map[string]int)
 
 	for _, track := range tracks {
-		if !isRelevantTrack(track) {
+		if !IsRelevantTrack(track) {
 			continue
 		}
 
@@ -666,7 +666,7 @@ func getTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	return audio, sub
 }
 
-func isRelevantTrack(track matroska.EbmlTrack) bool {
+func IsRelevantTrack(track matroska.EbmlTrack) bool {
 	return track.Type == "audio" || track.Type == "subtitles"
 }
 

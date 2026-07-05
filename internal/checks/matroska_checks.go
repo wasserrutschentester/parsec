@@ -339,7 +339,7 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 
 // extractCommentaryCoreRaw returns the core identifying part of a commentary
 // track name with original case preserved and without SDH stripping.
-func extractCommentaryCoreRaw(name string) string {
+func ExtractCommentaryCoreOriginalCase(name string) string {
 	if loc := commentaryByRegex.FindStringIndex(name); loc != nil {
 		name = name[loc[0]:]
 	} else if loc := isolatedScoreRegex.FindStringIndex(name); loc != nil {
@@ -353,8 +353,8 @@ func extractCommentaryCoreRaw(name string) string {
 	return strings.TrimSpace(name)
 }
 
-func extractCoreCommentaryName(name string) string {
-	name = extractCommentaryCoreRaw(name)
+func ExtractCommentaryCore(name string) string {
+	name = ExtractCommentaryCoreOriginalCase(name)
 	name = strings.ReplaceAll(name, "(SDH)", "")
 	name = strings.ReplaceAll(name, "[SDH]", "")
 	name = strings.ReplaceAll(name, "SDH", "")
@@ -375,7 +375,7 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 		track := &tracks[i]
 
 		if track.Type == "audio" && track.Properties.Commentary {
-			core := extractCoreCommentaryName(track.Properties.Name)
+			core := ExtractCommentaryCore(track.Properties.Name)
 			audioCommentaries = append(audioCommentaries, core)
 		}
 	}
@@ -384,7 +384,7 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 		track := &tracks[i]
 
 		if track.Type == "subtitles" && track.Properties.Commentary {
-			core := extractCoreCommentaryName(track.Properties.Name)
+			core := ExtractCommentaryCore(track.Properties.Name)
 
 			if !slices.Contains(audioCommentaries, core) {
 				res.Passed = false

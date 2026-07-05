@@ -22,45 +22,12 @@ var (
 	SimpleCodecs = simpleCodecs
 )
 
-// GetLanguageCodeFromName maps a language word to its BCP-47 base code.
-func GetLanguageCodeFromName(word string) string {
-	return getLanguageCodeFromName(word)
-}
 
-// DetermineShouldBeDefault decides the default-flag policy for a track.
-func DetermineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
-	return determineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
-}
-
-// GetTrackPriority computes a sort priority for audio/subtitle tracks.
-func GetTrackPriority(track matroska.EbmlTrack) int64 {
-	return getTrackPriority(track)
-}
-
-// GetTrackCounts counts audio and subtitle tracks per language.
-func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
-	return getTrackCounts(tracks)
-}
-
-// GetOriginalLanguageMap returns languages that already have an original flag.
-func GetOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
-	return getOriginalLanguageMap(tracks)
-}
-
-// IsRelevantTrack reports whether a track is audio or subtitles.
-func IsRelevantTrack(track matroska.EbmlTrack) bool {
-	return isRelevantTrack(track)
-}
-
-// IsFontAttachment detects font attachments by file extension or MIME type.
-func IsFontAttachment(att matroska.EbmlAttachment) bool {
-	return isFontAttachment(att)
-}
 
 // GetFontMapping extracts font attachments and returns normalized name and
 // attachment-ID lookups for fix policy code.
 func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
-	return FontMappingFromFonts(getFontMapping(filePath, attachments))
+	return FontMappingFromFonts(GetAttachmentFonts(filePath, attachments))
 }
 
 // FontMappingFromFonts derives the same normalized name and attachment-ID
@@ -225,37 +192,7 @@ func parseStyleConfigsFromTrack(track matroska.EbmlTrack) map[string]fontStyle {
 	return parseStyleConfigs(privateBytes)
 }
 
-// GetAttachmentFonts returns the parsed font info (family, weight, italic,
-// internal names) for each font attachment in the file. It is the same data
-// matroska_unused_fonts and matroska_subtitle_fonts match against, so fix
-// computations that need family/weight/italic fidelity (as opposed to
-// GetFontMapping's flattened name lookup) should use this instead.
-func GetAttachmentFonts(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
-	return getFontMapping(filePath, attachments)
-}
 
-// UnusedFontAttachments returns font attachments not referenced by any
-// subtitle track, matching by PostScript name or by family+italic+weight via
-// findUnusedFontAttachments, the same matching matroska_unused_fonts uses.
-func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[FontStyle]bool) []matroska.EbmlAttachment {
-	return findUnusedFontAttachments(attachments, attachmentFonts, allUsedFonts)
-}
-
-// FontFilenameCompliant reports whether a filename matches an internal font name.
-func FontFilenameCompliant(fileName string, internalNames []string) bool {
-	return isAttachmentNameCompliant(fileName, internalNames)
-}
-
-// ProposedFontFilename returns the compliant filename matroska_font_filename_compliance
-// proposes for a non-compliant font attachment: PostScript name, then the
-// first full name, then the family name (each cleaned via
-// cleanFallbackFontName), keeping attFileName's original extension. Returns
-// "" if attID has no usable internal name. correct's rename fix must use
-// this rather than deriving its own target, so the name it actually writes
-// can never drift from what the check displays as "Proposed Name".
-func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
-	return getProposedFontFilename(attFileName, attID, attachmentFonts)
-}
 
 // FontNameMatches reports whether name matches one of a font file's internal names.
 func FontNameMatches(name string, internalNames []string) bool {
@@ -269,22 +206,12 @@ func FontNameMatches(name string, internalNames []string) bool {
 	return false
 }
 
-// ExtractCommentaryCoreOriginalCase returns the core identifying part of a
-// commentary track name with original case preserved and SDH tokens intact.
-func ExtractCommentaryCoreOriginalCase(name string) string {
-	return extractCommentaryCoreRaw(name)
-}
 
-// ExtractCommentaryCore returns the normalised core of a commentary name:
-// SDH decorations removed, trimmed, and lowercased.
-func ExtractCommentaryCore(name string) string {
-	return extractCoreCommentaryName(name)
-}
 
 // GetVideoTrackNumberFromEBML returns the first video track's Matroska
 // number, or 0 when there is no video track.
 func GetVideoTrackNumberFromEBML(ebml *matroska.EbmlMetadata) uint64 {
-	track := getVideoTrackFromEBML(ebml)
+	track := GetVideoTrackFromEBML(ebml)
 	if track == nil {
 		return 0
 	}

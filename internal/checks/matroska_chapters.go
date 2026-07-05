@@ -363,7 +363,7 @@ func isAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
 	return false, closestDiff, prevKF, nextKF
 }
 
-func getVideoTrackFromEBML(ebml *matroska.EbmlMetadata) *matroska.EbmlTrack {
+func GetVideoTrackFromEBML(ebml *matroska.EbmlMetadata) *matroska.EbmlTrack {
 	for i, track := range ebml.Tracks {
 		if track.Type == "video" {
 			return &ebml.Tracks[i]
@@ -442,7 +442,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	videoTrack := getVideoTrackFromEBML(ebml)
+	videoTrack := GetVideoTrackFromEBML(ebml)
 	if videoTrack == nil {
 		return nil
 	}

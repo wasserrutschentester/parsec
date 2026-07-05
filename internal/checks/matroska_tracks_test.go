@@ -61,7 +61,7 @@ func TestGetTrackPriority(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := getTrackPriority(tt.track)
+			got := GetTrackPriority(tt.track)
 			if got < tt.wantMin || got > tt.wantMax {
 				t.Errorf("getTrackPriority() = %v, want range [%v, %v]", got, tt.wantMin, tt.wantMax)
 			}

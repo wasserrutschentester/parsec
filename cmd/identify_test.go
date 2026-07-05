@@ -21,7 +21,7 @@ func TestBatchIdentifyError(t *testing.T) {
 	}{
 		{name: "no files", errs: nil, wantErr: false},
 		{name: "all succeeded", errs: []error{nil, nil}, wantErr: false},
-		{name: "one failure among successes is not fatal", errs: []error{nil, errTestOther, nil}, wantErr: false},
+		{name: "one failure among successes is still a failure", errs: []error{nil, errTestOther, nil}, wantErr: true},
 		{name: "all failed", errs: []error{errTestOther, errSearch}, wantErr: true},
 	}
 

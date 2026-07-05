@@ -48,11 +48,6 @@ Flags can be used to override or provide missing information.`),
 	},
 }
 
-// runIdentifyBatch identifies each file independently. A failure on one file
-// (including the user answering an interactive disambiguation prompt badly)
-// is reported by identifyFile and skipped rather than aborting the rest of
-// the batch; only when every file in the batch fails does this return an
-// error, so the process still exits non-zero when nothing succeeded.
 func runIdentifyBatch(cmd *cobra.Command, filePaths []string) error {
 	var prevResult *mdb.SearchResult
 
@@ -72,16 +67,13 @@ func runIdentifyBatch(cmd *cobra.Command, filePaths []string) error {
 
 func batchIdentifyError(errs []error) error {
 	for _, err := range errs {
-		if err == nil {
-			return nil
+		if err != nil {
+			return err
 		}
 	}
 
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return errSearch
+	// if all errs were nil
+	return nil
 }
 
 func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, error) {

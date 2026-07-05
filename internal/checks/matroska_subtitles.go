@@ -664,7 +664,7 @@ func normalizeFontName(name string) string {
 	return strings.ToLower(fontSeparatorReplacer.Replace(name))
 }
 
-func isFontAttachment(att matroska.EbmlAttachment) bool {
+func IsFontAttachment(att matroska.EbmlAttachment) bool {
 	lowerName := strings.ToLower(att.FileName)
 	if strings.HasSuffix(lowerName, ".ttf") || strings.HasSuffix(lowerName, ".otf") || strings.HasSuffix(lowerName, ".ttc") {
 		return true
@@ -756,7 +756,7 @@ func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts [
 // "is this font attachment used": both the matroska_unused_fonts check and
 // internal/correct's removal/rename fix computations call this same
 // function, so they can never disagree about which attachments are unused.
-func findUnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) []matroska.EbmlAttachment {
+func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) []matroska.EbmlAttachment {
 	var unused []matroska.EbmlAttachment
 
 	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
@@ -781,7 +781,7 @@ func findUnusedFontAttachments(attachments []matroska.EbmlAttachment, attachment
 	}
 
 	for _, att := range attachments {
-		if isFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
+		if IsFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
 			unused = append(unused, att)
 		}
 	}
@@ -794,7 +794,7 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 		return nil
 	}
 
-	unused := findUnusedFontAttachments(attachments, attachmentFonts, allUsedFonts)
+	unused := UnusedFontAttachments(attachments, attachmentFonts, allUsedFonts)
 
 	if len(unused) > 0 {
 		warning := "Font attachments not used by any subtitle track"
@@ -847,7 +847,7 @@ func cleanFallbackFontName(fullName string, familyName string) string {
 	return strings.ReplaceAll(fullName, " ", "")
 }
 
-func getProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
+func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
 	var ext string
 
 	if idx := strings.LastIndex(attFileName, "."); idx != -1 {
@@ -873,7 +873,7 @@ func getProposedFontFilename(attFileName string, attID int, attachmentFonts []ma
 	return ""
 }
 
-func isAttachmentNameCompliant(attFileName string, names []string) bool {
+func FontFilenameCompliant(attFileName string, names []string) bool {
 	baseName := attFileName
 
 	if idx := strings.LastIndex(baseName, "."); idx != -1 {
@@ -901,7 +901,7 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 	var nonCompliant []fontComplianceRow
 
 	for _, att := range attachments {
-		if !isFontAttachment(att) {
+		if !IsFontAttachment(att) {
 			continue
 		}
 
@@ -910,8 +910,8 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 			continue
 		}
 
-		if !isAttachmentNameCompliant(att.FileName, names) {
-			proposed := getProposedFontFilename(att.FileName, att.ID, attachmentFonts)
+		if !FontFilenameCompliant(att.FileName, names) {
+			proposed := ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
 			if proposed == "" {
 				proposed = "-"
 			}
