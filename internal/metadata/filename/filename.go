@@ -252,8 +252,10 @@ func findEpisodeTitleStart(filename string, meta *metadata.Metadata) int {
 		}
 
 		tag := fmt.Sprintf("S%02dE%02d", meta.Season, ep)
-		if loc := strings.Index(strings.ToUpper(filename), tag); loc != -1 {
-			start = loc + len(tag)
+
+		re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(tag))
+		if loc := re.FindStringIndex(filename); loc != nil {
+			start = loc[1]
 			start = skipMultiEpisodeSpecification(filename, start, meta.Episodes)
 		}
 	}

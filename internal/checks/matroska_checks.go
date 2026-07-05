@@ -296,7 +296,11 @@ func verifyCommentaryTrackBitrate(track *matroska.EbmlTrack, miAudioTracks map[s
 	return nil
 }
 
-var commentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
+var (
+	commentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
+	commentaryByRegex     = regexp.MustCompile(`(?i)commentary by`)
+	isolatedScoreRegex    = regexp.MustCompile(`(?i)isolated score`)
+)
 
 func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
@@ -336,13 +340,11 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 // extractCommentaryCoreRaw returns the core identifying part of a commentary
 // track name with original case preserved and without SDH stripping.
 func extractCommentaryCoreRaw(name string) string {
-	lower := strings.ToLower(name)
-	switch {
-	case strings.Contains(lower, "commentary by"):
-		name = name[strings.Index(lower, "commentary by"):]
-	case strings.Contains(lower, "isolated score"):
-		name = name[strings.Index(lower, "isolated score"):]
-	default:
+	if loc := commentaryByRegex.FindStringIndex(name); loc != nil {
+		name = name[loc[0]:]
+	} else if loc := isolatedScoreRegex.FindStringIndex(name); loc != nil {
+		name = name[loc[0]:]
+	} else {
 		if _, after, ok := strings.Cut(name, "/"); ok {
 			name = after
 		}
