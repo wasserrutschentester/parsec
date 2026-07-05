@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -162,13 +163,82 @@ func processIdentificationResult(filePath string, result *mdb.SearchResult, meta
 }
 
 func maybeWriteTags(filePath string, tags []mdb.MatroskaTagSet) {
-	shouldWriteTags := writeTagsFlag
-	if !unattendedFlag && !dryRunFlag && filePath != "" && matroska.CheckForMatroska(filePath) == nil {
-		shouldWriteTags = shouldWriteTagsInteractively()
+	if filePath == "" || len(tags) == 0 {
+		return
 	}
 
-	if shouldWriteTags && filePath != "" && len(tags) > 0 {
+	if dryRunFlag {
+		printTagPreview(tags)
+
+		return
+	}
+
+	shouldWriteTags := writeTagsFlag || unattendedFlag
+
+	if !unattendedFlag && matroska.CheckForMatroska(filePath) == nil {
+		printTagPreview(tags)
+
+		shouldWriteTags = shouldWriteTagsInteractively()
+	} else if shouldWriteTags {
+		printTagPreview(tags)
+	}
+
+	if shouldWriteTags {
 		writeTags(filePath, tags)
+	}
+}
+
+var defaultTagOrder = map[string]int{
+	"TITLE":         1,
+	"PART_NUMBER":   2,
+	"TOTAL_PARTS":   3,
+	"DATE_RELEASED": 4,
+	"IMDB":          5,
+	"TMDB":          6,
+	"TVDB":          7,
+	"TVDB2":         8,
+	"COMMENT":       9,
+}
+
+func printTagPreview(tags []mdb.MatroskaTagSet) {
+	if config.GetTagPreview() && len(tags) > 0 {
+		fmt.Println(ui.Info.Render("\nTag Preview:"))
+
+		for _, tagSet := range tags {
+			if len(tagSet.Fields) == 0 {
+				continue
+			}
+
+			fmt.Println(ui.Muted.Render(fmt.Sprintf("  TargetTypeValue: %d", tagSet.TargetTypeValue)))
+
+			keys := make([]string, 0, len(tagSet.Fields))
+			for k := range tagSet.Fields {
+				keys = append(keys, k)
+			}
+
+			sort.Slice(keys, func(i, j int) bool {
+				rankI, okI := defaultTagOrder[keys[i]]
+				if !okI {
+					rankI = 1000
+				}
+
+				rankJ, okJ := defaultTagOrder[keys[j]]
+				if !okJ {
+					rankJ = 1000
+				}
+
+				if rankI == rankJ {
+					return keys[i] < keys[j]
+				}
+
+				return rankI < rankJ
+			})
+
+			for _, k := range keys {
+				v := tagSet.Fields[k]
+				fmt.Printf("    %s %s\n", ui.LabelStyle.Render(k+":"), ui.ValueStyle.Render(v))
+			}
+		}
 	}
 }
 
@@ -217,9 +287,11 @@ func init() {
 	identifyCmd.Flags().StringVarP(&sourceFlag, "source", "O", "", "source (e.g. BluRay, Web-DL)")
 	identifyCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
 	// Tag flags
+	identifyCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate identification and preview tags without writing to the file")
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
+	_ = identifyCmd.Flags().MarkDeprecated("write-tags", "use --unattended instead")
 	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
-	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
+	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode (implies writing tags)")
 	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
 	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")
 	// Group metadata flags

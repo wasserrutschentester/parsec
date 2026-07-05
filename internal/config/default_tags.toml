@@ -14,7 +14,7 @@ TVDB2 = "{{if and .Media.TvdbID .Media.TvdbType}}{{.Media.TvdbType}}/{{.Media.Tv
 target_value = 60 
 [tags.fields]
 PART_NUMBER = "{{if .Episode}}{{.Episode.Season}}{{end}}"
-TOTAL_PARTS = "{{if .Episode}}{{.Episode.TotalEpisodes}}{{end}}"
+TOTAL_PARTS = "{{if .Episode}}{{if .Episode.TotalEpisodes}}{{.Episode.TotalEpisodes}}{{end}}{{end}}"
 
 # --- Episode Level ---
 [[tags]]

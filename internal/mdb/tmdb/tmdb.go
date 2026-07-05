@@ -100,6 +100,7 @@ type tmdbEpisodeResponse struct {
 	SeasonNumber  int    `json:"season_number"`
 	EpisodeNumber int    `json:"episode_number"`
 	Overview      string `json:"overview"`
+	EpisodeType   string `json:"episode_type"`
 	ExternalIDs   struct {
 		ImdbID string `json:"imdb_id"`
 	} `json:"external_ids"`
@@ -367,6 +368,7 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 		Season:   season,
 		Episode:  episode,
 		ImdbID:   data.ExternalIDs.ImdbID,
+		IsFinale: data.EpisodeType == "finale" || data.EpisodeType == "series_finale",
 	}, nil
 }
 
@@ -394,6 +396,7 @@ func GetSeasonMetadata(seriesID, season int, lang string) ([]mdb.EpisodeResult, 
 			Overview: ep.Overview,
 			Season:   ep.SeasonNumber,
 			Episode:  ep.EpisodeNumber,
+			IsFinale: ep.EpisodeType == "finale" || ep.EpisodeType == "series_finale",
 		})
 	}
 

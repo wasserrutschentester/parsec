@@ -674,8 +674,20 @@ func GetSeasonEpisodes(result mdb.SearchResult, season int) ([]mdb.EpisodeResult
 setTotal:
 	total := len(results)
 
-	for i := range results {
-		results[i].TotalEpisodes = total
+	hasFinale := false
+
+	for _, res := range results {
+		if res.IsFinale {
+			hasFinale = true
+
+			break
+		}
+	}
+
+	if hasFinale {
+		for i := range results {
+			results[i].TotalEpisodes = total
+		}
 	}
 
 	return results, nil

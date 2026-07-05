@@ -59,9 +59,10 @@ Additional metadata that can be written to tags.
 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
-| `--write-tags` | | boolean| Write metadata tags to the file. |
-| `--comment` | | string| A comment exposed to tag templates (e.g. repack reason). |
-| `--unattended` | `-u` | boolean| Run in unattended mode (selects the first search result if it's a high-confidence match). |
+| `--write-tags` | boolean | **DEPRECATED**. Use `--unattended` instead. |
+| `--comment` | string | Comment exposed to tag templates (e.g. for use with `{{.Comment}}`). |
+| `--unattended` | `-u` | boolean| Run in unattended mode (selects the first search result, and implies writing tags). |
+| `--dry-run` | `-d` | boolean| Simulate the identification and display a tag preview without writing anything to the file. |
 | `--releases` | `-r` | boolean | Search for releases via Prowlarr for the identified entity. |
 | `--best-release`| `-b` | boolean | Only show the best release (same resolution and most seeders) when searching for releases. |
 
@@ -75,6 +76,11 @@ parsec identify "Loki.S01E01.mkv"
 **Identify multiple files in unattended mode:**
 ```bash
 parsec identify Series.S01E*.mkv -u
+```
+
+**Preview tags without writing to the file:**
+```bash
+parsec identify "Loki.S01E01.mkv" --dry-run
 ```
 
 **Search for releases for a specific movie:**
