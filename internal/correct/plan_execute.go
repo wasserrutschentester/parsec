@@ -36,7 +36,12 @@ func ExecutePlan(filePath string, plan *FixPlan) error {
 
 func executeContainerProperties(filePath string, plan *FixPlan) error {
 	if len(plan.ContainerProperties) > 0 {
-		if err := matroska.SetContainerProperties(filePath, plan.ContainerProperties); err != nil {
+		props := make(map[string]string)
+		for _, p := range plan.ContainerProperties {
+			props[p.Key] = p.NewValue
+		}
+
+		if err := matroska.SetContainerProperties(filePath, props); err != nil {
 			return fmt.Errorf("setting container properties: %w", err)
 		}
 	}
@@ -46,20 +51,39 @@ func executeContainerProperties(filePath string, plan *FixPlan) error {
 
 func executeAttachments(filePath string, plan *FixPlan) error {
 	if len(plan.AttachmentRenames) > 0 {
-		if err := matroska.RenameAttachments(filePath, plan.AttachmentRenames); err != nil {
+		renames := make(map[int]string)
+		for _, r := range plan.AttachmentRenames {
+			renames[r.ID] = r.NewName
+		}
+
+		if err := matroska.RenameAttachments(filePath, renames); err != nil {
 			return fmt.Errorf("renaming attachments: %w", err)
 		}
 	}
 
 	if len(plan.FontsToAdd) > 0 {
-		if err := matroska.AddAttachments(filePath, plan.FontsToAdd); err != nil {
-			return fmt.Errorf("adding attachments: %w", err)
+		var adds []matroska.AttachmentAdd
+		for _, f := range plan.FontsToAdd {
+			adds = append(adds, matroska.AttachmentAdd{
+				Path:     f.Path,
+				Name:     f.AttachmentName,
+				MIMEType: f.MIMEType,
+			})
+		}
+
+		if err := matroska.AddAttachments(filePath, adds); err != nil {
+			return fmt.Errorf("adding font attachments: %w", err)
 		}
 	}
 
 	if len(plan.FontsToRemove) > 0 {
-		if err := matroska.DeleteAttachments(filePath, plan.FontsToRemove); err != nil {
-			return fmt.Errorf("deleting attachments: %w", err)
+		var removes []int
+		for _, f := range plan.FontsToRemove {
+			removes = append(removes, f.ID)
+		}
+
+		if err := matroska.DeleteAttachments(filePath, removes); err != nil {
+			return fmt.Errorf("removing font attachments: %w", err)
 		}
 	}
 
@@ -116,10 +140,15 @@ func executeRemux(filePath string, plan *FixPlan) error {
 		return nil
 	}
 
+	var removeIDs []int
+	for _, r := range plan.RemuxRemoveTracks {
+		removeIDs = append(removeIDs, r.TrackID)
+	}
+
 	remuxOpts := matroska.RemuxOptions{
 		TrackOrder:          plan.RemuxTrackOrder,
 		StripCompressionIDs: plan.RemuxStripCompression,
-		RemoveTrackIDs:      plan.RemuxRemoveTracks,
+		RemoveTrackIDs:      removeIDs,
 	}
 
 	ui.Println(ui.Muted.Render("Remuxing... this may take a while for large files."))

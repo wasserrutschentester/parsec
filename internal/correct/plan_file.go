@@ -47,14 +47,12 @@ func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.FlagEdits, plan.NameEdits)
 
 	// 9. Remux Plan
-	remuxPlan := ComputeMatroskaRemux(simulatedTracks, "en") // assuming English for now or lookupOriginalLanguage
+	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
+	remuxPlan := ComputeMatroskaRemux(simulatedTracks, originalLang)
 	plan.RemuxRequired = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
 
 	plan.RemuxTrackOrder = remuxPlan.TrackOrder
-	for _, candidate := range remuxPlan.RemovalCandidates {
-		plan.RemuxRemoveTracks = append(plan.RemuxRemoveTracks, candidate.TrackID)
-	}
-
+	plan.RemuxRemoveTracks = append(plan.RemuxRemoveTracks, remuxPlan.RemovalCandidates...)
 	plan.RemuxStripCompression = remuxPlan.StripCompressionIDs
 
 	return plan, nil
@@ -109,22 +107,31 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 
 	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts, usedFonts)
 	for _, r := range renames {
-		plan.AttachmentRenames[r.ID] = r.NewName
+		plan.AttachmentRenames = append(plan.AttachmentRenames, AttachmentRename{
+			ID:      r.ID,
+			OldName: r.OldName,
+			NewName: r.NewName,
+		})
 	}
 
 	plan.ChapterKeyframeSnaps = ComputeChapterKeyframeSnaps(filePath, ebml)
 
 	missingPlan := ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, false)
 	for _, att := range missingPlan.Attachments {
-		plan.FontsToAdd = append(plan.FontsToAdd, matroska.AttachmentAdd{
-			Path:     att.Path,
-			Name:     att.AttachmentName,
-			MIMEType: att.MIMEType,
+		plan.FontsToAdd = append(plan.FontsToAdd, MissingFontAttachment{
+			Path:           att.Path,
+			AttachmentName: att.AttachmentName,
+			MIMEType:       att.MIMEType,
+			FontName:       att.FontName,
+			Source:         att.Source,
 		})
 	}
 
 	unused := ComputeUnusedFontAttachments(ebml, attachmentFonts, usedFonts)
 	for _, att := range unused {
-		plan.FontsToRemove = append(plan.FontsToRemove, att.ID)
+		plan.FontsToRemove = append(plan.FontsToRemove, AttachmentRemove{
+			ID:   att.ID,
+			Name: att.FileName,
+		})
 	}
 }

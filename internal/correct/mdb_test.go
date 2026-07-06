@@ -30,19 +30,3 @@ func TestNeedsOriginalLanguageForUnwantedAudio(t *testing.T) {
 		t.Fatal("expected MDB lookup for non-preferred audio language")
 	}
 }
-
-func TestRemovalLanguages(t *testing.T) {
-	t.Parallel()
-
-	candidates := []RemovalCandidate{
-		{Track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Language: "spa"}}},
-		{Track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Language: "fre"}}},
-		{Track: matroska.EbmlTrack{Properties: matroska.EbmlTrackProperties{Language: "spa"}}},
-		{Track: matroska.EbmlTrack{}},
-	}
-
-	want := []string{"fre", "spa", "und"}
-	if got := removalLanguages(candidates); !slices.Equal(got, want) {
-		t.Fatalf("removalLanguages() = %v, want %v", got, want)
-	}
-}

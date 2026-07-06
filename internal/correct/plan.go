@@ -6,15 +6,15 @@ import (
 
 // FixPlan represents a complete set of proposed modifications to a Matroska file.
 type FixPlan struct {
-	// 1. Container-level Properties (mkvpropedit)
-	ContainerProperties map[string]string // e.g. "title": "", "writing-application": ""
+	// 1. Container Properties (mkvpropedit)
+	ContainerProperties []ContainerPropertyEdit // e.g. Title
 	ClearCreationTime   bool
 	WriteStatistics     bool
 
-	// 2. Attachment Edits (mkvpropedit)
-	AttachmentRenames map[int]string           // Attachment ID -> New compliant filename
-	FontsToAdd        []matroska.AttachmentAdd // Missing font files to attach
-	FontsToRemove     []int                    // IDs of unused font attachments to strip
+	// 2. Font Attachments (mkvpropedit)
+	AttachmentRenames []AttachmentRename      // Rename non-compliant fonts
+	FontsToAdd        []MissingFontAttachment // Missing fonts to attach
+	FontsToRemove     []AttachmentRemove      // Unused fonts to removents to strip
 
 	// 3. Chapter Edits (mkvpropedit)
 	ChapterKeyframeSnaps ChapterAlignmentFix // Contains full list of new times
@@ -26,24 +26,24 @@ type FixPlan struct {
 
 	// 5. Destructive Remux Operations (mkvmerge)
 	RemuxRequired         bool
-	RemuxTrackOrder       []int // Track IDs in their new desired order
-	RemuxRemoveTracks     []int // Track IDs to delete (e.g., empty tracks, unwanted audio)
-	RemuxStripCompression []int // Track IDs that need zlib compression stripped
+	RemuxTrackOrder       []int              // Track IDs in their new desired order
+	RemuxRemoveTracks     []RemovalCandidate // Track IDs to delete (e.g., empty tracks, unwanted audio)
+	RemuxStripCompression []int              // Track IDs that need zlib compression stripped
 }
 
 // NewFixPlan creates an empty FixPlan.
 func NewFixPlan() *FixPlan {
 	return &FixPlan{
-		ContainerProperties:   make(map[string]string),
-		AttachmentRenames:     make(map[int]string),
-		FontsToAdd:            make([]matroska.AttachmentAdd, 0),
-		FontsToRemove:         make([]int, 0),
+		ContainerProperties:   make([]ContainerPropertyEdit, 0),
+		AttachmentRenames:     make([]AttachmentRename, 0),
+		FontsToAdd:            make([]MissingFontAttachment, 0),
+		FontsToRemove:         make([]AttachmentRemove, 0),
 		ChapterKeyframeSnaps:  ChapterAlignmentFix{},
 		FlagEdits:             make([]matroska.TrackEdit, 0),
 		NameEdits:             make([]matroska.TrackEdit, 0),
 		LanguageEdits:         make([]matroska.TrackEdit, 0),
 		RemuxTrackOrder:       make([]int, 0),
-		RemuxRemoveTracks:     make([]int, 0),
+		RemuxRemoveTracks:     make([]RemovalCandidate, 0),
 		RemuxStripCompression: make([]int, 0),
 	}
 }
@@ -65,4 +65,24 @@ func (p *FixPlan) hasContainerEdits() bool {
 
 func (p *FixPlan) hasTrackEdits() bool {
 	return len(p.FlagEdits) > 0 || len(p.NameEdits) > 0 || len(p.LanguageEdits) > 0
+}
+
+// ContainerPropertyEdit represents a change to a single container-level property.
+type ContainerPropertyEdit struct {
+	Key      string
+	OldValue string
+	NewValue string
+}
+
+// AttachmentRename represents a rename of a font attachment.
+type AttachmentRename struct {
+	ID      int
+	OldName string
+	NewName string
+}
+
+// AttachmentRemove represents the removal of an unused font attachment.
+type AttachmentRemove struct {
+	ID   int
+	Name string
 }

@@ -146,19 +146,3 @@ func TestTrackOrderTable(t *testing.T) {
 		}
 	}
 }
-
-func TestContainerKeyLabel(t *testing.T) {
-	t.Parallel()
-
-	tests := map[string]string{
-		"title":                 "Title",
-		"writing-application":   "Writing Application",
-		"some-unknown-property": "some-unknown-property",
-	}
-
-	for key, want := range tests {
-		if got := containerKeyLabel(key); got != want {
-			t.Errorf("containerKeyLabel(%q) = %q, want %q", key, got, want)
-		}
-	}
-}

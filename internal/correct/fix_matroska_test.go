@@ -302,9 +302,15 @@ func TestComputeContainerFixes(t *testing.T) {
 				t.Fatalf("ComputeContainerFixes() = %+v, want %+v", got, tt.props)
 			}
 
+			// Map got items
+			gotMap := make(map[string]string)
+			for _, edit := range got {
+				gotMap[edit.Key] = edit.NewValue
+			}
+
 			for k, v := range tt.props {
-				if got[k] != v {
-					t.Errorf("ComputeContainerFixes()[%q] = %q, want %q", k, got[k], v)
+				if gotMap[k] != v {
+					t.Errorf("ComputeContainerFixes()[%q] = %q, want %q", k, gotMap[k], v)
 				}
 			}
 		})

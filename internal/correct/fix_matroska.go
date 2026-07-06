@@ -52,19 +52,27 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 // a guessed replacement, mirroring the conservative junk-removal approach
 // used for track names. Checks that are disabled in the configuration are
 // skipped.
-func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) map[string]string {
-	props := make(map[string]string)
+func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) []ContainerPropertyEdit {
+	var props []ContainerPropertyEdit
 
 	if config.IsCheckEnabled(config.CheckMatroskaTitleHygiene) && checks.TitleHygieneNeedsFix(ebml.Container.Properties.Title, meta) {
-		props["title"] = ""
+		newTitle := ""
+		if meta != nil && meta.Title != "" {
+			newTitle = meta.Title
+		}
+
+		props = append(props, ContainerPropertyEdit{Key: "title", OldValue: ebml.Container.Properties.Title, NewValue: newTitle})
 	}
 
 	if config.IsCheckEnabled(config.CheckMatroskaAppHygiene) && checks.AppHygieneNeedsFix(ebml.Container.Properties.WritingApplication) {
-		props["writing-application"] = ""
+		props = append(props, ContainerPropertyEdit{Key: "writing-application", OldValue: ebml.Container.Properties.WritingApplication, NewValue: ""})
 	}
 
 	if config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) && checks.ContainerCreationTimeNeedsFix(ebml) {
-		props["date"] = ""
+		// Creation time is usually handled separately, but we leave it here if it was here.
+		// Wait, the old code had `props["date"] = ""` here!
+		// Let's preserve that.
+		props = append(props, ContainerPropertyEdit{Key: "date", OldValue: "set", NewValue: ""})
 	}
 
 	return props

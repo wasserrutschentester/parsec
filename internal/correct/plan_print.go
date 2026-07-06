@@ -31,17 +31,13 @@ func ReviewPlan(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) bool {
 
 func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	if len(plan.ContainerProperties) > 0 {
-		ui.Println(ui.Muted.Render("Container Properties:"))
+		ui.Println(ui.Muted.Render("Container Metadata:"))
 
-		for k, v := range plan.ContainerProperties {
-			if v == "" {
-				ui.Println("  - " + k + ": [delete]")
-			} else {
-				ui.Println(fmt.Sprintf("  - %s: %s", k, quoteOrNone(v)))
-			}
+		for _, p := range plan.ContainerProperties {
+			ui.Println("  " + formatContainerChange(p.Key, p.OldValue, p.NewValue))
 		}
 
-		if !confirmApplyWithPolicy(opts, "Apply container property fixes?", "Skipping container properties...", false) {
+		if !confirmApply(opts, "Apply these container fixes?", "Skipping container fixes...") {
 			plan.ContainerProperties = nil
 		}
 	}
@@ -49,14 +45,38 @@ func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	if len(plan.AttachmentRenames) > 0 {
 		ui.Println(ui.Muted.Render("Font Attachment Renames:"))
 
-		for _, v := range plan.AttachmentRenames {
-			ui.Println("  - rename to " + quoteOrNone(v))
+		for _, r := range plan.AttachmentRenames {
+			ui.Println(fmt.Sprintf("  - rename %d from %s to %s", r.ID, quoteOrNone(r.OldName), quoteOrNone(r.NewName)))
 		}
 
 		if !confirmApply(opts, "Rename these font attachments?", "Skipping font renames...") {
 			plan.AttachmentRenames = nil
 		}
 	}
+}
+
+func formatContainerChange(key, oldValue, newValue string) string {
+	arrow := ui.Muted.Render("->")
+	label := key
+
+	switch key {
+	case "title":
+		label = "Title"
+	case "writing-application":
+		label = "WritingApp"
+	case "muxing-application":
+		label = "MuxingApp"
+	case "date":
+		label = "CreationTime"
+
+		return fmt.Sprintf("  %s: %s %s %s", label, ui.Warning.Render("[present]"), arrow, ui.Muted.Render("[cleared]"))
+	}
+
+	if newValue == "" {
+		return fmt.Sprintf("  %s: %s %s %s", label, quoteOrNone(oldValue), arrow, ui.Muted.Render("[cleared]"))
+	}
+
+	return fmt.Sprintf("  %s: %s %s %s", label, quoteOrNone(oldValue), arrow, quoteOrNone(newValue))
 }
 
 func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
@@ -73,7 +93,8 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 		ui.Println(ui.Muted.Render("Missing Fonts to Attach:"))
 
 		for _, f := range plan.FontsToAdd {
-			ui.Println("  + " + f.Name)
+			ui.Println(fmt.Sprintf("  + %s -> %s", quoteOrNone(f.FontName), quoteOrNone(f.AttachmentName)))
+			ui.Println("      source: " + f.Source)
 		}
 
 		if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
@@ -84,7 +105,11 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	if len(plan.FontsToRemove) > 0 {
 		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused Fonts to Remove: %d attachments", len(plan.FontsToRemove))))
 
-		if !confirmApplyWithPolicy(opts, "  Delete these unused font attachments?", "Skipping unused font removal...", false) {
+		for _, f := range plan.FontsToRemove {
+			ui.Println("  - " + f.Name)
+		}
+
+		if !confirmApplyWithPolicy(opts, "Delete these unused font attachments?", "Skipping unused font removal...", false) {
 			plan.FontsToRemove = nil
 		}
 	}
@@ -173,7 +198,7 @@ func reviewRemux(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 
 	reviewRemuxTrackOrder(plan, ebml, opts)
 	reviewRemuxStripCompression(plan, opts)
-	reviewRemuxRemoveTracks(plan, opts)
+	reviewRemuxRemoveTracks(plan, ebml, opts)
 
 	// Re-evaluate if remux is still required after user choices
 	plan.RemuxRequired = len(plan.RemuxTrackOrder) > 0 || len(plan.RemuxStripCompression) > 0 || len(plan.RemuxRemoveTracks) > 0
@@ -203,9 +228,22 @@ func reviewRemuxStripCompression(plan *FixPlan, opts Options) {
 	}
 }
 
-func reviewRemuxRemoveTracks(plan *FixPlan, opts Options) {
+func reviewRemuxRemoveTracks(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 	if len(plan.RemuxRemoveTracks) > 0 {
-		ui.Println(fmt.Sprintf("  - Remove %d tracks", len(plan.RemuxRemoveTracks)))
+		ui.Println(fmt.Sprintf("  - Remove %d tracks:", len(plan.RemuxRemoveTracks)))
+
+		for _, r := range plan.RemuxRemoveTracks {
+			// Try to find the track to get more info for the UI
+			if ebml != nil {
+				if t := findTrackByID(ebml, r.TrackID); t != nil {
+					ui.Println(fmt.Sprintf("      %d: %s (%s)", t.Properties.Number, trackLabel(t), r.Reason))
+
+					continue
+				}
+			}
+
+			ui.Println(fmt.Sprintf("      UID %d (%s)", r.TrackID, r.Reason))
+		}
 
 		if !confirmApplyWithPolicy(opts, "Remove these tracks?", "Skipping track removal...", false) {
 			plan.RemuxRemoveTracks = nil

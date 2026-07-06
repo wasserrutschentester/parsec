@@ -503,43 +503,6 @@ func cachedFontPath(fontURL, fileName string) string {
 
 // attachMissingFonts locates missing ASS/SSA subtitle fonts and embeds the
 // matching font files as Matroska attachments.
-func attachMissingFonts(filePath string, ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, opts Options) error {
-	plan := ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, false)
-	if len(plan.Attachments) == 0 && len(plan.Unresolved) == 0 {
-		return nil
-	}
-
-	printMissingFontPlan(plan, opts.DryRun, len(plan.Unresolved) > 0)
-
-	if len(plan.Attachments) == 0 {
-		if opts.DryRun {
-			return nil
-		}
-	}
-
-	if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
-		return nil
-	}
-
-	if len(plan.Unresolved) > 0 {
-		plan = ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, true)
-		printMissingFontPlan(plan, false, false)
-	}
-
-	if len(plan.Attachments) == 0 {
-		return nil
-	}
-
-	if err := matroska.AddAttachments(filePath, fontAttachmentAdds(plan)); err != nil {
-		ui.PrintError(fmt.Sprintf("Error attaching fonts for %s: %v", ui.AnonymizePath(filePath), err))
-
-		return errTrackFix
-	}
-
-	ui.PrintSuccess("Missing subtitle fonts attached.")
-
-	return nil
-}
 
 func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun, downloadsDeferred bool) {
 	ui.Println(ui.ReportSection("Missing Subtitle Fonts"))
@@ -567,19 +530,6 @@ func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun, downloadsDefer
 	} else if downloadsDeferred && len(plan.Unresolved) > 0 {
 		ui.Println(ui.Muted.Render("Remote font downloads are deferred until after confirmation."))
 	}
-}
-
-func fontAttachmentAdds(plan MissingFontAttachmentPlan) []matroska.AttachmentAdd {
-	attachments := make([]matroska.AttachmentAdd, 0, len(plan.Attachments))
-	for _, att := range plan.Attachments {
-		attachments = append(attachments, matroska.AttachmentAdd{
-			Path:     att.Path,
-			Name:     att.AttachmentName,
-			MIMEType: att.MIMEType,
-		})
-	}
-
-	return attachments
 }
 
 func uniqueStrings(in []string) []string {
