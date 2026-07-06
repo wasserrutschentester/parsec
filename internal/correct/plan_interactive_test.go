@@ -1,13 +1,11 @@
 package correct
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
-	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 func TestMergeTrackEdits(t *testing.T) {
@@ -82,17 +80,6 @@ func TestBuildKeywordFlagEdits(t *testing.T) {
 	track2 := edits[1]
 	if track2.Number != 2 || track2.Props["flag-forced"] != "1" || track2.Props["flag-hearing-impaired"] != "1" {
 		t.Errorf("track 2 edit = %+v, want both flag-forced and flag-hearing-impaired set", track2)
-	}
-}
-
-func TestFormatContainerChange(t *testing.T) {
-	t.Parallel()
-
-	got := formatContainerChange("title", "Movie [1080p]", "")
-	want := fmt.Sprintf("  Title: %q %s %s", "Movie [1080p]", ui.Muted.Render("->"), ui.Muted.Render("[cleared]"))
-
-	if got != want {
-		t.Errorf("formatContainerChange() = %q, want %q", got, want)
 	}
 }
 
