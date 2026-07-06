@@ -38,6 +38,9 @@ var (
 	errFontTooLarge = errors.New("font exceeds maximum download size")
 	errHTTPStatus   = errors.New("unexpected HTTP status")
 	googleFontDirRe = regexp.MustCompile(`[^a-z0-9]+`)
+
+	checkFontFileMatches = fontFileMatches
+	checkGetFontNames    = matroska.GetFontNames
 )
 
 // MissingFontAttachmentPlan describes the missing subtitle fonts that can be
@@ -194,7 +197,7 @@ func (r defaultFontResolver) Resolve(fontName string, allowDownload bool) (Resol
 
 func resolveSystemFont(fontName string) (ResolvedFont, bool) {
 	for _, path := range fontConfigMatches(fontName) {
-		if names, ok := fontFileMatches(path, fontName); ok {
+		if names, ok := checkFontFileMatches(path, fontName); ok {
 			return ResolvedFont{Path: path, Source: fontSourceSystem, InternalNames: names}, true
 		}
 	}
@@ -241,7 +244,7 @@ func fontFileMatches(path, fontName string) ([]string, bool) {
 		return nil, false
 	}
 
-	names, err := matroska.GetFontNames(data)
+	names, err := checkGetFontNames(data)
 	if err != nil {
 		ui.PrintDebug(fmt.Sprintf("failed to parse font %s: %v", ui.AnonymizePath(path), err))
 
@@ -416,7 +419,7 @@ func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, s
 	path := cachedFontPath(fontURL, fileName)
 
 	if _, err := os.Stat(path); err == nil {
-		if names, ok := fontFileMatches(path, fontName); ok {
+		if names, ok := checkFontFileMatches(path, fontName); ok {
 			return ResolvedFont{Path: path, Source: source, InternalNames: names}, true
 		}
 	}
@@ -428,7 +431,7 @@ func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, s
 		return ResolvedFont{}, false
 	}
 
-	names, err := matroska.GetFontNames(data)
+	names, err := checkGetFontNames(data)
 	if err != nil || !FontNameMatches(fontName, names) {
 		return ResolvedFont{}, false
 	}

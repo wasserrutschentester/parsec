@@ -8,6 +8,19 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var (
+	execSetContainerProperties = matroska.SetContainerProperties
+	execRenameAttachments      = matroska.RenameAttachments
+	execAddAttachments         = matroska.AddAttachments
+	execDeleteAttachments      = matroska.DeleteAttachments
+	execRewriteChapterTimes    = matroska.RewriteChapterTimestamps
+	execAddTrackStatistics     = matroska.AddTrackStatisticsTags
+	execExtractTagsXML         = matroska.ExtractTagsXML
+	execSetTagsXML             = matroska.SetTagsXML
+	execSetTrackProperties     = matroska.SetTrackProperties
+	execRemuxTracks            = matroska.RemuxTracks
+)
+
 // ExecutePlan applies the non-destructive and destructive edits contained within
 // a FixPlan to a Matroska file.
 func ExecutePlan(filePath string, plan *FixPlan) error {
@@ -41,7 +54,7 @@ func executeContainerProperties(filePath string, plan *FixPlan) error {
 			props[p.Key] = p.NewValue
 		}
 
-		if err := matroska.SetContainerProperties(filePath, props); err != nil {
+		if err := execSetContainerProperties(filePath, props); err != nil {
 			return fmt.Errorf("setting container properties: %w", err)
 		}
 	}
@@ -56,7 +69,7 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 			renames[r.ID] = r.NewName
 		}
 
-		if err := matroska.RenameAttachments(filePath, renames); err != nil {
+		if err := execRenameAttachments(filePath, renames); err != nil {
 			return fmt.Errorf("renaming attachments: %w", err)
 		}
 	}
@@ -71,7 +84,7 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 			})
 		}
 
-		if err := matroska.AddAttachments(filePath, adds); err != nil {
+		if err := execAddAttachments(filePath, adds); err != nil {
 			return fmt.Errorf("adding font attachments: %w", err)
 		}
 	}
@@ -82,7 +95,7 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 			removes = append(removes, f.ID)
 		}
 
-		if err := matroska.DeleteAttachments(filePath, removes); err != nil {
+		if err := execDeleteAttachments(filePath, removes); err != nil {
 			return fmt.Errorf("removing font attachments: %w", err)
 		}
 	}
@@ -92,7 +105,7 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 
 func executeChapters(filePath string, plan *FixPlan) error {
 	if plan.ChapterKeyframeSnaps.Changed > 0 && len(plan.ChapterKeyframeSnaps.Times) > 0 {
-		if err := matroska.RewriteChapterTimestamps(filePath, plan.ChapterKeyframeSnaps.Times); err != nil {
+		if err := execRewriteChapterTimes(filePath, plan.ChapterKeyframeSnaps.Times); err != nil {
 			return fmt.Errorf("rewriting chapter timestamps: %w", err)
 		}
 	}
@@ -102,20 +115,20 @@ func executeChapters(filePath string, plan *FixPlan) error {
 
 func executeTracksAndTags(filePath string, plan *FixPlan) error {
 	if plan.WriteStatistics {
-		if err := matroska.AddTrackStatisticsTags(filePath); err != nil {
+		if err := execAddTrackStatistics(filePath); err != nil {
 			return fmt.Errorf("adding track statistics tags: %w", err)
 		}
 	}
 
 	if plan.ClearCreationTime {
-		tagsXML, err := matroska.ExtractTagsXML(filePath)
+		tagsXML, err := execExtractTagsXML(filePath)
 		if err != nil {
 			return fmt.Errorf("extracting tags xml: %w", err)
 		}
 
 		stripped, removed := checks.StripCreationTimeTags(tagsXML)
 		if len(removed) > 0 {
-			if err := matroska.SetTagsXML(filePath, stripped); err != nil {
+			if err := execSetTagsXML(filePath, stripped); err != nil {
 				return fmt.Errorf("setting tags xml: %w", err)
 			}
 		}
@@ -127,7 +140,7 @@ func executeTracksAndTags(filePath string, plan *FixPlan) error {
 	allTrackEdits = append(allTrackEdits, plan.LanguageEdits...)
 
 	if len(allTrackEdits) > 0 {
-		if err := matroska.SetTrackProperties(filePath, allTrackEdits); err != nil {
+		if err := execSetTrackProperties(filePath, allTrackEdits); err != nil {
 			return fmt.Errorf("setting track properties: %w", err)
 		}
 	}
@@ -153,7 +166,7 @@ func executeRemux(filePath string, plan *FixPlan) error {
 
 	ui.Println(ui.Muted.Render("Remuxing... this may take a while for large files."))
 
-	if err := matroska.RemuxTracks(filePath, remuxOpts); err != nil {
+	if err := execRemuxTracks(filePath, remuxOpts); err != nil {
 		return fmt.Errorf("remuxing tracks: %w", err)
 	}
 
