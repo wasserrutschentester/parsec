@@ -346,6 +346,7 @@ func runSingleIterationChecks(
 	}
 }
 
+// GetAttachmentFonts extracts font attachments and returns normalized name info.
 func GetAttachmentFonts(filePath string, attachments []matroska.EbmlAttachment) []matroska.AttachmentFontInfo {
 	info, err := os.Stat(filePath)
 	if err != nil {
@@ -591,6 +592,7 @@ func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack 
 	}
 }
 
+// GetOriginalLanguageMap returns a map of languages that have an original flag set.
 func GetOriginalLanguageMap(tracks []matroska.EbmlTrack) map[string]bool {
 	langHasOriginalFlag := make(map[string]bool)
 
@@ -646,6 +648,7 @@ func ebmlGetFlagsSlice(track *matroska.EbmlTrack) []string {
 	return flags
 }
 
+// GetTrackCounts counts the audio and subtitle tracks per language.
 func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	audio = make(map[string]int)
 	sub = make(map[string]int)
@@ -666,6 +669,7 @@ func GetTrackCounts(tracks []matroska.EbmlTrack) (audio, sub map[string]int) {
 	return audio, sub
 }
 
+// IsRelevantTrack reports whether a track is an audio or subtitle track.
 func IsRelevantTrack(track matroska.EbmlTrack) bool {
 	return track.Type == "audio" || track.Type == "subtitles"
 }

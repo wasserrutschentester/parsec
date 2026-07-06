@@ -22,8 +22,6 @@ var (
 	SimpleCodecs = simpleCodecs
 )
 
-
-
 // GetFontMapping extracts font attachments and returns normalized name and
 // attachment-ID lookups for fix policy code.
 func GetFontMapping(filePath string, attachments []matroska.EbmlAttachment) (map[string]string, map[int][]string) {
@@ -192,8 +190,6 @@ func parseStyleConfigsFromTrack(track matroska.EbmlTrack) map[string]fontStyle {
 	return parseStyleConfigs(privateBytes)
 }
 
-
-
 // FontNameMatches reports whether name matches one of a font file's internal names.
 func FontNameMatches(name string, internalNames []string) bool {
 	normalizedName := normalizeFontName(name)
@@ -205,8 +201,6 @@ func FontNameMatches(name string, internalNames []string) bool {
 
 	return false
 }
-
-
 
 // GetVideoTrackNumberFromEBML returns the first video track's Matroska
 // number, or 0 when there is no video track.

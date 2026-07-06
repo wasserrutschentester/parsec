@@ -337,7 +337,7 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-// extractCommentaryCoreRaw returns the core identifying part of a commentary
+// ExtractCommentaryCoreOriginalCase returns the core identifying part of a commentary
 // track name with original case preserved and without SDH stripping.
 func ExtractCommentaryCoreOriginalCase(name string) string {
 	if loc := commentaryByRegex.FindStringIndex(name); loc != nil {
@@ -353,6 +353,7 @@ func ExtractCommentaryCoreOriginalCase(name string) string {
 	return strings.TrimSpace(name)
 }
 
+// ExtractCommentaryCore returns the core identifying part of a commentary track name.
 func ExtractCommentaryCore(name string) string {
 	name = ExtractCommentaryCoreOriginalCase(name)
 	name = strings.ReplaceAll(name, "(SDH)", "")

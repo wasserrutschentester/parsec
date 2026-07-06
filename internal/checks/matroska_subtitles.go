@@ -664,6 +664,7 @@ func normalizeFontName(name string) string {
 	return strings.ToLower(fontSeparatorReplacer.Replace(name))
 }
 
+// IsFontAttachment detects font attachments by file extension or MIME type.
 func IsFontAttachment(att matroska.EbmlAttachment) bool {
 	lowerName := strings.ToLower(att.FileName)
 	if strings.HasSuffix(lowerName, ".ttf") || strings.HasSuffix(lowerName, ".otf") || strings.HasSuffix(lowerName, ".ttc") {
@@ -750,7 +751,7 @@ func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts [
 	return rows
 }
 
-// findUnusedFontAttachments returns the font attachments not referenced by
+// UnusedFontAttachments returns the font attachments not referenced by
 // any subtitle track, matching by PostScript name or by family+italic+weight
 // (variable fonts match any weight). This is the single source of truth for
 // "is this font attachment used": both the matroska_unused_fonts check and
@@ -847,6 +848,7 @@ func cleanFallbackFontName(fullName string, familyName string) string {
 	return strings.ReplaceAll(fullName, " ", "")
 }
 
+// ProposedFontFilename returns the compliant filename for a font attachment.
 func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
 	var ext string
 
@@ -873,6 +875,7 @@ func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matro
 	return ""
 }
 
+// FontFilenameCompliant reports whether an attachment filename matches an internal font name.
 func FontFilenameCompliant(attFileName string, names []string) bool {
 	baseName := attFileName
 

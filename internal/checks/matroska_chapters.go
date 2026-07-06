@@ -363,6 +363,7 @@ func isAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
 	return false, closestDiff, prevKF, nextKF
 }
 
+// GetVideoTrackFromEBML returns the first video track from the EBML metadata.
 func GetVideoTrackFromEBML(ebml *matroska.EbmlMetadata) *matroska.EbmlTrack {
 	for i, track := range ebml.Tracks {
 		if track.Type == "video" {

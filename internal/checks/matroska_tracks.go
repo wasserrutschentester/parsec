@@ -191,6 +191,7 @@ func isLanguageName(word string) bool {
 	return GetLanguageCodeFromName(word) != ""
 }
 
+// GetLanguageCodeFromName maps a language word to its BCP-47 base code.
 func GetLanguageCodeFromName(word string) string {
 	if len(word) <= 3 {
 		return ""
@@ -275,6 +276,7 @@ func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
+// DetermineShouldBeDefault decides the default-flag policy for a track.
 func DetermineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
 	switch track.Type {
 	case "audio":
@@ -423,6 +425,7 @@ func getCommentarySubPriority(name string) int64 {
 	}
 }
 
+// GetTrackPriority computes a sort priority for audio/subtitle tracks.
 func GetTrackPriority(track matroska.EbmlTrack) int64 {
 	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
 	propertyScore := calculatePropertyScore(track) & maskProperty
