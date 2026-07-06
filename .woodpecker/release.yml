@@ -25,6 +25,7 @@ steps:
             - |
               if [ -n "$CI_COMMIT_TAG" ] && [ "$CI_COMMIT_TAG" != "nightly" ]; then
                 echo "$CI_COMMIT_TAG" > .version
+                git tag -d nightly 2>/dev/null || true
               else
                 sh ./scripts/version.sh > .version
               fi
