@@ -48,7 +48,7 @@ func TestNeedsMultiLangName(t *testing.T) {
 	}
 }
 
-//nolint:funlen,paralleltest // comprehensive table of name-cleaning cases; depends on shared global config state
+//nolint:funlen,paralleltest // comprehensive test
 func TestFixedTrackName(t *testing.T) {
 	config.InitDefaults()
 
@@ -238,11 +238,7 @@ func TestComputeMatroskaFlagAndNameFixesAreIndependent(t *testing.T) {
 	}
 }
 
-//nolint:funlen,paralleltest // table-driven policy coverage; depends on shared global config state
-
 // Map got items
-
-//nolint:paralleltest // depends on shared global config state
 
 // NewName matches checks.ProposedFontFilename exactly (family-only
 // fallback strips spaces via cleanFallbackFontName), not the raw
@@ -271,34 +267,19 @@ func TestComputeMatroskaFlagAndNameFixesAreIndependent(t *testing.T) {
 
 // Only the Regular (400) weight is actually used by any subtitle.
 
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
-
 // aligned
 // misaligned, nearest is 20s
-
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
 
 // preferred language is "de"
 
 // German (preferred) audio should sort ahead of English.
 
-//nolint:paralleltest // depends on shared global config state
-
 // Same-language audio bloat (several tracks of one language, e.g. a lossless
 // track plus a lossy variant) is intentionally NOT auto-removed for now; only
 // unwanted-language audio is pruned. See the limitation noted in docs/fix.md.
 //
-//nolint:paralleltest // depends on shared global config state
 
 // preferred language is "de"
-
-//nolint:paralleltest // depends on shared global config state
 
 // preferred language is "de"
 
@@ -318,13 +299,8 @@ func TestComputeMatroskaFlagAndNameFixesAreIndependent(t *testing.T) {
 // test for a prior exact-tag comparison that disagreed with the check and
 // proposed the preferred-language track itself for removal.
 //
-//nolint:paralleltest // depends on shared global config state
 
 // preferred language is "de"
-
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
 
 //nolint:paralleltest // depends on shared global config state
 func TestReverseKeywordFlagFixes(t *testing.T) {

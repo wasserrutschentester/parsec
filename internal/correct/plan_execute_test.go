@@ -7,16 +7,19 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
+//nolint:gocognit,paralleltest,cyclop,funlen // mutates package variables
 func TestExecutePlan(t *testing.T) {
 	// Table driven tests for each execution step
-
 	t.Run("executeContainerProperties", func(t *testing.T) {
-		var capturedPath string
-		var capturedProps map[string]string
+		var (
+			capturedPath  string
+			capturedProps map[string]string
+		)
 
 		execSetContainerProperties = func(filePath string, props map[string]string) error {
 			capturedPath = filePath
 			capturedProps = props
+
 			return nil
 		}
 
@@ -42,27 +45,39 @@ func TestExecutePlan(t *testing.T) {
 	})
 
 	t.Run("executeAttachments", func(t *testing.T) {
-		var capturedRenamePath string
-		var capturedRenames map[int]string
+		var (
+			capturedRenamePath string
+			capturedRenames    map[int]string
+		)
+
 		execRenameAttachments = func(filePath string, renames map[int]string) error {
 			capturedRenamePath = filePath
 			capturedRenames = renames
+
 			return nil
 		}
 
-		var capturedAddPath string
-		var capturedAdds []matroska.AttachmentAdd
+		var (
+			capturedAddPath string
+			capturedAdds    []matroska.AttachmentAdd
+		)
+
 		execAddAttachments = func(filePath string, adds []matroska.AttachmentAdd) error {
 			capturedAddPath = filePath
 			capturedAdds = adds
+
 			return nil
 		}
 
-		var capturedDelPath string
-		var capturedRemoves []int
+		var (
+			capturedDelPath string
+			capturedRemoves []int
+		)
+
 		execDeleteAttachments = func(filePath string, removes []int) error {
 			capturedDelPath = filePath
 			capturedRemoves = removes
+
 			return nil
 		}
 
@@ -102,11 +117,15 @@ func TestExecutePlan(t *testing.T) {
 	})
 
 	t.Run("executeChapters", func(t *testing.T) {
-		var capturedPath string
-		var capturedTimes []int64
+		var (
+			capturedPath  string
+			capturedTimes []int64
+		)
+
 		execRewriteChapterTimes = func(filePath string, times []int64) error {
 			capturedPath = filePath
 			capturedTimes = times
+
 			return nil
 		}
 
@@ -134,28 +153,38 @@ func TestExecutePlan(t *testing.T) {
 
 	t.Run("executeTracksAndTags", func(t *testing.T) {
 		var addStatPath string
+
 		execAddTrackStatistics = func(filePath string) error {
 			addStatPath = filePath
+
 			return nil
 		}
 
 		var extractTagsPath string
+
 		execExtractTagsXML = func(filePath string) ([]byte, error) {
 			extractTagsPath = filePath
+
 			return []byte("<Tags></Tags>"), nil // mock XML
 		}
 
 		var setTagsPath string
-		execSetTagsXML = func(filePath string, tags []byte) error {
+
+		execSetTagsXML = func(filePath string, _ []byte) error {
 			setTagsPath = filePath
+
 			return nil
 		}
 
-		var setTracksPath string
-		var setTracksEdits []matroska.TrackEdit
+		var (
+			setTracksPath  string
+			setTracksEdits []matroska.TrackEdit
+		)
+
 		execSetTrackProperties = func(filePath string, edits []matroska.TrackEdit) error {
 			setTracksPath = filePath
 			setTracksEdits = edits
+
 			return nil
 		}
 
@@ -197,11 +226,15 @@ func TestExecutePlan(t *testing.T) {
 	})
 
 	t.Run("executeRemux", func(t *testing.T) {
-		var capturedPath string
-		var capturedOpts matroska.RemuxOptions
+		var (
+			capturedPath string
+			capturedOpts matroska.RemuxOptions
+		)
+
 		execRemuxTracks = func(filePath string, opts matroska.RemuxOptions) error {
 			capturedPath = filePath
 			capturedOpts = opts
+
 			return nil
 		}
 

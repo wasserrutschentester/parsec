@@ -11,29 +11,13 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:funlen,paralleltest // comprehensive table of name-cleaning cases; depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
-
 // First of two German audio tracks lacks the default flag -> should be set.
 
 // Specialized forced subtitle wrongly marked default -> should be cleared.
 
-//nolint:paralleltest // depends on shared global config state
-
-//nolint:paralleltest // depends on shared global config state
-
 // Track 1 needs both a flag fix (first of two German tracks, missing
 // default) and a name fix (redundant codec word), to verify the two
 // computations stay disjoint.
-
-//nolint:funlen,paralleltest // table-driven policy coverage; depends on shared global config state
 
 // Map got items
 

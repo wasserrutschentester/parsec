@@ -23,25 +23,27 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func newMockClient(fn roundTripFunc) *http.Client {
 	return &http.Client{
-		Transport: roundTripFunc(fn),
+		Transport: fn,
 	}
 }
 
+//nolint:paralleltest // mutates global state
 func TestResolveGoogleFontsGitHub(t *testing.T) {
 	config.NoCache = true
 	defer func() { config.NoCache = false }()
 
 	tempCache := t.TempDir()
-	os.Setenv("XDG_CACHE_HOME", tempCache)
-	defer os.Unsetenv("XDG_CACHE_HOME")
+	_ = os.Setenv("XDG_CACHE_HOME", tempCache)
+
+	defer func() { _ = os.Unsetenv("XDG_CACHE_HOME") }()
 
 	// Override checkFontFileMatches to always match the requested font
-	checkFontFileMatches = func(path, fontName string) ([]string, bool) {
+	checkFontFileMatches = func(_, fontName string) ([]string, bool) {
 		return []string{fontName}, true
 	}
 	defer func() { checkFontFileMatches = fontFileMatches }()
 
-	checkGetFontNames = func(data []byte) ([]string, error) {
+	checkGetFontNames = func(_ []byte) ([]string, error) {
 		return []string{"Open Sans"}, nil
 	}
 	defer func() { checkGetFontNames = matroska.GetFontNames }()
@@ -49,11 +51,13 @@ func TestResolveGoogleFontsGitHub(t *testing.T) {
 	client := newMockClient(func(req *http.Request) *http.Response {
 		// Log requests for debugging
 		t.Logf("GitHub API mock got request: %s %s", req.Method, req.URL.String())
+
 		if strings.Contains(req.URL.Path, "ofl/opensans") {
 			contents := []githubContent{
 				{Name: "OpenSans-Regular.ttf", Type: "file", DownloadURL: "https://raw.githubusercontent.com/mock/opensans.ttf"},
 			}
 			b, _ := json.Marshal(contents)
+
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(bytes.NewReader(b)),
@@ -76,7 +80,7 @@ func TestResolveGoogleFontsGitHub(t *testing.T) {
 
 	resolver := defaultFontResolver{client: client}
 	resolved, ok := resolver.resolveGoogleFontsGitHub("Open Sans")
-	
+
 	if !ok {
 		t.Fatalf("expected Open Sans to be resolved")
 	}
@@ -90,26 +94,29 @@ func TestResolveGoogleFontsGitHub(t *testing.T) {
 	}
 }
 
+//nolint:funlen,paralleltest // mutates global state
 func TestResolveGoogleFontsAPI(t *testing.T) {
 	config.NoCache = true
 	defer func() { config.NoCache = false }()
 
 	tempCache := t.TempDir()
-	os.Setenv("XDG_CACHE_HOME", tempCache)
-	defer os.Unsetenv("XDG_CACHE_HOME")
+	_ = os.Setenv("XDG_CACHE_HOME", tempCache)
 
-	checkFontFileMatches = func(path, fontName string) ([]string, bool) {
+	defer func() { _ = os.Unsetenv("XDG_CACHE_HOME") }()
+
+	checkFontFileMatches = func(_, fontName string) ([]string, bool) {
 		return []string{fontName}, true
 	}
 	defer func() { checkFontFileMatches = fontFileMatches }()
 
-	checkGetFontNames = func(data []byte) ([]string, error) {
+	checkGetFontNames = func(_ []byte) ([]string, error) {
 		return []string{"Roboto"}, nil
 	}
 	defer func() { checkGetFontNames = matroska.GetFontNames }()
 
 	client := newMockClient(func(req *http.Request) *http.Response {
 		t.Logf("Google API mock got request: %s %s", req.Method, req.URL.String())
+
 		if req.URL.Host == "www.googleapis.com" {
 			resp := googleFontsAPIResponse{
 				Items: []googleFontFamily{
@@ -122,6 +129,7 @@ func TestResolveGoogleFontsAPI(t *testing.T) {
 				},
 			}
 			b, _ := json.Marshal(resp)
+
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(bytes.NewReader(b)),
@@ -143,7 +151,7 @@ func TestResolveGoogleFontsAPI(t *testing.T) {
 
 	resolver := defaultFontResolver{client: client}
 	resolved, ok := resolver.resolveGoogleFontsAPI("Roboto", "dummy-key")
-	
+
 	if !ok {
 		t.Fatalf("expected Roboto to be resolved")
 	}

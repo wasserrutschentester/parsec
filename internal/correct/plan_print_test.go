@@ -14,8 +14,6 @@ import (
 
 // Track 2 must carry both its base and extra properties.
 
-//nolint:paralleltest // depends on shared global config state
-
 // Track 2 has two mismatches (Forced + SDH) and must produce one consolidated edit.
 
 func TestFormatContainerChange(t *testing.T) {
