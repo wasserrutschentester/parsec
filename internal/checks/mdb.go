@@ -50,19 +50,19 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 
 	mdb.PrintCompactResult(*searchResult)
 
-	if config.IsCheckEnabled("mdb_unknown_original_lang") {
+	if config.IsCheckEnabled(config.CheckMdbUnknownOrigLang) {
 		results = append(results, checkUnknownOriginalLang(searchResult)...)
 	}
 
-	if config.IsCheckEnabled("mdb_title") {
+	if config.IsCheckEnabled(config.CheckMdbTitle) {
 		results = append(results, checkTitle(meta, searchResult)...)
 	}
 
-	if config.IsCheckEnabled("mdb_movie_year") {
+	if config.IsCheckEnabled(config.CheckMdbMovieYear) {
 		results = append(results, checkMovieYear(meta, searchResult)...)
 	}
 
-	if meta.IsTV && config.IsCheckEnabled("mdb_series_year") {
+	if meta.IsTV && config.IsCheckEnabled(config.CheckMdbSeriesYear) {
 		results = append(results, checkSeriesYear(meta, searchResult)...)
 	}
 
@@ -70,11 +70,11 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		results = append(results, checkEpisode(meta, searchResult)...)
 	}
 
-	if mi != nil && config.IsCheckEnabled("mdb_track_languages") {
+	if mi != nil && config.IsCheckEnabled(config.CheckMdbTrackLanguages) {
 		results = append(results, checkTrackLanguages(mi, searchResult)...)
 	}
 
-	if mi != nil && config.IsCheckEnabled("mdb_unwanted_audio_lang") {
+	if mi != nil && config.IsCheckEnabled(config.CheckMdbUnwantedAudioLang) {
 		results = append(results, checkUnwantedAudioLang(mi, searchResult)...)
 	}
 
@@ -160,7 +160,7 @@ func checkUnknownOriginalLang(result *mdb.SearchResult) []CheckResult {
 	origTag := language.Make(origLang)
 	if origLang == "" || origTag == language.Und {
 		results = append(results, CheckResult{
-			Identifier: "mdb_unknown_original_lang",
+			Identifier: config.CheckMdbUnknownOrigLang,
 			Passed:     false,
 			Severity:   "info",
 			Warning:    fmt.Sprintf("original language '%s' is not recognized or missing from TMDB/TVDB", origLang),
@@ -219,7 +219,7 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 	unwantedLangs = metadata.RemoveDuplicates(unwantedLangs)
 	if len(unwantedLangs) > 0 {
 		results = append(results, CheckResult{
-			Identifier: "mdb_unwanted_audio_lang",
+			Identifier: config.CheckMdbUnwantedAudioLang,
 			Passed:     false,
 			Severity:   "warning",
 			Warning:    fmt.Sprintf("Has unwanted audio language track(s): %s", unwantedLangs),
@@ -231,7 +231,7 @@ func checkUnwantedAudioLang(mi *mediainfo.MediaInfo, result *mdb.SearchResult) [
 
 func checkMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	res := CheckResult{
-		Identifier: "mdb_movie_year",
+		Identifier: config.CheckMdbMovieYear,
 		Passed:     true,
 	}
 	if !meta.IsTV && meta.Year > 0 && result.Year > 0 {
@@ -250,7 +250,7 @@ func checkMovieYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckRe
 
 func checkSeriesYear(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	res := CheckResult{
-		Identifier: "mdb_series_year",
+		Identifier: config.CheckMdbSeriesYear,
 		Passed:     true,
 	}
 	if meta.Year > 0 && result.Year > 0 && meta.Season < 1900 {
@@ -277,12 +277,12 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 	episodes := mdbSearch.FindEpisodes(*result, meta, false)
 
 	existenceCheck := CheckResult{
-		Identifier: "mdb_episode_existence",
+		Identifier: config.CheckMdbEpisodeExistence,
 		Passed:     true,
 	}
 
 	if len(episodes) == 0 {
-		if config.IsCheckEnabled("mdb_episode_existence") {
+		if config.IsCheckEnabled(config.CheckMdbEpisodeExistence) {
 			existenceCheck.Passed = false
 			existenceCheck.Severity = "warning"
 			existenceCheck.Warning = fmt.Sprintf("Episode S%02dE%v not found on TVDB/TMDB.", meta.Season, meta.Episodes)
@@ -301,11 +301,11 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 	}
 
 	results = append(results, existenceCheck)
-	if config.IsCheckEnabled("mdb_episode_title") {
+	if config.IsCheckEnabled(config.CheckMdbEpisodeTitle) {
 		results = append(results, checkEpisodeTitle(meta, epResult)...)
 	}
 
-	if config.IsCheckEnabled("mdb_episode_date") {
+	if config.IsCheckEnabled(config.CheckMdbEpisodeDate) {
 		results = append(results, checkSpecialDate(meta, epResult)...)
 	}
 
@@ -314,7 +314,7 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 
 func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []CheckResult {
 	res := CheckResult{
-		Identifier: "mdb_episode_title",
+		Identifier: config.CheckMdbEpisodeTitle,
 		Passed:     true,
 	}
 	if len(meta.EpisodeTitles) > 0 {
@@ -335,7 +335,7 @@ func checkEpisodeTitle(meta *metadata.Metadata, epResult mdb.EpisodeResult) []Ch
 
 func checkTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
 	res := CheckResult{
-		Identifier: "mdb_title",
+		Identifier: config.CheckMdbTitle,
 		Passed:     true,
 	}
 	if meta.Title != "" {
@@ -356,7 +356,7 @@ func checkTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 
 func checkSpecialDate(meta *metadata.Metadata, epResult mdb.EpisodeResult) []CheckResult {
 	res := CheckResult{
-		Identifier: "mdb_episode_date",
+		Identifier: config.CheckMdbEpisodeDate,
 		Passed:     true,
 	}
 	if meta.Season == 0 && meta.Date != "" {

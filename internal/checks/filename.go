@@ -13,31 +13,31 @@ import (
 func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 
-	if config.IsCheckEnabled("filename_generation_mismatch") {
+	if config.IsCheckEnabled(config.CheckFilenameGenerationMismatch) {
 		results = append(results, checkNameMismatch(name, meta)...)
 	}
 
-	if config.IsCheckEnabled("filename_characters") {
+	if config.IsCheckEnabled(config.CheckFilenameCharacters) {
 		results = append(results, checkAllowedCharacters(name)...)
 	}
 
-	if config.IsCheckEnabled("filename_sequences") {
+	if config.IsCheckEnabled(config.CheckFilenameSequences) {
 		results = append(results, checkCharacterSequences(name)...)
 	}
 
-	if config.IsCheckEnabled("filename_year_missing") {
+	if config.IsCheckEnabled(config.CheckFilenameYearMissing) {
 		results = append(results, checkYearMissing(meta)...)
 	}
 
-	if config.IsCheckEnabled("filename_year_redundant") {
+	if config.IsCheckEnabled(config.CheckFilenameYearRedundant) {
 		results = append(results, checkYearRedundant(meta)...)
 	}
 
-	if config.IsCheckEnabled("filename_streaming") {
+	if config.IsCheckEnabled(config.CheckFilenameStreaming) {
 		results = append(results, checkStreamingService(meta)...)
 	}
 
-	if config.IsCheckEnabled("filename_tv_special") {
+	if config.IsCheckEnabled(config.CheckFilenameTVSpecial) {
 		results = append(results, checkTvSpecial(meta)...)
 	}
 
@@ -47,7 +47,7 @@ func RunFilenameChecks(name string, meta *metadata.Metadata) []CheckResult {
 func checkNameMismatch(name string, meta *metadata.Metadata) []CheckResult {
 	if name != meta.GetReleaseName() {
 		return []CheckResult{{
-			Identifier: "filename_generation_mismatch",
+			Identifier: config.CheckFilenameGenerationMismatch,
 			Warning:    "Generated name does not match the original",
 			Passed:     false,
 			Severity:   "warning",
@@ -62,7 +62,7 @@ func checkNameMismatch(name string, meta *metadata.Metadata) []CheckResult {
 func checkAllowedCharacters(filename string) []CheckResult {
 	if match, cleanName := findNotAllowedCharacters(filename); match != "" {
 		return []CheckResult{{
-			Identifier: "filename_characters",
+			Identifier: config.CheckFilenameCharacters,
 			Passed:     false,
 			Severity:   "warning",
 			Warning:    "disallowed character found: " + match,
@@ -89,7 +89,7 @@ func findNotAllowedCharacters(filename string) (string, string) {
 func checkCharacterSequences(filename string) []CheckResult {
 	if match, cleanName := findCharacterSequences(filename); match != "" {
 		return []CheckResult{{
-			Identifier: "filename_sequences",
+			Identifier: config.CheckFilenameSequences,
 			Passed:     false,
 			Severity:   "warning",
 			Warning:    "disallowed character sequence found: " + match,
@@ -116,7 +116,7 @@ func findCharacterSequences(filename string) (string, string) {
 func checkYearMissing(meta *metadata.Metadata) []CheckResult {
 	if meta.Year == 0 && !meta.IsTV {
 		return []CheckResult{{
-			Identifier: "filename_year_missing",
+			Identifier: config.CheckFilenameYearMissing,
 			Passed:     false,
 			Severity:   "warning",
 			Warning:    "year is missing for this Movie",
@@ -129,7 +129,7 @@ func checkYearMissing(meta *metadata.Metadata) []CheckResult {
 func checkYearRedundant(meta *metadata.Metadata) []CheckResult {
 	if meta.Year > 0 && meta.Season > 1900 {
 		return []CheckResult{{
-			Identifier: "filename_year_redundant",
+			Identifier: config.CheckFilenameYearRedundant,
 			Passed:     false,
 			Severity:   "info",
 			Warning:    fmt.Sprintf("redundant Year: The Season (%d) already indicates the year", meta.Season),
@@ -143,14 +143,14 @@ func checkStreamingService(meta *metadata.Metadata) []CheckResult {
 	isWeb := strings.Contains(meta.Source, "WEB")
 	if isWeb && meta.Service == "" {
 		return []CheckResult{{
-			Identifier: "filename_streaming",
+			Identifier: config.CheckFilenameStreaming,
 			Passed:     false,
 			Severity:   "warning",
 			Warning:    "Streaming Service Tag is missing for WEB source",
 		}}
 	} else if !isWeb && meta.Service != "" {
 		return []CheckResult{{
-			Identifier: "filename_streaming",
+			Identifier: config.CheckFilenameStreaming,
 			Passed:     false,
 			Severity:   "info",
 			Warning:    "Streaming Service Tag is not supported for non-WEB source",
@@ -177,7 +177,7 @@ func checkTvSpecial(meta *metadata.Metadata) []CheckResult {
 	}
 
 	return []CheckResult{{
-		Identifier: "filename_tv_special",
+		Identifier: config.CheckFilenameTVSpecial,
 		Passed:     false,
 		Severity:   "warning",
 		Warning:    warning + " is missing for TV Special",

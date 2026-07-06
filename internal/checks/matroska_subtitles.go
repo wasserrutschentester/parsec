@@ -39,7 +39,7 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should converted to SRT", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaSubtitleFormat, "Text subtitle track should converted to SRT", "warning", &track, warning)
 	}
 
 	return nil
@@ -55,7 +55,7 @@ func checkSubtitleFonts(track matroska.EbmlTrack, attachmentFonts []matroska.Att
 	if len(missing) > 0 {
 		warning := "missing fonts (Styles): " + strings.Join(missing, ", ")
 
-		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts in Styles not included as attachments", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaSubtitleFonts, "SSA/ASS subtitle track uses fonts in Styles not included as attachments", "warning", &track, warning)
 	}
 
 	return nil
@@ -67,7 +67,7 @@ func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, attachmentFon
 	if len(missing) > 0 {
 		warning := "missing fonts (Inline): " + strings.Join(missing, ", ")
 
-		return newFailedTrackResult("matroska_subtitle_inline_fonts", "SSA/ASS subtitle track uses fonts in inline tags not included as attachments", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaSubtitleInlineFonts, "SSA/ASS subtitle track uses fonts in inline tags not included as attachments", "warning", &track, warning)
 	}
 
 	return nil
@@ -83,7 +83,7 @@ func checkASSScriptInfo(track matroska.EbmlTrack, videoWidth, videoHeight int) *
 	errors := validateScriptInfo(info, videoWidth, videoHeight)
 
 	if len(errors) > 0 {
-		res := newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, "")
+		res := newFailedTrackResult(config.CheckMatroskaAssScriptInfo, "ASS Script Info missing recommended headers", "info", &track, "")
 		res.Tracks[0].List = errors
 
 		return res
@@ -218,7 +218,7 @@ func checkASSStyles(track matroska.EbmlTrack) *CheckResult {
 	rows := validateStyles(lines)
 
 	if len(rows) > 0 {
-		res := newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, "See table below")
+		res := newFailedTrackResult(config.CheckMatroskaAssStyles, "ASS Style validation failed", "warning", &track, "See table below")
 		res.Tracks[0].Table = &types.TableData{
 			Headers: []string{"Line #", "Style Name", "Validation Issue"},
 			Rows:    rows,
@@ -381,7 +381,7 @@ func checkASSEvents(track matroska.EbmlTrack, content []byte) *CheckResult {
 	errors := validateEvents(lines, definedStyles)
 
 	if len(errors) > 0 {
-		res := newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, "")
+		res := newFailedTrackResult(config.CheckMatroskaAssEvents, "ASS Event validation failed", "warning", &track, "")
 		res.Tracks[0].List = errors
 
 		return res
@@ -771,12 +771,12 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 
 	if len(unused) > 0 {
 		warning := "Font attachments not used by any subtitle track"
-		if !config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
+		if !config.IsCheckEnabled(config.CheckMatroskaSubtitleInlineFonts) {
 			warning += " (some might be used by inline styles since matroska_subtitle_inline_fonts is disabled)"
 		}
 
 		return &CheckResult{
-			Identifier: "matroska_unused_fonts",
+			Identifier: config.CheckMatroskaUnusedFonts,
 			Warning:    warning,
 			Passed:     false,
 			Severity:   "warning",
@@ -940,7 +940,7 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 	}
 
 	return &CheckResult{
-		Identifier: "matroska_font_filename_compliance",
+		Identifier: config.CheckMatroskaFontFilenameCompliance,
 		Warning:    "Font attachment filenames do not match internal font names",
 		Passed:     false,
 		Severity:   "info",
@@ -1281,7 +1281,7 @@ func parseTagsBlock(tagContent string, active *FontStyle, lineStyle FontStyle, s
 func checkZlibCompression(track matroska.EbmlTrack) *CheckResult {
 	for algo := range strings.SplitSeq(track.Properties.ContentEncodingAlgorithms, ",") {
 		if algo == "0" { // 0 = zlib
-			return newFailedTrackResult("matroska_zlib_compression", "Track uses zlib compression", "warning", &track, ui.Warning.Render("zlib compression enabled"))
+			return newFailedTrackResult(config.CheckMatroskaZlibCompression, "Track uses zlib compression", "warning", &track, ui.Warning.Render("zlib compression enabled"))
 		}
 	}
 
@@ -1338,7 +1338,7 @@ func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckRes
 			msgs = appendFormattedErrors(msgs, "Alignment/positioning detected: ", parser.posWarnings)
 		}
 
-		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, "")
+		res := newFailedTrackResult(config.CheckMatroskaSrtValidation, "SRT subtitle validation failed", "warning", track, "")
 		res.Tracks[0].List = msgs
 
 		return res
@@ -1347,7 +1347,7 @@ func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckRes
 	if len(parser.posWarnings) > 0 {
 		msgs := appendFormattedErrors(nil, "Alignment/positioning detected: ", parser.posWarnings)
 
-		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, "")
+		res := newFailedTrackResult(config.CheckMatroskaSrtValidation, "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, "")
 		res.Tracks[0].List = msgs
 
 		return res

@@ -83,7 +83,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 	found := false
 
 	for _, r := range res {
-		if r.Identifier == "matroska_duplicate_tracks" {
+		if r.Identifier == config.CheckMatroskaDuplicateTracks {
 			found = true
 
 			if len(r.Tracks) != 2 {
@@ -108,7 +108,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 //nolint:paralleltest,funlen // depends on shared global state; comprehensive metrics tests
 func TestRunTrackChecksTrackMetrics(t *testing.T) {
 	config.InitDefaults()
-	viper.Set("enabled_checks", []string{"matroska_track_delay", "matroska_video_cropping"})
+	viper.Set("enabled_checks", []string{config.CheckMatroskaTrackDelay, config.CheckMatroskaVideoCropping})
 
 	t.Run("Track Delays", func(t *testing.T) {
 		tests := []struct {
@@ -124,7 +124,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 5000000, Language: "ger", Number: 1}},
 					},
 				},
-				identifier: "matroska_track_delay",
+				identifier: config.CheckMatroskaTrackDelay,
 				wantErr:    false,
 			},
 			{
@@ -134,7 +134,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 2000000000, Language: "ger", Number: 1}},
 					},
 				},
-				identifier: "matroska_track_delay",
+				identifier: config.CheckMatroskaTrackDelay,
 				wantErr:    true,
 			},
 		}
@@ -158,7 +158,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x1080"}},
 					},
 				},
-				identifier: "matroska_video_cropping",
+				identifier: config.CheckMatroskaVideoCropping,
 				wantErr:    false,
 			},
 			{
@@ -168,7 +168,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x800"}},
 					},
 				},
-				identifier: "matroska_video_cropping",
+				identifier: config.CheckMatroskaVideoCropping,
 				wantErr:    true,
 			},
 		}

@@ -14,7 +14,7 @@ import (
 
 func getUnusedFontsResult(res []CheckResult) *CheckResult {
 	for _, r := range res {
-		if r.Identifier == "matroska_unused_fonts" {
+		if r.Identifier == config.CheckMatroskaUnusedFonts {
 			rCopy := r
 
 			return &rCopy
@@ -87,7 +87,7 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 
 func getFontComplianceResult(res []CheckResult) *CheckResult {
 	for _, r := range res {
-		if r.Identifier == "matroska_font_filename_compliance" {
+		if r.Identifier == config.CheckMatroskaFontFilenameCompliance {
 			rCopy := r
 
 			return &rCopy

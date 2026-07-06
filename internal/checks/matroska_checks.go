@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
@@ -58,7 +59,7 @@ func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
 	if displayAR > pixelAR+0.01 {
 		warning := fmt.Sprintf("resolution-based black bars detected but no MKV crop values set (AR %.2f vs Display AR %.2f)", pixelAR, displayAR)
 
-		return newFailedTrackResult("matroska_video_cropping", "Missing MKV Cropping", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaVideoCropping, "Missing MKV Cropping", "warning", &track, warning)
 	}
 
 	return nil
@@ -68,7 +69,7 @@ func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *Ch
 	title := ebml.Container.Properties.Title
 	if TitleHygieneNeedsFix(title, meta) {
 		return &CheckResult{
-			Identifier: "matroska_title_hygiene",
+			Identifier: config.CheckMatroskaTitleHygiene,
 			Warning:    "Global Title contains technical metadata",
 			Passed:     false,
 			Severity:   "warning",
@@ -104,7 +105,7 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 
 	if AppHygieneNeedsFix(app) {
 		return &CheckResult{
-			Identifier: "matroska_app_hygiene",
+			Identifier: config.CheckMatroskaAppHygiene,
 			Warning:    "Writing Application metadata contains potentially identifiable information",
 			Passed:     false,
 			Severity:   "warning",
@@ -137,7 +138,7 @@ func matchesAnyPattern(value string, patterns []string) bool {
 // checkTrueHDCompatibility checks if a Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/EAC3) in the same language.
 func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_truehd_compatibility",
+		Identifier: config.CheckMatroskaTruehdCompatibility,
 		Warning:    "TrueHD track is not followed by a lossy compatibility track",
 		Passed:     true,
 	}
@@ -197,7 +198,7 @@ func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 
 func checkCommentaryChannels(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_commentary_channels",
+		Identifier: config.CheckMatroskaCommentaryChannels,
 		Warning:    "Commentary audio track has more than 2 channels",
 		Passed:     true,
 	}
@@ -250,7 +251,7 @@ func checkCommentaryBitrate(filePath string, tracks []matroska.EbmlTrack) *Check
 	}
 
 	res := &CheckResult{
-		Identifier: "matroska_commentary_bitrate",
+		Identifier: config.CheckMatroskaCommentaryBitrate,
 		Warning:    "Commentary audio track bitrate exceeds 128 kbps",
 		Passed:     true,
 	}
@@ -305,7 +306,7 @@ var (
 
 func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_commentary_prefix",
+		Identifier: config.CheckMatroskaCommentaryPrefix,
 		Warning:    "Commentary track name does not start with a standard prefix",
 		Passed:     true,
 	}
@@ -366,7 +367,7 @@ func ExtractCommentaryCore(name string) string {
 
 func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_commentary_pairing",
+		Identifier: config.CheckMatroskaCommentaryPairing,
 		Warning:    "Commentary subtitle track name does not match any audio commentary track name",
 		Passed:     true,
 	}
@@ -462,7 +463,7 @@ func StripCreationTimeTags(tagsXML []byte) ([]byte, []string) {
 
 func checkCreationTimePrivacy(filePath string, ebml *matroska.EbmlMetadata) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_creation_time_privacy",
+		Identifier: config.CheckMatroskaCreationTimePrivacy,
 		Warning:    "Privacy concern: file contains creation/encode time metadata",
 		Passed:     true,
 		Severity:   "info",

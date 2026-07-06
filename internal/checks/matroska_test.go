@@ -15,17 +15,17 @@ import (
 func TestRunTrackChecks(t *testing.T) {
 	config.InitDefaults()
 	viper.Set("disabled_checks", []string{
-		"matroska_subtitle_inline_fonts",
-		"matroska_ass_events",
-		"matroska_srt_validation",
-		"matroska_video_cropping",
-		"matroska_title_hygiene",
-		"matroska_app_hygiene",
-		"matroska_track_delay",
-		"matroska_commentary_channels",
-		"matroska_commentary_bitrate",
-		"matroska_commentary_prefix",
-		"matroska_commentary_pairing",
+		config.CheckMatroskaSubtitleInlineFonts,
+		config.CheckMatroskaAssEvents,
+		config.CheckMatroskaSrtValidation,
+		config.CheckMatroskaVideoCropping,
+		config.CheckMatroskaTitleHygiene,
+		config.CheckMatroskaAppHygiene,
+		config.CheckMatroskaTrackDelay,
+		config.CheckMatroskaCommentaryChannels,
+		config.CheckMatroskaCommentaryBitrate,
+		config.CheckMatroskaCommentaryPrefix,
+		config.CheckMatroskaCommentaryPairing,
 	})
 	t.Logf("viper disabled_checks inside test = %v", viper.GetStringSlice("disabled_checks"))
 
@@ -671,7 +671,7 @@ func runHygieneTest(t *testing.T, name string, ebml *matroska.EbmlMetadata, meta
 //nolint:paralleltest // depends on shared global state
 func TestRunTrackChecksContainerHygiene(t *testing.T) {
 	config.InitDefaults()
-	viper.Set("enabled_checks", []string{"matroska_title_hygiene", "matroska_app_hygiene"})
+	viper.Set("enabled_checks", []string{config.CheckMatroskaTitleHygiene, config.CheckMatroskaAppHygiene})
 
 	tests := []struct {
 		name       string
@@ -686,7 +686,7 @@ func TestRunTrackChecksContainerHygiene(t *testing.T) {
 				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{Title: "Frieren"}},
 			},
 			meta:       &metadata.Metadata{Title: "Frieren"},
-			identifier: "matroska_title_hygiene",
+			identifier: config.CheckMatroskaTitleHygiene,
 			wantErr:    false,
 		},
 		{
@@ -695,7 +695,7 @@ func TestRunTrackChecksContainerHygiene(t *testing.T) {
 				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{Title: "Frieren [1080p]"}},
 			},
 			meta:       &metadata.Metadata{Title: "Frieren"},
-			identifier: "matroska_title_hygiene",
+			identifier: config.CheckMatroskaTitleHygiene,
 			wantErr:    true,
 		},
 		{
@@ -703,7 +703,7 @@ func TestRunTrackChecksContainerHygiene(t *testing.T) {
 			ebml: &matroska.EbmlMetadata{
 				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{WritingApplication: "mkvmerge v85.0"}},
 			},
-			identifier: "matroska_app_hygiene",
+			identifier: config.CheckMatroskaAppHygiene,
 			wantErr:    false,
 		},
 		{
@@ -711,7 +711,7 @@ func TestRunTrackChecksContainerHygiene(t *testing.T) {
 			ebml: &matroska.EbmlMetadata{
 				Container: matroska.EbmlContainer{Properties: matroska.EbmlContainerProperties{WritingApplication: "mkvmerge /home/user/test.mkv"}},
 			},
-			identifier: "matroska_app_hygiene",
+			identifier: config.CheckMatroskaAppHygiene,
 			wantErr:    true,
 		},
 	}
