@@ -1,6 +1,9 @@
 package correct
 
 import (
+	"fmt"
+	"strings"
+
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
@@ -105,6 +108,7 @@ func applyPropertyToTrack(track *matroska.EbmlTrack, key, value string) {
 	}
 }
 
+//nolint:cyclop,funlen // loop over nested slices adds complexity but is readable
 func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMetadata) {
 	attachmentFonts := checks.GetAttachmentFonts(filePath, ebml.Attachments)
 	_, attachmentNames := FontMappingFromFonts(attachmentFonts)
@@ -113,10 +117,16 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 
 	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts, usedFonts)
 	for _, r := range renames {
+		internalName := "-"
+		if len(r.InternalNames) > 0 {
+			internalName = strings.Join(r.InternalNames, ", ")
+		}
+
 		plan.AttachmentRenames = append(plan.AttachmentRenames, AttachmentRename{
-			ID:      r.ID,
-			OldName: r.OldName,
-			NewName: r.NewName,
+			ID:           r.ID,
+			OldName:      r.OldName,
+			NewName:      r.NewName,
+			InternalName: internalName,
 		})
 	}
 
@@ -135,9 +145,38 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 
 	unused := ComputeUnusedFontAttachments(ebml, attachmentFonts, usedFonts)
 	for _, att := range unused {
+		fullName := "-"
+
+		for _, fInfo := range attachmentFonts {
+			if fInfo.AttachmentID == att.ID {
+				if len(fInfo.FullNames) > 0 {
+					fullName = strings.Join(fInfo.FullNames, ", ")
+				} else if fInfo.FamilyName != "" {
+					fullName = fInfo.FamilyName
+				}
+
+				break
+			}
+		}
+
+		sizeStr := ""
+
+		const unit = 1024
+
+		switch {
+		case att.Size < unit:
+			sizeStr = fmt.Sprintf("%d B", att.Size)
+		case att.Size < unit*unit:
+			sizeStr = fmt.Sprintf("%.1f KB", float64(att.Size)/float64(unit))
+		default:
+			sizeStr = fmt.Sprintf("%.1f MB", float64(att.Size)/float64(unit*unit))
+		}
+
 		plan.FontsToRemove = append(plan.FontsToRemove, AttachmentRemove{
-			ID:   att.ID,
-			Name: att.FileName,
+			ID:       att.ID,
+			Name:     att.FileName,
+			FullName: fullName,
+			Size:     sizeStr,
 		})
 	}
 }

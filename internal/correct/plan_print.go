@@ -45,9 +45,14 @@ func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	if len(plan.AttachmentRenames) > 0 {
 		ui.Println(ui.Muted.Render("Font Attachment Renames:"))
 
+		headers := []string{"Old Name", "Internal Name", "New Name"}
+		rows := make([][]string, 0, len(plan.AttachmentRenames))
+
 		for _, r := range plan.AttachmentRenames {
-			ui.Println(fmt.Sprintf("  - rename %d from %s to %s", r.ID, quoteOrNone(r.OldName), quoteOrNone(r.NewName)))
+			rows = append(rows, []string{r.OldName, r.InternalName, r.NewName})
 		}
+
+		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
 
 		if !confirmApply(opts, "Rename these font attachments?", "Skipping font renames...") {
 			plan.AttachmentRenames = nil
@@ -92,10 +97,14 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	if len(plan.FontsToAdd) > 0 {
 		ui.Println(ui.Muted.Render("Missing Fonts to Attach:"))
 
+		headers := []string{"Font Name", "Sourced From"}
+		rows := make([][]string, 0, len(plan.FontsToAdd))
+
 		for _, f := range plan.FontsToAdd {
-			ui.Println(fmt.Sprintf("  + %s -> %s", quoteOrNone(f.FontName), quoteOrNone(f.AttachmentName)))
-			ui.Println("      source: " + f.Source)
+			rows = append(rows, []string{f.FontName, f.Source})
 		}
+
+		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
 
 		if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
 			plan.FontsToAdd = nil
@@ -105,9 +114,14 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	if len(plan.FontsToRemove) > 0 {
 		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused Fonts to Remove: %d attachments", len(plan.FontsToRemove))))
 
+		headers := []string{"Attachment Name", "Full Name", "Size"}
+		rows := make([][]string, 0, len(plan.FontsToRemove))
+
 		for _, f := range plan.FontsToRemove {
-			ui.Println("  - " + f.Name)
+			rows = append(rows, []string{f.Name, f.FullName, f.Size})
 		}
+
+		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
 
 		if !confirmApplyWithPolicy(opts, "Delete these unused font attachments?", "Skipping unused font removal...", false) {
 			plan.FontsToRemove = nil
