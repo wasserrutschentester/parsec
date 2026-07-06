@@ -36,7 +36,31 @@ type Options struct {
 	TvdbID     int
 }
 
+// AppendInteractiveTrackEdits prompts the user for manual fixes (like keyword/flag matching).
+func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) error {
+	if !canPrompt(opts) {
+		return nil
+	}
+
+	ebml, err := matroska.GetEbmlMetadata(filePath)
+	if err != nil {
+		return nil // skip if we can't parse
+	}
+
+	keywordEdits := promptKeywordFlagFixes(ebml)
+	multiLangEdits := promptMultiLangNameFixes(ebml)
+	langEdits := promptLanguageFixes(ebml)
+
+	plan.TrackEdits = append(plan.TrackEdits, keywordEdits...)
+	plan.TrackEdits = append(plan.TrackEdits, multiLangEdits...)
+	plan.TrackEdits = append(plan.TrackEdits, langEdits...)
+
+	return nil
+}
+
 // ApplyFile applies enabled Matroska fixes to one file.
+//
+// Deprecated: This is the old monolithic entrypoint. Wait until cmd/correct.go is fully migrated before removing.
 func ApplyFile(filePath string, opts Options) error {
 	ui.Println(ui.LabelValue("Target Name:", filename.GetBaseName(filePath)))
 

@@ -52,14 +52,41 @@ You can pass files or directories. Directories are scanned recursively for Matro
 }
 
 func correctFile(filePath string) error {
-	return fixer.ApplyFile(filePath, fixer.Options{
+	opts := fixer.Options{
 		DryRun:     dryRunFlag,
 		Remux:      remuxFlag,
 		Unattended: unattendedFlag,
 		ImdbID:     imdbIDFlag,
 		TmdbID:     tmdbIDFlag,
 		TvdbID:     tvdbIDFlag,
-	})
+	}
+
+	ui.Println(ui.LabelValue("Target Name:", filePath))
+
+	plan, err := fixer.PlanFile(filePath, opts)
+	if err != nil {
+		return err
+	}
+
+	if err := fixer.AppendInteractiveTrackEdits(filePath, plan, opts); err != nil {
+		return err
+	}
+
+	if fixer.PrintAndConfirmPlan(plan, opts) {
+		if opts.DryRun {
+			ui.PrintSuccess("Dry-run complete. No files were modified.")
+
+			return nil
+		}
+
+		if err := fixer.ExecutePlan(filePath, plan); err != nil {
+			return err
+		}
+
+		ui.PrintSuccess("Fixes applied.")
+	}
+
+	return nil
 }
 
 func init() {

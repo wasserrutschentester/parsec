@@ -13,6 +13,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
 // cleanSplitRegex tokenizes a track name for cleaning. Unlike wordSplitRegex it
@@ -899,4 +900,24 @@ func collectUnwantedLanguageAudio(collector *removalCollector, tracks []matroska
 			collector.add(track, RemovalUnwantedAudioLang, "unwanted audio language '"+track.Properties.Language+"'")
 		}
 	}
+}
+
+// ComputeMissingStatistics determines if a file needs statistics tags rebuilt.
+func ComputeMissingStatistics(mi *mediainfo.MediaInfo) bool {
+	if !config.IsCheckEnabled(config.CheckMediainfoMissingStatistics) {
+		return false
+	}
+
+	return checks.MissingStatisticsNeedsFix(mi)
+}
+
+// ComputeCreationTimeTags determines if a file has creation time tags that need removal.
+func ComputeCreationTimeTags(tagsXML []byte) bool {
+	if !config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) {
+		return false
+	}
+
+	_, removed := checks.StripCreationTimeTags(tagsXML)
+
+	return len(removed) > 0
 }
