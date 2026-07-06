@@ -8,6 +8,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/types"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 func formatNsToTime(ns int64) string {
@@ -407,7 +408,10 @@ func formatNextKF(nextKF, timeStart int64, videoTrack *matroska.EbmlTrack) strin
 	return nextStr
 }
 
-func getAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTrack *matroska.EbmlTrack) [][]string {
+// GetAlignedTableRows generates the detailed table rows displaying chapter alignment status.
+//
+//nolint:cyclop,nestif,gocritic // Table formatting requires nested logic
+func GetAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTrack *matroska.EbmlTrack) [][]string {
 	var rows [][]string
 
 	for i, ch := range chapters.Atoms {
@@ -426,12 +430,36 @@ func getAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTr
 
 			nextStr := formatNextKF(nextKF, ch.TimeStart, videoTrack)
 
+			diffPrev := int64(-1)
+			if prevKF != -1 {
+				diffPrev = ch.TimeStart - prevKF
+			}
+
+			diffNext := int64(-1)
+			if nextKF != -1 {
+				diffNext = nextKF - ch.TimeStart
+			}
+
+			// Highlight the nearest one
+			var direction string
+
+			if prevKF != -1 && (nextKF == -1 || diffPrev <= diffNext) {
+				prevStr = ui.Success.Render(prevStr)
+				direction = ui.Success.Render("<- Prev")
+			} else if nextKF != -1 {
+				nextStr = ui.Success.Render(nextStr)
+				direction = ui.Success.Render("Next ->")
+			} else {
+				direction = "-"
+			}
+
 			rows = append(rows, []string{
 				strconv.Itoa(i + 1),
 				name,
 				formatNsToTime(ch.TimeStart),
 				latencyStr,
 				prevStr,
+				direction,
 				nextStr,
 			})
 		}
@@ -475,7 +503,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	rows := getAlignedTableRows(chapters, keyframes, videoTrack)
+	rows := GetAlignedTableRows(chapters, keyframes, videoTrack)
 
 	if len(rows) > 0 {
 		return &CheckResult{
@@ -484,7 +512,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 			Passed:     false,
 			Severity:   "warning",
 			Table: &types.TableData{
-				Headers: []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Next KF"},
+				Headers: []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Closest", "Next KF"},
 				Rows:    rows,
 			},
 		}

@@ -10,8 +10,9 @@ import (
 // chapters with video keyframes.
 // Times is the full list of chapter start times (ns) to write back.
 type ChapterAlignmentFix struct {
-	Times   []int64
-	Changed int
+	Times     []int64
+	Changed   int
+	TableRows [][]string
 }
 
 // ComputeChapterKeyframeSnaps returns the chapter timestamp corrections that
@@ -49,7 +50,9 @@ func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) C
 		return ChapterAlignmentFix{}
 	}
 
-	return ChapterAlignmentFix{Times: times, Changed: changed}
+	tableRows := checks.GetAlignedTableRows(&matroska.Chapters{Atoms: chapters}, keyframes, checks.GetVideoTrackFromEBML(ebml))
+
+	return ChapterAlignmentFix{Times: times, Changed: changed, TableRows: tableRows}
 }
 
 // extractChapterAtoms returns the chapter atoms to align.

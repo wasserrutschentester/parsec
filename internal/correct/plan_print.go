@@ -23,7 +23,7 @@ func ReviewPlan(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) bool {
 
 	reviewContainerAndAttachments(plan, opts)
 	reviewChaptersAndFonts(plan, opts)
-	reviewStatisticsAndTags(plan, opts)
+	reviewStatisticsAndTags(plan, ebml, opts)
 	reviewTrackEdits(plan, ebml, opts)
 	reviewRemux(plan, ebml, opts)
 
@@ -123,6 +123,11 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	if plan.ChapterKeyframeSnaps.Changed > 0 {
 		ui.Println(ui.Muted.Render(fmt.Sprintf("Chapter Snaps: %d chapters to align to keyframes", plan.ChapterKeyframeSnaps.Changed)))
 
+		if len(plan.ChapterKeyframeSnaps.TableRows) > 0 {
+			headers := []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Next KF"}
+			ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, plan.ChapterKeyframeSnaps.TableRows), "\n", "\n  "))
+		}
+
 		if !confirmApplyWithPolicy(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...", false) {
 			plan.ChapterKeyframeSnaps.Changed = 0
 			plan.ChapterKeyframeSnaps.Times = nil
@@ -147,7 +152,25 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	}
 }
 
-func reviewStatisticsAndTags(plan *FixPlan, opts Options) {
+func getCreationTimeTags(ebml *matroska.EbmlMetadata) []string {
+	var foundTags []string
+
+	if ebml == nil {
+		return foundTags
+	}
+
+	if ebml.Container.Properties.DateUtc != "" {
+		foundTags = append(foundTags, "DateUTC: "+ebml.Container.Properties.DateUtc)
+	}
+
+	if ebml.Container.Properties.DateLocal != "" {
+		foundTags = append(foundTags, "DateLocal: "+ebml.Container.Properties.DateLocal)
+	}
+
+	return foundTags
+}
+
+func reviewStatisticsAndTags(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 	if plan.WriteStatistics {
 		ui.Println(ui.Muted.Render("Track Statistics: [recompute and write tags]"))
 
@@ -158,6 +181,11 @@ func reviewStatisticsAndTags(plan *FixPlan, opts Options) {
 
 	if plan.ClearCreationTime {
 		ui.Println(ui.Muted.Render("Creation Time: [remove privacy-leaking tags]"))
+
+		foundTags := getCreationTimeTags(ebml)
+		if len(foundTags) > 0 {
+			ui.Println("  Found: " + ui.Warning.Render(strings.Join(foundTags, "; ")))
+		}
 
 		if !confirmApplyWithPolicy(opts, "  Remove these creation/encode-time tags?", "Skipping creation-time tag removal...", false) {
 			plan.ClearCreationTime = false
@@ -229,7 +257,7 @@ func reviewRemux(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 	ui.Println(ui.Muted.Render("Remux Operations:"))
 
 	reviewRemuxTrackOrder(plan, ebml, opts)
-	reviewRemuxStripCompression(plan, opts)
+	reviewRemuxStripCompression(plan, ebml, opts)
 	reviewRemuxRemoveTracks(plan, ebml, opts)
 
 	// Re-evaluate if remux is still required after user choices
@@ -250,9 +278,21 @@ func reviewRemuxTrackOrder(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Opti
 	}
 }
 
-func reviewRemuxStripCompression(plan *FixPlan, opts Options) {
+func reviewRemuxStripCompression(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 	if len(plan.RemuxStripCompression) > 0 {
-		ui.Println(fmt.Sprintf("  - Strip compression from %d tracks", len(plan.RemuxStripCompression)))
+		ui.Println(fmt.Sprintf("  - Strip compression from %d tracks:", len(plan.RemuxStripCompression)))
+
+		for _, trackID := range plan.RemuxStripCompression {
+			label := fmt.Sprintf("UID %d", trackID)
+
+			if ebml != nil {
+				if t := findTrackByID(ebml, trackID); t != nil {
+					label = fmt.Sprintf("Track %d: %s (zlib compressed)", t.Properties.Number, trackLabel(t))
+				}
+			}
+
+			ui.Println("      " + label)
+		}
 
 		if !confirmApply(opts, "Strip container compression from these tracks?", "Skipping compression strip...") {
 			plan.RemuxStripCompression = nil
