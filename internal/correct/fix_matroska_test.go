@@ -660,8 +660,8 @@ func TestComputeMatroskaRemuxTrackOrder(t *testing.T) {
 
 	tracks := []matroska.EbmlTrack{
 		{ID: 0, Type: "video"},
-		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true}},
-		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true}},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, AudioChannels: 2}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, AudioChannels: 2}},
 	}
 
 	plan := ComputeMatroskaRemux(tracks, "")

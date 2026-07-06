@@ -772,10 +772,30 @@ func (p MatroskaRemuxPlan) IsEmpty() bool {
 // empty); without it, unwanted-language pruning is skipped so the original
 // track is never proposed for removal. Disabled checks are skipped.
 func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) MatroskaRemuxPlan {
+	removals := computeRemovalCandidates(tracks, originalLang)
+
+	var survivingTracks []matroska.EbmlTrack
+
+	for _, t := range tracks {
+		removed := false
+
+		for _, r := range removals {
+			if r.TrackID == t.ID {
+				removed = true
+
+				break
+			}
+		}
+
+		if !removed {
+			survivingTracks = append(survivingTracks, t)
+		}
+	}
+
 	return MatroskaRemuxPlan{
-		TrackOrder:          computeTrackOrder(tracks),
+		TrackOrder:          computeTrackOrder(survivingTracks),
 		StripCompressionIDs: computeCompressionStrips(tracks),
-		RemovalCandidates:   computeRemovalCandidates(tracks, originalLang),
+		RemovalCandidates:   removals,
 	}
 }
 
