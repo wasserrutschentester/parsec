@@ -369,7 +369,3 @@ func collectUnwantedLanguageAudio(collector *removalCollector, tracks []matroska
 		}
 	}
 }
-
-// ComputeMissingStatistics determines if a file needs statistics tags rebuilt.
-
-// ComputeCreationTimeTags determines if a file has creation time tags that need removal.

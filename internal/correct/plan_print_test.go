@@ -28,8 +28,3 @@ func TestFormatContainerChange(t *testing.T) {
 		t.Errorf("formatContainerChange() = %q, want %q", got, want)
 	}
 }
-
-// or {0, 2, 3}; both are valid LCS of equal length
-
-// Track 2 (subtitle, out of place before video/audio) moves to the end;
-// tracks 0, 1 and 3 keep their relative order and just shift index.

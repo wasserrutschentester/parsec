@@ -218,7 +218,3 @@ func TestComputeMatroskaRemuxEmptyAudioTrackDisabled(t *testing.T) {
 		t.Errorf("expected no removals when mediainfo_empty_tracks is disabled, got %+v", got)
 	}
 }
-
-//nolint:paralleltest // depends on shared global config state
-
-// When the flag is already set, there is no mismatch.
