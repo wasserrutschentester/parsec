@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -12,6 +14,13 @@ import (
 )
 
 var remuxFlag bool
+
+type correctResult struct {
+	File string         `json:"file"`
+	Plan *fixer.FixPlan `json:"plan"`
+}
+
+var errJSONRequiresDryRunOrUnattended = errors.New("json output mode requires --dry-run or --unattended")
 
 // correctCmd represents the correct command
 var correctCmd = &cobra.Command{
@@ -35,24 +44,51 @@ handled by the rename command.
 You can pass files or directories. Directories are scanned recursively for Matroska files.`),
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
-		ui.Println(ui.Banner(".: COURSE CORRECTION :."))
+		if jsonOutputFlag && !dryRunFlag && !unattendedFlag {
+			return errJSONRequiresDryRunOrUnattended
+		}
+
+		if jsonOutputFlag {
+			ui.IsSilent = true
+			ui.IsJSON = true
+		} else {
+			ui.Println(ui.Banner(".: COURSE CORRECTION :."))
+		}
 
 		if originalLanguageFlag != "" {
 			viper.Set("original_language", originalLanguageFlag)
 		}
 
+		var results []correctResult
+
 		expandedArgs := expandArgs(args)
 		for _, filePath := range expandedArgs {
-			if err := correctFile(filePath); err != nil {
+			plan, err := correctFile(filePath)
+			if err != nil {
 				return err
 			}
+
+			if plan != nil {
+				results = append(results, correctResult{File: filePath, Plan: plan})
+			}
+		}
+
+		if jsonOutputFlag {
+			//nolint:musttag // FixPlan doesn't have json tags but default marshaling is acceptable
+			data, err := json.MarshalIndent(results, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal json: %w", err)
+			}
+
+			fmt.Println(string(data))
 		}
 
 		return nil
 	},
 }
 
-func correctFile(filePath string) error {
+//nolint:cyclop // branching for json output adds minor complexity
+func correctFile(filePath string) (*fixer.FixPlan, error) {
 	opts := fixer.Options{
 		DryRun:     dryRunFlag,
 		Remux:      remuxFlag,
@@ -62,15 +98,27 @@ func correctFile(filePath string) error {
 		TvdbID:     tvdbIDFlag,
 	}
 
-	ui.Println(ui.LabelValue("Target Name:", filePath))
+	if !jsonOutputFlag {
+		ui.Println(ui.LabelValue("Target Name:", filePath))
+	}
 
 	plan, err := fixer.PlanFile(filePath, opts)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	if jsonOutputFlag {
+		if !opts.DryRun {
+			if err := fixer.ExecutePlan(filePath, plan); err != nil {
+				return nil, err
+			}
+		}
+
+		return plan, nil
 	}
 
 	if err := fixer.AppendInteractiveTrackEdits(filePath, plan, opts); err != nil {
-		return err
+		return nil, err
 	}
 
 	ebml, err := matroska.GetEbmlMetadata(filePath)
@@ -83,17 +131,17 @@ func correctFile(filePath string) error {
 		if opts.DryRun {
 			ui.PrintSuccess("Dry-run complete. No files were modified.")
 
-			return nil
+			return plan, nil
 		}
 
 		if err := fixer.ExecutePlan(filePath, plan); err != nil {
-			return err
+			return nil, err
 		}
 
 		ui.PrintSuccess("Fixes applied.")
 	}
 
-	return nil
+	return plan, nil
 }
 
 func init() {
@@ -111,5 +159,6 @@ func init() {
 		_ = correctCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
+	correctCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "output fix plan in JSON (requires --dry-run or --unattended)")
 	correctCmd.Flags().SortFlags = false
 }
