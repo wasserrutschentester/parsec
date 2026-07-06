@@ -77,7 +77,7 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 	plan.RemuxRequired = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
 
 	plan.RemuxTrackOrder = remuxPlan.TrackOrder
-	plan.RemuxRemoveTracks = append(plan.RemuxRemoveTracks, remuxPlan.RemovalCandidates...)
+	plan.RemuxRemoveTracks = remuxPlan.RemovalCandidates
 	plan.RemuxStripCompression = remuxPlan.StripCompressionIDs
 
 	return nil
