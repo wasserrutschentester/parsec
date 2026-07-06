@@ -16,14 +16,6 @@ import (
 
 // Options controls which fixes are applied and how interactive decisions are
 // handled.
-type Options struct {
-	DryRun     bool
-	Remux      bool
-	Unattended bool
-	ImdbID     string
-	TmdbID     int
-	TvdbID     int
-}
 
 // AppendInteractiveTrackEdits prompts the user for manual fixes (like keyword/flag matching).
 func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) error {
@@ -86,9 +78,6 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 // ApplyFile applies enabled Matroska fixes to one file.
 //
 // Deprecated: This is the old monolithic entrypoint. Wait until cmd/correct.go is fully migrated before removing.
-func confirmApply(opts Options, prompt, skipMsg string) bool {
-	return confirmApplyWithPolicy(opts, prompt, skipMsg, true)
-}
 
 // canPrompt reports whether interactive prompts can be shown: not dry-run,
 // not unattended, and a terminal is attached. Use this to gate prompt
@@ -668,4 +657,9 @@ func quoteOrNone(value string) string {
 	}
 
 	return strconv.Quote(value)
+}
+
+// confirmApply applies enabled Matroska fixes to one file.
+func confirmApply(opts Options, prompt, skipMsg string) bool {
+	return confirmApplyWithPolicy(opts, prompt, skipMsg, true)
 }

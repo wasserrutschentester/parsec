@@ -4,6 +4,17 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
+// Options controls which fixes are applied and how interactive decisions are
+// handled.
+type Options struct {
+	DryRun     bool
+	Remux      bool
+	Unattended bool
+	ImdbID     string
+	TmdbID     int
+	TvdbID     int
+}
+
 // FixPlan represents a complete set of proposed modifications to a Matroska file.
 type FixPlan struct {
 	// 1. Container Properties (mkvpropedit)

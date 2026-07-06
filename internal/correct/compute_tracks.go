@@ -1,8 +1,6 @@
 package correct
 
 import (
-	"cmp"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -11,9 +9,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
-	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
-	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
 // cleanSplitRegex tokenizes a track name for cleaning. Unlike wordSplitRegex it
@@ -52,31 +48,10 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 // a guessed replacement, mirroring the conservative junk-removal approach
 // used for track names. Checks that are disabled in the configuration are
 // skipped.
-func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) []ContainerPropertyEdit {
-	var props []ContainerPropertyEdit
 
-	if config.IsCheckEnabled(config.CheckMatroskaTitleHygiene) && checks.TitleHygieneNeedsFix(ebml.Container.Properties.Title, meta) {
-		newTitle := ""
-		if meta != nil && meta.Title != "" {
-			newTitle = meta.Title
-		}
-
-		props = append(props, ContainerPropertyEdit{Key: "title", OldValue: ebml.Container.Properties.Title, NewValue: newTitle})
-	}
-
-	if config.IsCheckEnabled(config.CheckMatroskaAppHygiene) && checks.AppHygieneNeedsFix(ebml.Container.Properties.WritingApplication) {
-		props = append(props, ContainerPropertyEdit{Key: "writing-application", OldValue: ebml.Container.Properties.WritingApplication, NewValue: ""})
-	}
-
-	if config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) && checks.ContainerCreationTimeNeedsFix(ebml) {
-		// Creation time is usually handled separately, but we leave it here if it was here.
-		// Wait, the old code had `props["date"] = ""` here!
-		// Let's preserve that.
-		props = append(props, ContainerPropertyEdit{Key: "date", OldValue: "set", NewValue: ""})
-	}
-
-	return props
-}
+// Creation time is usually handled separately, but we leave it here if it was here.
+// Wait, the old code had `props["date"] = ""` here!
+// Let's preserve that.
 
 // ChapterAlignmentFix describes the timestamp corrections needed to align
 // chapters with video keyframes, satisfying matroska_chapters_keyframe_alignment.
@@ -84,117 +59,25 @@ func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata)
 // mkvpropedit rewrites chapters by document position, so already-aligned
 // chapters pass their original time through unchanged alongside the snapped
 // ones. Changed counts how many entries actually differ from the original.
-type ChapterAlignmentFix struct {
-	Times   []int64
-	Changed int
-}
 
 // ComputeChapterKeyframeSnaps returns the chapter timestamp corrections that
 // align each misaligned chapter with its nearest video keyframe. Returns a
 // zero-value ChapterAlignmentFix (Changed == 0) when the check is disabled,
 // the file has no chapters, the video keyframe index can't be read, or
 // nothing needs to change.
-func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) ChapterAlignmentFix {
-	if !config.IsCheckEnabled(config.CheckMatroskaChaptersKeyframeAlignment) {
-		return ChapterAlignmentFix{}
-	}
-
-	if len(ebml.Chapters) != 1 {
-		return ChapterAlignmentFix{}
-	}
-
-	var videoTrackNum uint64
-	if track := checks.GetVideoTrackFromEBML(ebml); track != nil {
-		videoTrackNum = uint64(track.Properties.Number)
-	}
-
-	if videoTrackNum == 0 {
-		return ChapterAlignmentFix{}
-	}
-
-	chapters := extractChapterAtoms(filePath, ebml)
-	if len(chapters) == 0 {
-		return ChapterAlignmentFix{}
-	}
-
-	keyframes, err := matroska.ReadKeyframeTimestamps(filePath, videoTrackNum, ebml.Container.Properties.TimestampScale)
-	if err != nil || len(keyframes) == 0 {
-		return ChapterAlignmentFix{}
-	}
-
-	times, changed := snapChaptersToKeyframes(chapters, keyframes)
-	if changed == 0 {
-		return ChapterAlignmentFix{}
-	}
-
-	return ChapterAlignmentFix{Times: times, Changed: changed}
-}
 
 // extractChapterAtoms returns the chapter atoms to align. Real mkvmerge -J
 // output never populates ebml.Chapters[0].Editions (it only reports
 // num_entries), so in production this always extracts via mkvextract; the
 // ebml-provided path exists so tests can inject known atoms without a real
 // mkvextract round trip.
-func extractChapterAtoms(filePath string, ebml *matroska.EbmlMetadata) []matroska.EbmlChapterAtom {
-	if len(ebml.Chapters[0].Editions) > 0 {
-		if chapters := ebml.Chapters[0].Editions[0].Chapters; len(chapters) > 0 {
-			return chapters
-		}
-	}
-
-	extracted, err := matroska.ExtractChapters(filePath)
-	if err != nil || extracted == nil {
-		return nil
-	}
-
-	return extracted.Atoms
-}
 
 // snapChaptersToKeyframes returns, in chapter order, each chapter's start
 // time snapped to its nearest keyframe when misaligned, or unchanged when
 // already aligned, plus how many entries were actually snapped.
-func snapChaptersToKeyframes(chapters []matroska.EbmlChapterAtom, keyframes []int64) ([]int64, int) {
-	times := make([]int64, len(chapters))
-	changed := 0
-
-	for i, ch := range chapters {
-		aligned, _, _, _ := checks.IsAligned(ch.TimeStart, keyframes)
-		if aligned {
-			times[i] = ch.TimeStart
-
-			continue
-		}
-
-		times[i] = nearestKeyframe(ch.TimeStart, keyframes)
-		changed++
-	}
-
-	return times, changed
-}
 
 // nearestKeyframe returns the keyframe timestamp closest to timeStart.
 // keyframes must be non-empty.
-func nearestKeyframe(timeStart int64, keyframes []int64) int64 {
-	best := keyframes[0]
-	bestDiff := absInt64(timeStart - best)
-
-	for _, kf := range keyframes[1:] {
-		if diff := absInt64(timeStart - kf); diff < bestDiff {
-			bestDiff = diff
-			best = kf
-		}
-	}
-
-	return best
-}
-
-func absInt64(v int64) int64 {
-	if v < 0 {
-		return -v
-	}
-
-	return v
-}
 
 // ComputeUnusedFontAttachments returns the font attachments that satisfy the
 // matroska_unused_fonts check's removal criteria: not referenced by any
@@ -205,25 +88,12 @@ func absInt64(v int64) int64 {
 // for a whole correct run), so recomputing them per fix step would only
 // reparse identical data after an unrelated mkvpropedit edit bumps the
 // file's mtime and busts their disk cache.
-func ComputeUnusedFontAttachments(ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []matroska.EbmlAttachment {
-	if !config.IsCheckEnabled(config.CheckMatroskaUnusedFonts) {
-		return nil
-	}
-
-	return checks.UnusedFontAttachments(ebml.Attachments, attachmentFonts, usedFonts)
-}
 
 // FontRename describes a font attachment filename correction needed to
 // satisfy the matroska_font_filename_compliance check. InternalNames lists
 // every font name embedded in the attachment (a font file can carry more
 // than one face/name); NewName is derived from the first one since a
 // filename can only hold one.
-type FontRename struct {
-	ID            int
-	OldName       string
-	NewName       string
-	InternalNames []string
-}
 
 // ComputeFontRenames returns the font attachments whose filename should be
 // renamed to match the font's internal name. Unused attachments (not
@@ -235,34 +105,9 @@ type FontRename struct {
 // attachment carries a usable internal name. See ComputeUnusedFontAttachments
 // for why attachmentNames/attachmentFonts/usedFonts are passed in rather
 // than recomputed here.
-func ComputeFontRenames(ebml *matroska.EbmlMetadata, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []FontRename {
-	if !config.IsCheckEnabled(config.CheckMatroskaFontFilenameCompliance) {
-		return nil
-	}
-
-	unused := checks.UnusedFontAttachments(ebml.Attachments, attachmentFonts, usedFonts)
-
-	return computeFontRenames(excludeAttachments(ebml.Attachments, unused), attachmentNames, attachmentFonts)
-}
 
 // excludeAttachments returns the attachments in all that aren't present in
 // exclude, by ID.
-func excludeAttachments(all, exclude []matroska.EbmlAttachment) []matroska.EbmlAttachment {
-	excludedIDs := make(map[int]bool, len(exclude))
-	for _, att := range exclude {
-		excludedIDs[att.ID] = true
-	}
-
-	kept := make([]matroska.EbmlAttachment, 0, len(all))
-
-	for _, att := range all {
-		if !excludedIDs[att.ID] {
-			kept = append(kept, att)
-		}
-	}
-
-	return kept
-}
 
 // computeFontRenames is the pure font-rename policy, shared with tests so
 // font extraction (and therefore real font files) is not required to verify
@@ -275,60 +120,12 @@ func excludeAttachments(all, exclude []matroska.EbmlAttachment) []matroska.EbmlA
 // (PostScript name, then full name, then family name) and cleanup the check
 // shows as its own "Proposed Name" column, so the two can never disagree
 // about what a font should be renamed to.
-func computeFontRenames(attachments []matroska.EbmlAttachment, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo) []FontRename {
-	var renames []FontRename
-
-	for _, att := range attachments {
-		if !checks.IsFontAttachment(att) {
-			continue
-		}
-
-		names := attachmentNames[att.ID]
-		if len(names) == 0 || checks.FontFilenameCompliant(att.FileName, names) {
-			continue
-		}
-
-		newName := checks.ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
-		if newName == "" {
-			continue
-		}
-
-		renames = append(renames, FontRename{
-			ID:            att.ID,
-			OldName:       att.FileName,
-			NewName:       newName,
-			InternalNames: names,
-		})
-	}
-
-	return disambiguateFontRenames(renames)
-}
 
 // disambiguateFontRenames appends a numbered suffix to any rename whose
 // target filename collides with an earlier one in the list.
-func disambiguateFontRenames(renames []FontRename) []FontRename {
-	seen := make(map[string]int, len(renames))
-
-	for i, r := range renames {
-		seen[r.NewName]++
-		if n := seen[r.NewName]; n > 1 {
-			renames[i].NewName = suffixFontName(r.NewName, n)
-		}
-	}
-
-	return renames
-}
 
 // suffixFontName inserts " (n)" before the extension, e.g. "Times New
 // Roman.ttf" -> "Times New Roman (2).ttf".
-func suffixFontName(name string, n int) string {
-	base, ext := name, ""
-	if idx := strings.LastIndex(name, "."); idx != -1 {
-		base, ext = name[:idx], name[idx:]
-	}
-
-	return fmt.Sprintf("%s (%d)%s", base, n, ext)
-}
 
 // fontRenameTarget builds a filename from internalName, keeping oldName's
 // extension. Used for naming a newly-attached font (attachmentNameForFont in
@@ -337,14 +134,6 @@ func suffixFontName(name string, n int) string {
 // not for renaming an existing attachment, which must use
 // checks.ProposedFontFilename so it can never drift from what the
 // matroska_font_filename_compliance check proposes.
-func fontRenameTarget(oldName, internalName string) string {
-	ext := ""
-	if idx := strings.LastIndex(oldName, "."); idx != -1 {
-		ext = oldName[idx:]
-	}
-
-	return internalName + ext
-}
 
 // fixBuilder accumulates property edits per track while preserving the order in
 // which tracks are first touched, so the resulting edit list is deterministic.
@@ -727,43 +516,28 @@ func ReverseKeywordFlagFixes(track matroska.EbmlTrack) []KeywordFlagFix {
 }
 
 // RemovalKind identifies why a track is proposed for removal.
-type RemovalKind string
 
-const (
-	// RemovalUnwantedAudioLang identifies non-preferred, non-original audio removal.
-	RemovalUnwantedAudioLang RemovalKind = "unwanted_audio_language"
-	// RemovalEmptyTrack identifies an audio track carrying no channels.
-	RemovalEmptyTrack RemovalKind = "empty_track"
-)
+// RemovalUnwantedAudioLang identifies non-preferred, non-original audio removal.
+
+// RemovalEmptyTrack identifies an audio track carrying no channels.
 
 // RemovalCandidate describes a track proposed for removal during a remux,
 // together with a human-readable reason. Removals are destructive, so the
 // caller is expected to confirm each candidate with the user.
-type RemovalCandidate struct {
-	TrackID int
-	Kind    RemovalKind
-	Reason  string
-	Track   matroska.EbmlTrack
-}
 
 // MatroskaRemuxPlan describes the lossless remux operations needed to satisfy
 // the remux-only Matroska checks. Track IDs are mkvmerge track IDs (the "id"
 // field), as required by mkvmerge.
-type MatroskaRemuxPlan struct {
-	// TrackOrder is the desired output order of track IDs. It is nil when the
-	// tracks are already correctly ordered.
-	TrackOrder []int
-	// StripCompressionIDs lists track IDs whose container compression should be
-	// removed.
-	StripCompressionIDs []int
-	// RemovalCandidates lists tracks proposed for removal (requires confirmation).
-	RemovalCandidates []RemovalCandidate
-}
+
+// TrackOrder is the desired output order of track IDs. It is nil when the
+// tracks are already correctly ordered.
+
+// StripCompressionIDs lists track IDs whose container compression should be
+// removed.
+
+// RemovalCandidates lists tracks proposed for removal (requires confirmation).
 
 // IsEmpty reports whether the plan contains no work.
-func (p MatroskaRemuxPlan) IsEmpty() bool {
-	return len(p.TrackOrder) == 0 && len(p.StripCompressionIDs) == 0 && len(p.RemovalCandidates) == 0
-}
 
 // ComputeMatroskaRemux inspects the tracks of a Matroska file and returns the
 // remux operations needed to satisfy the checks that cannot be fixed in place:
@@ -771,181 +545,24 @@ func (p MatroskaRemuxPlan) IsEmpty() bool {
 // audio tracks. originalLang is the MDB original language (may be
 // empty); without it, unwanted-language pruning is skipped so the original
 // track is never proposed for removal. Disabled checks are skipped.
-func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) MatroskaRemuxPlan {
-	removals := computeRemovalCandidates(tracks, originalLang)
-
-	var survivingTracks []matroska.EbmlTrack
-
-	for _, t := range tracks {
-		removed := false
-
-		for _, r := range removals {
-			if r.TrackID == t.ID {
-				removed = true
-
-				break
-			}
-		}
-
-		if !removed {
-			survivingTracks = append(survivingTracks, t)
-		}
-	}
-
-	return MatroskaRemuxPlan{
-		TrackOrder:          computeTrackOrder(survivingTracks),
-		StripCompressionIDs: computeCompressionStrips(tracks),
-		RemovalCandidates:   removals,
-	}
-}
 
 // computeTrackOrder returns the desired output order (by track ID), grouping
 // tracks as video, audio, subtitles and other while sorting audio and subtitle
 // tracks by priority. It returns nil when the current order is already correct.
-func computeTrackOrder(tracks []matroska.EbmlTrack) []int {
-	if !config.IsCheckEnabled(config.CheckMatroskaTrackOrder) {
-		return nil
-	}
 
-	var video, audio, subs, other []matroska.EbmlTrack
-
-	for _, track := range tracks {
-		switch track.Type {
-		case "audio":
-			audio = append(audio, track)
-		case "subtitles":
-			subs = append(subs, track)
-		case "video":
-			video = append(video, track)
-		default:
-			other = append(other, track)
-		}
-	}
-
-	byPriority := func(a, b matroska.EbmlTrack) int {
-		return cmp.Compare(checks.GetTrackPriority(a), checks.GetTrackPriority(b))
-	}
-	slices.SortStableFunc(audio, byPriority)
-	slices.SortStableFunc(subs, byPriority)
-
-	ordered := slices.Concat(video, audio, subs, other)
-
-	desired := make([]int, len(ordered))
-	for i, track := range ordered {
-		desired[i] = track.ID
-	}
-
-	current := make([]int, len(tracks))
-	for i, track := range tracks {
-		current[i] = track.ID
-	}
-
-	if slices.Equal(desired, current) {
-		return nil
-	}
-
-	return desired
-}
-
-func computeCompressionStrips(tracks []matroska.EbmlTrack) []int {
-	if !config.IsCheckEnabled(config.CheckMatroskaZlibCompression) {
-		return nil
-	}
-
-	var ids []int
-
-	for _, track := range tracks {
-		for algo := range strings.SplitSeq(track.Properties.ContentEncodingAlgorithms, ",") {
-			if algo == "0" { // 0 = zlib
-				ids = append(ids, track.ID)
-
-				break
-			}
-		}
-	}
-
-	return ids
-}
+// 0 = zlib
 
 // removalCollector accumulates removal candidates, keeping the first reason
 // recorded for a track so the more specific signal (e.g. exact duplicate) wins.
-type removalCollector struct {
-	seen       map[int]bool
-	candidates []RemovalCandidate
-}
-
-func (c *removalCollector) add(track matroska.EbmlTrack, kind RemovalKind, reason string) {
-	if c.seen[track.ID] {
-		return
-	}
-
-	c.seen[track.ID] = true
-	c.candidates = append(c.candidates, RemovalCandidate{TrackID: track.ID, Kind: kind, Reason: reason, Track: track})
-}
-
-func computeRemovalCandidates(tracks []matroska.EbmlTrack, originalLang string) []RemovalCandidate {
-	collector := &removalCollector{seen: make(map[int]bool)}
-
-	collectUnwantedLanguageAudio(collector, tracks, originalLang)
-	collectEmptyAudioTracks(collector, tracks)
-
-	return collector.candidates
-}
 
 // collectEmptyAudioTracks proposes removal of audio tracks reporting zero
 // channels, satisfying mediainfo_empty_tracks for the part derivable from the
 // EBML track properties alone (mkvmerge always reports audio_channels for a
 // genuine audio track).
-func collectEmptyAudioTracks(collector *removalCollector, tracks []matroska.EbmlTrack) {
-	if !config.IsCheckEnabled(config.CheckMediainfoEmptyTracks) {
-		return
-	}
 
-	for _, track := range tracks {
-		if track.Type == "audio" && track.Properties.AudioChannels <= 0 {
-			collector.add(track, RemovalEmptyTrack, "audio track has zero channels")
-		}
-	}
-}
-
-func collectUnwantedLanguageAudio(collector *removalCollector, tracks []matroska.EbmlTrack, originalLang string) {
-	// Without the original language we cannot tell which non-preferred track is
-	// the legitimate original, so we skip pruning entirely to stay safe.
-	if originalLang == "" || !config.IsCheckEnabled(config.CheckMdbUnwantedAudioLang) {
-		return
-	}
-
-	prefTag := language.Make(config.GetPreferredLanguage())
-	origTag := language.Make(originalLang)
-
-	for _, track := range tracks {
-		if track.Type != "audio" {
-			continue
-		}
-
-		langTag := language.Make(track.Properties.Language)
-		if !checks.IsWantedAudioLang(langTag, prefTag, origTag) {
-			collector.add(track, RemovalUnwantedAudioLang, "unwanted audio language '"+track.Properties.Language+"'")
-		}
-	}
-}
+// Without the original language we cannot tell which non-preferred track is
+// the legitimate original, so we skip pruning entirely to stay safe.
 
 // ComputeMissingStatistics determines if a file needs statistics tags rebuilt.
-func ComputeMissingStatistics(mi *mediainfo.MediaInfo) bool {
-	if !config.IsCheckEnabled(config.CheckMediainfoMissingStatistics) {
-		return false
-	}
-
-	return checks.MissingStatisticsNeedsFix(mi)
-}
 
 // ComputeCreationTimeTags determines if a file has creation time tags that need removal.
-func ComputeCreationTimeTags(tagsXML []byte) bool {
-	if !config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) {
-		return false
-	}
-
-	_, removed := checks.StripCreationTimeTags(tagsXML)
-
-	return len(removed) > 0
-}
