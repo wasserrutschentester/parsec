@@ -67,11 +67,11 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	foundArial := false
 
 	for _, row := range targetRes.Table.Rows {
-		if len(row) > 0 && row[0] == "UnusedFont.ttf" {
+		if len(row) > 1 && row[1] == "UnusedFont.ttf" {
 			foundUnused = true
 		}
 
-		if len(row) > 0 && row[0] == "Arial.ttf" {
+		if len(row) > 1 && row[1] == "Arial.ttf" {
 			foundArial = true
 		}
 	}

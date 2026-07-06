@@ -12,7 +12,7 @@ import (
 // ComputeUnusedFontAttachments returns the font attachments that satisfy the
 // matroska_unused_fonts check's removal criteria.
 // It relies on pre-computed attachmentFonts and usedFonts for performance.
-func ComputeUnusedFontAttachments(ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []matroska.EbmlAttachment {
+func ComputeUnusedFontAttachments(ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []checks.UnusedFont {
 	if !config.IsCheckEnabled(config.CheckMatroskaUnusedFonts) {
 		return nil
 	}
@@ -30,34 +30,13 @@ type FontRename struct {
 }
 
 // ComputeFontRenames returns the font attachments whose filename should be
-// renamed to match the font's internal name. Unused attachments are excluded.
-func ComputeFontRenames(ebml *matroska.EbmlMetadata, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo, usedFonts map[checks.FontStyle]bool) []FontRename {
+// renamed to match the font's internal name.
+func ComputeFontRenames(ebml *matroska.EbmlMetadata, attachmentNames map[int][]string, attachmentFonts []matroska.AttachmentFontInfo) []FontRename {
 	if !config.IsCheckEnabled(config.CheckMatroskaFontFilenameCompliance) {
 		return nil
 	}
 
-	unused := checks.UnusedFontAttachments(ebml.Attachments, attachmentFonts, usedFonts)
-
-	return computeFontRenames(excludeAttachments(ebml.Attachments, unused), attachmentNames, attachmentFonts)
-}
-
-// excludeAttachments returns the attachments in all that aren't present in
-// exclude, by ID.
-func excludeAttachments(all, exclude []matroska.EbmlAttachment) []matroska.EbmlAttachment {
-	excludedIDs := make(map[int]bool, len(exclude))
-	for _, att := range exclude {
-		excludedIDs[att.ID] = true
-	}
-
-	kept := make([]matroska.EbmlAttachment, 0, len(all))
-
-	for _, att := range all {
-		if !excludedIDs[att.ID] {
-			kept = append(kept, att)
-		}
-	}
-
-	return kept
+	return computeFontRenames(ebml.Attachments, attachmentNames, attachmentFonts)
 }
 
 // computeFontRenames is the pure font-rename policy.
@@ -106,15 +85,18 @@ func disambiguateFontRenames(renames []FontRename) []FontRename {
 	return renames
 }
 
-// suffixFontName inserts " (n)" before the extension, e.g. "Times New
-// Roman.ttf" -> "Times New Roman (2).ttf".
+// suffixFontName appends _dupe suffixes for disambiguation.
 func suffixFontName(name string, n int) string {
 	base, ext := name, ""
 	if idx := strings.LastIndex(name, "."); idx != -1 {
 		base, ext = name[:idx], name[idx:]
 	}
 
-	return fmt.Sprintf("%s (%d)%s", base, n, ext)
+	if n == 2 {
+		return fmt.Sprintf("%s_dupe%s", base, ext)
+	}
+
+	return fmt.Sprintf("%s_dupe%d%s", base, n, ext)
 }
 
 // fontRenameTarget builds a filename from internalName, keeping oldName's extension.

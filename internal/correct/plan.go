@@ -100,4 +100,5 @@ type AttachmentRemove struct {
 	Name     string
 	FullName string
 	Size     string
+	Reason   string
 }

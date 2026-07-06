@@ -98,7 +98,7 @@ func TestComputeFontRenamesDisambiguatesCollisions(t *testing.T) {
 		t.Fatalf("expected 3 renames, got %d: %+v", len(got), got)
 	}
 
-	wantNames := []string{"TimesNewRoman.ttf", "TimesNewRoman (2).ttf", "TimesNewRoman (3).ttf"}
+	wantNames := []string{"TimesNewRoman.ttf", "TimesNewRoman_dupe.ttf", "TimesNewRoman_dupe3.ttf"}
 	for i, want := range wantNames {
 		if got[i].NewName != want {
 			t.Errorf("rename %d: NewName = %q, want %q", i, got[i].NewName, want)
@@ -134,23 +134,6 @@ func TestComputeFontRenamesPrefersPostScriptName(t *testing.T) {
 	}
 }
 
-func TestComputeFontRenamesExcludesUnusedAttachments(t *testing.T) {
-	t.Parallel()
-
-	attachments := []matroska.EbmlAttachment{
-		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
-	}
-	attachmentFonts := []matroska.AttachmentFontInfo{{AttachmentID: 1, FamilyName: "Open Sans"}}
-
-	// font1.ttf isn't referenced by anything used, so it must be excluded
-	// from rename candidates by ComputeFontRenames itself (via
-	// excludeAttachments), matching matroska_unused_fonts' notion of unused.
-	got := excludeAttachments(attachments, checks.UnusedFontAttachments(attachments, attachmentFonts, map[checks.FontStyle]bool{}))
-	if len(got) != 0 {
-		t.Errorf("expected unused attachment to be excluded, got %+v", got)
-	}
-}
-
 // Regression test: the exported UnusedFontAttachments must match by
 // family+weight+italic like the matroska_unused_fonts check does, not by
 // family alone. A prior version of the fix-side export collapsed to
@@ -173,7 +156,7 @@ func TestUnusedFontAttachmentsMatchesByWeightAndItalic(t *testing.T) {
 	}
 
 	got := checks.UnusedFontAttachments(attachments, attachmentFonts, usedFonts)
-	if len(got) != 1 || got[0].ID != 1 {
+	if len(got) != 1 || got[0].Attachment.ID != 1 {
 		t.Errorf("expected the Bold attachment to be flagged unused despite matching family, got %+v", got)
 	}
 }
@@ -187,7 +170,7 @@ func TestComputeFontRenamesDisabled(t *testing.T) {
 		Attachments: []matroska.EbmlAttachment{{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"}},
 	}
 
-	if got := ComputeFontRenames(ebml, nil, nil, nil); got != nil {
+	if got := ComputeFontRenames(ebml, nil, nil); got != nil {
 		t.Errorf("expected nil when matroska_font_filename_compliance is disabled, got %+v", got)
 	}
 }
@@ -223,7 +206,7 @@ func TestComputeMissingFontAttachmentPlan(t *testing.T) {
 	}
 
 	att := plan.Attachments[0]
-	if att.FontName != "Open Sans" || att.AttachmentName != "Open Sans (2).ttf" || att.MIMEType != "font/ttf" || att.Source != fontSourceSystem {
+	if att.FontName != "Open Sans" || att.AttachmentName != "Open Sans_dupe.ttf" || att.MIMEType != "font/ttf" || att.Source != fontSourceSystem {
 		t.Errorf("unexpected attachment plan: %+v", att)
 	}
 

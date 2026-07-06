@@ -115,7 +115,7 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 	extracted := checks.ExtractSubtitleTracks(filePath, ebml.Tracks, true, false)
 	usedFonts := checks.ComputeAllUsedFonts(ebml.Tracks, extracted)
 
-	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts, usedFonts)
+	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts)
 	for _, r := range renames {
 		fullName := "-"
 		psName := "-"
@@ -157,7 +157,8 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 	}
 
 	unused := ComputeUnusedFontAttachments(ebml, attachmentFonts, usedFonts)
-	for _, att := range unused {
+	for _, u := range unused {
+		att := u.Attachment
 		fullName := "-"
 
 		for _, fInfo := range attachmentFonts {
@@ -190,6 +191,7 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 			Name:     att.FileName,
 			FullName: fullName,
 			Size:     sizeStr,
+			Reason:   u.Reason,
 		})
 	}
 }

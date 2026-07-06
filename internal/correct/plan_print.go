@@ -2,6 +2,7 @@ package correct
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -29,6 +30,7 @@ func ReviewPlan(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) bool {
 	return !plan.IsEmpty()
 }
 
+//nolint:cyclop // UI step has multiple branches
 func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	if len(plan.ContainerProperties) > 0 {
 		ui.Println(ui.Muted.Render("Container Metadata:"))
@@ -42,14 +44,47 @@ func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 		}
 	}
 
+	if len(plan.FontsToRemove) > 0 {
+		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused & Duplicate Fonts to Remove: %d attachments", len(plan.FontsToRemove))))
+
+		headers := []string{"ID", "Attachment Name", "Full Name", "Size", "Reason"}
+		rows := make([][]string, 0, len(plan.FontsToRemove))
+
+		for _, f := range plan.FontsToRemove {
+			rows = append(rows, []string{strconv.Itoa(f.ID), f.Name, f.FullName, f.Size, f.Reason})
+		}
+
+		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
+
+		if !confirmApplyWithPolicy(opts, "Delete these unused/duplicate font attachments?", "Skipping unused font removal...", false) {
+			plan.FontsToRemove = nil
+		} else {
+			// They accepted removal, so we shouldn't rename the ones being removed.
+			var filtered []AttachmentRename
+
+			removed := make(map[int]bool, len(plan.FontsToRemove))
+			for _, f := range plan.FontsToRemove {
+				removed[f.ID] = true
+			}
+
+			for _, r := range plan.AttachmentRenames {
+				if !removed[r.ID] {
+					filtered = append(filtered, r)
+				}
+			}
+
+			plan.AttachmentRenames = filtered
+		}
+	}
+
 	if len(plan.AttachmentRenames) > 0 {
 		ui.Println(ui.Muted.Render("Font Attachment Renames:"))
 
-		headers := []string{"Old Name", "Full Name", "PostScript Name", "New Name"}
+		headers := []string{"ID", "Old Name", "Full Name", "PostScript Name", "New Name"}
 		rows := make([][]string, 0, len(plan.AttachmentRenames))
 
 		for _, r := range plan.AttachmentRenames {
-			rows = append(rows, []string{r.OldName, r.FullName, r.PostScriptName, r.NewName})
+			rows = append(rows, []string{strconv.Itoa(r.ID), r.OldName, r.FullName, r.PostScriptName, r.NewName})
 		}
 
 		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
@@ -108,23 +143,6 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 
 		if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
 			plan.FontsToAdd = nil
-		}
-	}
-
-	if len(plan.FontsToRemove) > 0 {
-		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused Fonts to Remove: %d attachments", len(plan.FontsToRemove))))
-
-		headers := []string{"Attachment Name", "Full Name", "Size"}
-		rows := make([][]string, 0, len(plan.FontsToRemove))
-
-		for _, f := range plan.FontsToRemove {
-			rows = append(rows, []string{f.Name, f.FullName, f.Size})
-		}
-
-		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
-
-		if !confirmApplyWithPolicy(opts, "Delete these unused font attachments?", "Skipping unused font removal...", false) {
-			plan.FontsToRemove = nil
 		}
 	}
 }

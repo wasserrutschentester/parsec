@@ -686,14 +686,20 @@ func isAttachmentUsedNorm(attID int, normAtts []normalizedAttachmentFontID, norm
 	return false
 }
 
-func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) [][]string {
+// UnusedFont represents a font attachment that is either genuinely unused or a duplicate of another used font.
+type UnusedFont struct {
+	Attachment matroska.EbmlAttachment
+	Reason     string
+}
+
+func getUnusedFontsTableRows(unused []UnusedFont, attachmentFonts []matroska.AttachmentFontInfo) [][]string {
 	rows := make([][]string, 0, len(unused))
 
 	for _, u := range unused {
 		fontName := "-"
 
 		for _, fInfo := range attachmentFonts {
-			if fInfo.AttachmentID == u.ID {
+			if fInfo.AttachmentID == u.Attachment.ID {
 				if len(fInfo.FullNames) > 0 {
 					fontName = strings.Join(fInfo.FullNames, ", ")
 				} else if fInfo.FamilyName != "" {
@@ -709,15 +715,15 @@ func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts [
 		const unit = 1024
 
 		switch {
-		case u.Size < unit:
-			sizeStr = fmt.Sprintf("%d B", u.Size)
-		case u.Size < unit*unit:
-			sizeStr = fmt.Sprintf("%.1f KB", float64(u.Size)/float64(unit))
+		case u.Attachment.Size < unit:
+			sizeStr = fmt.Sprintf("%d B", u.Attachment.Size)
+		case u.Attachment.Size < unit*unit:
+			sizeStr = fmt.Sprintf("%.1f KB", float64(u.Attachment.Size)/float64(unit))
 		default:
-			sizeStr = fmt.Sprintf("%.1f MB", float64(u.Size)/float64(unit*unit))
+			sizeStr = fmt.Sprintf("%.1f MB", float64(u.Attachment.Size)/float64(unit*unit))
 		}
 
-		rows = append(rows, []string{u.FileName, fontName, sizeStr})
+		rows = append(rows, []string{strconv.Itoa(u.Attachment.ID), u.Attachment.FileName, fontName, sizeStr, u.Reason})
 	}
 
 	return rows
@@ -729,8 +735,8 @@ func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts [
 // "is this font attachment used": both the matroska_unused_fonts check and
 // internal/correct's removal/rename fix computations call this same
 // function, so they can never disagree about which attachments are unused.
-func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[FontStyle]bool) []matroska.EbmlAttachment {
-	var unused []matroska.EbmlAttachment
+func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[FontStyle]bool) []UnusedFont {
+	var unused []UnusedFont
 
 	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
 	for font := range allUsedFonts {
@@ -753,9 +759,33 @@ func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFont
 		}
 	}
 
+	usedProposed := make(map[string]matroska.EbmlAttachment)
+
 	for _, att := range attachments {
-		if IsFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
-			unused = append(unused, att)
+		if !IsFontAttachment(att) {
+			continue
+		}
+
+		if !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
+			unused = append(unused, UnusedFont{
+				Attachment: att,
+				Reason:     "Unused",
+			})
+
+			continue
+		}
+
+		proposed := ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
+		if proposed != "" {
+			proposedLower := strings.ToLower(proposed)
+			if original, ok := usedProposed[proposedLower]; ok {
+				unused = append(unused, UnusedFont{
+					Attachment: att,
+					Reason:     fmt.Sprintf("Duplicate of %s (ID %d)", original.FileName, original.ID),
+				})
+			} else {
+				usedProposed[proposedLower] = att
+			}
 		}
 	}
 
@@ -781,7 +811,7 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 			Passed:     false,
 			Severity:   "warning",
 			Table: &types.TableData{
-				Headers: []string{"Attachment Name", "Full Name", "Size"},
+				Headers: []string{"ID", "Attachment Name", "Full Name", "Size", "Reason"},
 				Rows:    getUnusedFontsTableRows(unused, attachmentFonts),
 			},
 		}
@@ -872,8 +902,23 @@ type fontComplianceRow struct {
 	proposed string
 }
 
+//nolint:gocognit,nestif,cyclop,funlen // Requires multiple passes and deduplication
 func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []fontComplianceRow {
 	var nonCompliant []fontComplianceRow
+
+	usedNewNames := make(map[string]bool)
+
+	// First pass: record names of compliant attachments
+	for _, att := range attachments {
+		if !IsFontAttachment(att) {
+			continue
+		}
+
+		names := getAttachmentFontNames(att.ID, attachmentFonts)
+		if len(names) > 0 && FontFilenameCompliant(att.FileName, names) {
+			usedNewNames[strings.ToLower(att.FileName)] = true
+		}
+	}
 
 	for _, att := range attachments {
 		if !IsFontAttachment(att) {
@@ -887,7 +932,31 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 
 		if !FontFilenameCompliant(att.FileName, names) {
 			proposed := ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
-			if proposed == "" {
+			if proposed != "" {
+				base := proposed
+				ext := ""
+
+				if idx := strings.LastIndex(proposed, "."); idx != -1 {
+					base = proposed[:idx]
+					ext = proposed[idx:]
+				}
+
+				newName := proposed
+
+				counter := 2
+				for usedNewNames[strings.ToLower(newName)] {
+					if counter == 2 {
+						newName = fmt.Sprintf("%s_dupe%s", base, ext)
+					} else {
+						newName = fmt.Sprintf("%s_dupe%d%s", base, counter, ext)
+					}
+
+					counter++
+				}
+
+				proposed = newName
+				usedNewNames[strings.ToLower(newName)] = true
+			} else {
 				proposed = "-"
 			}
 
@@ -903,7 +972,7 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 }
 
 func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
-	headers := []string{"Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
+	headers := []string{"ID", "Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
 
 	var rows [][]string
 
@@ -931,6 +1000,7 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 			}
 
 			rows = append(rows, []string{
+				strconv.Itoa(row.attID),
 				row.current,
 				fullName,
 				psName,
