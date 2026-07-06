@@ -6,18 +6,24 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
 )
 
+var (
+	resolveMetadata = resolve.Metadata
+	getEbmlMetadata = matroska.GetEbmlMetadata
+	extractTagsXML  = matroska.ExtractTagsXML
+)
+
 // PlanFile analyzes a Matroska file and returns a complete FixPlan containing
 // all proposed modifications without applying any changes.
 func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 	plan := NewFixPlan()
 
-	ebml, err := matroska.GetEbmlMetadata(filePath)
+	ebml, err := getEbmlMetadata(filePath)
 	if err != nil {
 		// If we can't parse EBML, we can't plan any fixes
 		return plan, nil
 	}
 
-	res, _ := resolve.Metadata(resolve.Options{
+	res, _ := resolveMetadata(resolve.Options{
 		FilePath: filePath,
 		ImdbID:   opts.ImdbID,
 		TmdbID:   opts.TmdbID,
@@ -34,7 +40,7 @@ func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 	plan.WriteStatistics = ComputeMissingStatistics(res.MediaInfo)
 
 	// 7. Creation Time Tags
-	tagsXML, _ := matroska.ExtractTagsXML(filePath)
+	tagsXML, _ := extractTagsXML(filePath)
 	plan.ClearCreationTime = ComputeCreationTimeTags(tagsXML)
 
 	// 8. Track Edits
