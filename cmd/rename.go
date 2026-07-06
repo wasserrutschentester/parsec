@@ -16,14 +16,13 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
-	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 var (
-	errRename           = errors.New("rename failed")
-	errMediaInfoParsing = errors.New("mediainfo parsing failed")
-	seasonPackFlag      bool
+	errRename      = errors.New("rename failed")
+	seasonPackFlag bool
 )
 
 // renameCmd represents the rename command
@@ -57,41 +56,37 @@ The resulting filename is generated according to the configured template.`),
 
 func renameFile(cmd *cobra.Command, filePath string) error {
 	ext := filepath.Ext(filePath)
-	filenameNoExt := filename.GetBaseName(filePath)
 
-	// 1. Parse filename for initial metadata
-	meta := filename.Parse(filenameNoExt)
-
-	// 2. Get MediaInfo/EBML and merge
-	mi, err := renameGetMediaMetadata(filePath, meta)
+	res, err := resolve.Metadata(resolve.Options{
+		FilePath:   filePath,
+		ImdbID:     imdbIDFlag,
+		TmdbID:     tmdbIDFlag,
+		TvdbID:     tvdbIDFlag,
+		IsTVSet:    cmd.Flags().Changed("tv"),
+		IsMovieSet: cmd.Flags().Changed("movie"),
+		ParseEBML:  true,
+	})
 	if err != nil {
 		return err
 	}
 
-	// 2.3 Apply MDB IDs from file tags
-	renameApplyMdbIDs(cmd, meta, mi)
+	meta := res.Meta
 
-	// 3. Override with CLI flags
+	// Apply other CLI flags (resolution, codec, etc.)
 	applyMetadataFlags(cmd, meta)
 
 	// 4. MDB Search to get "correct" title and year
 	renameApplyMdbSearch(meta)
 
-	// 6. Apply normalization
 	renameApplyNormalization(meta)
 
 	if meta.Service != "" {
 		meta.Service = filename.NormalizeService(meta.Service)
 	}
 
-	// 7. Set defaults for missing fields (Source, Group)
 	meta.SetDefaults()
 
-	// 8. Generate new name
-	newNameBase := meta.GetReleaseName()
-	newNameBase = filename.ApplyReplacements(newNameBase, config.GetOutputReplacements())
-	newName := newNameBase + ext
-
+	newName := filename.ApplyReplacements(meta.GetReleaseName(), config.GetOutputReplacements()) + ext
 	destDir := filepath.Dir(filePath)
 
 	outputPath := outputPathFlag
@@ -236,29 +231,6 @@ func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo, ebm
 	}
 }
 
-func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainfo.MediaInfo, error) {
-	// 2.1 Get MediaInfo and merge
-	mi, err := mediainfo.Get(filePath)
-	if err == nil {
-		mediaMeta := mi.GetMetadata()
-		meta.Override(mediaMeta)
-	} else {
-		ui.PrintError(fmt.Sprintf("Could not get MediaInfo for %s: %v\n", ui.AnonymizePath(filePath), err))
-
-		return nil, errMediaInfoParsing
-	}
-
-	// 2.2 Get EBML Metadata for Visual Impaired flag
-	ebml, err := matroska.GetEbmlMetadata(filePath)
-	if err == nil {
-		if ebml.HasVisualImpairedAudio() {
-			meta.HasAudioDesc = true
-		}
-	}
-
-	return mi, nil
-}
-
 func renameApplyMdbSearch(meta *metadata.Metadata) {
 	meta.SetDefaults()
 	result, _ := mdbSearch.InteractiveSearch(meta, true)
@@ -294,25 +266,6 @@ func renameApplyNormalization(meta *metadata.Metadata) {
 		for i, t := range meta.EpisodeTitles {
 			meta.EpisodeTitles[i] = filename.NormalizeTitle(t)
 		}
-	}
-}
-
-func renameApplyMdbIDs(cmd *cobra.Command, meta *metadata.Metadata, mi *mediainfo.MediaInfo) {
-	tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
-	if meta.ImdbID == "" {
-		meta.ImdbID = tagImdb
-	}
-
-	if meta.TmdbID == 0 {
-		meta.TmdbID = tagTmdb
-	}
-
-	if meta.TvdbID == 0 {
-		meta.TvdbID = tagTvdb
-	}
-
-	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
-		meta.IsTV = true
 	}
 }
 

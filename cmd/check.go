@@ -17,8 +17,7 @@ import (
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
-	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
-	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
 	"codeberg.org/upPollo/parsec/internal/types"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
@@ -221,24 +220,23 @@ func collectCheckData(cmd *cobra.Command, filePath string, showIndividual bool) 
 		ui.Println(fmt.Sprintf("Checking %s...", filenameNoExt))
 	}
 
-	match := filename.Parse(filenameNoExt)
-
-	mi, err := mediainfo.Get(filePath)
+	res, err := resolve.Metadata(resolve.Options{
+		FilePath:   filePath,
+		ImdbID:     imdbIDFlag,
+		TmdbID:     tmdbIDFlag,
+		TvdbID:     tvdbIDFlag,
+		IsTVSet:    cmd.Flags().Changed("tv"),
+		IsMovieSet: cmd.Flags().Changed("movie"),
+		ParseEBML:  true,
+	})
 	if err != nil {
 		return types.CheckReport{}, nil, fmt.Errorf("error getting mediainfo: %w", err)
 	}
 
-	mediaMeta := mi.GetMetadata()
-	match.Override(mediaMeta)
-
-	ebml, ebmlErr := matroska.GetEbmlMetadata(filePath)
-	if ebmlErr == nil {
-		if ebml.HasVisualImpairedAudio() && !match.HasAudioDesc {
-			match.HasAudioDesc = true
-		}
-	}
-
-	setupMdbIDs(cmd, mi, match)
+	match := res.Meta
+	mi := res.MediaInfo
+	ebml := res.Ebml
+	ebmlErr := res.EbmlErr
 
 	// Run Checks
 	var allIssues []types.IssueGroup
@@ -268,37 +266,6 @@ func appendFailed(allIssues *[]types.IssueGroup, category string, results []chec
 
 	if len(failed) > 0 {
 		*allIssues = append(*allIssues, types.IssueGroup{Category: category, Results: failed})
-	}
-}
-
-func setupMdbIDs(cmd *cobra.Command, mi *mediainfo.MediaInfo, match *metadata.Metadata) {
-	tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
-	if match.ImdbID == "" {
-		match.ImdbID = tagImdb
-	}
-
-	if match.TmdbID == 0 {
-		match.TmdbID = tagTmdb
-	}
-
-	if match.TvdbID == 0 {
-		match.TvdbID = tagTvdb
-	}
-
-	if !cmd.Flags().Changed("tv") && !cmd.Flags().Changed("movie") && tagIsTV {
-		match.IsTV = true
-	}
-
-	if imdbIDFlag != "" {
-		match.ImdbID = imdbIDFlag
-	}
-
-	if tmdbIDFlag != 0 {
-		match.TmdbID = tmdbIDFlag
-	}
-
-	if tvdbIDFlag != 0 {
-		match.TvdbID = tvdbIDFlag
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -64,7 +65,14 @@ func fixContainerMetadata(filePath string, opts Options) error {
 		return nil
 	}
 
-	meta := buildFixMetadata(filePath, opts)
+	res, _ := resolve.Metadata(resolve.Options{
+		FilePath: filePath,
+		ImdbID:   opts.ImdbID,
+		TmdbID:   opts.TmdbID,
+		TvdbID:   opts.TvdbID,
+	})
+	meta := res.Meta
+
 	if err := fixContainerProperties(filePath, ebml, meta, opts); err != nil {
 		return err
 	}

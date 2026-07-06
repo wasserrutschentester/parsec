@@ -8,10 +8,8 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
-	"codeberg.org/upPollo/parsec/internal/metadata"
-	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
-	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -30,7 +28,13 @@ func lookupOriginalLanguage(filePath string, tracks []matroska.EbmlTrack, opts O
 		return ""
 	}
 
-	meta := buildFixMetadata(filePath, opts)
+	res, _ := resolve.Metadata(resolve.Options{
+		FilePath: filePath,
+		ImdbID:   opts.ImdbID,
+		TmdbID:   opts.TmdbID,
+		TvdbID:   opts.TvdbID,
+	})
+	meta := res.Meta
 
 	result, err := mdbSearch.InteractiveSearch(meta, opts.Unattended)
 	if err != nil {
@@ -76,56 +80,4 @@ func needsOriginalLanguageForUnwantedAudio(tracks []matroska.EbmlTrack) bool {
 	}
 
 	return false
-}
-
-func buildFixMetadata(filePath string, opts Options) *metadata.Metadata {
-	meta := filename.Parse(filename.GetBaseName(filePath))
-
-	mi, err := mediainfo.Get(filePath)
-	if err != nil {
-		ui.PrintDebug(fmt.Sprintf("could not read MediaInfo for MDB lookup on %s: %v", ui.AnonymizePath(filePath), err))
-		applyMdbIDOverrides(meta, opts)
-
-		return meta
-	}
-
-	meta.Override(mi.GetMetadata())
-	applyMdbIDsFromMediaInfo(meta, mi)
-	applyMdbIDOverrides(meta, opts)
-
-	return meta
-}
-
-func applyMdbIDsFromMediaInfo(meta *metadata.Metadata, mi *mediainfo.MediaInfo) {
-	tagImdb, tagTmdb, tagTvdb, tagIsTV := mi.GetMdbIDs()
-	if meta.ImdbID == "" {
-		meta.ImdbID = tagImdb
-	}
-
-	if meta.TmdbID == 0 {
-		meta.TmdbID = tagTmdb
-	}
-
-	if meta.TvdbID == 0 {
-		meta.TvdbID = tagTvdb
-	}
-
-	if tagIsTV {
-		meta.IsTV = true
-	}
-}
-
-func applyMdbIDOverrides(meta *metadata.Metadata, opts Options) {
-	if opts.ImdbID != "" {
-		meta.ImdbID = opts.ImdbID
-	}
-
-	if opts.TmdbID != 0 {
-		meta.TmdbID = opts.TmdbID
-	}
-
-	if opts.TvdbID != 0 {
-		meta.TvdbID = opts.TvdbID
-		meta.IsTV = true
-	}
 }
