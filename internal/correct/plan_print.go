@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-// PrintAndConfirmPlan displays the proposed fixes and asks the user for confirmation.
-func PrintAndConfirmPlan(plan *FixPlan, opts Options) bool {
+// ReviewPlan displays the proposed fixes group-by-group, prompting the user for
+// confirmation on each. If the user declines a group, it is cleared from the plan.
+// It returns true if there are any approved changes remaining to execute.
+func ReviewPlan(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) bool {
 	if plan.IsEmpty() {
 		ui.Println("No issues found. File is clean.")
 
@@ -17,15 +20,16 @@ func PrintAndConfirmPlan(plan *FixPlan, opts Options) bool {
 
 	ui.Println(ui.ReportSection("Proposed Corrections"))
 
-	printContainerAndAttachments(plan)
-	printChaptersAndFonts(plan)
-	printStatisticsAndTags(plan)
-	printTrackEditsAndRemux(plan)
+	reviewContainerAndAttachments(plan, opts)
+	reviewChaptersAndFonts(plan, opts)
+	reviewStatisticsAndTags(plan, opts)
+	reviewTrackEdits(plan, ebml, opts)
+	reviewRemux(plan, ebml, opts)
 
-	return confirmApply(opts, "Apply these fixes?", "Skipping fixes...")
+	return !plan.IsEmpty()
 }
 
-func printContainerAndAttachments(plan *FixPlan) {
+func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	if len(plan.ContainerProperties) > 0 {
 		ui.Println(ui.Muted.Render("Container Properties:"))
 
@@ -36,6 +40,10 @@ func printContainerAndAttachments(plan *FixPlan) {
 				ui.Println(fmt.Sprintf("  - %s: %s", k, quoteOrNone(v)))
 			}
 		}
+
+		if !confirmApplyWithPolicy(opts, "Apply container property fixes?", "Skipping container properties...", false) {
+			plan.ContainerProperties = nil
+		}
 	}
 
 	if len(plan.AttachmentRenames) > 0 {
@@ -44,12 +52,21 @@ func printContainerAndAttachments(plan *FixPlan) {
 		for _, v := range plan.AttachmentRenames {
 			ui.Println("  - rename to " + quoteOrNone(v))
 		}
+
+		if !confirmApply(opts, "Rename these font attachments?", "Skipping font renames...") {
+			plan.AttachmentRenames = nil
+		}
 	}
 }
 
-func printChaptersAndFonts(plan *FixPlan) {
+func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	if plan.ChapterKeyframeSnaps.Changed > 0 {
 		ui.Println(ui.Muted.Render(fmt.Sprintf("Chapter Snaps: %d chapters to align to keyframes", plan.ChapterKeyframeSnaps.Changed)))
+
+		if !confirmApplyWithPolicy(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...", false) {
+			plan.ChapterKeyframeSnaps.Changed = 0
+			plan.ChapterKeyframeSnaps.Times = nil
+		}
 	}
 
 	if len(plan.FontsToAdd) > 0 {
@@ -58,55 +75,118 @@ func printChaptersAndFonts(plan *FixPlan) {
 		for _, f := range plan.FontsToAdd {
 			ui.Println("  + " + f.Name)
 		}
+
+		if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
+			plan.FontsToAdd = nil
+		}
 	}
 
 	if len(plan.FontsToRemove) > 0 {
 		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused Fonts to Remove: %d attachments", len(plan.FontsToRemove))))
+
+		if !confirmApplyWithPolicy(opts, "  Delete these unused font attachments?", "Skipping unused font removal...", false) {
+			plan.FontsToRemove = nil
+		}
 	}
 }
 
-func printStatisticsAndTags(plan *FixPlan) {
+func reviewStatisticsAndTags(plan *FixPlan, opts Options) {
 	if plan.WriteStatistics {
 		ui.Println(ui.Muted.Render("Track Statistics: [recompute and write tags]"))
+
+		if !confirmApply(opts, "Add track statistics tags?", "Skipping track statistics tags...") {
+			plan.WriteStatistics = false
+		}
 	}
 
 	if plan.ClearCreationTime {
 		ui.Println(ui.Muted.Render("Creation Time: [remove privacy-leaking tags]"))
+
+		if !confirmApplyWithPolicy(opts, "  Remove these creation/encode-time tags?", "Skipping creation-time tag removal...", false) {
+			plan.ClearCreationTime = false
+		}
 	}
 }
 
-func printTrackEditsAndRemux(plan *FixPlan) {
-	if len(plan.TrackEdits) > 0 {
-		ui.Println(ui.Muted.Render(fmt.Sprintf("Track Edits: %d properties to change", len(plan.TrackEdits))))
-
-		for _, e := range plan.TrackEdits {
-			var props []string
-
-			for k, v := range e.Props {
-				if v == "" {
-					props = append(props, k+"=[delete]")
-				} else {
-					props = append(props, fmt.Sprintf("%s=%s", k, v))
-				}
-			}
-
-			ui.Println(fmt.Sprintf("  Track %d: %s", e.Number, strings.Join(props, ", ")))
-		}
+func reviewTrackEdits(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
+	if len(plan.TrackEdits) == 0 {
+		return
 	}
 
-	if plan.RemuxRequired {
-		ui.Println(ui.Muted.Render("Remux Operations:"))
+	if ebml != nil {
+		previewTrackEdits("Track Edits", ebml, plan.TrackEdits)
+	} else {
+		printTrackEditsFallback(plan.TrackEdits)
+	}
 
-		if len(plan.RemuxTrackOrder) > 0 {
-			ui.Println("  - Reorder tracks")
+	if !confirmApply(opts, "Apply these track property fixes?", "Skipping track properties...") {
+		plan.TrackEdits = nil
+	}
+}
+
+func printTrackEditsFallback(edits []matroska.TrackEdit) {
+	ui.Println(ui.Muted.Render(fmt.Sprintf("Track Edits: %d properties to change", len(edits))))
+
+	for _, e := range edits {
+		var props []string
+
+		for k, v := range e.Props {
+			if v == "" {
+				props = append(props, k+"=[delete]")
+			} else {
+				props = append(props, fmt.Sprintf("%s=%s", k, v))
+			}
 		}
 
-		if len(plan.RemuxStripCompression) > 0 {
-			ui.Println(fmt.Sprintf("  - Strip compression from %d tracks", len(plan.RemuxStripCompression)))
+		ui.Println(fmt.Sprintf("  Track %d: %s", e.Number, strings.Join(props, ", ")))
+	}
+}
+
+func reviewRemux(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
+	if !plan.RemuxRequired {
+		return
+	}
+
+	ui.Println(ui.Muted.Render("Remux Operations:"))
+
+	reviewRemuxTrackOrder(plan, ebml, opts)
+	reviewRemuxStripCompression(plan, opts)
+	reviewRemuxRemoveTracks(plan, opts)
+
+	// Re-evaluate if remux is still required after user choices
+	plan.RemuxRequired = len(plan.RemuxTrackOrder) > 0 || len(plan.RemuxStripCompression) > 0 || len(plan.RemuxRemoveTracks) > 0
+}
+
+func reviewRemuxTrackOrder(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
+	if len(plan.RemuxTrackOrder) > 0 {
+		ui.Println("  - Reorder tracks")
+
+		if ebml != nil {
+			ui.Println(trackOrderTable(ebml, plan.RemuxTrackOrder))
 		}
 
-		if len(plan.RemuxRemoveTracks) > 0 {
-			ui.Println(fmt.Sprintf("  - Remove %d tracks", len(plan.RemuxRemoveTracks)))
+		if !confirmApply(opts, "Reorder tracks like this?", "Skipping track reordering...") {
+			plan.RemuxTrackOrder = nil
+		}
+	}
+}
+
+func reviewRemuxStripCompression(plan *FixPlan, opts Options) {
+	if len(plan.RemuxStripCompression) > 0 {
+		ui.Println(fmt.Sprintf("  - Strip compression from %d tracks", len(plan.RemuxStripCompression)))
+
+		if !confirmApply(opts, "Strip container compression from these tracks?", "Skipping compression strip...") {
+			plan.RemuxStripCompression = nil
+		}
+	}
+}
+
+func reviewRemuxRemoveTracks(plan *FixPlan, opts Options) {
+	if len(plan.RemuxRemoveTracks) > 0 {
+		ui.Println(fmt.Sprintf("  - Remove %d tracks", len(plan.RemuxRemoveTracks)))
+
+		if !confirmApplyWithPolicy(opts, "Remove these tracks?", "Skipping track removal...", false) {
+			plan.RemuxRemoveTracks = nil
 		}
 	}
 }

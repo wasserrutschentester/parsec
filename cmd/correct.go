@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 
 	fixer "codeberg.org/upPollo/parsec/internal/correct"
+	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -72,7 +73,13 @@ func correctFile(filePath string) error {
 		return err
 	}
 
-	if fixer.PrintAndConfirmPlan(plan, opts) {
+	ebml, err := matroska.GetEbmlMetadata(filePath)
+	if err != nil {
+		// Log a warning or just pass nil to ReviewPlan? PlanFile probably already warned/errored.
+		ebml = nil
+	}
+
+	if fixer.ReviewPlan(plan, ebml, opts) {
 		if opts.DryRun {
 			ui.PrintSuccess("Dry-run complete. No files were modified.")
 
