@@ -109,18 +109,40 @@ func reviewStatisticsAndTags(plan *FixPlan, opts Options) {
 }
 
 func reviewTrackEdits(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if len(plan.TrackEdits) == 0 {
-		return
+	if len(plan.FlagEdits) > 0 {
+		if ebml != nil {
+			previewFlagEdits(ebml, plan.FlagEdits)
+		} else {
+			printTrackEditsFallback(plan.FlagEdits)
+		}
+
+		if !confirmApply(opts, "Apply these flag fixes?", "Skipping flag fixes...") {
+			plan.FlagEdits = nil
+		}
 	}
 
-	if ebml != nil {
-		previewTrackEdits("Track Edits", ebml, plan.TrackEdits)
-	} else {
-		printTrackEditsFallback(plan.TrackEdits)
+	if len(plan.NameEdits) > 0 {
+		if ebml != nil {
+			previewTrackEdits("Track Names", ebml, plan.NameEdits)
+		} else {
+			printTrackEditsFallback(plan.NameEdits)
+		}
+
+		if !confirmApply(opts, "Apply these name fixes?", "Skipping name fixes...") {
+			plan.NameEdits = nil
+		}
 	}
 
-	if !confirmApply(opts, "Apply these track property fixes?", "Skipping track properties...") {
-		plan.TrackEdits = nil
+	if len(plan.LanguageEdits) > 0 {
+		if ebml != nil {
+			previewTrackEdits("Language Tags", ebml, plan.LanguageEdits)
+		} else {
+			printTrackEditsFallback(plan.LanguageEdits)
+		}
+
+		if !confirmApply(opts, "Apply these language tag fixes?", "Skipping language tag fixes...") {
+			plan.LanguageEdits = nil
+		}
 	}
 }
 

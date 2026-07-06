@@ -20,7 +20,9 @@ type FixPlan struct {
 	ChapterKeyframeSnaps ChapterAlignmentFix // Contains full list of new times
 
 	// 4. Track Metadata Edits (mkvpropedit)
-	TrackEdits []matroska.TrackEdit // Batch of name/flag/language edits
+	FlagEdits     []matroska.TrackEdit // Flag changes
+	NameEdits     []matroska.TrackEdit // Name changes
+	LanguageEdits []matroska.TrackEdit // Language changes
 
 	// 5. Destructive Remux Operations (mkvmerge)
 	RemuxRequired         bool
@@ -37,7 +39,9 @@ func NewFixPlan() *FixPlan {
 		FontsToAdd:            make([]matroska.AttachmentAdd, 0),
 		FontsToRemove:         make([]int, 0),
 		ChapterKeyframeSnaps:  ChapterAlignmentFix{},
-		TrackEdits:            make([]matroska.TrackEdit, 0),
+		FlagEdits:             make([]matroska.TrackEdit, 0),
+		NameEdits:             make([]matroska.TrackEdit, 0),
+		LanguageEdits:         make([]matroska.TrackEdit, 0),
 		RemuxTrackOrder:       make([]int, 0),
 		RemuxRemoveTracks:     make([]int, 0),
 		RemuxStripCompression: make([]int, 0),
@@ -46,13 +50,19 @@ func NewFixPlan() *FixPlan {
 
 // IsEmpty returns true if the plan contains no modifications.
 func (p *FixPlan) IsEmpty() bool {
-	return len(p.ContainerProperties) == 0 &&
-		!p.ClearCreationTime &&
-		!p.WriteStatistics &&
-		len(p.AttachmentRenames) == 0 &&
-		len(p.FontsToAdd) == 0 &&
-		len(p.FontsToRemove) == 0 &&
-		p.ChapterKeyframeSnaps.Changed == 0 &&
-		len(p.TrackEdits) == 0 &&
-		!p.RemuxRequired
+	return !p.hasContainerEdits() && !p.hasTrackEdits() && !p.RemuxRequired
+}
+
+func (p *FixPlan) hasContainerEdits() bool {
+	return len(p.ContainerProperties) > 0 ||
+		p.ClearCreationTime ||
+		p.WriteStatistics ||
+		len(p.AttachmentRenames) > 0 ||
+		len(p.FontsToAdd) > 0 ||
+		len(p.FontsToRemove) > 0 ||
+		p.ChapterKeyframeSnaps.Changed > 0
+}
+
+func (p *FixPlan) hasTrackEdits() bool {
+	return len(p.FlagEdits) > 0 || len(p.NameEdits) > 0 || len(p.LanguageEdits) > 0
 }

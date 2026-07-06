@@ -39,11 +39,15 @@ func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 
 	// 8. Track Edits
 	// For now we just append the basic flag and name fixes
-	plan.TrackEdits = append(plan.TrackEdits, ComputeMatroskaNameFixes(ebml.Tracks)...)
-	plan.TrackEdits = append(plan.TrackEdits, ComputeMatroskaFlagFixes(ebml.Tracks)...)
+	plan.FlagEdits = ComputeMatroskaFlagFixes(ebml.Tracks)
+	plan.NameEdits = ComputeMatroskaNameFixes(ebml.Tracks)
+
+	// Apply automatic track edits to an in-memory copy before computing the remux plan
+	// because track reordering depends on the *new* track languages!
+	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.FlagEdits, plan.NameEdits)
 
 	// 9. Remux Plan
-	remuxPlan := ComputeMatroskaRemux(ebml.Tracks, "en") // assuming English for now or lookupOriginalLanguage
+	remuxPlan := ComputeMatroskaRemux(simulatedTracks, "en") // assuming English for now or lookupOriginalLanguage
 	plan.RemuxRequired = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
 
 	plan.RemuxTrackOrder = remuxPlan.TrackOrder
@@ -54,6 +58,47 @@ func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 	plan.RemuxStripCompression = remuxPlan.StripCompressionIDs
 
 	return plan, nil
+}
+
+// ApplyEditsToMemoryTracks creates a copy of the given tracks and applies the specified track edits to them.
+func ApplyEditsToMemoryTracks(original []matroska.EbmlTrack, editGroups ...[]matroska.TrackEdit) []matroska.EbmlTrack {
+	tracks := make([]matroska.EbmlTrack, len(original))
+	copy(tracks, original)
+
+	for _, group := range editGroups {
+		for _, edit := range group {
+			for i := range tracks {
+				if tracks[i].Properties.Number == edit.Number {
+					for k, v := range edit.Props {
+						applyPropertyToTrack(&tracks[i], k, v)
+					}
+				}
+			}
+		}
+	}
+
+	return tracks
+}
+
+func applyPropertyToTrack(track *matroska.EbmlTrack, key, value string) {
+	switch key {
+	case "language":
+		track.Properties.Language = value
+	case "name":
+		track.Properties.Name = value
+	case "flag-default":
+		track.Properties.Default = value == "1"
+	case "flag-forced":
+		track.Properties.Forced = value == "1"
+	case "flag-hearing-impaired":
+		track.Properties.HearingImpaired = value == "1"
+	case "flag-visual-impaired":
+		track.Properties.VisualImpaired = value == "1"
+	case "flag-original":
+		track.Properties.OriginalLanguage = value == "1"
+	case "flag-commentary":
+		track.Properties.Commentary = value == "1"
+	}
 }
 
 func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMetadata) {

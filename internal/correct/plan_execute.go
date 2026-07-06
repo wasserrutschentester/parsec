@@ -97,8 +97,13 @@ func executeTracksAndTags(filePath string, plan *FixPlan) error {
 		}
 	}
 
-	if len(plan.TrackEdits) > 0 {
-		if err := matroska.SetTrackProperties(filePath, plan.TrackEdits); err != nil {
+	allTrackEdits := make([]matroska.TrackEdit, 0, len(plan.FlagEdits)+len(plan.NameEdits)+len(plan.LanguageEdits))
+	allTrackEdits = append(allTrackEdits, plan.FlagEdits...)
+	allTrackEdits = append(allTrackEdits, plan.NameEdits...)
+	allTrackEdits = append(allTrackEdits, plan.LanguageEdits...)
+
+	if len(allTrackEdits) > 0 {
+		if err := matroska.SetTrackProperties(filePath, allTrackEdits); err != nil {
 			return fmt.Errorf("setting track properties: %w", err)
 		}
 	}

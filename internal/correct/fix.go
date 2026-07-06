@@ -51,9 +51,25 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 	multiLangEdits := promptMultiLangNameFixes(ebml)
 	langEdits := promptLanguageFixes(ebml)
 
-	plan.TrackEdits = append(plan.TrackEdits, keywordEdits...)
-	plan.TrackEdits = append(plan.TrackEdits, multiLangEdits...)
-	plan.TrackEdits = append(plan.TrackEdits, langEdits...)
+	plan.FlagEdits = mergeTrackEdits(plan.FlagEdits, keywordEdits)
+	plan.NameEdits = mergeTrackEdits(plan.NameEdits, multiLangEdits)
+	plan.LanguageEdits = mergeTrackEdits(plan.LanguageEdits, langEdits)
+
+	// Recompute Remux Plan based on the final set of Track Edits
+	// because interactive edits might have altered languages which changes sort order
+	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.FlagEdits, plan.NameEdits, plan.LanguageEdits)
+
+	remuxPlan := ComputeMatroskaRemux(simulatedTracks, "en") // assuming English for now
+	plan.RemuxRequired = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
+
+	plan.RemuxTrackOrder = remuxPlan.TrackOrder
+
+	plan.RemuxRemoveTracks = nil
+	for _, candidate := range remuxPlan.RemovalCandidates {
+		plan.RemuxRemoveTracks = append(plan.RemuxRemoveTracks, candidate.TrackID)
+	}
+
+	plan.RemuxStripCompression = remuxPlan.StripCompressionIDs
 
 	return nil
 }
