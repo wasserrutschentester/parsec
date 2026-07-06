@@ -117,16 +117,29 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 
 	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts, usedFonts)
 	for _, r := range renames {
-		internalName := "-"
-		if len(r.InternalNames) > 0 {
-			internalName = strings.Join(r.InternalNames, ", ")
+		fullName := "-"
+		psName := "-"
+
+		for _, fInfo := range attachmentFonts {
+			if fInfo.AttachmentID == r.ID {
+				if len(fInfo.FullNames) > 0 {
+					fullName = strings.Join(fInfo.FullNames, ", ")
+				}
+
+				if fInfo.PostScriptName != "" {
+					psName = fInfo.PostScriptName
+				}
+
+				break
+			}
 		}
 
 		plan.AttachmentRenames = append(plan.AttachmentRenames, AttachmentRename{
-			ID:           r.ID,
-			OldName:      r.OldName,
-			NewName:      r.NewName,
-			InternalName: internalName,
+			ID:             r.ID,
+			OldName:        r.OldName,
+			NewName:        r.NewName,
+			FullName:       fullName,
+			PostScriptName: psName,
 		})
 	}
 

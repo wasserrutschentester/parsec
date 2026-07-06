@@ -45,11 +45,11 @@ func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	if len(plan.AttachmentRenames) > 0 {
 		ui.Println(ui.Muted.Render("Font Attachment Renames:"))
 
-		headers := []string{"Old Name", "Internal Name", "New Name"}
+		headers := []string{"Old Name", "Full Name", "PostScript Name", "New Name"}
 		rows := make([][]string, 0, len(plan.AttachmentRenames))
 
 		for _, r := range plan.AttachmentRenames {
-			rows = append(rows, []string{r.OldName, r.InternalName, r.NewName})
+			rows = append(rows, []string{r.OldName, r.FullName, r.PostScriptName, r.NewName})
 		}
 
 		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))

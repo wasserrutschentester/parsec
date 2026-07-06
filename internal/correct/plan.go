@@ -87,10 +87,11 @@ type ContainerPropertyEdit struct {
 
 // AttachmentRename represents a rename of a font attachment.
 type AttachmentRename struct {
-	ID           int
-	OldName      string
-	NewName      string
-	InternalName string
+	ID             int
+	OldName        string
+	NewName        string
+	FullName       string
+	PostScriptName string
 }
 
 // AttachmentRemove represents the removal of an unused font attachment.
