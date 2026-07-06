@@ -97,7 +97,7 @@ func newDefaultFontResolver() defaultFontResolver {
 // attachmentFonts is the caller's already-computed checks.GetAttachmentFonts
 // result (see ComputeUnusedFontAttachments for why this isn't recomputed here).
 func ComputeMissingFontAttachments(filePath string, ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, allowDownload bool) MissingFontAttachmentPlan {
-	missing := checks.ComputeMissingFonts(filePath, ebml.Tracks, attachmentFonts)
+	missing := ComputeMissingFonts(filePath, ebml.Tracks, attachmentFonts)
 
 	return computeMissingFontAttachmentPlan(missing, ebml.Attachments, newDefaultFontResolver(), allowDownload)
 }
@@ -248,7 +248,7 @@ func fontFileMatches(path, fontName string) ([]string, bool) {
 		return nil, false
 	}
 
-	return names, checks.FontNameMatches(fontName, names)
+	return names, FontNameMatches(fontName, names)
 }
 
 func (r defaultFontResolver) resolveGoogleFontsGitHub(fontName string) (ResolvedFont, bool) {
@@ -321,7 +321,7 @@ func (r defaultFontResolver) resolveGoogleFontsAPI(fontName, key string) (Resolv
 	}
 
 	for _, family := range response.Items {
-		if !checks.FontNameMatches(fontName, []string{family.Family}) {
+		if !FontNameMatches(fontName, []string{family.Family}) {
 			continue
 		}
 
@@ -429,7 +429,7 @@ func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, s
 	}
 
 	names, err := matroska.GetFontNames(data)
-	if err != nil || !checks.FontNameMatches(fontName, names) {
+	if err != nil || !FontNameMatches(fontName, names) {
 		return ResolvedFont{}, false
 	}
 
@@ -580,4 +580,85 @@ func fontAttachmentAdds(plan MissingFontAttachmentPlan) []matroska.AttachmentAdd
 	}
 
 	return attachments
+}
+
+func uniqueStrings(in []string) []string {
+	seen := make(map[string]bool)
+
+	var out []string
+
+	for _, v := range in {
+		if v != "" && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+
+	return out
+}
+
+// FontMappingFromFonts returns mapping from normalized font name to real name, and ID to all names.
+func FontMappingFromFonts(attachmentFonts []matroska.AttachmentFontInfo) (map[string]string, map[int][]string) {
+	fontMap := make(map[string]string)
+	attachmentNames := make(map[int][]string)
+
+	for _, font := range attachmentFonts {
+		names := make([]string, 0, 2+len(font.FullNames))
+		names = append(names, font.PostScriptName, font.FamilyName)
+		names = append(names, font.FullNames...)
+		attachmentNames[font.AttachmentID] = uniqueStrings(append(attachmentNames[font.AttachmentID], names...))
+	}
+
+	for _, names := range attachmentNames {
+		for _, name := range names {
+			fontMap[checks.NormalizeFontName(name)] = name
+		}
+	}
+
+	return fontMap, attachmentNames
+}
+
+// ComputeMissingFonts gathers ASS/SSA font descriptions that lack a matching attachment.
+func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo) []string {
+	seen := make(map[string]bool)
+	missing := make([]string, 0)
+	extracted := checks.ExtractSubtitleTracks(filePath, tracks, true, false)
+
+	for _, track := range tracks {
+		if track.Type != "subtitles" || track.Properties.CodecID != "S_TEXT/ASS" && track.Properties.CodecID != "S_TEXT/SSA" {
+			continue
+		}
+
+		var content []byte
+		if c, ok := extracted[track.ID]; ok {
+			content = c
+		}
+
+		trackMissing := checks.GetMissingFontsForTrack(track, content, attachmentFonts, config.IsCheckEnabled("matroska_subtitle_fonts"), config.IsCheckEnabled("matroska_subtitle_inline_fonts"))
+
+		for _, desc := range trackMissing {
+			normalized := checks.NormalizeFontName(desc)
+			if !seen[normalized] {
+				seen[normalized] = true
+
+				missing = append(missing, desc)
+			}
+		}
+	}
+
+	slices.Sort(missing)
+
+	return missing
+}
+
+// FontNameMatches reports whether name matches one of a font file's internal names.
+func FontNameMatches(name string, internalNames []string) bool {
+	normalizedName := checks.NormalizeFontName(name)
+	for _, internalName := range internalNames {
+		if checks.NormalizeFontName(internalName) == normalizedName {
+			return true
+		}
+	}
+
+	return false
 }

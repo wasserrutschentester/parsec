@@ -297,7 +297,8 @@ func verifyCommentaryTrackBitrate(track *matroska.EbmlTrack, miAudioTracks map[s
 }
 
 var (
-	commentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
+	// CommentaryPrefixRegex matches standard commentary attribution prefixes.
+	CommentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
 	commentaryByRegex     = regexp.MustCompile(`(?i)commentary by`)
 	isolatedScoreRegex    = regexp.MustCompile(`(?i)isolated score`)
 )
@@ -322,7 +323,7 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 				continue
 			}
 
-			if !commentaryPrefixRegex.MatchString(name) {
+			if !CommentaryPrefixRegex.MatchString(name) {
 				res.Passed = false
 				res.Severity = "warning"
 				res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("Track name %q does not start with standard prefix (e.g., \"Commentary by ...\")", name)))

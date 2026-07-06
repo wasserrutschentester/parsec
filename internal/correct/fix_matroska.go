@@ -94,7 +94,11 @@ func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) C
 		return ChapterAlignmentFix{}
 	}
 
-	videoTrackNum := checks.GetVideoTrackNumberFromEBML(ebml)
+	var videoTrackNum uint64
+	if track := checks.GetVideoTrackFromEBML(ebml); track != nil {
+		videoTrackNum = uint64(track.Properties.Number)
+	}
+
 	if videoTrackNum == 0 {
 		return ChapterAlignmentFix{}
 	}
@@ -145,7 +149,8 @@ func snapChaptersToKeyframes(chapters []matroska.EbmlChapterAtom, keyframes []in
 	changed := 0
 
 	for i, ch := range chapters {
-		if aligned, _ := checks.IsAligned(ch.TimeStart, keyframes); aligned {
+		aligned, _, _, _ := checks.IsAligned(ch.TimeStart, keyframes)
+		if aligned {
 			times[i] = ch.TimeStart
 
 			continue
@@ -186,7 +191,7 @@ func absInt64(v int64) int64 {
 // matroska_unused_fonts check's removal criteria: not referenced by any
 // subtitle track's Styles or inline tags. Returns nil when the check is
 // disabled in the configuration. attachmentFonts and usedFonts are the
-// caller's already-computed checks.GetAttachmentFonts/checks.ComputeUsedFonts
+// caller's already-computed checks.GetAttachmentFonts/checks.ComputeAllUsedFonts
 // results: both are pure functions of ebml (which is a single fixed snapshot
 // for a whole correct run), so recomputing them per fix step would only
 // reparse identical data after an unrelated mkvpropedit edit bumps the
@@ -504,23 +509,13 @@ func maybePrefixCommentaryName(name string, props matroska.EbmlTrackProperties) 
 		return name, false
 	}
 
-	if hasCommentaryPrefix(name) {
+	if checks.CommentaryPrefixRegex.MatchString(name) {
 		return name, false
 	}
 
 	prefixed := addCommentaryPrefix(name)
 
 	return prefixed, prefixed != name
-}
-
-func hasCommentaryPrefix(name string) bool {
-	core := checks.ExtractCommentaryCoreOriginalCase(name)
-	lower := strings.ToLower(core)
-
-	return lower == "commentary by" ||
-		strings.HasPrefix(lower, "commentary by ") ||
-		lower == "isolated score with commentary by" ||
-		strings.HasPrefix(lower, "isolated score with commentary by ")
 }
 
 func addCommentaryPrefix(name string) string {

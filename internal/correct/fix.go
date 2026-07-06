@@ -77,8 +77,9 @@ func fixContainerMetadata(filePath string, opts Options) error {
 	// caused by an unrelated mkvpropedit edit (title, chapters, a prior
 	// rename) bumping the file's mtime and busting the mtime-keyed cache.
 	attachmentFonts := checks.GetAttachmentFonts(filePath, ebml.Attachments)
-	_, attachmentNames := checks.FontMappingFromFonts(attachmentFonts)
-	usedFonts := checks.ComputeUsedFonts(filePath, ebml.Tracks)
+	_, attachmentNames := FontMappingFromFonts(attachmentFonts)
+	extracted := checks.ExtractSubtitleTracks(filePath, ebml.Tracks, true, false)
+	usedFonts := checks.ComputeAllUsedFonts(ebml.Tracks, extracted)
 
 	if err := renameNonCompliantFonts(filePath, ebml, attachmentNames, attachmentFonts, usedFonts, opts); err != nil {
 		return err

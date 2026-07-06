@@ -331,7 +331,8 @@ func findPrevNextKeyframes(timeStart int64, keyframes []int64) (int64, int64) {
 	return prevKF, nextKF
 }
 
-func isAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
+// IsAligned reports whether a chapter timestamp is close enough to a keyframe.
+func IsAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
 	closestDiff := int64(-1)
 	prevKF, nextKF := findPrevNextKeyframes(timeStart, keyframes)
 
@@ -409,7 +410,7 @@ func getAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTr
 	var rows [][]string
 
 	for i, ch := range chapters.Atoms {
-		if aligned, _, prevKF, nextKF := isAligned(ch.TimeStart, keyframes); !aligned {
+		if aligned, _, prevKF, nextKF := IsAligned(ch.TimeStart, keyframes); !aligned {
 			name := "-"
 			if len(ch.Display) > 0 && ch.Display[0].String != "" {
 				name = ch.Display[0].String

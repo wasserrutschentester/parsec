@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	dtsRegex        = regexp.MustCompile(`\bDTS\b`)
-	adRegex         = regexp.MustCompile(`\bAD\b`)
+	dtsRegex = regexp.MustCompile(`\bDTS\b`)
+	// ADRegex matches a standalone "AD" audio-description token in a track name.
+	ADRegex         = regexp.MustCompile(`\bAD\b`)
 	wordSplitRegex  = regexp.MustCompile(`[\s/.,;()]+`)
 	commonLangNames = map[string]string{
 		"english": "en", "german": "de", "french": "fr", "spanish": "es",
@@ -31,8 +32,10 @@ var (
 		"한국어": "ko", "русский": "ru",
 	}
 
-	junkKeywords = []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
-	simpleCodecs = []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
+	// JunkKeywords are stripped from track names by the name-quality fix policy.
+	JunkKeywords = []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
+	// SimpleCodecs are simple codec-name tokens stripped from track names.
+	SimpleCodecs = []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
 )
 
 const (
@@ -112,7 +115,7 @@ func formatPriority(p int64) string {
 
 func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
-	for _, junk := range junkKeywords {
+	for _, junk := range JunkKeywords {
 		if strings.Contains(nameUpper, junk) {
 			warning := fmt.Sprintf("junk keyword '%s' in Name", ui.Warning.Render(junk))
 
@@ -125,7 +128,7 @@ func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 
 func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
-	for _, codec := range simpleCodecs {
+	for _, codec := range SimpleCodecs {
 		if strings.Contains(nameUpper, codec) {
 			warning := fmt.Sprintf("simple codec '%s' in Name", ui.Warning.Render(codec))
 
@@ -361,7 +364,7 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 		return res
 	}
 
-	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || adRegex.MatchString(nameUpper)
+	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || ADRegex.MatchString(nameUpper)
 	if res := checkFlagKeywordResult(track, props.VisualImpaired, "Visual Impaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); res != nil {
 		return res
 	}
