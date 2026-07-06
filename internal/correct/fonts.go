@@ -152,7 +152,7 @@ func attachmentNameForFont(fontName, path string) string {
 func uniqueAttachmentName(name string, used map[string]bool) string {
 	candidate := name
 	for n := 2; used[strings.ToLower(candidate)]; n++ {
-		candidate = suffixFontName(name, n)
+		candidate = checks.SuffixFontName(name, n)
 	}
 
 	used[strings.ToLower(candidate)] = true

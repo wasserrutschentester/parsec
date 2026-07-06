@@ -38,15 +38,12 @@ func TestComputeUnusedFontAttachmentsDisabled(t *testing.T) {
 func TestComputeFontRenames(t *testing.T) {
 	t.Parallel()
 
-	attachments := []matroska.EbmlAttachment{
-		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
-		{ID: 2, FileName: "Calibri-Bold.ttf", ContentType: "font/ttf"},
-		{ID: 3, FileName: "subs.ass"},
-	}
-
-	attachmentNames := map[int][]string{
-		1: {"Open Sans"},
-		2: {"Calibri Bold"},
+	ebml := &matroska.EbmlMetadata{
+		Attachments: []matroska.EbmlAttachment{
+			{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+			{ID: 2, FileName: "Calibri-Bold.ttf", ContentType: "font/ttf"},
+			{ID: 3, FileName: "subs.ass"},
+		},
 	}
 
 	attachmentFonts := []matroska.AttachmentFontInfo{
@@ -54,7 +51,7 @@ func TestComputeFontRenames(t *testing.T) {
 		{AttachmentID: 2, FamilyName: "Calibri Bold"},
 	}
 
-	got := computeFontRenames(attachments, attachmentNames, attachmentFonts)
+	got := ComputeFontRenames(ebml, attachmentFonts)
 
 	if len(got) != 1 {
 		t.Fatalf("expected 1 rename, got %d: %+v", len(got), got)
@@ -73,17 +70,12 @@ func TestComputeFontRenames(t *testing.T) {
 func TestComputeFontRenamesDisambiguatesCollisions(t *testing.T) {
 	t.Parallel()
 
-	attachments := []matroska.EbmlAttachment{
-		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
-		{ID: 2, FileName: "font2.ttf", ContentType: "font/ttf"},
-		{ID: 3, FileName: "font3.ttf", ContentType: "font/ttf"},
-	}
-
-	// Three distinct attachments all embedding the same font name.
-	attachmentNames := map[int][]string{
-		1: {"Times New Roman"},
-		2: {"Times New Roman"},
-		3: {"Times New Roman"},
+	ebml := &matroska.EbmlMetadata{
+		Attachments: []matroska.EbmlAttachment{
+			{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+			{ID: 2, FileName: "font2.ttf", ContentType: "font/ttf"},
+			{ID: 3, FileName: "font3.ttf", ContentType: "font/ttf"},
+		},
 	}
 
 	attachmentFonts := []matroska.AttachmentFontInfo{
@@ -92,7 +84,7 @@ func TestComputeFontRenamesDisambiguatesCollisions(t *testing.T) {
 		{AttachmentID: 3, FamilyName: "Times New Roman"},
 	}
 
-	got := computeFontRenames(attachments, attachmentNames, attachmentFonts)
+	got := ComputeFontRenames(ebml, attachmentFonts)
 
 	if len(got) != 3 {
 		t.Fatalf("expected 3 renames, got %d: %+v", len(got), got)
@@ -115,19 +107,17 @@ func TestComputeFontRenamesDisambiguatesCollisions(t *testing.T) {
 func TestComputeFontRenamesPrefersPostScriptName(t *testing.T) {
 	t.Parallel()
 
-	attachments := []matroska.EbmlAttachment{
-		{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
-	}
-
-	attachmentNames := map[int][]string{
-		1: {"Open Sans", "OpenSans-Bold"},
+	ebml := &matroska.EbmlMetadata{
+		Attachments: []matroska.EbmlAttachment{
+			{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"},
+		},
 	}
 
 	attachmentFonts := []matroska.AttachmentFontInfo{
 		{AttachmentID: 1, FamilyName: "Open Sans", PostScriptName: "OpenSans-Bold"},
 	}
 
-	got := computeFontRenames(attachments, attachmentNames, attachmentFonts)
+	got := ComputeFontRenames(ebml, attachmentFonts)
 
 	if len(got) != 1 || got[0].NewName != "OpenSans-Bold.ttf" {
 		t.Errorf("expected rename to use the PostScript name, got %+v", got)
@@ -170,7 +160,7 @@ func TestComputeFontRenamesDisabled(t *testing.T) {
 		Attachments: []matroska.EbmlAttachment{{ID: 1, FileName: "font1.ttf", ContentType: "font/ttf"}},
 	}
 
-	if got := ComputeFontRenames(ebml, nil, nil); got != nil {
+	if got := ComputeFontRenames(ebml, nil); got != nil {
 		t.Errorf("expected nil when matroska_font_filename_compliance is disabled, got %+v", got)
 	}
 }

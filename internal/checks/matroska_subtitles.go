@@ -896,15 +896,19 @@ func FontFilenameCompliant(attFileName string, names []string) bool {
 	return false
 }
 
-type fontComplianceRow struct {
-	attID    int
-	current  string
-	proposed string
+// ProposedFontRename contains a proposed rename for a non-compliant font attachment.
+type ProposedFontRename struct {
+	AttachmentID  int
+	CurrentName   string
+	ProposedName  string
+	InternalNames []string
 }
 
-//nolint:gocognit,nestif,cyclop,funlen // Requires multiple passes and deduplication
-func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []fontComplianceRow {
-	var nonCompliant []fontComplianceRow
+// ComputeProposedFontRenames computes the necessary font renames for non-compliant fonts.
+//
+//nolint:cyclop // Requires multiple passes and deduplication
+func ComputeProposedFontRenames(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []ProposedFontRename {
+	var nonCompliant []ProposedFontRename
 
 	usedNewNames := make(map[string]bool)
 
@@ -933,24 +937,11 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 		if !FontFilenameCompliant(att.FileName, names) {
 			proposed := ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
 			if proposed != "" {
-				base := proposed
-				ext := ""
-
-				if idx := strings.LastIndex(proposed, "."); idx != -1 {
-					base = proposed[:idx]
-					ext = proposed[idx:]
-				}
-
 				newName := proposed
 
 				counter := 2
 				for usedNewNames[strings.ToLower(newName)] {
-					if counter == 2 {
-						newName = fmt.Sprintf("%s_dupe%s", base, ext)
-					} else {
-						newName = fmt.Sprintf("%s_dupe%d%s", base, counter, ext)
-					}
-
+					newName = SuffixFontName(proposed, counter)
 					counter++
 				}
 
@@ -960,10 +951,11 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 				proposed = "-"
 			}
 
-			nonCompliant = append(nonCompliant, fontComplianceRow{
-				attID:    att.ID,
-				current:  att.FileName,
-				proposed: proposed,
+			nonCompliant = append(nonCompliant, ProposedFontRename{
+				AttachmentID:  att.ID,
+				CurrentName:   att.FileName,
+				ProposedName:  proposed,
+				InternalNames: names,
 			})
 		}
 	}
@@ -971,7 +963,7 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 	return nonCompliant
 }
 
-func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
+func buildFontComplianceResult(nonCompliant []ProposedFontRename, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
 	headers := []string{"ID", "Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
 
 	var rows [][]string
@@ -980,7 +972,7 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 		var fInfo *matroska.AttachmentFontInfo
 
 		for _, f := range attachmentFonts {
-			if f.AttachmentID == row.attID {
+			if f.AttachmentID == row.AttachmentID {
 				fCopy := f
 				fInfo = &fCopy
 
@@ -1000,11 +992,11 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 			}
 
 			rows = append(rows, []string{
-				strconv.Itoa(row.attID),
-				row.current,
+				strconv.Itoa(row.AttachmentID),
+				row.CurrentName,
 				fullName,
 				psName,
-				row.proposed,
+				row.ProposedName,
 			})
 		}
 	}
@@ -1022,7 +1014,7 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 }
 
 func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
-	nonCompliant := findNonCompliantFonts(attachments, attachmentFonts)
+	nonCompliant := ComputeProposedFontRenames(attachments, attachmentFonts)
 	if len(nonCompliant) == 0 {
 		return nil
 	}
@@ -1774,4 +1766,18 @@ func parseStyleConfigsFromTrack(track matroska.EbmlTrack) map[string]FontStyle {
 	}
 
 	return parseStyleConfigs(privateBytes)
+}
+
+// SuffixFontName appends _dupe suffixes for disambiguation.
+func SuffixFontName(name string, n int) string {
+	base, ext := name, ""
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		base, ext = name[:idx], name[idx:]
+	}
+
+	if n == 2 {
+		return fmt.Sprintf("%s_dupe%s", base, ext)
+	}
+
+	return fmt.Sprintf("%s_dupe%d%s", base, n, ext)
 }

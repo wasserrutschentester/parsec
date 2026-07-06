@@ -111,11 +111,10 @@ func applyPropertyToTrack(track *matroska.EbmlTrack, key, value string) {
 //nolint:cyclop,funlen // loop over nested slices adds complexity but is readable
 func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMetadata) {
 	attachmentFonts := checks.GetAttachmentFonts(filePath, ebml.Attachments)
-	_, attachmentNames := FontMappingFromFonts(attachmentFonts)
 	extracted := checks.ExtractSubtitleTracks(filePath, ebml.Tracks, true, false)
 	usedFonts := checks.ComputeAllUsedFonts(ebml.Tracks, extracted)
 
-	renames := ComputeFontRenames(ebml, attachmentNames, attachmentFonts)
+	renames := ComputeFontRenames(ebml, attachmentFonts)
 	for _, r := range renames {
 		fullName := "-"
 		psName := "-"
