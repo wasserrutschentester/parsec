@@ -160,7 +160,7 @@ func TestIsCheckEnabledSpecialValues(t *testing.T) {
 		t.Errorf("IsCheckEnabled(some_check) with 'all' = false, want true")
 	}
 
-	if !IsCheckEnabled("matroska_subtitle_inline_fonts") {
+	if !IsCheckEnabled(CheckMatroskaSubtitleInlineFonts) {
 		t.Errorf("IsCheckEnabled(matroska_subtitle_inline_fonts) with 'all' = false, want true")
 	}
 
@@ -169,7 +169,7 @@ func TestIsCheckEnabledSpecialValues(t *testing.T) {
 	InitDefaults()
 	viper.Set("disabled_checks", []string{})
 
-	if !IsCheckEnabled("matroska_subtitle_inline_fonts") {
+	if !IsCheckEnabled(CheckMatroskaSubtitleInlineFonts) {
 		t.Errorf("IsCheckEnabled(matroska_subtitle_inline_fonts) with [] = false, want true")
 	}
 }

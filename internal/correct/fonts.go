@@ -587,7 +587,7 @@ func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmen
 			content = c
 		}
 
-		trackMissing := checks.GetMissingFontsForTrack(track, content, attachmentFonts, config.IsCheckEnabled("matroska_subtitle_fonts"), config.IsCheckEnabled("matroska_subtitle_inline_fonts"))
+		trackMissing := checks.GetMissingFontsForTrack(track, content, attachmentFonts, config.IsCheckEnabled(config.CheckMatroskaSubtitleFonts), config.IsCheckEnabled(config.CheckMatroskaSubtitleInlineFonts))
 
 		for _, desc := range trackMissing {
 			normalized := checks.NormalizeFontName(desc)
