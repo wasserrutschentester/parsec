@@ -7,15 +7,6 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-// merged into existing track 2
-// appended as a new track
-
-// Order is base order followed by new tracks from extra.
-
-// Track 2 must carry both its base and extra properties.
-
-// Track 2 has two mismatches (Forced + SDH) and must produce one consolidated edit.
-
 func TestFormatContainerChange(t *testing.T) {
 	t.Parallel()
 

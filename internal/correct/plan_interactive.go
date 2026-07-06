@@ -14,9 +14,6 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
-// Options controls which fixes are applied and how interactive decisions are
-// handled.
-
 // AppendInteractiveTrackEdits prompts the user for manual fixes (like keyword/flag matching).
 func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) error {
 	if !canPrompt(opts) {

@@ -3,15 +3,16 @@ package correct
 import (
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
-	"github.com/spf13/viper"
 )
 
-//nolint:paralleltest // mutates global state
+//nolint:paralleltest,funlen // mutates global state
 func TestPlanFile(t *testing.T) {
 	config.InitDefaults()
 	// Force the check to be enabled so we guarantee a title edit is proposed
@@ -19,7 +20,8 @@ func TestPlanFile(t *testing.T) {
 
 	// Mock resolveMetadata
 	originalResolve := resolveMetadata
-	resolveMetadata = func(opts resolve.Options) (*resolve.Result, error) {
+
+	resolveMetadata = func(_ resolve.Options) (*resolve.Result, error) {
 		return &resolve.Result{
 			Meta: &metadata.Metadata{
 				Title: "Test Title",
@@ -31,7 +33,8 @@ func TestPlanFile(t *testing.T) {
 
 	// Mock getEbmlMetadata
 	originalGetEbml := getEbmlMetadata
-	getEbmlMetadata = func(filePath string) (*matroska.EbmlMetadata, error) {
+
+	getEbmlMetadata = func(_ string) (*matroska.EbmlMetadata, error) {
 		return &matroska.EbmlMetadata{
 			Container: matroska.EbmlContainer{
 				Properties: matroska.EbmlContainerProperties{
@@ -62,7 +65,8 @@ func TestPlanFile(t *testing.T) {
 
 	// Mock extractTagsXML
 	originalExtractTags := extractTagsXML
-	extractTagsXML = func(filePath string) ([]byte, error) {
+
+	extractTagsXML = func(_ string) ([]byte, error) {
 		return []byte("<Tags></Tags>"), nil
 	}
 	defer func() { extractTagsXML = originalExtractTags }()
@@ -82,14 +86,17 @@ func TestPlanFile(t *testing.T) {
 
 	// Verify that the title fix got populated
 	var foundTitle bool
+
 	for _, prop := range plan.ContainerProperties {
 		if prop.Key == "title" {
 			foundTitle = true
+
 			if prop.NewValue != "Test Title" {
 				t.Errorf("expected container title to be set to 'Test Title', got '%s'", prop.NewValue)
 			}
 		}
 	}
+
 	if !foundTitle {
 		t.Errorf("expected a container property edit for 'title'")
 	}
