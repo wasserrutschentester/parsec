@@ -152,6 +152,7 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 			MIMEType:       att.MIMEType,
 			FontName:       att.FontName,
 			Source:         att.Source,
+			RequestedBy:    att.RequestedBy,
 		})
 	}
 

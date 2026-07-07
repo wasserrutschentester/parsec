@@ -186,6 +186,7 @@ func TestComputeMissingFontAttachmentPlan(t *testing.T) {
 
 	plan := computeMissingFontAttachmentPlan(
 		[]string{"Open Sans", "Unknown Font"},
+		map[string][]string{"Open Sans": {"Track 1"}},
 		[]matroska.EbmlAttachment{{FileName: "Open Sans.ttf"}},
 		resolver,
 		true,

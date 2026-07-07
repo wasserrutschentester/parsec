@@ -58,6 +58,7 @@ type MissingFontAttachment struct {
 	MIMEType       string
 	Source         string
 	InternalNames  []string
+	RequestedBy    []string
 }
 
 // ResolvedFont describes a font file found by a resolver.
@@ -100,12 +101,12 @@ func newDefaultFontResolver() defaultFontResolver {
 // attachmentFonts is the caller's already-computed checks.GetAttachmentFonts
 // result (see ComputeUnusedFontAttachments for why this isn't recomputed here).
 func ComputeMissingFontAttachments(filePath string, ebml *matroska.EbmlMetadata, attachmentFonts []matroska.AttachmentFontInfo, allowDownload bool) MissingFontAttachmentPlan {
-	missing := ComputeMissingFonts(filePath, ebml.Tracks, attachmentFonts)
+	missingFonts, fontRequesters := ComputeMissingFonts(filePath, ebml.Tracks, attachmentFonts)
 
-	return computeMissingFontAttachmentPlan(missing, ebml.Attachments, newDefaultFontResolver(), allowDownload)
+	return computeMissingFontAttachmentPlan(missingFonts, fontRequesters, ebml.Attachments, newDefaultFontResolver(), allowDownload)
 }
 
-func computeMissingFontAttachmentPlan(missing []string, existing []matroska.EbmlAttachment, resolver fontResolver, allowDownload bool) MissingFontAttachmentPlan {
+func computeMissingFontAttachmentPlan(missing []string, fontRequesters map[string][]string, existing []matroska.EbmlAttachment, resolver fontResolver, allowDownload bool) MissingFontAttachmentPlan {
 	plan := MissingFontAttachmentPlan{}
 	usedNames := existingAttachmentNames(existing)
 
@@ -125,6 +126,7 @@ func computeMissingFontAttachmentPlan(missing []string, existing []matroska.Ebml
 			MIMEType:       fontMIMEType(resolved.Path),
 			Source:         resolved.Source,
 			InternalNames:  resolved.InternalNames,
+			RequestedBy:    fontRequesters[fontName],
 		})
 	}
 
@@ -572,9 +574,11 @@ func FontMappingFromFonts(attachmentFonts []matroska.AttachmentFontInfo) (map[st
 }
 
 // ComputeMissingFonts gathers ASS/SSA font descriptions that lack a matching attachment.
-func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo) []string {
+// It returns a list of missing font names and a map of font names to the tracks that requested them.
+func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo) ([]string, map[string][]string) {
 	seen := make(map[string]bool)
 	missing := make([]string, 0)
+	requesters := make(map[string][]string)
 	extracted := checks.ExtractSubtitleTracks(filePath, tracks, true, false)
 
 	for _, track := range tracks {
@@ -596,12 +600,29 @@ func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmen
 
 				missing = append(missing, desc)
 			}
+
+			// Always append the requester, even if we've seen it before
+			requesters[desc] = append(requesters[desc], fontRequesterLabel(&track))
 		}
+	}
+
+	// Deduplicate requesters
+	for k, reqs := range requesters {
+		requesters[k] = slices.Compact(reqs)
 	}
 
 	slices.Sort(missing)
 
-	return missing
+	return missing, requesters
+}
+
+func fontRequesterLabel(track *matroska.EbmlTrack) string {
+	label := fmt.Sprintf("Track %d", track.Properties.Number)
+	if track.Properties.Language != "" {
+		label += fmt.Sprintf(" (%s)", track.Properties.Language)
+	}
+
+	return label
 }
 
 // FontNameMatches reports whether name matches one of a font file's internal names.

@@ -38,34 +38,47 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 // fixBuilder accumulates property edits per track while preserving the order in
 // which tracks are first touched, so the resulting edit list is deterministic.
 type fixBuilder struct {
-	order []int
-	byNum map[int]map[string]string
+	order   []int
+	byNum   map[int]map[string]string
+	reasons map[int]map[string]string
 }
 
 func newFixBuilder() *fixBuilder {
-	return &fixBuilder{byNum: make(map[int]map[string]string)}
+	return &fixBuilder{
+		byNum:   make(map[int]map[string]string),
+		reasons: make(map[int]map[string]string),
+	}
 }
 
-func (b *fixBuilder) set(number int, key, value string) {
+func (b *fixBuilder) set(number int, key, value, reason string) {
 	props, ok := b.byNum[number]
 	if !ok {
 		props = make(map[string]string)
 		b.byNum[number] = props
+		b.reasons[number] = make(map[string]string)
 		b.order = append(b.order, number)
 	}
 
 	props[key] = value
+	if reason != "" {
+		b.reasons[number][key] = reason
+	}
 }
 
 func (b *fixBuilder) edits() []matroska.TrackEdit {
 	edits := make([]matroska.TrackEdit, 0, len(b.order))
 	for _, number := range b.order {
-		edits = append(edits, matroska.TrackEdit{Number: number, Props: b.byNum[number]})
+		edits = append(edits, matroska.TrackEdit{
+			Number:  number,
+			Props:   b.byNum[number],
+			Reasons: b.reasons[number],
+		})
 	}
 
 	return edits
 }
 
+//nolint:cyclop // Resolving default flags inherently requires several condition branches
 func (b *fixBuilder) computeDefaultFlagFixes(tracks []matroska.EbmlTrack) {
 	if !config.IsCheckEnabled(config.CheckMatroskaDefaultFlags) {
 		return
@@ -90,7 +103,14 @@ func (b *fixBuilder) computeDefaultFlagFixes(tracks []matroska.EbmlTrack) {
 		}
 
 		if props.Default != shouldBeDefault {
-			b.set(props.Number, "flag-default", boolFlag(shouldBeDefault))
+			reason := "Resolve default flag conflicts"
+			if shouldBeDefault {
+				reason = "Set as default standard track"
+			} else if isSpecialized {
+				reason = "Strip default flag from specialized track"
+			}
+
+			b.set(props.Number, "flag-default", boolFlag(shouldBeDefault), reason)
 		}
 	}
 }
@@ -110,7 +130,7 @@ func (b *fixBuilder) computeOriginalFlagFixes(tracks []matroska.EbmlTrack) {
 
 		props := track.Properties
 		if langHasOriginalFlag[props.Language] && !props.OriginalLanguage {
-			b.set(props.Number, "flag-original", "1")
+			b.set(props.Number, "flag-original", "1", "Infer original language from file context")
 		}
 	}
 }
@@ -126,7 +146,7 @@ func (b *fixBuilder) computeNameFixes(tracks []matroska.EbmlTrack) {
 
 		if newName := fixedTrackName(track); newName != track.Properties.Name {
 			// An empty value instructs SetTrackProperties to delete the name.
-			b.set(track.Properties.Number, "name", newName)
+			b.set(track.Properties.Number, "name", newName, "Clean junk keywords or redundant language")
 			fixedNames[track.Properties.Number] = newName
 		} else {
 			fixedNames[track.Properties.Number] = track.Properties.Name
@@ -260,7 +280,7 @@ func (b *fixBuilder) computeCommentaryPairingNameFixes(tracks []matroska.EbmlTra
 
 		newName, _ := maybeAppendKeywords(audioName, track.Properties)
 		newName, _ = maybePrefixCommentaryName(newName, track.Properties)
-		b.set(track.Properties.Number, "name", newName)
+		b.set(track.Properties.Number, "name", newName, "Generate missing multi-language track name")
 		fixedNames[track.Properties.Number] = newName
 	}
 }

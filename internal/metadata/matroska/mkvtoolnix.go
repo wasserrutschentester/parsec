@@ -1041,6 +1041,8 @@ type TrackEdit struct {
 	// Props maps an mkvpropedit property name (e.g. "flag-default", "name") to
 	// its new value. An empty value deletes the property instead of setting it.
 	Props map[string]string
+	// Reasons maps a property name to the rationale for changing it.
+	Reasons map[string]string
 }
 
 // SetTrackProperties applies the given per-track property edits to a Matroska

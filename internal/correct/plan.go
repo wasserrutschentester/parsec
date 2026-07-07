@@ -83,6 +83,7 @@ type ContainerPropertyEdit struct {
 	Key      string
 	OldValue string
 	NewValue string
+	Reason   string
 }
 
 // AttachmentRename represents a rename of a font attachment.

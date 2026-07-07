@@ -309,7 +309,7 @@ func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualVa
 // TrackTable renders a table of track information.
 func TrackTable(headers []string, rows [][]string) string {
 	t := table.New().
-		Border(lipgloss.DoubleBorder()).
+		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(white)).
 		StyleFunc(func(row, _ int) lipgloss.Style {
 			if row < 0 { // Header row

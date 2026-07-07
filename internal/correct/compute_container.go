@@ -19,18 +19,33 @@ func ComputeContainerFixes(ebml *matroska.EbmlMetadata, meta *metadata.Metadata)
 			newTitle = meta.Title
 		}
 
-		props = append(props, ContainerPropertyEdit{Key: "title", OldValue: ebml.Container.Properties.Title, NewValue: newTitle})
+		props = append(props, ContainerPropertyEdit{
+			Key:      "title",
+			OldValue: ebml.Container.Properties.Title,
+			NewValue: newTitle,
+			Reason:   "Strip release group metadata",
+		})
 	}
 
 	if config.IsCheckEnabled(config.CheckMatroskaAppHygiene) && checks.AppHygieneNeedsFix(ebml.Container.Properties.WritingApplication) {
-		props = append(props, ContainerPropertyEdit{Key: "writing-application", OldValue: ebml.Container.Properties.WritingApplication, NewValue: ""})
+		props = append(props, ContainerPropertyEdit{
+			Key:      "writing-application",
+			OldValue: ebml.Container.Properties.WritingApplication,
+			NewValue: "",
+			Reason:   "Strip encoding software footprint",
+		})
 	}
 
 	if config.IsCheckEnabled(config.CheckMatroskaCreationTimePrivacy) && checks.ContainerCreationTimeNeedsFix(ebml) {
 		// Creation time is usually handled separately, but we leave it here if it was here.
 		// Wait, the old code had `props["date"] = ""` here!
 		// Let's preserve that.
-		props = append(props, ContainerPropertyEdit{Key: "date", OldValue: "set", NewValue: ""})
+		props = append(props, ContainerPropertyEdit{
+			Key:      "date",
+			OldValue: "set",
+			NewValue: "",
+			Reason:   "Clear non-standard or dirty creation time string",
+		})
 	}
 
 	return props

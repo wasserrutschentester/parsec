@@ -36,7 +36,7 @@ func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 		ui.Println(ui.Muted.Render("Container Metadata:"))
 
 		for _, p := range plan.ContainerProperties {
-			ui.Println("  " + formatContainerChange(p.Key, p.OldValue, p.NewValue))
+			ui.Println("  " + formatContainerChange(p.Key, p.OldValue, p.NewValue, p.Reason))
 		}
 
 		if !confirmApply(opts, "Apply these container fixes?", "Skipping container fixes...") {
@@ -95,7 +95,7 @@ func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
 	}
 }
 
-func formatContainerChange(key, oldValue, newValue string) string {
+func formatContainerChange(key, oldValue, newValue, reason string) string {
 	arrow := ui.Muted.Render("->")
 	label := key
 
@@ -107,16 +107,25 @@ func formatContainerChange(key, oldValue, newValue string) string {
 	case "muxing-application":
 		label = "MuxingApp"
 	case "date":
-		label = "CreationTime"
-
-		return fmt.Sprintf("  %s: %s %s %s", label, ui.Warning.Render("[present]"), arrow, ui.Muted.Render("[cleared]"))
+		label = "Date"
 	}
 
-	if newValue == "" {
-		return fmt.Sprintf("  %s: %s %s %s", label, quoteOrNone(oldValue), arrow, ui.Muted.Render("[cleared]"))
+	var res string
+
+	switch {
+	case oldValue == "set" && newValue == "":
+		res = fmt.Sprintf("%s: %s %s %s", label, ui.Muted.Render("[present]"), arrow, ui.Muted.Render("[cleared]"))
+	case newValue == "":
+		res = fmt.Sprintf("%s: %s %s %s", label, quoteOrNone(oldValue), arrow, ui.Muted.Render("[cleared]"))
+	default:
+		res = fmt.Sprintf("%s: %s %s %s", label, quoteOrNone(oldValue), arrow, quoteOrNone(newValue))
 	}
 
-	return fmt.Sprintf("  %s: %s %s %s", label, quoteOrNone(oldValue), arrow, quoteOrNone(newValue))
+	if reason != "" {
+		res += ui.Muted.Render(" (" + reason + ")")
+	}
+
+	return res
 }
 
 func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
@@ -135,13 +144,18 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 	}
 
 	if len(plan.FontsToAdd) > 0 {
-		ui.Println(ui.Muted.Render("Missing Fonts to Attach:"))
+		ui.Println("  - Add missing fonts:")
 
-		headers := []string{"Font Name", "Sourced From"}
+		headers := []string{"Font Name", "File", "Source", "Requested By"}
 		rows := make([][]string, 0, len(plan.FontsToAdd))
 
 		for _, f := range plan.FontsToAdd {
-			rows = append(rows, []string{f.FontName, f.Source})
+			rows = append(rows, []string{
+				f.FontName,
+				f.AttachmentName,
+				f.Source,
+				strings.Join(f.RequestedBy, ", "),
+			})
 		}
 
 		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
@@ -300,21 +314,58 @@ func reviewRemuxStripCompression(plan *FixPlan, ebml *matroska.EbmlMetadata, opt
 	}
 }
 
+//nolint:nestif // UI printing logic requires some nested checks
 func reviewRemuxRemoveTracks(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 	if len(plan.RemuxRemoveTracks) > 0 {
 		ui.Println(fmt.Sprintf("  - Remove %d tracks:", len(plan.RemuxRemoveTracks)))
 
-		for _, r := range plan.RemuxRemoveTracks {
-			// Try to find the track to get more info for the UI
-			if ebml != nil {
-				if t := findTrackByID(ebml, r.TrackID); t != nil {
-					ui.Println(fmt.Sprintf("      %d: %s (%s)", t.Properties.Number, trackLabel(t), r.Reason))
+		headers := []string{"Track", "UID", "Type", "Lang", "Codec", "Name", "Flags", "Reason"}
 
-					continue
+		rows := make([][]string, 0, len(plan.RemuxRemoveTracks))
+
+		for _, candidate := range plan.RemuxRemoveTracks {
+			uidStr := strconv.Itoa(candidate.TrackID)
+			trackNum, trackType, lang, codec, name, flags := "?", "?", "?", "?", "", ""
+
+			if ebml != nil {
+				if t := findTrackByID(ebml, candidate.TrackID); t != nil {
+					trackNum = strconv.Itoa(t.Properties.Number)
+					trackType = t.Type
+					lang = t.Properties.Language
+					codec = t.Properties.CodecID
+					name = t.Properties.Name
+					
+					var flagParts []string
+					if t.Properties.Default {
+						flagParts = append(flagParts, "Default")
+					}
+					if t.Properties.Forced {
+						flagParts = append(flagParts, "Forced")
+					}
+					if t.Properties.HearingImpaired {
+						flagParts = append(flagParts, "SDH")
+					}
+					if t.Properties.VisualImpaired {
+						flagParts = append(flagParts, "AD")
+					}
+					flags = strings.Join(flagParts, " ")
 				}
 			}
 
-			ui.Println(fmt.Sprintf("      UID %d (%s)", r.TrackID, r.Reason))
+			rows = append(rows, []string{
+				trackNum,
+				uidStr,
+				trackType,
+				lang,
+				codec,
+				name,
+				flags,
+				candidate.Reason,
+			})
+		}
+
+		if len(rows) > 0 {
+			ui.Println(ui.TrackTable(headers, rows))
 		}
 
 		if !confirmApplyWithPolicy(opts, "Remove these tracks?", "Skipping track removal...", false) {
