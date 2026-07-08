@@ -214,7 +214,7 @@ func skipMultiEpisodeSpecification(filename string, startPos int, episodes []int
 	}
 
 	rest := filename[startPos:]
-	multiEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,3})`)
+	multiEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
 
 	pos := startPos
 
@@ -288,7 +288,7 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 }
 
 func matchTitleYear(filename string) (string, int) {
-	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,3}(?:(?:[ .\&-]E?\d{1,3})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
+	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,4}(?:(?:[ .\&-]E?\d{1,3})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
 
 	match := re.FindStringSubmatchIndex(filename)
 	if match != nil {
@@ -323,7 +323,7 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 	var episodes []int
 
 	// We want to match an initial episode, e.g. E01, E01, -E01, etc.
-	firstEpRegex := regexp.MustCompile(`(?i)^[ .&-]*E(\d{1,3})`)
+	firstEpRegex := regexp.MustCompile(`(?i)^[ .&-]*E(\d{1,4})`)
 	epMatch := firstEpRegex.FindStringSubmatchIndex(rest)
 
 	if epMatch == nil {
@@ -337,7 +337,7 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 	rest = rest[epMatch[1]:]
 
 	// Now iteratively look for subsequent episodes
-	nextEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,3})`)
+	nextEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
 
 	for {
 		nextMatch := nextEpRegex.FindStringSubmatchIndex(rest)

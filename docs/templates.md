@@ -22,6 +22,7 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{cut_edition}.{episode
 | `{episode_raw}` | Episode number without padding. | `1` |
 | `{episode_02}` | Episode number with 2-digit padding. | `01` |
 | `{episode_03}` | Episode number with 3-digit padding. | `001` |
+| `{episode_03}` | Episode number with 4-digit padding. | `0001` |
 | `{episode_id}` | Episode ID (E + 2-digit padding). | `E01` |
 | `{date}` | Air date for TV specials (YYYY-MM-DD). | `2019-11-12` |
 | `{cut_edition}` | Movie edition/cut. | `Directors.Cut` |

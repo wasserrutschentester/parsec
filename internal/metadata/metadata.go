@@ -514,11 +514,13 @@ func (meta *Metadata) setEpisodeReplacements(replacements map[string]string) {
 		replacements["{episode_raw}"] = strconv.Itoa(first)
 		replacements["{episode_02}"] = fmt.Sprintf("%02d", first)
 		replacements["{episode_03}"] = fmt.Sprintf("%03d", first)
+		replacements["{episode_04}"] = fmt.Sprintf("%04d", first)
 		replacements["{episode_id}"] = fmt.Sprintf("E%02d", first)
 	} else {
 		replacements["{episode_raw}"] = fmt.Sprintf("%d-%d", first, last)
 		replacements["{episode_02}"] = fmt.Sprintf("%02d-%02d", first, last)
 		replacements["{episode_03}"] = fmt.Sprintf("%03d-%03d", first, last)
+		replacements["{episode_04}"] = fmt.Sprintf("%04d-%04d", first, last)
 		replacements["{episode_id}"] = fmt.Sprintf("E%02d-E%02d", first, last)
 	}
 }
