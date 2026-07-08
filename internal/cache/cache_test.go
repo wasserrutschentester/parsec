@@ -15,7 +15,7 @@ func TestCache(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	setDir(tempDir)
+	SetDir(tempDir)
 
 	defer resetDir()
 
@@ -72,7 +72,7 @@ func TestCleanup(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	setDir(tempDir)
+	SetDir(tempDir)
 
 	defer resetDir()
 
@@ -117,7 +117,7 @@ func TestPersistentCache(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	setDir(tempDir)
+	SetDir(tempDir)
 
 	defer resetDir()
 

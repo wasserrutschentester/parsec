@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
@@ -33,9 +33,7 @@ func TestResolveGoogleFontsGitHub(t *testing.T) {
 	defer func() { config.NoCache = false }()
 
 	tempCache := t.TempDir()
-	_ = os.Setenv("XDG_CACHE_HOME", tempCache)
-
-	defer func() { _ = os.Unsetenv("XDG_CACHE_HOME") }()
+	cache.SetDir(tempCache)
 
 	// Override checkFontFileMatches to always match the requested font
 	checkFontFileMatches = func(_, fontName string) ([]string, bool) {
@@ -100,9 +98,7 @@ func TestResolveGoogleFontsAPI(t *testing.T) {
 	defer func() { config.NoCache = false }()
 
 	tempCache := t.TempDir()
-	_ = os.Setenv("XDG_CACHE_HOME", tempCache)
-
-	defer func() { _ = os.Unsetenv("XDG_CACHE_HOME") }()
+	cache.SetDir(tempCache)
 
 	checkFontFileMatches = func(_, fontName string) ([]string, bool) {
 		return []string{fontName}, true

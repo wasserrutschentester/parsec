@@ -49,7 +49,8 @@ func resetDir() {
 	fontDir = filepath.Join(dir, "parsec", "fonts")
 }
 
-func setDir(dir string) {
+// SetDir overrides the cache directories. Useful for tests.
+func SetDir(dir string) {
 	cacheDir = dir
 	metaDir = filepath.Join(dir, "meta")
 	subDir = filepath.Join(dir, "subtitles")

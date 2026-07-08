@@ -141,6 +141,15 @@ func existingAttachmentNames(attachments []matroska.EbmlAttachment) map[string]b
 }
 
 func attachmentNameForFont(fontName, path string) string {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if infos, err := matroska.GetAttachmentFonts(-1, filepath.Base(path), data); err == nil && len(infos) > 0 {
+			if proposed := checks.ProposedFontFilename(filepath.Base(path), -1, infos); proposed != "" {
+				return proposed
+			}
+		}
+	}
+
 	base := filepath.Base(path)
 	if filepath.Ext(base) == "" {
 		base = fontName + ".ttf"
@@ -196,6 +205,10 @@ func (r defaultFontResolver) Resolve(fontName string, allowDownload bool) (Resol
 		if resolved, ok := r.resolveGoogleFontsAPI(fontName, key); ok {
 			return resolved, true
 		}
+	}
+
+	if resolved, ok := r.resolveCoreFonts(fontName); ok {
+		return resolved, true
 	}
 
 	return ResolvedFont{}, false
@@ -615,4 +628,129 @@ func FontNameMatches(name string, internalNames []string) bool {
 	}
 
 	return false
+}
+
+var corefontsPackages = map[string]string{
+	"Arial Black":     "arialb32.exe",
+	"Arial":           "arial32.exe",
+	"Comic Sans MS":   "comic32.exe",
+	"Courier New":     "courie32.exe",
+	"Georgia":         "georgi32.exe",
+	"Impact":          "impact32.exe",
+	"Times New Roman": "times32.exe",
+	"Trebuchet MS":    "trebuc32.exe",
+	"Verdana":         "verdan32.exe",
+	"Webdings":        "webdin32.exe",
+	"Andale Mono":     "andale32.exe",
+}
+
+func (r defaultFontResolver) resolveCoreFonts(fontName string) (ResolvedFont, bool) {
+	var targetPkg string
+	normalizedFontName := checks.NormalizeFontName(fontName)
+
+	// We iterate to find a match (e.g., "arialbold" has prefix "arial")
+	for family, pkg := range corefontsPackages {
+		if strings.HasPrefix(normalizedFontName, checks.NormalizeFontName(family)) {
+			targetPkg = pkg
+			break
+		}
+	}
+
+	if targetPkg == "" {
+		return ResolvedFont{}, false
+	}
+
+	if _, err := exec.LookPath("cabextract"); err != nil {
+		ui.PrintError(fmt.Sprintf("Font %q is a Windows Corefont. To automatically download it, please install 'cabextract' using your system's package manager (e.g. 'sudo apt install cabextract').", fontName))
+		return ResolvedFont{}, false
+	}
+
+	downloadURL := fmt.Sprintf("https://downloads.sourceforge.net/project/corefonts/the%%20fonts/final/%s", targetPkg)
+	ui.PrintDebug(fmt.Sprintf("Downloading Corefont package %s from SourceForge...", targetPkg))
+
+	tmpDir, err := os.MkdirTemp("", "corefonts-*")
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to create temp dir for corefonts: %v", err))
+		return ResolvedFont{}, false
+	}
+	defer os.RemoveAll(tmpDir)
+
+	exePath := filepath.Join(tmpDir, targetPkg)
+
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to download corefont %s: %v", downloadURL, err))
+		return ResolvedFont{}, false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ui.PrintDebug(fmt.Sprintf("failed to download corefont %s: HTTP %d", downloadURL, resp.StatusCode))
+		return ResolvedFont{}, false
+	}
+
+	out, err := os.Create(exePath)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to create corefont exe file: %v", err))
+		return ResolvedFont{}, false
+	}
+	_, err = io.Copy(out, resp.Body)
+	out.Close()
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to write corefont exe file: %v", err))
+		return ResolvedFont{}, false
+	}
+
+	cmd := exec.Command("cabextract", "-L", "-d", tmpDir, exePath)
+	if err := cmd.Run(); err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to extract corefont package %s: %v", targetPkg, err))
+		return ResolvedFont{}, false
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		return ResolvedFont{}, false
+	}
+
+	var targetResolved ResolvedFont
+	var targetFound bool
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".ttf") {
+			continue
+		}
+
+		fontFilePath := filepath.Join(tmpDir, entry.Name())
+		data, err := os.ReadFile(fontFilePath)
+		if err != nil {
+			continue
+		}
+
+		names, err := checkGetFontNames(data)
+		if err != nil || len(names) == 0 {
+			continue
+		}
+
+		fullName := names[0]
+		if len(names) > 1 {
+			fullName = names[1]
+		}
+
+		ext := filepath.Ext(entry.Name())
+		cachedPath, err := cache.SetFont(checks.NormalizeFontName(fullName), ext, data)
+		if err != nil {
+			continue
+		}
+
+		if !targetFound && FontNameMatches(fontName, names) {
+			targetResolved = ResolvedFont{
+				Path:          cachedPath,
+				Source:        "sourceforge",
+				InternalNames: names,
+			}
+			targetFound = true
+		}
+	}
+
+	return targetResolved, targetFound
 }
