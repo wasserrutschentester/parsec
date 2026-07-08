@@ -178,7 +178,7 @@ func (r defaultFontResolver) Resolve(fontName string, allowDownload bool) (Resol
 		return resolved, true
 	}
 
-	if path, err := cache.GetFontPath(fontName); err == nil {
+	if path, err := cache.GetFontPath(checks.NormalizeFontName(fontName)); err == nil {
 		if names, ok := checkFontFileMatches(path, fontName); ok {
 			return ResolvedFont{Path: path, Source: "cache", InternalNames: names}, true
 		}
@@ -445,7 +445,7 @@ func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, s
 		ext = ".ttf"
 	}
 
-	path, err := cache.SetFont(fontName, ext, data)
+	path, err := cache.SetFont(checks.NormalizeFontName(fontName), ext, data)
 	if err != nil {
 		ui.PrintDebug(fmt.Sprintf("failed to cache font %s: %v", fontName, err))
 

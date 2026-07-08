@@ -395,8 +395,7 @@ func GetFontPath(key string) (string, error) {
 		return "", errCacheBypassed
 	}
 
-	hash := sha256.Sum256([]byte(key))
-	prefix := filepath.Join(fontDir, hex.EncodeToString(hash[:]))
+	prefix := filepath.Join(fontDir, key)
 
 	// Match the exact hash + any extension
 	matches, err := filepath.Glob(prefix + ".*")
@@ -421,8 +420,7 @@ func SetFont(key, ext string, data []byte) (string, error) {
 		return "", fmt.Errorf("failed to create font cache directory: %w", err)
 	}
 
-	hash := sha256.Sum256([]byte(key))
-	path := filepath.Join(fontDir, hex.EncodeToString(hash[:])+ext)
+	path := filepath.Join(fontDir, key+ext)
 
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("failed to write font cache file: %w", err)

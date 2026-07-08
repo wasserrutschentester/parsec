@@ -45,6 +45,16 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 					RequestedBy:    a.RequestedBy,
 				})
 			}
+
+			if len(missingPlan.Unresolved) == 0 {
+				ui.Println(ui.Success.Render("Successfully downloaded and cached all missing fonts."))
+			} else {
+				ui.PrintError(fmt.Sprintf("Could not find %d font(s). Please download and install them manually:", len(missingPlan.Unresolved)))
+
+				for _, fontName := range missingPlan.Unresolved {
+					ui.Println("  - " + ui.Warning.Render(fontName))
+				}
+			}
 		}
 	}
 
