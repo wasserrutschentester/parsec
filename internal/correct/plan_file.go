@@ -1,7 +1,7 @@
 package correct
 
 import (
-	"fmt"
+	"maps"
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/checks"
@@ -35,36 +35,74 @@ func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 	meta := res.Meta
 
 	// 1. Container Properties
-	plan.ContainerProperties = ComputeContainerFixes(ebml, meta)
+	plan.Metadata.Container.Properties = ComputeContainerFixes(ebml, meta)
 
 	computeFontsForPlan(plan, filePath, ebml)
 
 	// 6. Missing Statistics
-	plan.WriteStatistics = ComputeMissingStatistics(res.MediaInfo)
+	plan.Metadata.Container.WriteStatistics = ComputeMissingStatistics(res.MediaInfo)
 
 	// 7. Creation Time Tags
 	tagsXML, _ := extractTagsXML(filePath)
-	plan.ClearCreationTime = ComputeCreationTimeTags(tagsXML)
+	plan.Metadata.Container.ClearCreationTime = ComputeCreationTimeTags(tagsXML)
 
 	// 8. Track Edits
 	// For now we just append the basic flag and name fixes
-	plan.FlagEdits = ComputeMatroskaFlagFixes(ebml.Tracks)
-	plan.NameEdits = ComputeMatroskaNameFixes(ebml.Tracks)
+	flagEdits := ComputeMatroskaFlagFixes(ebml.Tracks)
+	nameEdits := ComputeMatroskaNameFixes(ebml.Tracks)
+
+	plan.Metadata.Tracks = mergeTrackEdits(flagEdits, nameEdits)
 
 	// Apply automatic track edits to an in-memory copy before computing the remux plan
 	// because track reordering depends on the *new* track languages!
-	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.FlagEdits, plan.NameEdits)
+	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.Metadata.Tracks)
 
 	// 9. Remux Plan
 	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
 	remuxPlan := ComputeMatroskaRemux(simulatedTracks, originalLang)
-	plan.RemuxRequired = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
+	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
 
-	plan.RemuxTrackOrder = remuxPlan.TrackOrder
-	plan.RemuxRemoveTracks = append(plan.RemuxRemoveTracks, remuxPlan.RemovalCandidates...)
-	plan.RemuxStripCompression = remuxPlan.StripCompressionIDs
+	plan.Remux.TrackOrder = remuxPlan.TrackOrder
+	plan.Remux.RemoveTracks = append(plan.Remux.RemoveTracks, remuxPlan.RemovalCandidates...)
+	plan.Remux.StripCompression = remuxPlan.StripCompressionIDs
 
 	return plan, nil
+}
+
+func mergeTrackEdits(editGroups ...[]matroska.TrackEdit) []matroska.TrackEdit {
+	merged := make(map[int]*matroska.TrackEdit)
+
+	var order []int
+
+	for _, group := range editGroups {
+		for _, e := range group {
+			if _, ok := merged[e.Number]; !ok {
+				order = append(order, e.Number)
+				merged[e.Number] = &matroska.TrackEdit{
+					Number:  e.Number,
+					Props:   make(map[string]string),
+					Reasons: make(map[string]string),
+				}
+			}
+
+			maps.Copy(merged[e.Number].Props, e.Props)
+
+			for k, v := range e.Reasons {
+				if merged[e.Number].Reasons == nil {
+					merged[e.Number].Reasons = make(map[string]string)
+				}
+
+				merged[e.Number].Reasons[k] = v
+			}
+		}
+	}
+
+	res := make([]matroska.TrackEdit, 0, len(order))
+	for _, num := range order {
+		res = append(res, *merged[num])
+	}
+
+	return res
 }
 
 // ApplyEditsToMemoryTracks creates a copy of the given tracks and applies the specified track edits to them.
@@ -133,7 +171,7 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 			}
 		}
 
-		plan.AttachmentRenames = append(plan.AttachmentRenames, AttachmentRename{
+		plan.Metadata.Attachments.Renames = append(plan.Metadata.Attachments.Renames, AttachmentRename{
 			ID:             r.ID,
 			OldName:        r.OldName,
 			NewName:        r.NewName,
@@ -142,11 +180,11 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 		})
 	}
 
-	plan.ChapterKeyframeSnaps = ComputeChapterKeyframeSnaps(filePath, ebml)
+	plan.Metadata.Chapters.KeyframeSnaps = ComputeChapterKeyframeSnaps(filePath, ebml)
 
 	missingPlan := ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, false)
 	for _, att := range missingPlan.Attachments {
-		plan.FontsToAdd = append(plan.FontsToAdd, MissingFontAttachment{
+		plan.Metadata.Attachments.ToAdd = append(plan.Metadata.Attachments.ToAdd, MissingFontAttachment{
 			Path:           att.Path,
 			AttachmentName: att.AttachmentName,
 			MIMEType:       att.MIMEType,
@@ -173,25 +211,12 @@ func computeFontsForPlan(plan *FixPlan, filePath string, ebml *matroska.EbmlMeta
 			}
 		}
 
-		sizeStr := ""
-
-		const unit = 1024
-
-		switch {
-		case att.Size < unit:
-			sizeStr = fmt.Sprintf("%d B", att.Size)
-		case att.Size < unit*unit:
-			sizeStr = fmt.Sprintf("%.1f KB", float64(att.Size)/float64(unit))
-		default:
-			sizeStr = fmt.Sprintf("%.1f MB", float64(att.Size)/float64(unit*unit))
-		}
-
-		plan.FontsToRemove = append(plan.FontsToRemove, AttachmentRemove{
-			ID:       att.ID,
-			Name:     att.FileName,
-			FullName: fullName,
-			Size:     sizeStr,
-			Reason:   u.Reason,
+		plan.Metadata.Attachments.ToRemove = append(plan.Metadata.Attachments.ToRemove, AttachmentRemove{
+			ID:        att.ID,
+			Name:      att.FileName,
+			FullName:  fullName,
+			SizeBytes: int64(att.Size),
+			Reason:    u.Reason,
 		})
 	}
 }

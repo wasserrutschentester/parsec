@@ -24,8 +24,12 @@ func TestExecutePlan(t *testing.T) {
 		}
 
 		plan := &FixPlan{
-			ContainerProperties: []ContainerPropertyEdit{
-				{Key: "title", NewValue: "Test Title"},
+			Metadata: MetadataPlan{
+				Container: ContainerPlan{
+					Properties: []ContainerPropertyEdit{
+						{Key: "title", NewValue: "Test Title"},
+					},
+				},
 			},
 		}
 
@@ -82,13 +86,17 @@ func TestExecutePlan(t *testing.T) {
 		}
 
 		plan := &FixPlan{
-			AttachmentRenames: []AttachmentRename{{ID: 1, NewName: "font.ttf"}},
-			FontsToAdd: []MissingFontAttachment{{
-				Path:           "/tmp/font.ttf",
-				AttachmentName: "font2.ttf",
-				MIMEType:       "application/x-truetype-font",
-			}},
-			FontsToRemove: []AttachmentRemove{{ID: 2}},
+			Metadata: MetadataPlan{
+				Attachments: AttachmentPlan{
+					Renames: []AttachmentRename{{ID: 1, NewName: "font.ttf"}},
+					ToAdd: []MissingFontAttachment{{
+						Path:           "/tmp/font.ttf",
+						AttachmentName: "font2.ttf",
+						MIMEType:       "application/x-truetype-font",
+					}},
+					ToRemove: []AttachmentRemove{{ID: 2}},
+				},
+			},
 		}
 
 		err := executeAttachments("test.mkv", plan)
@@ -130,9 +138,13 @@ func TestExecutePlan(t *testing.T) {
 		}
 
 		plan := &FixPlan{
-			ChapterKeyframeSnaps: ChapterAlignmentFix{
-				Changed: 1,
-				Times:   []int64{100, 200},
+			Metadata: MetadataPlan{
+				Chapters: ChapterPlan{
+					KeyframeSnaps: ChapterAlignmentFix{
+						Changed: 1,
+						Times:   []int64{100, 200},
+					},
+				},
 			},
 		}
 
@@ -189,11 +201,13 @@ func TestExecutePlan(t *testing.T) {
 		}
 
 		plan := &FixPlan{
-			WriteStatistics:   true,
-			ClearCreationTime: true,
-			FlagEdits:         []matroska.TrackEdit{{Number: 1}},
-			NameEdits:         []matroska.TrackEdit{{Number: 2}},
-			LanguageEdits:     []matroska.TrackEdit{{Number: 3}},
+			Metadata: MetadataPlan{
+				Container: ContainerPlan{
+					WriteStatistics:   true,
+					ClearCreationTime: true,
+				},
+				Tracks: []matroska.TrackEdit{{Number: 1}, {Number: 2}, {Number: 3}},
+			},
 		}
 
 		err := executeTracksAndTags("test.mkv", plan)
@@ -239,10 +253,12 @@ func TestExecutePlan(t *testing.T) {
 		}
 
 		plan := &FixPlan{
-			RemuxRequired:         true,
-			RemuxTrackOrder:       []int{2, 1, 3},
-			RemuxStripCompression: []int{2},
-			RemuxRemoveTracks:     []RemovalCandidate{{TrackID: 3}},
+			Remux: RemuxPlan{
+				Required:         true,
+				TrackOrder:       []int{2, 1, 3},
+				StripCompression: []int{2},
+				RemoveTracks:     []RemovalCandidate{{TrackID: 3}},
+			},
 		}
 
 		err := executeRemux("test.mkv", plan)

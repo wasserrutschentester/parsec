@@ -24,10 +24,10 @@ const (
 
 // RemovalCandidate describes a track proposed for removal.
 type RemovalCandidate struct {
-	TrackID int
-	Kind    RemovalKind
-	Reason  string
-	Track   matroska.EbmlTrack
+	TrackID int                `json:"track_id"`
+	Kind    RemovalKind        `json:"kind"`
+	Reason  string             `json:"reason"`
+	Track   matroska.EbmlTrack `json:"-"`
 }
 
 // MatroskaRemuxPlan describes the lossless remux operations needed to satisfy

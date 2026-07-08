@@ -87,7 +87,7 @@ func TestPlanFile(t *testing.T) {
 	// Verify that the title fix got populated
 	var foundTitle bool
 
-	for _, prop := range plan.ContainerProperties {
+	for _, prop := range plan.Metadata.Container.Properties {
 		if prop.Key == "title" {
 			foundTitle = true
 

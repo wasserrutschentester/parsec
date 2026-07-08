@@ -48,9 +48,9 @@ func ExecutePlan(filePath string, plan *FixPlan) error {
 }
 
 func executeContainerProperties(filePath string, plan *FixPlan) error {
-	if len(plan.ContainerProperties) > 0 {
+	if len(plan.Metadata.Container.Properties) > 0 {
 		props := make(map[string]string)
-		for _, p := range plan.ContainerProperties {
+		for _, p := range plan.Metadata.Container.Properties {
 			props[p.Key] = p.NewValue
 		}
 
@@ -63,9 +63,9 @@ func executeContainerProperties(filePath string, plan *FixPlan) error {
 }
 
 func executeAttachments(filePath string, plan *FixPlan) error {
-	if len(plan.AttachmentRenames) > 0 {
+	if len(plan.Metadata.Attachments.Renames) > 0 {
 		renames := make(map[int]string)
-		for _, r := range plan.AttachmentRenames {
+		for _, r := range plan.Metadata.Attachments.Renames {
 			renames[r.ID] = r.NewName
 		}
 
@@ -74,9 +74,9 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 		}
 	}
 
-	if len(plan.FontsToAdd) > 0 {
+	if len(plan.Metadata.Attachments.ToAdd) > 0 {
 		var adds []matroska.AttachmentAdd
-		for _, f := range plan.FontsToAdd {
+		for _, f := range plan.Metadata.Attachments.ToAdd {
 			adds = append(adds, matroska.AttachmentAdd{
 				Path:     f.Path,
 				Name:     f.AttachmentName,
@@ -89,9 +89,9 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 		}
 	}
 
-	if len(plan.FontsToRemove) > 0 {
+	if len(plan.Metadata.Attachments.ToRemove) > 0 {
 		var removes []int
-		for _, f := range plan.FontsToRemove {
+		for _, f := range plan.Metadata.Attachments.ToRemove {
 			removes = append(removes, f.ID)
 		}
 
@@ -104,8 +104,8 @@ func executeAttachments(filePath string, plan *FixPlan) error {
 }
 
 func executeChapters(filePath string, plan *FixPlan) error {
-	if plan.ChapterKeyframeSnaps.Changed > 0 && len(plan.ChapterKeyframeSnaps.Times) > 0 {
-		if err := execRewriteChapterTimes(filePath, plan.ChapterKeyframeSnaps.Times); err != nil {
+	if plan.Metadata.Chapters.KeyframeSnaps.Changed > 0 && len(plan.Metadata.Chapters.KeyframeSnaps.Times) > 0 {
+		if err := execRewriteChapterTimes(filePath, plan.Metadata.Chapters.KeyframeSnaps.Times); err != nil {
 			return fmt.Errorf("rewriting chapter timestamps: %w", err)
 		}
 	}
@@ -114,13 +114,13 @@ func executeChapters(filePath string, plan *FixPlan) error {
 }
 
 func executeTracksAndTags(filePath string, plan *FixPlan) error {
-	if plan.WriteStatistics {
+	if plan.Metadata.Container.WriteStatistics {
 		if err := execAddTrackStatistics(filePath); err != nil {
 			return fmt.Errorf("adding track statistics tags: %w", err)
 		}
 	}
 
-	if plan.ClearCreationTime {
+	if plan.Metadata.Container.ClearCreationTime {
 		tagsXML, err := execExtractTagsXML(filePath)
 		if err != nil {
 			return fmt.Errorf("extracting tags xml: %w", err)
@@ -134,13 +134,8 @@ func executeTracksAndTags(filePath string, plan *FixPlan) error {
 		}
 	}
 
-	allTrackEdits := make([]matroska.TrackEdit, 0, len(plan.FlagEdits)+len(plan.NameEdits)+len(plan.LanguageEdits))
-	allTrackEdits = append(allTrackEdits, plan.FlagEdits...)
-	allTrackEdits = append(allTrackEdits, plan.NameEdits...)
-	allTrackEdits = append(allTrackEdits, plan.LanguageEdits...)
-
-	if len(allTrackEdits) > 0 {
-		if err := execSetTrackProperties(filePath, allTrackEdits); err != nil {
+	if len(plan.Metadata.Tracks) > 0 {
+		if err := execSetTrackProperties(filePath, plan.Metadata.Tracks); err != nil {
 			return fmt.Errorf("setting track properties: %w", err)
 		}
 	}
@@ -149,18 +144,18 @@ func executeTracksAndTags(filePath string, plan *FixPlan) error {
 }
 
 func executeRemux(filePath string, plan *FixPlan) error {
-	if !plan.RemuxRequired {
+	if !plan.Remux.Required {
 		return nil
 	}
 
 	var removeIDs []int
-	for _, r := range plan.RemuxRemoveTracks {
+	for _, r := range plan.Remux.RemoveTracks {
 		removeIDs = append(removeIDs, r.TrackID)
 	}
 
 	remuxOpts := matroska.RemuxOptions{
-		TrackOrder:          plan.RemuxTrackOrder,
-		StripCompressionIDs: plan.RemuxStripCompression,
+		TrackOrder:          plan.Remux.TrackOrder,
+		StripCompressionIDs: plan.Remux.StripCompression,
 		RemoveTrackIDs:      removeIDs,
 	}
 

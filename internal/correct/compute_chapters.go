@@ -10,9 +10,9 @@ import (
 // chapters with video keyframes.
 // Times is the full list of chapter start times (ns) to write back.
 type ChapterAlignmentFix struct {
-	Times     []int64
-	Changed   int
-	TableRows [][]string
+	Times   []int64            `json:"times"`
+	Changed int                `json:"changed"`
+	Events  []ChapterSnapEvent `json:"events"`
 }
 
 // ComputeChapterKeyframeSnaps returns the chapter timestamp corrections that
@@ -50,9 +50,39 @@ func ComputeChapterKeyframeSnaps(filePath string, ebml *matroska.EbmlMetadata) C
 		return ChapterAlignmentFix{}
 	}
 
-	tableRows := checks.GetAlignedTableRows(&matroska.Chapters{Atoms: chapters}, keyframes, checks.GetVideoTrackFromEBML(ebml))
+	var defaultDuration int64
+	if track := checks.GetVideoTrackFromEBML(ebml); track != nil {
+		defaultDuration = track.Properties.DefaultDuration
+	}
 
-	return ChapterAlignmentFix{Times: times, Changed: changed, TableRows: tableRows}
+	events := buildChapterSnapEvents(chapters, keyframes, defaultDuration)
+
+	return ChapterAlignmentFix{Times: times, Changed: changed, Events: events}
+}
+
+func buildChapterSnapEvents(chapters []matroska.EbmlChapterAtom, keyframes []int64, defaultDuration int64) []ChapterSnapEvent {
+	var events []ChapterSnapEvent
+
+	for i, ch := range chapters {
+		aligned, _, prevKF, nextKF := checks.IsAligned(ch.TimeStart, keyframes)
+		if !aligned {
+			name := "-"
+			if len(ch.Display) > 0 && ch.Display[0].String != "" {
+				name = ch.Display[0].String
+			}
+
+			events = append(events, ChapterSnapEvent{
+				ChapterNum:       i + 1,
+				Name:             name,
+				OriginalTime:     ch.TimeStart,
+				PreviousKeyframe: prevKF,
+				NextKeyframe:     nextKF,
+				DefaultDuration:  defaultDuration,
+			})
+		}
+	}
+
+	return events
 }
 
 // extractChapterAtoms returns the chapter atoms to align.

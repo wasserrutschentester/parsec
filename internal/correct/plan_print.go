@@ -30,67 +30,77 @@ func ReviewPlan(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) bool {
 	return !plan.IsEmpty()
 }
 
-//nolint:cyclop // UI step has multiple branches
 func reviewContainerAndAttachments(plan *FixPlan, opts Options) {
-	if len(plan.ContainerProperties) > 0 {
+	reviewContainerProperties(plan, opts)
+	reviewAttachmentsToRemove(plan, opts)
+	reviewAttachmentsToRename(plan, opts)
+}
+
+func reviewContainerProperties(plan *FixPlan, opts Options) {
+	if len(plan.Metadata.Container.Properties) > 0 {
 		ui.Println(ui.Muted.Render("Container Metadata:"))
 
-		for _, p := range plan.ContainerProperties {
+		for _, p := range plan.Metadata.Container.Properties {
 			ui.Println("  " + formatContainerChange(p.Key, p.OldValue, p.NewValue, p.Reason))
 		}
 
 		if !confirmApply(opts, "Apply these container fixes?", "Skipping container fixes...") {
-			plan.ContainerProperties = nil
+			plan.Metadata.Container.Properties = nil
 		}
 	}
+}
 
-	if len(plan.FontsToRemove) > 0 {
-		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused & Duplicate Fonts to Remove: %d attachments", len(plan.FontsToRemove))))
+func reviewAttachmentsToRemove(plan *FixPlan, opts Options) {
+	if len(plan.Metadata.Attachments.ToRemove) > 0 {
+		ui.Println(ui.Muted.Render(fmt.Sprintf("Unused & Duplicate Fonts to Remove: %d attachments", len(plan.Metadata.Attachments.ToRemove))))
 
 		headers := []string{"ID", "Attachment Name", "Full Name", "Size", "Reason"}
-		rows := make([][]string, 0, len(plan.FontsToRemove))
+		rows := make([][]string, 0, len(plan.Metadata.Attachments.ToRemove))
 
-		for _, f := range plan.FontsToRemove {
-			rows = append(rows, []string{strconv.Itoa(f.ID), f.Name, f.FullName, f.Size, f.Reason})
+		for _, f := range plan.Metadata.Attachments.ToRemove {
+			sizeStr := formatSizeBytes(f.SizeBytes)
+			rows = append(rows, []string{strconv.Itoa(f.ID), f.Name, f.FullName, sizeStr, f.Reason})
 		}
 
 		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
 
 		if !confirmApplyWithPolicy(opts, "Delete these unused/duplicate font attachments?", "Skipping unused font removal...", false) {
-			plan.FontsToRemove = nil
+			plan.Metadata.Attachments.ToRemove = nil
 		} else {
 			// They accepted removal, so we shouldn't rename the ones being removed.
 			var filtered []AttachmentRename
 
-			removed := make(map[int]bool, len(plan.FontsToRemove))
-			for _, f := range plan.FontsToRemove {
+			removed := make(map[int]bool, len(plan.Metadata.Attachments.ToRemove))
+			for _, f := range plan.Metadata.Attachments.ToRemove {
 				removed[f.ID] = true
 			}
 
-			for _, r := range plan.AttachmentRenames {
+			for _, r := range plan.Metadata.Attachments.Renames {
 				if !removed[r.ID] {
 					filtered = append(filtered, r)
 				}
 			}
 
-			plan.AttachmentRenames = filtered
+			plan.Metadata.Attachments.Renames = filtered
 		}
 	}
+}
 
-	if len(plan.AttachmentRenames) > 0 {
+func reviewAttachmentsToRename(plan *FixPlan, opts Options) {
+	if len(plan.Metadata.Attachments.Renames) > 0 {
 		ui.Println(ui.Muted.Render("Font Attachment Renames:"))
 
 		headers := []string{"ID", "Old Name", "Full Name", "PostScript Name", "New Name"}
-		rows := make([][]string, 0, len(plan.AttachmentRenames))
+		rows := make([][]string, 0, len(plan.Metadata.Attachments.Renames))
 
-		for _, r := range plan.AttachmentRenames {
+		for _, r := range plan.Metadata.Attachments.Renames {
 			rows = append(rows, []string{strconv.Itoa(r.ID), r.OldName, r.FullName, r.PostScriptName, r.NewName})
 		}
 
 		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
 
 		if !confirmApply(opts, "Rename these font attachments?", "Skipping font renames...") {
-			plan.AttachmentRenames = nil
+			plan.Metadata.Attachments.Renames = nil
 		}
 	}
 }
@@ -129,27 +139,87 @@ func formatContainerChange(key, oldValue, newValue, reason string) string {
 }
 
 func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
-	if plan.ChapterKeyframeSnaps.Changed > 0 {
-		ui.Println(ui.Muted.Render(fmt.Sprintf("Chapter Snaps: %d chapters to align to keyframes", plan.ChapterKeyframeSnaps.Changed)))
+	reviewChapterSnaps(plan, opts)
+	reviewMissingFonts(plan, opts)
+}
 
-		if len(plan.ChapterKeyframeSnaps.TableRows) > 0 {
-			headers := []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Next KF"}
-			ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, plan.ChapterKeyframeSnaps.TableRows), "\n", "\n  "))
-		}
-
-		if !confirmApplyWithPolicy(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...", false) {
-			plan.ChapterKeyframeSnaps.Changed = 0
-			plan.ChapterKeyframeSnaps.Times = nil
-		}
+func reviewChapterSnaps(plan *FixPlan, opts Options) {
+	if plan.Metadata.Chapters.KeyframeSnaps.Changed <= 0 {
+		return
 	}
 
-	if len(plan.FontsToAdd) > 0 {
+	ui.Println(ui.Muted.Render(fmt.Sprintf("Chapter Snaps: %d chapters to align to keyframes", plan.Metadata.Chapters.KeyframeSnaps.Changed)))
+
+	if len(plan.Metadata.Chapters.KeyframeSnaps.Events) > 0 {
+		headers := []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Next KF"}
+		tableRows := formatChapterEventsTable(plan.Metadata.Chapters.KeyframeSnaps.Events)
+		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, tableRows), "\n", "\n  "))
+	}
+
+	if !confirmApplyWithPolicy(opts, "Apply chapter keyframe alignment?", "Skipping chapter alignment...", false) {
+		plan.Metadata.Chapters.KeyframeSnaps.Changed = 0
+		plan.Metadata.Chapters.KeyframeSnaps.Times = nil
+	}
+}
+
+func formatChapterEventsTable(events []ChapterSnapEvent) [][]string {
+	tableRows := make([][]string, 0, len(events))
+
+	for _, e := range events {
+		latencyStr := formatSeekLatency(e.PreviousKeyframe, e.OriginalTime, e.DefaultDuration)
+
+		prevStr := "-"
+		if e.PreviousKeyframe != -1 {
+			prevStr = formatNsToTime(e.PreviousKeyframe)
+		}
+
+		nextStr := formatNextKF(e.NextKeyframe, e.OriginalTime, e.DefaultDuration)
+
+		diffPrev := int64(-1)
+		if e.PreviousKeyframe != -1 {
+			diffPrev = e.OriginalTime - e.PreviousKeyframe
+		}
+
+		diffNext := int64(-1)
+		if e.NextKeyframe != -1 {
+			diffNext = e.NextKeyframe - e.OriginalTime
+		}
+
+		var direction string
+
+		switch {
+		case e.PreviousKeyframe != -1 && (e.NextKeyframe == -1 || diffPrev <= diffNext):
+			prevStr = ui.Success.Render(prevStr)
+			direction = ui.Success.Render("<- Prev")
+		case e.NextKeyframe != -1:
+			nextStr = ui.Success.Render(nextStr)
+			direction = ui.Success.Render("Next ->")
+		default:
+			direction = "-"
+		}
+
+		tableRows = append(tableRows, []string{
+			strconv.Itoa(e.ChapterNum),
+			e.Name,
+			formatNsToTime(e.OriginalTime),
+			latencyStr,
+			prevStr,
+			direction,
+			nextStr,
+		})
+	}
+
+	return tableRows
+}
+
+func reviewMissingFonts(plan *FixPlan, opts Options) {
+	if len(plan.Metadata.Attachments.ToAdd) > 0 {
 		ui.Println("  - Add missing fonts:")
 
 		headers := []string{"Font Name", "File", "Source", "Requested By"}
-		rows := make([][]string, 0, len(plan.FontsToAdd))
+		rows := make([][]string, 0, len(plan.Metadata.Attachments.ToAdd))
 
-		for _, f := range plan.FontsToAdd {
+		for _, f := range plan.Metadata.Attachments.ToAdd {
 			rows = append(rows, []string{
 				f.FontName,
 				f.AttachmentName,
@@ -161,7 +231,7 @@ func reviewChaptersAndFonts(plan *FixPlan, opts Options) {
 		ui.Println("  " + strings.ReplaceAll(ui.DataTable(headers, rows), "\n", "\n  "))
 
 		if !confirmApplyWithPolicy(opts, "Attach these missing subtitle fonts?", "Skipping missing font attachments...", false) {
-			plan.FontsToAdd = nil
+			plan.Metadata.Attachments.ToAdd = nil
 		}
 	}
 }
@@ -185,15 +255,15 @@ func getCreationTimeTags(ebml *matroska.EbmlMetadata) []string {
 }
 
 func reviewStatisticsAndTags(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if plan.WriteStatistics {
+	if plan.Metadata.Container.WriteStatistics {
 		ui.Println(ui.Muted.Render("Track Statistics: [recompute and write tags]"))
 
 		if !confirmApply(opts, "Add track statistics tags?", "Skipping track statistics tags...") {
-			plan.WriteStatistics = false
+			plan.Metadata.Container.WriteStatistics = false
 		}
 	}
 
-	if plan.ClearCreationTime {
+	if plan.Metadata.Container.ClearCreationTime {
 		ui.Println(ui.Muted.Render("Creation Time: [remove privacy-leaking tags]"))
 
 		foundTags := getCreationTimeTags(ebml)
@@ -202,45 +272,21 @@ func reviewStatisticsAndTags(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Op
 		}
 
 		if !confirmApplyWithPolicy(opts, "  Remove these creation/encode-time tags?", "Skipping creation-time tag removal...", false) {
-			plan.ClearCreationTime = false
+			plan.Metadata.Container.ClearCreationTime = false
 		}
 	}
 }
 
 func reviewTrackEdits(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if len(plan.FlagEdits) > 0 {
+	if len(plan.Metadata.Tracks) > 0 {
 		if ebml != nil {
-			previewFlagEdits(ebml, plan.FlagEdits)
+			previewTrackEdits("Track Metadata", ebml, plan.Metadata.Tracks)
 		} else {
-			printTrackEditsFallback(plan.FlagEdits)
+			printTrackEditsFallback(plan.Metadata.Tracks)
 		}
 
-		if !confirmApply(opts, "Apply these flag fixes?", "Skipping flag fixes...") {
-			plan.FlagEdits = nil
-		}
-	}
-
-	if len(plan.NameEdits) > 0 {
-		if ebml != nil {
-			previewTrackEdits("Track Names", ebml, plan.NameEdits)
-		} else {
-			printTrackEditsFallback(plan.NameEdits)
-		}
-
-		if !confirmApply(opts, "Apply these name fixes?", "Skipping name fixes...") {
-			plan.NameEdits = nil
-		}
-	}
-
-	if len(plan.LanguageEdits) > 0 {
-		if ebml != nil {
-			previewTrackEdits("Language Tags", ebml, plan.LanguageEdits)
-		} else {
-			printTrackEditsFallback(plan.LanguageEdits)
-		}
-
-		if !confirmApply(opts, "Apply these language tag fixes?", "Skipping language tag fixes...") {
-			plan.LanguageEdits = nil
+		if !confirmApply(opts, "Apply these track metadata fixes?", "Skipping track metadata fixes...") {
+			plan.Metadata.Tracks = nil
 		}
 	}
 }
@@ -264,7 +310,7 @@ func printTrackEditsFallback(edits []matroska.TrackEdit) {
 }
 
 func reviewRemux(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if !plan.RemuxRequired {
+	if !plan.Remux.Required {
 		return
 	}
 
@@ -275,28 +321,28 @@ func reviewRemux(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 	reviewRemuxRemoveTracks(plan, ebml, opts)
 
 	// Re-evaluate if remux is still required after user choices
-	plan.RemuxRequired = len(plan.RemuxTrackOrder) > 0 || len(plan.RemuxStripCompression) > 0 || len(plan.RemuxRemoveTracks) > 0
+	plan.Remux.Required = len(plan.Remux.TrackOrder) > 0 || len(plan.Remux.StripCompression) > 0 || len(plan.Remux.RemoveTracks) > 0
 }
 
 func reviewRemuxTrackOrder(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if len(plan.RemuxTrackOrder) > 0 {
+	if len(plan.Remux.TrackOrder) > 0 {
 		ui.Println("  - Reorder tracks")
 
 		if ebml != nil {
-			ui.Println(trackOrderTable(ebml, plan.RemuxTrackOrder))
+			ui.Println(trackOrderTable(ebml, plan.Remux.TrackOrder))
 		}
 
 		if !confirmApply(opts, "Reorder tracks like this?", "Skipping track reordering...") {
-			plan.RemuxTrackOrder = nil
+			plan.Remux.TrackOrder = nil
 		}
 	}
 }
 
 func reviewRemuxStripCompression(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if len(plan.RemuxStripCompression) > 0 {
-		ui.Println(fmt.Sprintf("  - Strip compression from %d tracks:", len(plan.RemuxStripCompression)))
+	if len(plan.Remux.StripCompression) > 0 {
+		ui.Println(fmt.Sprintf("  - Strip compression from %d tracks:", len(plan.Remux.StripCompression)))
 
-		for _, trackID := range plan.RemuxStripCompression {
+		for _, trackID := range plan.Remux.StripCompression {
 			label := fmt.Sprintf("UID %d", trackID)
 
 			if ebml != nil {
@@ -309,59 +355,21 @@ func reviewRemuxStripCompression(plan *FixPlan, ebml *matroska.EbmlMetadata, opt
 		}
 
 		if !confirmApply(opts, "Strip container compression from these tracks?", "Skipping compression strip...") {
-			plan.RemuxStripCompression = nil
+			plan.Remux.StripCompression = nil
 		}
 	}
 }
 
-//nolint:nestif // UI printing logic requires some nested checks
 func reviewRemuxRemoveTracks(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
-	if len(plan.RemuxRemoveTracks) > 0 {
-		ui.Println(fmt.Sprintf("  - Remove %d tracks:", len(plan.RemuxRemoveTracks)))
+	if len(plan.Remux.RemoveTracks) > 0 {
+		ui.Println(fmt.Sprintf("  - Remove %d tracks:", len(plan.Remux.RemoveTracks)))
 
 		headers := []string{"Track", "UID", "Type", "Lang", "Codec", "Name", "Flags", "Reason"}
 
-		rows := make([][]string, 0, len(plan.RemuxRemoveTracks))
+		rows := make([][]string, 0, len(plan.Remux.RemoveTracks))
 
-		for _, candidate := range plan.RemuxRemoveTracks {
-			uidStr := strconv.Itoa(candidate.TrackID)
-			trackNum, trackType, lang, codec, name, flags := "?", "?", "?", "?", "", ""
-
-			if ebml != nil {
-				if t := findTrackByID(ebml, candidate.TrackID); t != nil {
-					trackNum = strconv.Itoa(t.Properties.Number)
-					trackType = t.Type
-					lang = t.Properties.Language
-					codec = t.Properties.CodecID
-					name = t.Properties.Name
-					
-					var flagParts []string
-					if t.Properties.Default {
-						flagParts = append(flagParts, "Default")
-					}
-					if t.Properties.Forced {
-						flagParts = append(flagParts, "Forced")
-					}
-					if t.Properties.HearingImpaired {
-						flagParts = append(flagParts, "SDH")
-					}
-					if t.Properties.VisualImpaired {
-						flagParts = append(flagParts, "AD")
-					}
-					flags = strings.Join(flagParts, " ")
-				}
-			}
-
-			rows = append(rows, []string{
-				trackNum,
-				uidStr,
-				trackType,
-				lang,
-				codec,
-				name,
-				flags,
-				candidate.Reason,
-			})
+		for _, candidate := range plan.Remux.RemoveTracks {
+			rows = append(rows, formatRemoveTrackRow(candidate, ebml))
 		}
 
 		if len(rows) > 0 {
@@ -369,7 +377,110 @@ func reviewRemuxRemoveTracks(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Op
 		}
 
 		if !confirmApplyWithPolicy(opts, "Remove these tracks?", "Skipping track removal...", false) {
-			plan.RemuxRemoveTracks = nil
+			plan.Remux.RemoveTracks = nil
 		}
 	}
+}
+
+func formatRemoveTrackRow(candidate RemovalCandidate, ebml *matroska.EbmlMetadata) []string {
+	uidStr := strconv.Itoa(candidate.TrackID)
+	trackNum, trackType, lang, codec, name, flags := "?", "?", "?", "?", "", ""
+
+	var t *matroska.EbmlTrack
+	if ebml != nil {
+		t = findTrackByID(ebml, candidate.TrackID)
+	}
+
+	if t != nil {
+		trackNum = strconv.Itoa(t.Properties.Number)
+		trackType = t.Type
+		lang = t.Properties.Language
+		codec = t.Properties.CodecID
+		name = t.Properties.Name
+
+		var flagParts []string
+		if t.Properties.Default {
+			flagParts = append(flagParts, "Default")
+		}
+
+		if t.Properties.Forced {
+			flagParts = append(flagParts, "Forced")
+		}
+
+		if t.Properties.HearingImpaired {
+			flagParts = append(flagParts, "SDH")
+		}
+
+		if t.Properties.VisualImpaired {
+			flagParts = append(flagParts, "AD")
+		}
+
+		flags = strings.Join(flagParts, " ")
+	}
+
+	return []string{
+		trackNum,
+		uidStr,
+		trackType,
+		lang,
+		codec,
+		name,
+		flags,
+		candidate.Reason,
+	}
+}
+
+func formatSizeBytes(sizeBytes int64) string {
+	const unit = 1024
+	switch {
+	case sizeBytes < unit:
+		return fmt.Sprintf("%d B", sizeBytes)
+	case sizeBytes < unit*unit:
+		return fmt.Sprintf("%.1f KB", float64(sizeBytes)/float64(unit))
+	default:
+		return fmt.Sprintf("%.1f MB", float64(sizeBytes)/float64(unit*unit))
+	}
+}
+
+func formatNsToTime(ns int64) string {
+	ms := ns / 1000000
+	hours := ms / 3600000
+	ms %= 3600000
+	minutes := ms / 60000
+	ms %= 60000
+	seconds := ms / 1000
+	ms %= 1000
+
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms)
+}
+
+func formatSeekLatency(prevKF, timeStart int64, defaultDuration int64) string {
+	if prevKF == -1 {
+		return "-"
+	}
+
+	diff := timeStart - prevKF
+	latencyStr := fmt.Sprintf("%.3fs", float64(diff)/1e9)
+
+	if defaultDuration > 0 {
+		frames := float64(diff) / float64(defaultDuration)
+		latencyStr += fmt.Sprintf(" (%.0ff)", frames)
+	}
+
+	return latencyStr
+}
+
+func formatNextKF(nextKF, timeStart int64, defaultDuration int64) string {
+	if nextKF == -1 {
+		return "-"
+	}
+
+	nextStr := formatNsToTime(nextKF)
+
+	if defaultDuration > 0 {
+		frames := float64(nextKF-timeStart) / float64(defaultDuration)
+		nextStr += fmt.Sprintf(" (+%.0ff)", frames)
+	}
+
+	return nextStr
 }

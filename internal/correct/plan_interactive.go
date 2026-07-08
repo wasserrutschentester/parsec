@@ -35,9 +35,9 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 		if confirmApplyWithPolicy(opts, "Search for and download these missing subtitle fonts?", "Skipping missing font downloads...", false) {
 			missingPlan = ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, true)
 
-			plan.FontsToAdd = nil
+			plan.Metadata.Attachments.ToAdd = nil
 			for _, a := range missingPlan.Attachments {
-				plan.FontsToAdd = append(plan.FontsToAdd, MissingFontAttachment{
+				plan.Metadata.Attachments.ToAdd = append(plan.Metadata.Attachments.ToAdd, MissingFontAttachment{
 					Path:           a.Path,
 					AttachmentName: a.AttachmentName,
 					MIMEType:       a.MIMEType,
@@ -54,21 +54,19 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 	multiLangEdits := promptMultiLangNameFixes(ebml)
 	langEdits := promptLanguageFixes(ebml)
 
-	plan.FlagEdits = mergeTrackEdits(plan.FlagEdits, keywordEdits)
-	plan.NameEdits = mergeTrackEdits(plan.NameEdits, multiLangEdits)
-	plan.LanguageEdits = mergeTrackEdits(plan.LanguageEdits, langEdits)
+	plan.Metadata.Tracks = mergeTrackEdits(plan.Metadata.Tracks, keywordEdits, multiLangEdits, langEdits)
 
 	// Recompute Remux Plan based on the final set of Track Edits
 	// because interactive edits might have altered languages which changes sort order
-	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.FlagEdits, plan.NameEdits, plan.LanguageEdits)
+	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.Metadata.Tracks)
 
 	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
 	remuxPlan := ComputeMatroskaRemux(simulatedTracks, originalLang)
-	plan.RemuxRequired = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
+	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
 
-	plan.RemuxTrackOrder = remuxPlan.TrackOrder
-	plan.RemuxRemoveTracks = remuxPlan.RemovalCandidates
-	plan.RemuxStripCompression = remuxPlan.StripCompressionIDs
+	plan.Remux.TrackOrder = remuxPlan.TrackOrder
+	plan.Remux.RemoveTracks = remuxPlan.RemovalCandidates
+	plan.Remux.StripCompression = remuxPlan.StripCompressionIDs
 
 	return nil
 }
@@ -525,32 +523,6 @@ func promptBulkChoice(prompt string) bulkChoice {
 
 // mergeTrackEdits merges extra edits into base, combining property maps for
 // tracks that appear in both.
-func mergeTrackEdits(base, extra []matroska.TrackEdit) []matroska.TrackEdit {
-	if len(extra) == 0 {
-		return base
-	}
-
-	position := make(map[int]int, len(base))
-
-	result := make([]matroska.TrackEdit, 0, len(base)+len(extra))
-	for _, edit := range base {
-		position[edit.Number] = len(result)
-		result = append(result, edit)
-	}
-
-	for _, edit := range extra {
-		if pos, ok := position[edit.Number]; ok {
-			maps.Copy(result[pos].Props, edit.Props)
-
-			continue
-		}
-
-		position[edit.Number] = len(result)
-		result = append(result, edit)
-	}
-
-	return result
-}
 
 func findTrackByID(ebml *matroska.EbmlMetadata, id int) *matroska.EbmlTrack {
 	for i := range ebml.Tracks {

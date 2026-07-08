@@ -52,13 +52,13 @@ type MissingFontAttachmentPlan struct {
 
 // MissingFontAttachment is one font attachment to add to a Matroska file.
 type MissingFontAttachment struct {
-	FontName       string
-	Path           string
-	AttachmentName string
-	MIMEType       string
-	Source         string
-	InternalNames  []string
-	RequestedBy    []string
+	FontName       string   `json:"font_name"`
+	Path           string   `json:"path"`
+	AttachmentName string   `json:"attachment_name"`
+	MIMEType       string   `json:"mime_type"`
+	Source         string   `json:"source"`
+	InternalNames  []string `json:"internal_names,omitempty"`
+	RequestedBy    []string `json:"requested_by,omitempty"`
 }
 
 // ResolvedFont describes a font file found by a resolver.
