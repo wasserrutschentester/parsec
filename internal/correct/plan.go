@@ -22,6 +22,10 @@ type FixPlan struct {
 
 	// Destructive file-rewriting operations (mkvmerge)
 	Remux RemuxPlan `json:"remux"`
+
+	// OriginalLanguage holds the resolved original language of the media file,
+	// used for display logic and context during review.
+	OriginalLanguage string `json:"original_language"`
 }
 
 // MetadataPlan defines safe, in-place edits executed via mkvpropedit.

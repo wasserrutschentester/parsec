@@ -195,12 +195,17 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *m
 		allUsedFonts = ComputeAllUsedFonts(tracks, extractedTracks)
 	}
 
+	originalLang := ""
+	if meta != nil {
+		originalLang = meta.OriginalLanguage
+	}
+
 	for i := range tracks {
 		runSingleIterationChecks(filePath, &tracks[i], agg,
 			&lastAudioTrack, &lastSubTrack, &lastAudioPriority, &lastSubPriority,
 			reportedOrderTracks, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs,
 			audioCounts, subCounts, langHasOriginalFlag, videoWidth, videoHeight, attachmentFonts,
-			extractedTracks)
+			extractedTracks, originalLang)
 	}
 
 	runGlobalMatroskaChecks(filePath, ebml, meta, agg, allUsedFonts, attachmentFonts)
@@ -314,7 +319,7 @@ func runSingleIterationChecks(
 	reportedOrderTracks map[int]bool, seenTracks map[string]*matroska.EbmlTrack, reportedDuplicates map[string]bool,
 	seenAudioLangs, seenSubLangs map[string]bool, audioCounts, subCounts map[string]int,
 	langHasOriginalFlag map[string]bool, videoWidth, videoHeight int, attachmentFonts []matroska.AttachmentFontInfo,
-	extractedTracks map[int][]byte,
+	extractedTracks map[int][]byte, originalLang string,
 ) {
 	if config.IsCheckEnabled(config.CheckMatroskaTrackDelay) {
 		agg.Add(checkTrackDelay(*track))
@@ -332,7 +337,7 @@ func runSingleIterationChecks(
 	agg.AddAll(runStatefulTrackChecks(track, audioCounts, subCounts, seenTracks, reportedDuplicates, seenAudioLangs, seenSubLangs))
 
 	if config.IsCheckEnabled(config.CheckMatroskaTrackOrder) {
-		runTrackOrderCheck(track, lastAudioTrack, lastSubTrack, lastAudioPriority, lastSubPriority, reportedOrderTracks, agg)
+		runTrackOrderCheck(track, lastAudioTrack, lastSubTrack, lastAudioPriority, lastSubPriority, reportedOrderTracks, agg, originalLang)
 	}
 }
 
@@ -571,8 +576,8 @@ func runStatefulTrackChecks(track *matroska.EbmlTrack, audioCounts, subCounts ma
 	return results
 }
 
-func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack **matroska.EbmlTrack, lastAudioPriority, lastSubPriority *int64, reportedOrderTracks map[int]bool, agg *trackResultAggregator) {
-	priority := GetTrackPriority(*track)
+func runTrackOrderCheck(track *matroska.EbmlTrack, lastAudioTrack, lastSubTrack **matroska.EbmlTrack, lastAudioPriority, lastSubPriority *int64, reportedOrderTracks map[int]bool, agg *trackResultAggregator, originalLang string) {
+	priority := GetTrackPriority(*track, originalLang)
 	switch track.Type {
 	case "audio":
 		agg.Add(checkTrackOrder(track, *lastAudioTrack, priority, lastAudioPriority, "some Audio tracks are out of order", reportedOrderTracks))

@@ -14,10 +14,11 @@ func TestGetTrackPriority(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		track   matroska.EbmlTrack
-		wantMin int64
-		wantMax int64
+		name     string
+		track    matroska.EbmlTrack
+		origLang string
+		wantMin  int64
+		wantMax  int64
 	}{
 		{
 			name:    "German Audio Default",
@@ -44,10 +45,11 @@ func TestGetTrackPriority(t *testing.T) {
 			wantMax: priorityPreferred + (int64(1) << 60) - 1,
 		},
 		{
-			name:    "Original Language",
-			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fre", OriginalLanguage: true}},
-			wantMin: priorityOriginal,
-			wantMax: priorityOriginal + (int64(1) << 60) - 1,
+			name:     "Original Language",
+			track:    matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fre"}},
+			origLang: "fre",
+			wantMin:  priorityOriginal,
+			wantMax:  priorityOriginal + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "English Audio",
@@ -61,7 +63,7 @@ func TestGetTrackPriority(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := GetTrackPriority(tt.track)
+			got := GetTrackPriority(tt.track, tt.origLang)
 			if got < tt.wantMin || got > tt.wantMax {
 				t.Errorf("getTrackPriority() = %v, want range [%v, %v]", got, tt.wantMin, tt.wantMax)
 			}

@@ -72,7 +72,7 @@ func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) Matr
 	}
 
 	return MatroskaRemuxPlan{
-		TrackOrder:          computeTrackOrder(survivingTracks),
+		TrackOrder:          computeTrackOrder(survivingTracks, originalLang),
 		StripCompressionIDs: computeCompressionStrips(tracks),
 		RemovalCandidates:   removals,
 	}
@@ -80,7 +80,7 @@ func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) Matr
 
 // computeTrackOrder returns the desired output order (by track ID).
 // It returns nil when the current order is already correct.
-func computeTrackOrder(tracks []matroska.EbmlTrack) []int {
+func computeTrackOrder(tracks []matroska.EbmlTrack, originalLang string) []int {
 	if !config.IsCheckEnabled(config.CheckMatroskaTrackOrder) {
 		return nil
 	}
@@ -101,7 +101,7 @@ func computeTrackOrder(tracks []matroska.EbmlTrack) []int {
 	}
 
 	byPriority := func(a, b matroska.EbmlTrack) int {
-		return cmp.Compare(checks.GetTrackPriority(a), checks.GetTrackPriority(b))
+		return cmp.Compare(checks.GetTrackPriority(a, originalLang), checks.GetTrackPriority(b, originalLang))
 	}
 	slices.SortStableFunc(audio, byPriority)
 	slices.SortStableFunc(subs, byPriority)

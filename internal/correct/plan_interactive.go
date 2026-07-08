@@ -31,7 +31,7 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 	if len(missingPlan.Unresolved) > 0 {
 		printMissingFontPlan(missingPlan, false, false)
 
-		if confirmApplyWithPolicy(opts, "Search for and download these missing subtitle fonts?", "Skipping missing font downloads...", false) {
+		if confirmApplyWithPolicy(opts, "Search for and download these missing subtitle fonts?", "Skipping missing font downloads...") {
 			missingPlan = ComputeMissingFontAttachments(filePath, ebml, attachmentFonts, true)
 
 			plan.Metadata.Attachments.ToAdd = nil
@@ -60,6 +60,7 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 	simulatedTracks := ApplyEditsToMemoryTracks(ebml.Tracks, plan.Metadata.Tracks)
 
 	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
+	plan.OriginalLanguage = originalLang
 	remuxPlan := ComputeMatroskaRemux(simulatedTracks, originalLang)
 	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
 
@@ -81,7 +82,7 @@ func canPrompt(opts Options) bool {
 	return !opts.DryRun && !opts.Unattended && ui.IsTerminal()
 }
 
-func confirmApplyWithPolicy(opts Options, prompt, skipMsg string, allowUnattended bool) bool {
+func confirmApplyWithPolicy(opts Options, prompt, skipMsg string) bool {
 	if opts.DryRun {
 		ui.Println(ui.Muted.Render("Dry run: no changes made."))
 
@@ -89,10 +90,6 @@ func confirmApplyWithPolicy(opts Options, prompt, skipMsg string, allowUnattende
 	}
 
 	if opts.Unattended {
-		if allowUnattended {
-			return true
-		}
-
 		ui.Println(ui.Muted.Render(skipMsg))
 
 		return false
@@ -110,126 +107,6 @@ func confirmApplyWithPolicy(opts Options, prompt, skipMsg string, allowUnattende
 // fixChapterAlignment snaps misaligned chapter start times to the nearest
 // video keyframe. Re-timing chapters changes seek/navigation points, so it is
 // always confirmed like the other container fixes above.
-func previewFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) {
-	ui.Println(ui.ReportSection("Track Flags"))
-
-	editByNumber := make(map[int][]matroska.TrackPropertyEdit, len(edits))
-	hasDefaultEdit := false
-
-	for _, edit := range edits {
-		editByNumber[edit.Number] = edit.Properties
-		if hasProp(edit.Properties, "flag-default") {
-			hasDefaultEdit = true
-		}
-	}
-
-	headers := []string{"Track", "Type", "Lang", "Name", "Changes", "Reason"}
-
-	var rows [][]string
-
-	if hasDefaultEdit {
-		rows = defaultFlagRows(ebml, edits)
-	} else {
-		rows = editedFlagRows(ebml, edits)
-	}
-
-	ui.Println(ui.TrackTable(headers, rows))
-	ui.Println()
-}
-
-// defaultFlagRows returns one row per audio/subtitle track, showing pending
-// changes for edited tracks and the unchanged Default state for others.
-func defaultFlagRows(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) [][]string {
-	editMap := make(map[int]matroska.TrackEdit, len(edits))
-	for _, e := range edits {
-		editMap[e.Number] = e
-	}
-
-	var rows [][]string
-
-	for i := range ebml.Tracks {
-		track := &ebml.Tracks[i]
-		if track.Type != "audio" && track.Type != "subtitles" {
-			continue
-		}
-
-		edit, hasEdit := editMap[track.Properties.Number]
-
-		var changes, reason string
-
-		if hasEdit {
-			changes = flagChangeTags(edit.Properties)
-			reason = joinReasons(edit.Properties)
-		} else if track.Properties.Default {
-			changes = ui.Muted.Render("Default (unchanged)")
-			reason = "-"
-		}
-
-		rows = append(rows, []string{
-			strconv.Itoa(track.Properties.Number),
-			track.Type,
-			track.Properties.Language,
-			track.Properties.Name,
-			changes,
-			reason,
-		})
-	}
-
-	return rows
-}
-
-// editedFlagRows returns one row per edited track only.
-func editedFlagRows(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) [][]string {
-	rows := make([][]string, 0, len(edits))
-
-	for _, edit := range edits {
-		track := findTrack(ebml, edit.Number)
-
-		trackType, lang, name := "?", "?", ""
-		if track != nil {
-			trackType, lang, name = track.Type, track.Properties.Language, track.Properties.Name
-		}
-
-		rows = append(rows, []string{strconv.Itoa(edit.Number), trackType, lang, name, flagChangeTags(edit.Properties), joinReasons(edit.Properties)})
-	}
-
-	return rows
-}
-
-func joinReasons(props []matroska.TrackPropertyEdit) string {
-	var parts []string
-
-	for _, p := range props {
-		if p.Reason != "" {
-			parts = append(parts, p.Reason)
-		}
-	}
-
-	if len(parts) == 0 {
-		return "-"
-	}
-
-	return strings.Join(slices.Compact(parts), "; ")
-}
-
-func flagChangeTags(props []matroska.TrackPropertyEdit) string {
-	tags := make([]string, 0, len(props))
-
-	for _, p := range props {
-		tags = append(tags, flagChangeTag(p.Key, p.Value == "1"))
-	}
-
-	return strings.Join(tags, " ")
-}
-
-func flagChangeTag(key string, set bool) string {
-	label := prettyFlag(key)
-	if set {
-		return ui.Success.Render("[+] " + label)
-	}
-
-	return ui.Muted.Render("[-] " + label)
-}
 
 // remuxMatroska previews the pending remux-only fixes (track order,
 // compression stripping, track removals) regardless of --remux, so a plain
@@ -409,41 +286,12 @@ func promptMultiLangNameFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit 
 	return edits
 }
 
-func hasProp(props []matroska.TrackPropertyEdit, key string) bool {
-	for _, p := range props {
-		if p.Key == key {
-			return true
-		}
-	}
-
-	return false
-}
-
 // promptKeywordFlagFixes gathers every SDH/Forced/Commentary/Descriptive
 // keyword-flag mismatch, consolidates them per track, then previews and
 // confirms using previewFlagEdits — consistent with the auto-computed flag edits
 // that follow. Multiple mismatches on the same track are batched into one edit.
 func promptKeywordFlagFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
-	edits := buildKeywordFlagEdits(ebml)
-	if len(edits) == 0 {
-		return nil
-	}
-
-	total := countFlagProps(edits)
-
-	ui.Println()
-	previewFlagEdits(ebml, edits)
-
-	switch promptBulkChoice(fmt.Sprintf("Set %d flag(s) to match track names?", total)) {
-	case bulkAll:
-		return edits
-	case bulkSelect:
-		return selectKeywordFlagEdits(ebml, edits)
-	default:
-		ui.Println(ui.Muted.Render("Skipping keyword/flag fixes..."))
-
-		return nil
-	}
+	return buildKeywordFlagEdits(ebml)
 }
 
 // buildKeywordFlagEdits consolidates all keyword/flag mismatches per track into
@@ -473,60 +321,6 @@ func buildKeywordFlagEdits(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
 	}
 
 	return edits
-}
-
-func countFlagProps(edits []matroska.TrackEdit) int {
-	n := 0
-
-	for _, edit := range edits {
-		n += len(edit.Properties)
-	}
-
-	return n
-}
-
-// selectKeywordFlagEdits prompts once per track (showing its pending flag
-// changes) and returns only the edits the user confirmed.
-func selectKeywordFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) []matroska.TrackEdit {
-	var selected []matroska.TrackEdit
-
-	for _, edit := range edits {
-		track := findTrack(ebml, edit.Number)
-
-		ui.Println()
-		ui.Println("  " + trackLabel(track))
-		ui.Println("  " + flagChangeTags(edit.Properties))
-
-		if confirmPrompt("  Apply these flag changes?") {
-			selected = append(selected, edit)
-		}
-	}
-
-	return selected
-}
-
-// bulkChoice is the user's answer to a batched all/none/select prompt.
-type bulkChoice int
-
-const (
-	bulkNone bulkChoice = iota
-	bulkAll
-	bulkSelect
-)
-
-// promptBulkChoice asks prompt and reads an [a]ll/[n]one/[s]elect answer,
-// defaulting to the safe bulkNone for anything else (including a blank Enter).
-func promptBulkChoice(prompt string) bulkChoice {
-	response := strings.ToLower(ui.Prompt(ui.Warning.Render(prompt) + " [a]ll / [n]one / [s]elect: "))
-
-	switch response {
-	case "a", "all":
-		return bulkAll
-	case "s", "select":
-		return bulkSelect
-	default:
-		return bulkNone
-	}
 }
 
 // mergeTrackEdits merges extra edits into base, combining property maps for
@@ -597,56 +391,6 @@ func trackFlagsCompact(track *matroska.EbmlTrack) string {
 	return strings.Join(parts, " ")
 }
 
-func previewTrackEdits(section string, ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) {
-	ui.Println(ui.ReportSection(section))
-
-	headers := []string{"Track", "Type", "Lang", "Name", "Changes", "Reason"}
-	rows := make([][]string, 0, len(edits))
-
-	for _, edit := range edits {
-		track := findTrack(ebml, edit.Number)
-
-		trackType, lang, name := "?", "?", ""
-		if track != nil {
-			trackType, lang, name = track.Type, track.Properties.Language, track.Properties.Name
-		}
-
-		var changes []string
-
-		for _, prop := range edit.Properties {
-			oldVal := ""
-
-			if track != nil {
-				switch prop.Key {
-				case "name":
-					oldVal = track.Properties.Name
-				case "language":
-					oldVal = track.Properties.Language
-				}
-			}
-
-			// Format like: Name: "old" -> "new"
-			change := fmt.Sprintf("%s: %s %s %s", strings.ToTitle(prop.Key), quoteOrNone(oldVal), ui.Muted.Render("->"), quoteOrNone(prop.Value))
-			changes = append(changes, change)
-		}
-
-		rows = append(rows, []string{
-			strconv.Itoa(edit.Number),
-			trackType,
-			lang,
-			name,
-			strings.Join(changes, ", "),
-			joinReasons(edit.Properties),
-		})
-	}
-
-	if len(rows) > 0 {
-		ui.Println(ui.TrackTable(headers, rows))
-	}
-
-	ui.Println()
-}
-
 func findTrack(ebml *matroska.EbmlMetadata, number int) *matroska.EbmlTrack {
 	for i := range ebml.Tracks {
 		if ebml.Tracks[i].Properties.Number == number {
@@ -672,9 +416,4 @@ func quoteOrNone(value string) string {
 	}
 
 	return strconv.Quote(value)
-}
-
-// confirmApply applies enabled Matroska fixes to one file.
-func confirmApply(opts Options, prompt, skipMsg string) bool {
-	return confirmApplyWithPolicy(opts, prompt, skipMsg, true)
 }

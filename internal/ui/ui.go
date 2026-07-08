@@ -212,11 +212,29 @@ func Card(title, subtitle, body, footer string) string {
 	return CardStyle.Width(width).Render(content)
 }
 
-// formatStringDiff visualizes a mismatch between two strings with character-level alignment.
-func formatStringDiff(oldStr, newStr string) string {
+// FormatStringDiff visualizes a mismatch between two strings with character-level alignment.
+// If the diff consists only of additions, it returns only the additions line.
+// If it consists only of removals, it returns only the removals line.
+// Otherwise, it returns both lines vertically joined.
+func FormatStringDiff(oldStr, newStr string) string {
+	line1, line2, hasRemovals, hasAdditions := formatStringDiffLines(oldStr, newStr)
+
+	if hasAdditions && !hasRemovals {
+		return line2
+	} else if hasRemovals && !hasAdditions {
+		return line1
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, line1, line2)
+}
+
+func formatStringDiffLines(oldStr, newStr string) (string, string, bool, bool) {
 	edits := udiff.Strings(oldStr, newStr)
 
-	var line1, line2 strings.Builder
+	var (
+		line1, line2              strings.Builder
+		hasAdditions, hasRemovals bool
+	)
 
 	pos := 0
 
@@ -230,6 +248,14 @@ func formatStringDiff(oldStr, newStr string) string {
 
 		oldText := oldStr[edit.Start:edit.End]
 		newText := edit.New
+
+		if len(oldText) > 0 {
+			hasRemovals = true
+		}
+
+		if len(newText) > 0 {
+			hasAdditions = true
+		}
 
 		maxW := calculateMaxW(oldText, newText)
 
@@ -246,7 +272,7 @@ func formatStringDiff(oldStr, newStr string) string {
 		line2.WriteString(remaining)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, line1.String(), line2.String())
+	return line1.String(), line2.String(), hasRemovals, hasAdditions
 }
 
 func calculateMaxW(oldText, newText string) int {
@@ -288,12 +314,7 @@ func renderNewPart(b *strings.Builder, newText string, maxW int) {
 
 // FormatStringDiffAligned visualizes a mismatch between two strings with labels and character-level alignment.
 func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualValue string) string {
-	diff := formatStringDiff(expectedValue, actualValue)
-
-	lines := strings.Split(diff, "\n")
-	if len(lines) != 2 {
-		return diff
-	}
+	line1, line2, _, _ := formatStringDiffLines(expectedValue, actualValue)
 
 	maxLabelLen := max(len(expectedLabel), len(actualLabel))
 	expectedPrefix := LabelStyle.Width(maxLabelLen + 4).Render(expectedLabel + ":")
@@ -301,43 +322,128 @@ func FormatStringDiffAligned(expectedLabel, expectedValue, actualLabel, actualVa
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		lipgloss.JoinHorizontal(lipgloss.Top, expectedPrefix, lines[0]),
-		lipgloss.JoinHorizontal(lipgloss.Top, actualPrefix, lines[1]),
+		lipgloss.JoinHorizontal(lipgloss.Top, expectedPrefix, line1),
+		lipgloss.JoinHorizontal(lipgloss.Top, actualPrefix, line2),
 	)
+}
+
+func calculateGenericTableWidths(headers []string, rows [][]string) map[int]int {
+	widths := make(map[int]int)
+	for i, h := range headers {
+		widths[i] = lipgloss.Width(h)
+	}
+
+	for _, r := range rows {
+		for i, cell := range r {
+			if i < len(headers) {
+				w := lipgloss.Width(cell)
+				if w > widths[i] {
+					widths[i] = w
+				}
+			}
+		}
+	}
+
+	return widths
+}
+
+//nolint:cyclop // UI logic
+func calculateGenericFlexWidths(headers []string, contentWidths map[int]int) map[int]int {
+	termWidth, _, _ := term.GetSize(os.Stdout.Fd())
+	if termWidth <= 0 {
+		termWidth = 120
+	}
+
+	overhead := 6 + len(headers) + 1 + (len(headers) * 2)
+	availableWidth := termWidth - overhead
+
+	flexWidths := make(map[int]int)
+	fixedColsWidth := 0
+	flexIndices := make(map[int]bool)
+
+	totalFlexContentWidth := 0
+
+	for i, h := range headers {
+		lower := strings.ToLower(h)
+		if lower == "name" || lower == "reason" || lower == "warning" || lower == "changes" || lower == "new file" || lower == "full style name" {
+			flexIndices[i] = true
+			totalFlexContentWidth += contentWidths[i]
+		} else {
+			flexWidths[i] = contentWidths[i]
+			fixedColsWidth += contentWidths[i]
+		}
+	}
+
+	if len(flexIndices) == 0 {
+		for i := range headers {
+			flexWidths[i] = contentWidths[i]
+		}
+
+		return flexWidths
+	}
+
+	remainingWidth := max(availableWidth-fixedColsWidth, 40)
+
+	if totalFlexContentWidth <= remainingWidth {
+		for i := range headers {
+			if flexIndices[i] {
+				flexWidths[i] = contentWidths[i]
+			}
+		}
+	} else {
+		for i := range headers {
+			if flexIndices[i] {
+				ratio := float64(contentWidths[i]) / float64(totalFlexContentWidth)
+				flexWidths[i] = max(int(float64(remainingWidth)*ratio), 15)
+			}
+		}
+	}
+
+	return flexWidths
 }
 
 // TrackTable renders a table of track information.
 func TrackTable(headers []string, rows [][]string) string {
+	contentWidths := calculateGenericTableWidths(headers, rows)
+	flexWidths := calculateGenericFlexWidths(headers, contentWidths)
+
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(white)).
-		StyleFunc(func(row, _ int) lipgloss.Style {
+		StyleFunc(func(row, col int) lipgloss.Style {
+			style := lipgloss.NewStyle().Padding(0, 1)
 			if row < 0 { // Header row
-				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
+				style = style.Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
 
-			return lipgloss.NewStyle().Padding(0, 1)
+			return style.Width(flexWidths[col] + 2)
 		}).
 		Headers(headers...).
-		Rows(rows...)
+		Rows(rows...).
+		Wrap(true)
 
 	return t.Render()
 }
 
 // DataTable renders a generic table with headers and rows.
 func DataTable(headers []string, rows [][]string) string {
+	contentWidths := calculateGenericTableWidths(headers, rows)
+	flexWidths := calculateGenericFlexWidths(headers, contentWidths)
+
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(white)).
-		StyleFunc(func(row, _ int) lipgloss.Style {
+		StyleFunc(func(row, col int) lipgloss.Style {
+			style := lipgloss.NewStyle().Padding(0, 1)
 			if row < 0 { // Header row
-				return lipgloss.NewStyle().Bold(true).Foreground(blue).Align(lipgloss.Center)
+				style = style.Bold(true).Foreground(blue).Align(lipgloss.Center)
 			}
 
-			return lipgloss.NewStyle().Padding(0, 1)
+			return style.Width(flexWidths[col] + 2)
 		}).
 		Headers(headers...).
-		Rows(rows...)
+		Rows(rows...).
+		Wrap(true)
 
 	return t.Render()
 }
@@ -639,21 +745,135 @@ func Prompt(msg string) string {
 // ConfirmContinue prompts the user to continue with a [Y/n] prompt.
 // Empty input returns true, "no" or "n" returns false.
 func ConfirmContinue(msg string) bool {
+	return PromptYN(msg, "y")
+}
+
+// PromptYN asks a yes/no question and returns true for yes, false for no.
+// If defaultOpt is "y" or "Y", empty input returns true.
+// If defaultOpt is "n" or "N", empty input returns false.
+//
+//nolint:cyclop // UI logic
+func PromptYN(msg string, defaultOpt string) bool {
 	if IsSilent || !IsTerminal() {
-		return true
+		return strings.ToLower(defaultOpt) == "y"
 	}
 
-	fmt.Printf("%s [Y/n]: ", msg)
+	prompt := msg + " [y/n]: "
+	if strings.ToLower(defaultOpt) == "y" {
+		prompt = msg + " [Y/n]: "
+	} else if strings.ToLower(defaultOpt) == "n" {
+		prompt = msg + " [y/N]: "
+	}
 
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		input := strings.ToLower(strings.TrimSpace(scanner.Text()))
-		if input == "no" || input == "n" {
+	for {
+		fmt.Print(prompt)
+
+		input := readInput()
+		if input == "" {
+			return strings.ToLower(defaultOpt) == "y"
+		}
+
+		if input == "y" || input == "yes" {
+			return true
+		}
+
+		if input == "n" || input == "no" {
 			return false
 		}
 	}
+}
 
-	return true
+func readInput() string {
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return strings.ToLower(strings.TrimSpace(scanner.Text()))
+	}
+
+	return ""
+}
+
+// PromptYNI asks a yes/no/inspect question and returns "y", "n", or "i".
+//
+//nolint:cyclop // UI logic
+func PromptYNI(msg string, defaultOpt string) string {
+	if IsSilent || !IsTerminal() {
+		return strings.ToLower(defaultOpt)
+	}
+
+	var options string
+
+	switch strings.ToLower(defaultOpt) {
+	case "y":
+		options = "Y/n/i"
+	case "n":
+		options = "y/N/i"
+	case "i":
+		options = "y/n/I"
+	default:
+		options = "y/n/i"
+	}
+
+	prompt := fmt.Sprintf("%s [%s]: ", msg, options)
+
+	for {
+		fmt.Print(prompt)
+
+		input := readInput()
+		if input == "" {
+			return strings.ToLower(defaultOpt)
+		}
+
+		switch input {
+		case "y", "yes":
+			return "y"
+		case "n", "no":
+			return "n"
+		case "i", "inspect":
+			return "i"
+		}
+	}
+}
+
+// PromptYNE asks a yes/no/edit question and returns "y", "n", or "e".
+//
+//nolint:cyclop // UI logic
+func PromptYNE(msg string, defaultOpt string) string {
+	if IsSilent || !IsTerminal() {
+		return strings.ToLower(defaultOpt)
+	}
+
+	var options string
+
+	switch strings.ToLower(defaultOpt) {
+	case "y":
+		options = "Y/n/e"
+	case "n":
+		options = "y/N/e"
+	case "e":
+		options = "y/n/E"
+	default:
+		options = "y/n/e"
+	}
+
+	prompt := fmt.Sprintf("%s [%s]: ", msg, options)
+
+	for {
+		fmt.Print(prompt)
+
+		input := readInput()
+		if input == "" {
+			return strings.ToLower(defaultOpt)
+		}
+
+		switch input {
+		case "y", "yes":
+			return "y"
+		case "n", "no":
+			return "n"
+		case "e", "edit":
+			return "e"
+		}
+	}
 }
 
 // IsTerminal returns true if both stdin and stdout are terminals.

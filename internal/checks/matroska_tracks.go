@@ -429,8 +429,13 @@ func getCommentarySubPriority(name string) int64 {
 }
 
 // GetTrackPriority computes a sort priority for audio/subtitle tracks.
-func GetTrackPriority(track matroska.EbmlTrack) int64 {
-	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
+func GetTrackPriority(track matroska.EbmlTrack, originalLang string) int64 {
+	isOriginal := false
+	if originalLang != "" {
+		isOriginal = metadata.MatchLanguage(language.Make(track.Properties.Language), language.Make(originalLang))
+	}
+
+	langScore := calculateLangScore(track.Properties.Language, isOriginal)
 	propertyScore := calculatePropertyScore(track) & maskProperty
 
 	if track.Properties.Commentary {
