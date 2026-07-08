@@ -87,7 +87,7 @@ Rename files based on metadata and naming conventions.
 
 For more information see the [Rename Documentation](docs/rename.md)
 
-### `correct`
+### `autocorrect`
 Automatically repair issues reported by `check` that can be resolved without re-encoding.
 
 **Features:**
@@ -96,7 +96,7 @@ Automatically repair issues reported by `check` that can be resolved without re-
 - **Container Remux**: With `--remux`, also fixes track order, compression, and safe track removals.
 - **Safe by Default**: Destructive, remote-download and value-input fixes are skipped in unattended mode; track removals always require confirmation.
 
-For more information see the [Correct Documentation](docs/correct.md)
+For more information see the [Autocorrect Documentation](docs/autocorrect.md)
 
 ### `update`
 Update `parsec` to the latest version.

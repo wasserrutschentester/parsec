@@ -15,23 +15,23 @@ import (
 
 var remuxFlag bool
 
-type correctResult struct {
+type autocorrectResult struct {
 	File string         `json:"file"`
 	Plan *fixer.FixPlan `json:"plan"`
 }
 
 var errJSONRequiresDryRunOrUnattended = errors.New("json output mode requires --dry-run or --unattended")
 
-// correctCmd represents the correct command
-var correctCmd = &cobra.Command{
-	Use:   "correct [path...]",
+// autocorrectCmd represents the autocorrect command
+var autocorrectCmd = &cobra.Command{
+	Use:   "autocorrect [path...]",
 	Short: "automatically fix Matroska track issues reported by check",
 	Long: fmt.Sprintf("%s\n%s", ui.Banner(".: COURSE CORRECTION :."),
 		`Automatically repairs Matroska issues that can be fixed without re-encoding:
   1. Track flags (default and original-language)
   2. Track names (removing codecs, junk and redundant language tags)
   3. Missing language tags, multi-language names and keyword/flag mismatches (prompted)
-  4. Container metadata and font attachments (prompted)
+  4. Container metadata, chapters alignment, and font attachments (prompted)
 
 With --remux, also applies fixes that require rewriting the container: track
 order, container compression and (with confirmation) removal of unwanted-language
@@ -59,17 +59,17 @@ You can pass files or directories. Directories are scanned recursively for Matro
 			viper.Set("original_language", originalLanguageFlag)
 		}
 
-		var results []correctResult
+		var results []autocorrectResult
 
 		expandedArgs := expandArgs(args)
 		for _, filePath := range expandedArgs {
-			plan, err := correctFile(filePath)
+			plan, err := autocorrectFile(filePath)
 			if err != nil {
 				return err
 			}
 
 			if plan != nil {
-				results = append(results, correctResult{File: filePath, Plan: plan})
+				results = append(results, autocorrectResult{File: filePath, Plan: plan})
 			}
 		}
 
@@ -87,7 +87,7 @@ You can pass files or directories. Directories are scanned recursively for Matro
 }
 
 //nolint:cyclop // branching for json output adds minor complexity
-func correctFile(filePath string) (*fixer.FixPlan, error) {
+func autocorrectFile(filePath string) (*fixer.FixPlan, error) {
 	opts := fixer.Options{
 		DryRun:     dryRunFlag,
 		Remux:      remuxFlag,
@@ -144,20 +144,20 @@ func correctFile(filePath string) (*fixer.FixPlan, error) {
 }
 
 func init() {
-	rootCmd.AddCommand(correctCmd)
+	rootCmd.AddCommand(autocorrectCmd)
 
-	correctCmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
-	correctCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
-	correctCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
-	correctCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "override original language (sets original_language config key)")
-	correctCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
-	correctCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
-	correctCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	autocorrectCmd.Flags().BoolVar(&remuxFlag, "remux", false, "also apply fixes that require rewriting the container (track order, compression, track removal)")
+	autocorrectCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "do not prompt for confirmation")
+	autocorrectCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "preview changes without modifying files")
+	autocorrectCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "override original language (sets original_language config key)")
+	autocorrectCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	autocorrectCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	autocorrectCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 
 	for _, f := range []string{"imdb", "tmdb", "tvdb"} {
-		_ = correctCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+		_ = autocorrectCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
-	correctCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "output fix plan in JSON (requires --dry-run or --unattended)")
-	correctCmd.Flags().SortFlags = false
+	autocorrectCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "output fix plan in JSON (requires --dry-run or --unattended)")
+	autocorrectCmd.Flags().SortFlags = false
 }
