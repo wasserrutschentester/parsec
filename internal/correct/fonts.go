@@ -2,8 +2,6 @@ package correct
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -178,6 +176,12 @@ func fontMIMEType(path string) string {
 func (r defaultFontResolver) Resolve(fontName string, allowDownload bool) (ResolvedFont, bool) {
 	if resolved, ok := resolveSystemFont(fontName); ok {
 		return resolved, true
+	}
+
+	if path, err := cache.GetFontPath(fontName); err == nil {
+		if names, ok := checkFontFileMatches(path, fontName); ok {
+			return ResolvedFont{Path: path, Source: "cache", InternalNames: names}, true
+		}
 	}
 
 	if !allowDownload {
@@ -418,14 +422,6 @@ func (r defaultFontResolver) getJSON(cacheKey, requestURL string, target any) er
 }
 
 func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, source string) (ResolvedFont, bool) {
-	path := cachedFontPath(fontURL, fileName)
-
-	if _, err := os.Stat(path); err == nil {
-		if names, ok := checkFontFileMatches(path, fontName); ok {
-			return ResolvedFont{Path: path, Source: source, InternalNames: names}, true
-		}
-	}
-
 	data, err := r.downloadFont(fontURL)
 	if err != nil {
 		ui.PrintDebug(fmt.Sprintf("failed to download font %s from %s: %v", fontName, fontURL, err))
@@ -438,14 +434,20 @@ func (r defaultFontResolver) downloadAndMatchFont(fontURL, fileName, fontName, s
 		return ResolvedFont{}, false
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		ui.PrintDebug(fmt.Sprintf("failed to create font cache: %v", err))
-
-		return ResolvedFont{}, false
+	ext := strings.ToLower(filepath.Ext(fileName))
+	if ext == "" {
+		if u, err := url.Parse(fontURL); err == nil {
+			ext = strings.ToLower(filepath.Ext(u.Path))
+		}
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		ui.PrintDebug(fmt.Sprintf("failed to write cached font %s: %v", ui.AnonymizePath(path), err))
+	if ext == "" {
+		ext = ".ttf"
+	}
+
+	path, err := cache.SetFont(fontName, ext, data)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to cache font %s: %v", fontName, err))
 
 		return ResolvedFont{}, false
 	}
@@ -482,28 +484,6 @@ func (r defaultFontResolver) downloadFont(fontURL string) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-func cachedFontPath(fontURL, fileName string) string {
-	dir, err := os.UserCacheDir()
-	if err != nil {
-		dir = os.TempDir()
-	}
-
-	ext := strings.ToLower(filepath.Ext(fileName))
-	if ext == "" {
-		if u, err := url.Parse(fontURL); err == nil {
-			ext = strings.ToLower(filepath.Ext(u.Path))
-		}
-	}
-
-	if ext == "" {
-		ext = ".ttf"
-	}
-
-	hash := sha256.Sum256([]byte(fontURL))
-
-	return filepath.Join(dir, "parsec", "fonts", hex.EncodeToString(hash[:])+ext)
 }
 
 // attachMissingFonts locates missing ASS/SSA subtitle fonts and embeds the

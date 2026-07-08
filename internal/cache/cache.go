@@ -18,10 +18,12 @@ var (
 	cacheDir string
 	metaDir  string
 	subDir   string
+	fontDir  string
 	mu       sync.Mutex
 
 	errCacheBypassed = errors.New("cache bypassed")
 	errCacheExpired  = errors.New("cache expired")
+	errFontNotFound  = errors.New("font not found in cache")
 )
 
 const (
@@ -44,12 +46,14 @@ func resetDir() {
 	cacheDir = filepath.Join(dir, "parsec", "api")
 	metaDir = filepath.Join(dir, "parsec", "meta")
 	subDir = filepath.Join(dir, "parsec", "subtitles")
+	fontDir = filepath.Join(dir, "parsec", "fonts")
 }
 
 func setDir(dir string) {
 	cacheDir = dir
 	metaDir = filepath.Join(dir, "meta")
 	subDir = filepath.Join(dir, "subtitles")
+	fontDir = filepath.Join(dir, "fonts")
 }
 
 func cleanup() {
@@ -68,6 +72,7 @@ func cleanup() {
 	removeExpiredFiles()
 	removeExpiredMetaFiles()
 	removeExpiredSubtitleFiles()
+	removeExpiredFontFiles()
 	removeOldExecutable()
 
 	// Update marker
@@ -158,10 +163,37 @@ func removeExpiredSubtitleFiles() {
 	}
 }
 
+func removeExpiredFontFiles() {
+	if _, err := os.Stat(fontDir); os.IsNotExist(err) {
+		return
+	}
+
+	files, err := os.ReadDir(fontDir)
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
+		if time.Since(info.ModTime()) > persistentCacheDuration {
+			_ = os.Remove(filepath.Join(fontDir, file.Name()))
+		}
+	}
+}
+
 func clearCache() {
 	_ = os.RemoveAll(cacheDir)
 	_ = os.RemoveAll(metaDir)
 	_ = os.RemoveAll(subDir)
+	_ = os.RemoveAll(fontDir)
 }
 
 // Get retrieves data from the cache for the given key.
@@ -352,4 +384,49 @@ func getSubPath(key string) string {
 	hash := sha256.Sum256([]byte(key))
 
 	return filepath.Join(subDir, hex.EncodeToString(hash[:]))
+}
+
+// GetFontPath retrieves the absolute path to the cached font file for the given key, if it exists.
+func GetFontPath(key string) (string, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if config.NoCache {
+		return "", errCacheBypassed
+	}
+
+	hash := sha256.Sum256([]byte(key))
+	prefix := filepath.Join(fontDir, hex.EncodeToString(hash[:]))
+
+	// Match the exact hash + any extension
+	matches, err := filepath.Glob(prefix + ".*")
+	if err != nil || len(matches) == 0 {
+		return "", errFontNotFound
+	}
+
+	path := matches[0]
+
+	now := time.Now()
+	_ = os.Chtimes(path, now, now)
+
+	return path, nil
+}
+
+// SetFont stores a font file in the cache for the given key and extension, returning the absolute path.
+func SetFont(key, ext string, data []byte) (string, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if err := os.MkdirAll(fontDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create font cache directory: %w", err)
+	}
+
+	hash := sha256.Sum256([]byte(key))
+	path := filepath.Join(fontDir, hex.EncodeToString(hash[:])+ext)
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("failed to write font cache file: %w", err)
+	}
+
+	return path, nil
 }
