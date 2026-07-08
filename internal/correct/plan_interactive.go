@@ -4,7 +4,6 @@ package correct
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -114,12 +113,12 @@ func confirmApplyWithPolicy(opts Options, prompt, skipMsg string, allowUnattende
 func previewFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) {
 	ui.Println(ui.ReportSection("Track Flags"))
 
-	editByNumber := make(map[int]map[string]string, len(edits))
+	editByNumber := make(map[int][]matroska.TrackPropertyEdit, len(edits))
 	hasDefaultEdit := false
 
 	for _, edit := range edits {
-		editByNumber[edit.Number] = edit.Props
-		if _, ok := edit.Props["flag-default"]; ok {
+		editByNumber[edit.Number] = edit.Properties
+		if hasProp(edit.Properties, "flag-default") {
 			hasDefaultEdit = true
 		}
 	}
@@ -159,8 +158,8 @@ func defaultFlagRows(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) []
 		var changes, reason string
 
 		if hasEdit {
-			changes = flagChangeTags(edit.Props)
-			reason = joinReasons(edit.Reasons)
+			changes = flagChangeTags(edit.Properties)
+			reason = joinReasons(edit.Properties)
 		} else if track.Properties.Default {
 			changes = ui.Muted.Render("Default (unchanged)")
 			reason = "-"
@@ -191,18 +190,18 @@ func editedFlagRows(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) [][
 			trackType, lang, name = track.Type, track.Properties.Language, track.Properties.Name
 		}
 
-		rows = append(rows, []string{strconv.Itoa(edit.Number), trackType, lang, name, flagChangeTags(edit.Props), joinReasons(edit.Reasons)})
+		rows = append(rows, []string{strconv.Itoa(edit.Number), trackType, lang, name, flagChangeTags(edit.Properties), joinReasons(edit.Properties)})
 	}
 
 	return rows
 }
 
-func joinReasons(reasons map[string]string) string {
+func joinReasons(props []matroska.TrackPropertyEdit) string {
 	var parts []string
 
-	for _, k := range slices.Sorted(maps.Keys(reasons)) {
-		if reasons[k] != "" {
-			parts = append(parts, reasons[k])
+	for _, p := range props {
+		if p.Reason != "" {
+			parts = append(parts, p.Reason)
 		}
 	}
 
@@ -213,12 +212,11 @@ func joinReasons(reasons map[string]string) string {
 	return strings.Join(slices.Compact(parts), "; ")
 }
 
-func flagChangeTags(props map[string]string) string {
-	keys := slices.Sorted(maps.Keys(props))
-	tags := make([]string, 0, len(keys))
+func flagChangeTags(props []matroska.TrackPropertyEdit) string {
+	tags := make([]string, 0, len(props))
 
-	for _, key := range keys {
-		tags = append(tags, flagChangeTag(key, props[key] == "1"))
+	for _, p := range props {
+		tags = append(tags, flagChangeTag(p.Key, p.Value == "1"))
 	}
 
 	return strings.Join(tags, " ")
@@ -373,9 +371,10 @@ func promptLanguageFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
 
 		if lang := ui.Prompt("  " + ui.Warning.Render("Missing language tag.") + " Enter a language code (blank to skip): "); lang != "" {
 			edits = append(edits, matroska.TrackEdit{
-				Number:  track.Properties.Number,
-				Props:   map[string]string{"language": lang},
-				Reasons: map[string]string{"language": "User interactive language prompt"},
+				Number: track.Properties.Number,
+				Properties: []matroska.TrackPropertyEdit{
+					{Key: "language", Value: lang, Reason: "User interactive language prompt"},
+				},
 			})
 		}
 	}
@@ -399,14 +398,25 @@ func promptMultiLangNameFixes(ebml *matroska.EbmlMetadata) []matroska.TrackEdit 
 
 		if name := ui.Prompt("  " + ui.Warning.Render("Multi-language ('mul') track should list at least two languages in its Name.") + " Enter a name (blank to skip): "); name != "" {
 			edits = append(edits, matroska.TrackEdit{
-				Number:  track.Properties.Number,
-				Props:   map[string]string{"name": name},
-				Reasons: map[string]string{"name": "User interactive name prompt"},
+				Number: track.Properties.Number,
+				Properties: []matroska.TrackPropertyEdit{
+					{Key: "name", Value: name, Reason: "User interactive name prompt"},
+				},
 			})
 		}
 	}
 
 	return edits
+}
+
+func hasProp(props []matroska.TrackPropertyEdit, key string) bool {
+	for _, p := range props {
+		if p.Key == key {
+			return true
+		}
+	}
+
+	return false
 }
 
 // promptKeywordFlagFixes gathers every SDH/Forced/Commentary/Descriptive
@@ -447,20 +457,18 @@ func buildKeywordFlagEdits(ebml *matroska.EbmlMetadata) []matroska.TrackEdit {
 			continue
 		}
 
-		props := make(map[string]string, len(fixes))
+		var props []matroska.TrackPropertyEdit
 		for _, fix := range fixes {
-			props[fix.Property] = "1"
-		}
-
-		reasons := make(map[string]string)
-		for k := range props {
-			reasons[k] = "User interactive flag prompt"
+			props = append(props, matroska.TrackPropertyEdit{
+				Key:    fix.Property,
+				Value:  "1",
+				Reason: "User interactive flag prompt",
+			})
 		}
 
 		edits = append(edits, matroska.TrackEdit{
-			Number:  ebml.Tracks[i].Properties.Number,
-			Props:   props,
-			Reasons: reasons,
+			Number:     ebml.Tracks[i].Properties.Number,
+			Properties: props,
 		})
 	}
 
@@ -471,7 +479,7 @@ func countFlagProps(edits []matroska.TrackEdit) int {
 	n := 0
 
 	for _, edit := range edits {
-		n += len(edit.Props)
+		n += len(edit.Properties)
 	}
 
 	return n
@@ -487,7 +495,7 @@ func selectKeywordFlagEdits(ebml *matroska.EbmlMetadata, edits []matroska.TrackE
 
 		ui.Println()
 		ui.Println("  " + trackLabel(track))
-		ui.Println("  " + flagChangeTags(edit.Props))
+		ui.Println("  " + flagChangeTags(edit.Properties))
 
 		if confirmPrompt("  Apply these flag changes?") {
 			selected = append(selected, edit)
@@ -605,11 +613,11 @@ func previewTrackEdits(section string, ebml *matroska.EbmlMetadata, edits []matr
 
 		var changes []string
 
-		for _, key := range slices.Sorted(maps.Keys(edit.Props)) {
+		for _, prop := range edit.Properties {
 			oldVal := ""
 
 			if track != nil {
-				switch key {
+				switch prop.Key {
 				case "name":
 					oldVal = track.Properties.Name
 				case "language":
@@ -618,7 +626,7 @@ func previewTrackEdits(section string, ebml *matroska.EbmlMetadata, edits []matr
 			}
 
 			// Format like: Name: "old" -> "new"
-			change := fmt.Sprintf("%s: %s %s %s", strings.ToTitle(key), quoteOrNone(oldVal), ui.Muted.Render("->"), quoteOrNone(edit.Props[key]))
+			change := fmt.Sprintf("%s: %s %s %s", strings.ToTitle(prop.Key), quoteOrNone(oldVal), ui.Muted.Render("->"), quoteOrNone(prop.Value))
 			changes = append(changes, change)
 		}
 
@@ -628,7 +636,7 @@ func previewTrackEdits(section string, ebml *matroska.EbmlMetadata, edits []matr
 			lang,
 			name,
 			strings.Join(changes, ", "),
-			joinReasons(edit.Reasons),
+			joinReasons(edit.Properties),
 		})
 	}
 

@@ -74,7 +74,6 @@ You can pass files or directories. Directories are scanned recursively for Matro
 		}
 
 		if jsonOutputFlag {
-			//nolint:musttag // FixPlan doesn't have json tags but default marshaling is acceptable
 			data, err := json.MarshalIndent(results, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal json: %w", err)

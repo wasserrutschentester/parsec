@@ -12,12 +12,12 @@ func TestMergeTrackEdits(t *testing.T) {
 	t.Parallel()
 
 	base := []matroska.TrackEdit{
-		{Number: 1, Props: map[string]string{"flag-default": "1"}},
-		{Number: 2, Props: map[string]string{"name": "Foo"}},
+		{Number: 1, Properties: []matroska.TrackPropertyEdit{{Key: "flag-default", Value: "1"}}},
+		{Number: 2, Properties: []matroska.TrackPropertyEdit{{Key: "name", Value: "Foo"}}},
 	}
 	extra := []matroska.TrackEdit{
-		{Number: 2, Props: map[string]string{"language": "ger"}},  // merged into existing track 2
-		{Number: 3, Props: map[string]string{"flag-forced": "1"}}, // appended as a new track
+		{Number: 2, Properties: []matroska.TrackPropertyEdit{{Key: "language", Value: "ger"}}},
+		{Number: 3, Properties: []matroska.TrackPropertyEdit{{Key: "flag-forced", Value: "1"}}},
 	}
 
 	got := mergeTrackEdits(base, extra)
@@ -36,19 +36,29 @@ func TestMergeTrackEdits(t *testing.T) {
 
 	// Track 2 must carry both its base and extra properties.
 	track2 := got[1]
-	if track2.Props["name"] != "Foo" || track2.Props["language"] != "ger" {
-		t.Errorf("track 2 props = %+v, want name=Foo and language=ger", track2.Props)
+	if !hasPropValue(track2.Properties, "name", "Foo") || !hasPropValue(track2.Properties, "language", "ger") {
+		t.Errorf("track 2 props = %+v, want name=Foo and language=ger", track2.Properties)
 	}
 
-	if got[2].Props["flag-forced"] != "1" {
-		t.Errorf("track 3 props = %+v, want flag-forced=1", got[2].Props)
+	if !hasPropValue(got[2].Properties, "flag-forced", "1") {
+		t.Errorf("track 3 props = %+v, want flag-forced=1", got[2].Properties)
 	}
+}
+
+func hasPropValue(props []matroska.TrackPropertyEdit, key, value string) bool {
+	for _, p := range props {
+		if p.Key == key && p.Value == value {
+			return true
+		}
+	}
+
+	return false
 }
 
 func TestMergeTrackEditsEmptyExtra(t *testing.T) {
 	t.Parallel()
 
-	base := []matroska.TrackEdit{{Number: 1, Props: map[string]string{"flag-default": "1"}}}
+	base := []matroska.TrackEdit{{Number: 1, Properties: []matroska.TrackPropertyEdit{{Key: "flag-default", Value: "1"}}}}
 
 	got := mergeTrackEdits(base, nil)
 	if len(got) != 1 || got[0].Number != 1 {
@@ -73,12 +83,12 @@ func TestBuildKeywordFlagEdits(t *testing.T) {
 		t.Fatalf("expected 2 edits (one per track), got %d: %+v", len(edits), edits)
 	}
 
-	if edits[0].Number != 1 || edits[0].Props["flag-commentary"] != "1" {
+	if edits[0].Number != 1 || !hasPropValue(edits[0].Properties, "flag-commentary", "1") {
 		t.Errorf("track 1 edit = %+v, want flag-commentary=1", edits[0])
 	}
 
 	track2 := edits[1]
-	if track2.Number != 2 || track2.Props["flag-forced"] != "1" || track2.Props["flag-hearing-impaired"] != "1" {
+	if track2.Number != 2 || !hasPropValue(track2.Properties, "flag-forced", "1") || !hasPropValue(track2.Properties, "flag-hearing-impaired", "1") {
 		t.Errorf("track 2 edit = %+v, want both flag-forced and flag-hearing-impaired set", track2)
 	}
 }

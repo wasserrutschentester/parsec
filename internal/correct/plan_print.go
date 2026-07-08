@@ -297,11 +297,11 @@ func printTrackEditsFallback(edits []matroska.TrackEdit) {
 	for _, e := range edits {
 		var props []string
 
-		for k, v := range e.Props {
-			if v == "" {
-				props = append(props, k+"=[delete]")
+		for _, p := range e.Properties {
+			if p.Value == "" {
+				props = append(props, p.Key+"=[delete]")
 			} else {
-				props = append(props, fmt.Sprintf("%s=%s", k, v))
+				props = append(props, fmt.Sprintf("%s=%s", p.Key, p.Value))
 			}
 		}
 

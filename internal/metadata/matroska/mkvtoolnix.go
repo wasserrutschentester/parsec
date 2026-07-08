@@ -1037,12 +1037,15 @@ func SetTagsXML(filePath string, xmlContent []byte) error {
 // TrackEdit describes a set of property changes for a single track, identified
 // by its track number (the "number" property reported by mkvmerge -J).
 type TrackEdit struct {
-	Number int
-	// Props maps an mkvpropedit property name (e.g. "flag-default", "name") to
-	// its new value. An empty value deletes the property instead of setting it.
-	Props map[string]string
-	// Reasons maps a property name to the rationale for changing it.
-	Reasons map[string]string
+	Number     int                 `json:"track_number"`
+	Properties []TrackPropertyEdit `json:"properties"`
+}
+
+// TrackPropertyEdit represents a change to a single track-level property.
+type TrackPropertyEdit struct {
+	Key    string `json:"key"`
+	Value  string `json:"value"`
+	Reason string `json:"reason"`
 }
 
 // SetTrackProperties applies the given per-track property edits to a Matroska
@@ -1068,11 +1071,11 @@ func buildPropeditArgs(filePath string, edits []TrackEdit) []string {
 	for _, edit := range edits {
 		args = append(args, "--edit", "track:@"+strconv.Itoa(edit.Number))
 
-		for _, key := range slices.Sorted(maps.Keys(edit.Props)) {
-			if value := edit.Props[key]; value == "" {
-				args = append(args, "--delete", key)
+		for _, prop := range edit.Properties {
+			if prop.Value == "" {
+				args = append(args, "--delete", prop.Key)
 			} else {
-				args = append(args, "--set", key+"="+value)
+				args = append(args, "--set", prop.Key+"="+prop.Value)
 			}
 		}
 	}

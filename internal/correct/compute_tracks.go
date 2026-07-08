@@ -38,30 +38,42 @@ func ComputeMatroskaNameFixes(tracks []matroska.EbmlTrack) []matroska.TrackEdit 
 // fixBuilder accumulates property edits per track while preserving the order in
 // which tracks are first touched, so the resulting edit list is deterministic.
 type fixBuilder struct {
-	order   []int
-	byNum   map[int]map[string]string
-	reasons map[int]map[string]string
+	order      []int
+	trackProps map[int][]matroska.TrackPropertyEdit
 }
 
 func newFixBuilder() *fixBuilder {
 	return &fixBuilder{
-		byNum:   make(map[int]map[string]string),
-		reasons: make(map[int]map[string]string),
+		trackProps: make(map[int][]matroska.TrackPropertyEdit),
 	}
 }
 
 func (b *fixBuilder) set(number int, key, value, reason string) {
-	props, ok := b.byNum[number]
-	if !ok {
-		props = make(map[string]string)
-		b.byNum[number] = props
-		b.reasons[number] = make(map[string]string)
+	if _, ok := b.trackProps[number]; !ok {
 		b.order = append(b.order, number)
 	}
 
-	props[key] = value
-	if reason != "" {
-		b.reasons[number][key] = reason
+	found := false
+
+	for i, e := range b.trackProps[number] {
+		if e.Key == key {
+			b.trackProps[number][i].Value = value
+			if reason != "" {
+				b.trackProps[number][i].Reason = reason
+			}
+
+			found = true
+
+			break
+		}
+	}
+
+	if !found {
+		b.trackProps[number] = append(b.trackProps[number], matroska.TrackPropertyEdit{
+			Key:    key,
+			Value:  value,
+			Reason: reason,
+		})
 	}
 }
 
@@ -69,9 +81,8 @@ func (b *fixBuilder) edits() []matroska.TrackEdit {
 	edits := make([]matroska.TrackEdit, 0, len(b.order))
 	for _, number := range b.order {
 		edits = append(edits, matroska.TrackEdit{
-			Number:  number,
-			Props:   b.byNum[number],
-			Reasons: b.reasons[number],
+			Number:     number,
+			Properties: b.trackProps[number],
 		})
 	}
 

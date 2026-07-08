@@ -8,13 +8,33 @@ import (
 )
 
 func findEdit(edits []matroska.TrackEdit, number int) (matroska.TrackEdit, bool) {
-	for _, edit := range edits {
-		if edit.Number == number {
-			return edit, true
+	for _, e := range edits {
+		if e.Number == number {
+			return e, true
 		}
 	}
 
 	return matroska.TrackEdit{}, false
+}
+
+func hasPropValueTest(props []matroska.TrackPropertyEdit, key, value string) bool {
+	for _, p := range props {
+		if p.Key == key && p.Value == value {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasPropKeyTest(props []matroska.TrackPropertyEdit, key string) bool {
+	for _, p := range props {
+		if p.Key == key {
+			return true
+		}
+	}
+
+	return false
 }
 
 //nolint:paralleltest // depends on shared global config state
@@ -141,12 +161,12 @@ func TestComputeMatroskaNameFixesCommentaryPairing(t *testing.T) {
 	edits := ComputeMatroskaNameFixes(tracks)
 
 	audioEdit, ok := findEdit(edits, 1)
-	if !ok || audioEdit.Props["name"] != "Commentary by Jane Doe" {
+	if !ok || !hasPropValueTest(audioEdit.Properties, "name", "Commentary by Jane Doe") {
 		t.Fatalf("expected audio commentary prefix edit, got %+v", edits)
 	}
 
 	subEdit, ok := findEdit(edits, 2)
-	if !ok || subEdit.Props["name"] != "Commentary by Jane Doe" {
+	if !ok || !hasPropValueTest(subEdit.Properties, "name", "Commentary by Jane Doe") {
 		t.Fatalf("expected subtitle commentary pairing edit, got %+v", edits)
 	}
 }
@@ -164,7 +184,7 @@ func TestComputeMatroskaNameFixesSkipsAmbiguousCommentaryPairing(t *testing.T) {
 	edits := ComputeMatroskaNameFixes(tracks)
 	edit, ok := findEdit(edits, 3)
 
-	if !ok || edit.Props["name"] != "Commentary by Different" {
+	if !ok || !hasPropValueTest(edit.Properties, "name", "Commentary by Different") {
 		t.Fatalf("expected only commentary prefix fix when pairing is ambiguous, got %+v", edits)
 	}
 }
@@ -184,12 +204,12 @@ func TestComputeMatroskaFixesDefaultFlag(t *testing.T) {
 	edits := ComputeMatroskaFlagFixes(tracks)
 
 	first, ok := findEdit(edits, 1)
-	if !ok || first.Props["flag-default"] != "1" {
+	if !ok || !hasPropValueTest(first.Properties, "flag-default", "1") {
 		t.Errorf("expected track 1 to gain flag-default=1, got %+v", edits)
 	}
 
 	third, ok := findEdit(edits, 3)
-	if !ok || third.Props["flag-default"] != "0" {
+	if !ok || !hasPropValueTest(third.Properties, "flag-default", "0") {
 		t.Errorf("expected track 3 to lose default flag (flag-default=0), got %+v", edits)
 	}
 }
@@ -206,7 +226,7 @@ func TestComputeMatroskaFixesOriginalFlag(t *testing.T) {
 	edits := ComputeMatroskaFlagFixes(tracks)
 
 	second, ok := findEdit(edits, 2)
-	if !ok || second.Props["flag-original"] != "1" {
+	if !ok || !hasPropValueTest(second.Properties, "flag-original", "1") {
 		t.Errorf("expected track 2 to gain flag-original=1, got %+v", edits)
 	}
 }
@@ -224,16 +244,16 @@ func TestComputeMatroskaFlagAndNameFixesAreIndependent(t *testing.T) {
 	}
 
 	flagEdits := ComputeMatroskaFlagFixes(tracks)
-	if edit, ok := findEdit(flagEdits, 1); !ok || edit.Props["flag-default"] != "1" {
+	if edit, ok := findEdit(flagEdits, 1); !ok || !hasPropValueTest(edit.Properties, "flag-default", "1") {
 		t.Fatalf("expected ComputeMatroskaFlagFixes to set flag-default=1, got %+v", flagEdits)
-	} else if _, hasName := edit.Props["name"]; hasName {
+	} else if hasPropKeyTest(edit.Properties, "name") {
 		t.Errorf("ComputeMatroskaFlagFixes must not include name edits, got %+v", edit)
 	}
 
 	nameEdits := ComputeMatroskaNameFixes(tracks)
-	if edit, ok := findEdit(nameEdits, 1); !ok || edit.Props["name"] != "5.1" {
+	if edit, ok := findEdit(nameEdits, 1); !ok || !hasPropValueTest(edit.Properties, "name", "5.1") {
 		t.Fatalf("expected ComputeMatroskaNameFixes to clean the name to \"5.1\", got %+v", nameEdits)
-	} else if _, hasFlag := edit.Props["flag-default"]; hasFlag {
+	} else if hasPropKeyTest(edit.Properties, "flag-default") {
 		t.Errorf("ComputeMatroskaNameFixes must not include flag edits, got %+v", edit)
 	}
 }

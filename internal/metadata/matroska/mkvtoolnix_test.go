@@ -99,8 +99,8 @@ func TestBuildPropeditArgs(t *testing.T) {
 	t.Parallel()
 
 	edits := []TrackEdit{
-		{Number: 2, Props: map[string]string{"name": "German", "flag-default": "1"}},
-		{Number: 3, Props: map[string]string{"name": ""}},
+		{Number: 2, Properties: []TrackPropertyEdit{{Key: "flag-default", Value: "1"}, {Key: "name", Value: "German"}}},
+		{Number: 3, Properties: []TrackPropertyEdit{{Key: "name", Value: ""}}},
 	}
 
 	got := buildPropeditArgs("movie.mkv", edits)

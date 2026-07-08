@@ -1,7 +1,6 @@
 package correct
 
 import (
-	"maps"
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/checks"
@@ -79,20 +78,27 @@ func mergeTrackEdits(editGroups ...[]matroska.TrackEdit) []matroska.TrackEdit {
 			if _, ok := merged[e.Number]; !ok {
 				order = append(order, e.Number)
 				merged[e.Number] = &matroska.TrackEdit{
-					Number:  e.Number,
-					Props:   make(map[string]string),
-					Reasons: make(map[string]string),
+					Number: e.Number,
 				}
 			}
 
-			maps.Copy(merged[e.Number].Props, e.Props)
+			trackMerge := merged[e.Number]
 
-			for k, v := range e.Reasons {
-				if merged[e.Number].Reasons == nil {
-					merged[e.Number].Reasons = make(map[string]string)
+			for _, prop := range e.Properties {
+				found := false
+
+				for i, existing := range trackMerge.Properties {
+					if existing.Key == prop.Key {
+						trackMerge.Properties[i] = prop
+						found = true
+
+						break
+					}
 				}
 
-				merged[e.Number].Reasons[k] = v
+				if !found {
+					trackMerge.Properties = append(trackMerge.Properties, prop)
+				}
 			}
 		}
 	}
@@ -114,8 +120,8 @@ func ApplyEditsToMemoryTracks(original []matroska.EbmlTrack, editGroups ...[]mat
 		for _, edit := range group {
 			for i := range tracks {
 				if tracks[i].Properties.Number == edit.Number {
-					for k, v := range edit.Props {
-						applyPropertyToTrack(&tracks[i], k, v)
+					for _, prop := range edit.Properties {
+						applyPropertyToTrack(&tracks[i], prop.Key, prop.Value)
 					}
 				}
 			}
