@@ -115,6 +115,7 @@ func (a *trackResultAggregator) ToSlice() []CheckResult {
 		"matroska_chapters_name_hygiene",
 		"matroska_chapters_language_hygiene",
 		"matroska_chapters_keyframe_alignment",
+		"matroska_data_layout",
 		"matroska_app_hygiene",
 		"matroska_creation_time_privacy",
 	}
@@ -257,6 +258,10 @@ func runGlobalMatroskaChecks(filePath string, ebml *matroska.EbmlMetadata, meta 
 
 	if config.IsCheckEnabled("matroska_font_filename_compliance") {
 		agg.Add(checkFontFilenameCompliance(ebml.Attachments, attachmentFonts))
+	}
+
+	if config.IsCheckEnabled("matroska_data_layout") {
+		agg.Add(checkDataLayout(filePath))
 	}
 
 	runCommentaryChecks(filePath, ebml.Tracks, agg)

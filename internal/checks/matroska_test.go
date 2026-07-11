@@ -26,6 +26,7 @@ func TestRunTrackChecks(t *testing.T) {
 		"matroska_commentary_bitrate",
 		"matroska_commentary_prefix",
 		"matroska_commentary_pairing",
+		"matroska_data_layout",
 	})
 	t.Logf("viper disabled_checks inside test = %v", viper.GetStringSlice("disabled_checks"))
 

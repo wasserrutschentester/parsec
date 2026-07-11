@@ -215,6 +215,7 @@ var validCheckIdentifiers = map[string]bool{
 	"matroska_chapters_name_hygiene":       true,
 	"matroska_chapters_language_hygiene":   true,
 	"matroska_chapters_keyframe_alignment": true,
+	"matroska_data_layout":                 true,
 }
 
 func checkValueTypes() {

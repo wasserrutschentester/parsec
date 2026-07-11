@@ -95,6 +95,7 @@ These checks ensure the Matroska container and its components meet quality stand
 | Matroska Format | `checkMatroskaFormat` | `matroska_ebml_error` | No | Verifies that the file is a valid Matroska (MKV) container. |
 | Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
 | Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
+| Matroska Format | `checkDataLayout` | `matroska_data_layout` | yes | Verifies that the Info and Tracks Elemnts are placed before the first Cluster |
 | Creation Time Privacy | `checkCreationTimePrivacy` | `matroska_creation_time_privacy` | Yes | Warns if the file contains creation/encode time metadata such as `DateUTC`, `DateLocal`, or track-level encoded dates, which might be a privacy concern. Disabled by default. |
 | Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
 | Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
