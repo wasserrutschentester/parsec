@@ -66,6 +66,7 @@ func checkAPIKeys() {
 }
 
 var expectedTypes = map[string]string{
+	"description":           "string",
 	"group":                 "string",
 	"source":                "string",
 	"preferred_language":    "string",

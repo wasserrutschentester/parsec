@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
@@ -75,6 +77,41 @@ func getPresetKey(key string) string {
 // PresetExists returns true if the given preset name exists in the configuration.
 func PresetExists(name string) bool {
 	return viper.IsSet("preset." + name)
+}
+
+// ListPresets returns all preset names found in the loaded configuration,
+// formatted for shell completion. Each entry is either "name" or
+// "name\tdescription" (the tab-separated format Cobra uses for hints).
+// Names are sorted alphabetically.
+func ListPresets() []string {
+	seen := make(map[string]struct{})
+
+	for _, key := range viper.AllKeys() {
+		// Keys look like "preset.<name>.<field>"
+		parts := strings.SplitN(key, ".", 3)
+		if len(parts) >= 2 && parts[0] == "preset" {
+			seen[parts[1]] = struct{}{}
+		}
+	}
+
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	completions := make([]string, 0, len(names))
+	for _, name := range names {
+		desc := viper.GetString("preset." + name + ".description")
+		if desc != "" {
+			completions = append(completions, name+"\t"+desc)
+		} else {
+			completions = append(completions, name)
+		}
+	}
+
+	return completions
 }
 
 func getString(key string) string {

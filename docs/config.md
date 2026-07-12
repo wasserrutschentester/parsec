@@ -34,6 +34,8 @@ Presets allow you to define groups of settings that can be activated via the `--
 
 Presets are defined under the `[preset.NAME]` section. Almost all configuration options (except API keys) can be used within a preset to override global settings.
 
+An optional `description` field can be added to any preset. It is displayed as a hint in shells that support completion descriptions (zsh, fish, PowerShell) when tab-completing the `--preset` flag.
+
 ```toml
 # Global defaults
 source = "WEB-DL"
@@ -46,11 +48,13 @@ tmdb = "your_tmdb_api_key"
 tvdb = "your_tvdb_api_key"
 
 [preset.marvel]
+description = "Pin metadata to Loki (2021)"
 title = "Loki"
 is_tv = true
 tmdb_id = 84958
 
 [preset.remux]
+description = "AVC/HEVC codec names"
 source = "BluRay"
 video_codec_avc = "AVC"
 video_codec_hevc = "HEVC"

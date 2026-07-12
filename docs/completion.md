@@ -2,6 +2,27 @@
 
 `parsec` supports generating autocompletion scripts for various shells. This allows you to use the `Tab` key to complete commands, flags, and arguments.
 
+## Preset Completion
+
+The `--preset` / `-p` flag supports dynamic completion. When you press `Tab` after `--preset`, parsec reads your active configuration file and suggests the preset names defined in it.
+
+```
+parsec rename --preset <Tab>
+anime        encode       mandalorian  movie-remux  quick-check
+```
+
+In shells that support completion descriptions (zsh, fish, PowerShell), the optional [`description`](config.md#defining-presets) field from each preset is shown as a hint:
+
+```
+parsec rename --preset <Tab>
+anime        -- Anime naming scheme with CRC32 and no word separator
+encode       -- BluRay encode using x264/x265 codec labels
+mandalorian  -- Pin metadata to The Mandalorian on DSNP
+movie-remux  -- High-quality BluRay remux (HEVC/AVC codec labels)
+```
+
+> **Note:** Bash does not display completion descriptions — preset names still complete correctly, descriptions are simply not shown.
+
 ## Supported Shells
 
 - [Bash](#bash)

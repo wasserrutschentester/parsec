@@ -78,6 +78,15 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&noCacheFlag, "no-cache", false, "bypass the API cache and fetch fresh data")
 
+	// Provide dynamic shell completions for --preset / -p.
+	// initConfig() is called explicitly here because completion runs before
+	// PersistentPreRun, so viper has not yet loaded the configuration file.
+	_ = rootCmd.RegisterFlagCompletionFunc("preset", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		initConfig()
+
+		return config.ListPresets(), cobra.ShellCompDirectiveNoFileComp
+	})
+
 	// Add template functions for flag grouping
 	cobra.AddTemplateFunc("filterFlags", func(fs *pflag.FlagSet, key, value string) *pflag.FlagSet {
 		newFs := pflag.NewFlagSet(value, pflag.ContinueOnError)

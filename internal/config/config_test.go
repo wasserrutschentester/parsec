@@ -199,3 +199,58 @@ func TestGetOriginalLanguage(t *testing.T) {
 		t.Errorf("GetOriginalLanguage() = %v, want fr", GetOriginalLanguage())
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestListPresets(t *testing.T) {
+	t.Run("returns empty slice when no presets are defined", func(t *testing.T) {
+		viper.Reset()
+		InitDefaults()
+
+		got := ListPresets()
+		if len(got) != 0 {
+			t.Errorf("ListPresets() = %v, want []", got)
+		}
+	})
+
+	t.Run("returns sorted preset names without descriptions", func(t *testing.T) {
+		viper.Reset()
+		InitDefaults()
+		viper.Set("preset.zebra.group", "Z")
+		viper.Set("preset.alpha.source", "WEB-DL")
+
+		got := ListPresets()
+		want := []string{"alpha", "zebra"}
+
+		if len(got) != len(want) {
+			t.Fatalf("ListPresets() len = %d, want %d; got %v", len(got), len(want), got)
+		}
+
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("ListPresets()[%d] = %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("appends tab-separated description when present", func(t *testing.T) {
+		viper.Reset()
+		InitDefaults()
+		viper.Set("preset.foo.group", "Foo")
+		viper.Set("preset.foo.description", "A foo preset")
+		viper.Set("preset.bar.source", "BluRay")
+		// bar has no description
+
+		got := ListPresets()
+		want := []string{"bar", "foo\tA foo preset"}
+
+		if len(got) != len(want) {
+			t.Fatalf("ListPresets() len = %d, want %d; got %v", len(got), len(want), got)
+		}
+
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("ListPresets()[%d] = %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+}

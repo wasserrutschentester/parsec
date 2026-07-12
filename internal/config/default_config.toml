@@ -77,6 +77,16 @@ url = "http://localhost:9696" # e.g. http://localhost:9696
 api_key = "your_prowlarr_api_key"
 indexers = [] # Array of indexer IDs to limit the search (empty for all)
 
+[update]
+# Automatically check for updates in the background
+check = true
+
+# Automatically download and install updates in the background
+auto = false
+
+# Check for prerelease/nightly updates
+prerelease = false
+
 
 # ---------------------------------- #
 #        SOME EXAMPLE PRESETS        #
@@ -88,6 +98,7 @@ indexers = [] # Array of indexer IDs to limit the search (empty for all)
 # Useful for automation or when the file name is ambiguous.
 # ------------------------------------------------------------------------------
 [preset.mandalorian]
+description = "Mandalorian on DSNP"
 title = "The Mandalorian"
 tmdb_id = 82856
 is_tv = true
@@ -100,6 +111,7 @@ service = "DSNP"
 # use REMUX keyword and change order of video and audio codec info
 # ------------------------------------------------------------------------------
 [preset.movie-remux]
+description = "HEVC/AVC codec labels"
 source = "BluRay"
 video_codec_hevc = "HEVC"
 video_codec_avc = "AVC"
@@ -110,6 +122,7 @@ template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_code
 # Use case: Name of the encoding library is used as the video codec.
 # ------------------------------------------------------------------------------
 [preset.encode]
+description = "x264/x265 codec labels"
 source = "BluRay"
 video_codec_hevc = "x265"
 video_codec_avc = "x264"
@@ -120,6 +133,7 @@ video_codec_avc = "x264"
 # Disables some verbose and opinionated checks.
 # ------------------------------------------------------------------------------
 [preset.quick-check]
+description = "disables verbose/opinionated checks"
 disabled_checks = [
     "filename_sequences",
     "mediainfo_bitrate",
@@ -127,21 +141,12 @@ disabled_checks = [
     "matroska_name_quality"
 ]
 
-[update]
-# Automatically check for updates in the background
-check = true
-
-# Automatically download and install updates in the background
-auto = false
-
-# Check for prerelease/nightly updates
-prerelease = false
-
 # ------------------------------------------------------------------------------
 # PRESET: tvnation
 # Use case: disable all checks except for disallowed filename characters
 # ------------------------------------------------------------------------------
 [preset.tvnation]
+description = "disable almost all checks"
 enabled_checks = ["filename_characters"]
 
 # ------------------------------------------------------------------------------
@@ -150,6 +155,7 @@ enabled_checks = ["filename_characters"]
 # Enables matching title/Aired date against Season 0 for TVDB
 # ------------------------------------------------------------------------------
 [preset.special]
+description = "TV specials and extras"
 allow_special_matches = true
 season = 0
 is_tv = true
@@ -160,6 +166,7 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resol
 # Use case: Naming scheme following the parsec naming guide for anime.
 # ------------------------------------------------------------------------------
 [preset.anime]
+description = "CRC32 brackets and spaces"
 is_tv = true
-word_separator = ""
+word_separator = " "
 template = "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]"

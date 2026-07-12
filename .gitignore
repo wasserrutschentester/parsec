@@ -5,3 +5,6 @@ vendor/
 
 # test files
 *.mkv
+
+# local config
+.env
