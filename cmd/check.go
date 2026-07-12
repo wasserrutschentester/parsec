@@ -333,6 +333,8 @@ func init() {
 	for _, f := range idFlags {
 		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
+
+	_ = checkCmd.RegisterFlagCompletionFunc("original-language", completeLanguages)
 }
 
 type checkJobResult struct {

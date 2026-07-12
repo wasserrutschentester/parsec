@@ -254,7 +254,7 @@ func init() {
 	identifyCmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
 	identifyCmd.Flags().IntSliceVarP(&episodeFlag, "episode", "e", nil, "episode numbers (comma-separated)")
 	identifyCmd.Flags().StringVarP(&dateFlag, "date", "D", "", "episode aired date")
-	identifyCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
+	identifyCmd.Flags().StringVarP(&episodeTitleFlag, "episode-title", "E", "", "episode title")
 	// Mdb IDs
 	identifyCmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")
 	identifyCmd.Flags().BoolVarP(&isMovieFlag, "movie", "M", false, "identify as movie")
@@ -269,6 +269,9 @@ func init() {
 	identifyCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate identification and preview tags without writing to the file")
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 	_ = identifyCmd.Flags().MarkDeprecated("write-tags", "use --unattended instead")
+	_ = identifyCmd.Flags().MarkDeprecated("source", "source is not used by identify")
+	_ = identifyCmd.Flags().MarkDeprecated("service", "service is not used by identify")
+	_ = identifyCmd.Flags().MarkDeprecated("group", "group is not used by identify")
 	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
 	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode (implies writing tags)")
 	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
@@ -277,12 +280,6 @@ func init() {
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
 		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
-	}
-
-	// Group P2P flags
-	p2pFlags := []string{"service", "source", "group"}
-	for _, f := range p2pFlags {
-		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
 	// Group ID flags

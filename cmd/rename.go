@@ -393,5 +393,11 @@ func init() {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
 
+	_ = renameCmd.RegisterFlagCompletionFunc("source", completeSources)
+	_ = renameCmd.RegisterFlagCompletionFunc("hdr", completeHdrs)
+	_ = renameCmd.RegisterFlagCompletionFunc("service", completeServices)
+	_ = renameCmd.RegisterFlagCompletionFunc("cut-edition", completeCutEditions)
+	_ = renameCmd.RegisterFlagCompletionFunc("group", completeGroups)
+
 	renameCmd.Flags().SortFlags = false
 }

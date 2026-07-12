@@ -3,10 +3,12 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 )
 
@@ -123,4 +125,149 @@ func hasAllowedExt(name string, exts []string) bool {
 	}
 
 	return false
+}
+
+// completeSources returns common source values with description hints.
+func completeSources(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return formatMapCompletions(sourceOptions), cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeHdrs returns standard HDR formats with description hints.
+func completeHdrs(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return formatMapCompletions(hdrOptions), cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeLanguages returns common ISO 639-1 language codes with description hints.
+func completeLanguages(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return formatMapCompletions(languageOptions), cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeServices returns common streaming service tags with description hints.
+func completeServices(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return formatMapCompletions(serviceOptions), cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeCutEditions returns common release editions/cuts with description hints,
+// formatted using the user's configured word separator.
+func completeCutEditions(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	sep := config.GetWordSeparator()
+
+	formattedOptions := make(map[string]string, len(cutEditionOptions))
+	for k, v := range cutEditionOptions {
+		formattedKey := strings.ReplaceAll(k, " ", sep)
+		formattedOptions[formattedKey] = v
+	}
+
+	return formatMapCompletions(formattedOptions), cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeGroups returns the user's default configured group with a description hint.
+func completeGroups(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	initConfig()
+
+	g := config.GetGroup()
+	if g == "" {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return []string{g + "\tConfigured default group"}, cobra.ShellCompDirectiveNoFileComp
+}
+
+// formatMapCompletions converts a map of completions to a sorted slice of "key\tdescription" strings.
+func formatMapCompletions(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	completions := make([]string, len(keys))
+	for i, k := range keys {
+		completions[i] = k + "\t" + m[k]
+	}
+
+	return completions
+}
+
+var sourceOptions = map[string]string{
+	"BluRay": "Blu-ray disc source",
+	"DVD5":   "Single layer DVD fitting around 4.7 GB",
+	"DVD9":   "Double layer DVD fitting around 8.5 GB",
+	"DVDRip": "DVD encode",
+	"HDDVD":  "High Definition DVD",
+	"HDTV":   "High Definition Television broadcast",
+	"dTV":    "Standard Definition Digital TV broadcast",
+	"WEB-DL": "Web Download (untouched stream from streaming services)",
+	"WEBRip": "Web Rip (transcoded/re-encoded stream from streaming services)",
+}
+
+var hdrOptions = map[string]string{
+	"DV":        "Dolby Vision",
+	"HDR":       "HDR10 (static metadata)",
+	"HDR10Plus": "HDR10+ (dynamic metadata)",
+	"HLG":       "Hybrid Log-Gamma",
+	"PQ10":      "PQ10 format",
+}
+
+var languageOptions = map[string]string{
+	"ar": "Arabic",
+	"cs": "Czech",
+	"da": "Danish",
+	"de": "German",
+	"en": "English",
+	"es": "Spanish",
+	"fi": "Finnish",
+	"fr": "French",
+	"hi": "Hindi",
+	"hu": "Hungarian",
+	"it": "Italian",
+	"ja": "Japanese",
+	"ko": "Korean",
+	"nl": "Dutch",
+	"no": "Norwegian",
+	"pl": "Polish",
+	"pt": "Portuguese",
+	"ro": "Romanian",
+	"ru": "Russian",
+	"sv": "Swedish",
+	"tr": "Turkish",
+	"uk": "Ukrainian",
+	"zh": "Chinese",
+}
+
+var serviceOptions = map[string]string{
+	"AMZN": "Amazon Prime Video",
+	"ARD":  "ARD Mediathek",
+	"ATVP": "Apple TV+",
+	"CR":   "Crunchyroll",
+	"DSNP": "Disney+",
+	"HMAX": "HBO Max",
+	"KiKA": "KiKA",
+	"NF":   "Netflix",
+	"PCOK": "Peacock",
+	"PMTP": "Paramount+",
+	"RTLP": "RTL+",
+	"SHO":  "Showtime",
+	"ZDF":  "ZDF Mediathek",
+	"iT":   "iTunes",
+}
+
+var cutEditionOptions = map[string]string{
+	"3D":              "3D Version",
+	"3D HOU":          "3D Half Over-Under",
+	"3D HSBS":         "3D Half Side-by-Side",
+	"3D SBS":          "3D Side-by-Side",
+	"4K REMASTERED":   "Remastered in 4K",
+	"CRITERION":       "Criterion Collection",
+	"DIRECTOR'S CUT":  "Director's Cut",
+	"EXTENDED":        "Extended Edition",
+	"IMAX":            "IMAX Version",
+	"IMAX Enhanced":   "IMAX Enhanced Version",
+	"Open Matte":      "Open Matte aspect ratio",
+	"REMASTERED":      "Remastered Version",
+	"SPECIAL EDITION": "Special Edition",
+	"THEATRICAL":      "Theatrical Version",
+	"UNCENSORED":      "Uncensored Version",
+	"UNRATED":         "Unrated Version",
 }
