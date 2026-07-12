@@ -52,6 +52,10 @@ It validates:
 You can pass files or directories. Directories are scanned recursively for Matroska files.
 You can also pass a JSON check report file to render it.`),
 	Args: cobra.MinimumNArgs(1),
+	ValidArgsFunction: func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// mkv for media files, json for existing check report files
+		return completeFiles(toComplete, "mkv", "json")
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
 		ui.IsJSON = jsonOutputFlag

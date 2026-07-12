@@ -35,6 +35,9 @@ If filenames or directories are provided, they will be parsed for metadata.
 Directories are scanned recursively for Matroska files.
 Flags can be used to override or provide missing information.`),
 	Args: cobra.ArbitraryArgs,
+	ValidArgsFunction: func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completeFiles(toComplete, "mkv")
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
 

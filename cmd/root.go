@@ -27,7 +27,9 @@ var rootCmd = &cobra.Command{
 	Short: "parsec allows you to parse, check and create releases",
 	Long:  ui.Banner(".: FIRST STEPS? :."),
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-		ui.IsSilent = jsonOutputFlag // make sure only json is printed
+		// Silence stdout during shell completion so that warnings and debug
+		// output from initConfig() do not corrupt the completion stream.
+		ui.IsSilent = jsonOutputFlag || isCompletionCommand(cmd)
 		ui.IsJSON = jsonOutputFlag
 
 		if ui.IsSilent {
@@ -51,8 +53,12 @@ var rootCmd = &cobra.Command{
 }
 
 func isExcludedFromUpdateCheck(cmd *cobra.Command) bool {
+	if isCompletionCommand(cmd) {
+		return true
+	}
+
 	switch cmd.Name() {
-	case "__complete", "__completeNoDesc", "completion", "update":
+	case "completion", "update":
 		return true
 	default:
 		// checks for "parsec completion bash" and similar commands

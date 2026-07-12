@@ -40,6 +40,9 @@ var renameCmd = &cobra.Command{
 You can pass files or directories. Directories are scanned recursively for Matroska files.
 The resulting filename is generated according to the configured template.`),
 	Args: cobra.MinimumNArgs(1),
+	ValidArgsFunction: func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completeFiles(toComplete, "mkv")
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Println(ui.Banner(".: VECTOR REALIGNMENT :."))
 
