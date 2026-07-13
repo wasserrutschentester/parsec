@@ -192,7 +192,7 @@ func TestStaticFlagCompletions(t *testing.T) {
 			t.Fatal("Expected services completions to be populated")
 		}
 
-		if res[0] != "AMZN\tAmazon Prime Video" {
+		if res[0] != "3SAT\t3Sat" {
 			t.Errorf("Unexpected first service suggestion: %s", res[0])
 		}
 	})

@@ -7,7 +7,7 @@
   </br>
 </div>
 
-`parsec` is a tool for managing media files, providing capabilities to identify, check, and rename files according to specific standards and metadata from online databases.
+`parsec` is a tool for managing media files, providing capabilities to identify, check, rename, and generate `.nfo` files according to specific standards and metadata from online databases.
 
 ## Installation
 
@@ -86,6 +86,17 @@ Rename files based on metadata and naming conventions.
 - **Metadata Overrides**: Manually specify details like `--hdr`, `--cut-edition`, or `--repack`.
 
 For more information see the [Rename Documentation](docs/rename.md)
+
+### `nfogen`
+Generate an NFO file for a media file.
+
+**Features:**
+- **Automated Generation**: Automatically scans files with MediaInfo and fetches TMDB/TVDB/IMDb metadata to generate complete `.nfo` files.
+- **Go Templates**: Uses powerful, customizable Go `text/template` files to format the output.
+- **Source Mapping**: Accurately document hybrid releases by mapping different sources to specific tracks (video, audio, subtitles).
+- **Interactive Diffs**: Shows detailed diffs when updating an existing NFO file to prevent accidental overrides.
+
+For more information see the [nfogen Documentation](docs/nfogen.md) and [NFO Templating Guide](docs/nfo_templating.md)
 
 ### `update`
 Update `parsec` to the latest version.

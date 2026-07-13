@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/nfo"
 )
 
 // expandArgs takes a list of paths and expands any directories into a list of Matroska files recursively.
@@ -147,6 +148,11 @@ func completeServices(_ *cobra.Command, _ []string, _ string) ([]string, cobra.S
 	return formatMapCompletions(serviceOptions), cobra.ShellCompDirectiveNoFileComp
 }
 
+// completeTemplates returns available NFO templates with their descriptions.
+func completeTemplates(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return formatMapCompletions(nfo.GetAvailableTemplates()), cobra.ShellCompDirectiveNoFileComp
+}
+
 // completeCutEditions returns common release editions/cuts with description hints,
 // formatted using the user's configured word separator.
 func completeCutEditions(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -236,22 +242,7 @@ var languageOptions = map[string]string{
 	"zh": "Chinese",
 }
 
-var serviceOptions = map[string]string{
-	"AMZN": "Amazon Prime Video",
-	"ARD":  "ARD Mediathek",
-	"ATVP": "Apple TV+",
-	"CR":   "Crunchyroll",
-	"DSNP": "Disney+",
-	"HMAX": "HBO Max",
-	"KiKA": "KiKA",
-	"NF":   "Netflix",
-	"PCOK": "Peacock",
-	"PMTP": "Paramount+",
-	"RTLP": "RTL+",
-	"SHO":  "Showtime",
-	"ZDF":  "ZDF Mediathek",
-	"iT":   "iTunes",
-}
+var serviceOptions = nfo.StreamingServiceNames
 
 var cutEditionOptions = map[string]string{
 	"3D":              "3D Version",

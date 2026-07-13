@@ -1,0 +1,23 @@
+{{ define "video_info" }}
+  {{- include "video_info/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "video_info/content" }}
+  {{ "Codec " | padRight 13 "." }}: {{ .Video.Codec }}
+  {{ "Resolution " | padRight 13 "." }}: {{ .Video.Resolution }} ({{ .Video.Dimensions }})
+  {{ "Bitrate " | padRight 13 "." }}: {{ .Video.Bitrate }}
+  {{ "Framerate " | padRight 13 "." }}: {{ .Video.Framerate }}
+  {{ "Aspect " | padRight 13 "." }}: {{ .Video.AspectRatio }}
+  {{- if .Video.BitDepth }}
+  {{ "Bit Depth " | padRight 13 "." }}: {{ .Video.BitDepth }}-bit
+  {{- end }}
+  {{- if .Video.HDRFormat }}
+  {{ "HDR " | padRight 13 "." }}: {{ .Video.HDRFormat }}
+  {{- end }}
+  {{- if .Video.ChromaSubsampling }}
+  {{ "Chroma " | padRight 13 "." }}: {{ .Video.ChromaSubsampling }}
+  {{- end }}
+  {{- if .Video.Source }}
+  {{ "Source " | padRight 13 "." }}: {{ .Video.Source }}
+  {{- end }}
+{{- end }}

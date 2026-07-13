@@ -1,0 +1,22 @@
+{{ define "sub_langs" }}
+  {{- include "sub_langs/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "sub_langs/format_languages" }}
+  {{- range $i, $lang := (uniq (pluck "Language" .Subtitles)) -}}
+    {{- if $i }}, {{ end }}{{ titleCase (languageName $lang) }}
+  {{- end -}}
+{{- end }}
+
+{{ define "sub_langs/content" }}
+  {{- $subStr := include "sub_langs/format_languages" . | default "None" -}}
+
+  {{- $lines := $subStr | wordWrap (sub .LineWidth 18) | split "\n" -}}
+  {{- range $i, $line := $lines -}}
+    {{- if eq $i 0 }}
+  Subtitles    : {{ $line }}
+    {{- else }}
+                 {{ $line }}
+    {{- end -}}
+  {{- end -}}
+{{- end }}

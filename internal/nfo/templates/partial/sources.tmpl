@@ -1,0 +1,11 @@
+{{ define "sources" }}
+  {{- include "sources/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "sources/content" }}
+  {{- range $i, $source := .Sources }}
+    {{- range $line := $source | breakReleaseName (sub $.LineWidth 4) }}
+  {{ $line }}
+    {{- end }}
+  {{ end }}
+{{- end }}

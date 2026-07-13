@@ -1,0 +1,11 @@
+{{ define "overview" }}
+  {{- include "overview/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "overview/content" }}
+  {{ "Size " | padRight 13 "." }}: {{ .Size }}
+  {{ "Duration " | padRight 13 "." }}: {{ .Duration }}
+  {{- if .Source }}
+  {{ "Source " | padRight 13 "." }}: {{ if .ServiceName }}{{ .ServiceName }} {{end}}{{ .Source }}
+  {{- end }}
+{{- end }}

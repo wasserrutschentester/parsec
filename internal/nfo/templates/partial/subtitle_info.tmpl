@@ -1,0 +1,19 @@
+{{ define "subtitle_info" }}
+  {{- include "subtitle_info/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "subtitle_info/content" }}
+  {{- range .Subtitles }}
+  {{ print (titleCase (languageName .Language)) " " | padRight 13 "." true }}: {{ .Format  }}
+    {{- include "subtitle_info/flags" . | padRight 15 }}
+    {{- if .Title }} {{ .Title }}{{ end }}
+    {{- if .Source }} (Src: {{ .Source }}){{ end }}
+  {{- end }}
+{{- end }}
+
+{{ define "subtitle_info/flags" }}
+    {{- if .Flags.Default }} [Default]{{ end }}
+    {{- if .Flags.Forced }} [Forced]{{ end }}
+    {{- if .Flags.HearingImpaired }} [SDH]{{ end }}
+    {{- if .Flags.Commentary }} [Commentary]{{ end }}
+{{- end }}

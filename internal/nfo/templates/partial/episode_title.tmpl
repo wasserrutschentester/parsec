@@ -1,0 +1,3 @@
+{{ define "episode_title" }}
+  {{- .EpisodeTitle | wordWrap (sub .LineWidth 16) | center .LineWidth | padRight .LineWidth }}
+{{- end }}

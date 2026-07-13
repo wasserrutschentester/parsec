@@ -1,0 +1,49 @@
+{{/* Description: Template with a classic bordered design */}}
+{{ .SetLineWidth 68 -}}
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+{{ include "art" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{ include "release_name" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{- if .Notes }}
+╠═ /// RELEASE NOTES //////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "notes" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{- end }}
+{{- if .Sources }}
+╠═ /// SOURCES USED ///////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "sources" . | applyBorder "║ " " ║" }}
+{{- end }}
+╠═ /// OVERVIEW ///////////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "overview" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+╠═ /// VIDEO INFO /////////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "video_info" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+╠═ /// AUDIO INFO /////////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "audio_info" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+╠═ /// SUBTITLE INFO //////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "subtitle_info" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+╠═ /// SUMMARY ////////////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "title" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{ "─" | repeat 40 | center .LineWidth | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{ include "plot" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{ "─" | repeat 40 | center .LineWidth | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{ include "links" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{ include "footer" . | applyBorder "║ " " ║"}}
+╚══════════════════════════════════════════════════════════════════════╝

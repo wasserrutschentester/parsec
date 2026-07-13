@@ -1,0 +1,15 @@
+{{ define "links" }}
+  {{- include "links/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "links/content" }}
+  {{- if .ImdbURL }}
+  {{ "IMDb " | padRight 13 "." }}: {{ .ImdbURL }}
+  {{- end }}
+  {{- if .TmdbURL }}
+  {{ "TMDb " | padRight 13 "." }}: {{ .TmdbURL }}
+  {{- end }}
+  {{- if .TvdbURL }}
+  {{ "TVDb " | padRight 13 "." }}: {{ .TvdbURL }}
+  {{- end }}
+{{- end }}

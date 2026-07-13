@@ -143,6 +143,8 @@ type Track struct {
 	FormatProfile            string    `json:"Format_Profile,omitempty"`
 	FormatLevel              string    `json:"Format_Level,omitempty"`
 	FormatVersion            string    `json:"Format_Version,omitempty"`
+	FormatCommercial         string    `json:"Format_Commercial,omitempty"`
+	FormatCommercialIfAny    string    `json:"Format_Commercial_IfAny,omitempty"`
 	FormatAdditionalFeatures string    `json:"Format_AdditionalFeatures,omitempty"`
 	FormatSettingsCABAC      string    `json:"Format_Settings_CABAC,omitempty"`
 	FormatSettingsRefFrames  string    `json:"Format_Settings_RefFrames,omitempty"`

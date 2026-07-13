@@ -74,6 +74,7 @@ var expectedTypes = map[string]string{
 	"subbed_tagging":        "bool",
 	"audio_description":     "bool",
 	"template":              "string",
+	"nfogen_template":       "string",
 	"video_codec_avc":       "string",
 	"video_codec_hevc":      "string",
 	"word_separator":        "string",

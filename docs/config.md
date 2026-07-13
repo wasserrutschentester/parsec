@@ -115,6 +115,7 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | Key | Type | Description |
 |-----|------|-------------|
 | `template` | string | The naming template used for renaming and checking. See [Naming Templates](templates.md) for available tokens and formatting rules. |
+| `nfogen_template` | string | The default template used when generating NFO files with the `nfogen` command (default: `default`). |
 | `preferred_language` | string | Preferred language code (default: `de`). |
 | `original_language` | string | Override original language of the media file used in integrity checks (default: `""`). |
 | `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |

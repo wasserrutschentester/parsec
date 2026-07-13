@@ -1,0 +1,5 @@
+{{ define "release_name" }}
+    {{- range $line := .ReleaseName | breakReleaseName .LineWidth }}
+{{ $line | center $.LineWidth }}
+    {{- end }}
+{{- end }}

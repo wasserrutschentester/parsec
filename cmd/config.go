@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/nfo"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -83,6 +84,19 @@ var configValidateCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, _ []string) {
 		ui.Println(ui.Banner(".: ASSESSING STABILITY :."))
 		config.Validate()
+
+		// Validate configured NFO template
+		tmplName := config.GetNfogenTemplate()
+
+		tmpl, err := nfo.LoadTemplate(tmplName)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to load template '%s': %v", tmplName, err))
+		} else if err := nfo.ValidateTemplate(tmpl); err != nil {
+			ui.PrintError(fmt.Sprintf("Template validation failed:\n%v", nfo.FormatTemplateError(err, []string{filepath.Dir(config.GetConfigFileUsed())})))
+		} else {
+			ui.PrintSuccess("Template validation complete.")
+		}
+
 		ui.PrintSuccess("Configuration validation complete.")
 	},
 }

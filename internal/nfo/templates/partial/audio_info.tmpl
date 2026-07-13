@@ -1,0 +1,16 @@
+{{ define "audio_info" }}
+  {{- include "audio_info/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "audio_info/content" }}
+  {{- range .Audio }}
+  {{ print (titleCase (languageName .Language)) " " | padRight 13 "." true }}: {{ .Codec }} | {{ .Channels  }} | {{ .Bitrate  }}
+    {{- if .Atmos }} | Atmos{{ end }}
+    {{- if .Flags.Default }} [Default]{{ end }}
+    {{- if .Flags.Forced }} [Forced]{{ end }}
+    {{- if .Flags.HearingImpaired }} [SDH]{{ end }}
+    {{- if .Flags.VisualImpaired }} [AD]{{ end }}
+    {{- if .Flags.Commentary }} [Commentary]{{ end }}
+    {{- if .Source }} (Src: {{ .Source }}){{ end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,7 @@
+{{ define "title" }}
+  {{- include "title/content" . | center .LineWidth -}}
+{{- end }}
+
+{{ define "title/content" }}
+{{ .Title }}{{ if .Year }} ({{ .Year }}){{ end }}
+{{- end }}

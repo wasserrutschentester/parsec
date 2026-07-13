@@ -1,0 +1,15 @@
+{{ define "header" }}
+  {{- $title := printf "%s %v" .ReleaseName .Year -}}
+  {{- range $i, $line := $title | wordWrap 70 | split "\n" }}
+    {{- if gt $i 0 }}
+|{{ $line | center 70 }}
+    {{- else }}
+{{ $line | center 70 }}
+    {{- end }}
+  {{- end }}
+  {{- if .EpisodeTitle }}
+    {{- range $line := .EpisodeTitle | wordWrap 70 | split "\n" }}
+|{{ $line | center 70 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

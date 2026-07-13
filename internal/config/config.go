@@ -36,6 +36,7 @@ func InitDefaults() {
 	viper.SetDefault("word_separator", ".")
 	viper.SetDefault("normalize_diacritics", true)
 	viper.SetDefault("output_path", "")
+	viper.SetDefault("nfogen_template", "default")
 	viper.SetDefault("replacements.title", []map[string]any{
 		{
 			"pattern":     `(?i)(\s*\|.*|\s*\((Teil|Part)\s*\d+\))`,
@@ -133,6 +134,11 @@ func getStringSlice(key string) []string {
 // GetTemplate returns the naming template from the configuration.
 func GetTemplate() string {
 	return getString("template")
+}
+
+// GetNfogenTemplate returns the NFO template from the configuration.
+func GetNfogenTemplate() string {
+	return getString("nfogen_template")
 }
 
 // GetPreferredLanguage returns the preferred language code from the configuration.

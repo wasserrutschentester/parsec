@@ -24,6 +24,7 @@ var (
 	errRename           = errors.New("rename failed")
 	errMediaInfoParsing = errors.New("mediainfo parsing failed")
 	seasonPackFlag      bool
+	releaseFolderFlag   bool
 )
 
 // renameCmd represents the rename command
@@ -64,7 +65,6 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	// 1. Parse filename for initial metadata
 	meta := filename.Parse(filenameNoExt)
-
 	// 2. Get MediaInfo/EBML and merge
 	mi, err := renameGetMediaMetadata(filePath, meta)
 	if err != nil {
@@ -91,9 +91,25 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	meta.SetDefaults()
 
 	// 8. Generate new name
+	destDir, newNameBase := renameNewPath(filePath, meta)
+
+	newName := newNameBase + ext
+	newPath := filepath.Join(destDir, newName)
+
+	if filePath == newPath {
+		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' is already has the correct name.", filepath.Base(filePath))))
+
+		return nil
+	}
+
+	return renameCommit(filePath, newPath, newName)
+}
+
+//nolint:cyclop // logic is naturally complex due to nested folder structures, but kept clean and readable
+func renameNewPath(filePath string, meta *metadata.Metadata) (string, string) {
+	// 8. Generate new name
 	newNameBase := meta.GetReleaseName()
 	newNameBase = filename.ApplyReplacements(newNameBase, config.GetOutputReplacements())
-	newName := newNameBase + ext
 
 	destDir := filepath.Dir(filePath)
 
@@ -106,24 +122,24 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 		destDir = outputPath
 	}
 
+	absDestDir, _ := filepath.Abs(destDir)
+	base := filepath.Base(absDestDir)
+	parentBase := filepath.Base(filepath.Dir(absDestDir))
+
 	if seasonPackFlag && meta.IsTV && meta.Season >= 0 {
 		seasonPackName := meta.GetSeasonPackName()
 
-		absDestDir, _ := filepath.Abs(destDir)
-		if filepath.Base(absDestDir) != seasonPackName {
+		switch {
+		case !releaseFolderFlag && (base != seasonPackName):
 			destDir = filepath.Join(destDir, seasonPackName)
+		case releaseFolderFlag && (base != newNameBase) && (parentBase != seasonPackName):
+			destDir = filepath.Join(destDir, seasonPackName, newNameBase)
 		}
+	} else if releaseFolderFlag && base != newNameBase {
+		destDir = filepath.Join(destDir, newNameBase)
 	}
 
-	newPath := filepath.Join(destDir, newName)
-
-	if filePath == newPath {
-		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' is already has the correct name.", filepath.Base(filePath))))
-
-		return nil
-	}
-
-	return renameCommit(filePath, newPath, newName)
+	return destDir, newNameBase
 }
 
 func renameCommit(filePath, newPath, newName string) error {
@@ -374,6 +390,7 @@ func init() {
 	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
 	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
 	renameCmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
+	renameCmd.Flags().BoolVarP(&releaseFolderFlag, "release-folder", "F", false, "move each release into a identivally named folder")
 	renameCmd.Flags().StringVarP(&outputPathFlag, "output", "O", "", "output path where to move the files after renaming")
 
 	// Group metadata flags
