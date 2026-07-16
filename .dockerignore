@@ -18,7 +18,6 @@ tmp/
 dist/
 build/
 coverage/
-vendor/
 scripts/
 docker/config/
 

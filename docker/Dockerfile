@@ -15,6 +15,7 @@ COPY . .
 # -buildvcs=false prevents Go from adding +dirty suffix from git status
 
 RUN CGO_ENABLED=0 go build \
+    -mod=vendor \
     -tags no_update \
     -buildvcs=false \
     -trimpath \
@@ -24,11 +25,16 @@ RUN CGO_ENABLED=0 go build \
 # 2. Runtime stage
 FROM alpine:3.21
 
+ARG VERSION=dev
+
 LABEL org.opencontainers.image.title="parsec" \
       org.opencontainers.image.description="parse, check and create releases to send far into space" \
       org.opencontainers.image.url="https://codeberg.org/upPollo/parsec" \
       org.opencontainers.image.source="https://codeberg.org/upPollo/parsec" \
-      org.opencontainers.image.licenses="WTFPL"
+      org.opencontainers.image.documentation="https://codeberg.org/upPollo/parsec/src/branch/main/docs/README.md" \
+      org.opencontainers.image.licenses="WTFPL" \
+      org.opencontainers.image.vendor="upPollo" \
+      org.opencontainers.image.version="${VERSION}"
 
 
 # Install runtime dependencies
@@ -37,7 +43,8 @@ RUN apk add --no-cache \
     mkvtoolnix \
     ca-certificates \
     tzdata \
-    su-exec
+    su-exec \
+    tini
 
 # Copy the binary from the builder stage
 COPY --from=builder /parsec /usr/local/bin/parsec
@@ -57,4 +64,4 @@ ENV PUID=1000 \
 WORKDIR /home/parsec
 
 # Set entrypoint
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]
