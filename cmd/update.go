@@ -1,3 +1,5 @@
+//go:build !no_update
+
 package cmd
 
 import (

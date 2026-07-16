@@ -8,3 +8,6 @@ vendor/
 
 # local config
 .env
+
+# docker
+docker/config/

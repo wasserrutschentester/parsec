@@ -77,7 +77,7 @@ func CheckForUpdateBackground(currentVersion string) {
 		return
 	}
 
-	if !config.GetAutoUpdate() {
+	if !SelfUpdate || !config.GetAutoUpdate() {
 		ui.PrintWarning(fmt.Sprintf("A new version of parsec is available: %s (Current: %s).", latestTag, currentVersion))
 
 		return

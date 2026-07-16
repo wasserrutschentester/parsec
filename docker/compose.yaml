@@ -1,0 +1,13 @@
+services:
+    parsec:
+        image: uppollo/parsec:latest
+        container_name: parsec
+        restart: unless-stopped
+        environment:
+            # user and group id
+            - PUID=1000
+            - PGID=1000
+        volumes:
+            # mapping your host paths to those inside the container
+            - ./config:/home/parsec/.config/parsec
+            - /mnt/user/data:/data
