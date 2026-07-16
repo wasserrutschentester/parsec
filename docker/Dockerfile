@@ -1,30 +1,8 @@
-# 1. Build stage
-FROM golang:1.25-alpine AS builder
-
-# Accept build-time variables
-ARG VERSION=dev
-
-# Install build dependencies
-RUN apk add --no-cache git gcc musl-dev
-
-# Copy the repository into the container
-WORKDIR /app
-COPY . .
-
-# Build parsec from the main package with static linking
-# -buildvcs=false prevents Go from adding +dirty suffix from git status
-
-RUN CGO_ENABLED=0 go build \
-    -mod=vendor \
-    -tags no_update \
-    -buildvcs=false \
-    -trimpath \
-    -ldflags "-s -w -X codeberg.org/upPollo/parsec/cmd.Version=${VERSION}" \
-    -o /parsec .
-
-# 2. Runtime stage
 FROM alpine:3.21
 
+# Docker Buildx automatic variables
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 
 LABEL org.opencontainers.image.title="parsec" \
@@ -46,8 +24,9 @@ RUN apk add --no-cache \
     su-exec \
     tini
 
-# Copy the binary from the builder stage
-COPY --from=builder /parsec /usr/local/bin/parsec
+# Copy the pre-built binary for the specific architecture
+COPY dist/parsec-${TARGETOS}-${TARGETARCH} /usr/local/bin/parsec
+RUN chmod +x /usr/local/bin/parsec
 
 # Copy the container entrypoint
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

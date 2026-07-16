@@ -2,6 +2,7 @@
 /parsec
 .parsec.toml
 vendor/
+dist/
 
 # test files
 *.mkv

@@ -14,16 +14,12 @@ Use `uppollo/parsec:nightly` for nightly builds or a version tag such as `uppoll
 
 ## Build the Image Locally
 
-Until a published image is available, build the repository locally with the same image name used throughout this guide:
+We provide a convenient Makefile target that natively builds the binary for your architecture and creates the Docker image:
 
 ```bash
 git clone https://codeberg.org/upPollo/parsec.git
 cd parsec
-docker build \
-  --build-arg VERSION="$(sh ./scripts/version.sh)" \
-  -t uppollo/parsec:latest \
-  -f docker/Dockerfile \
-  .
+make docker
 ```
 
 ## Configuration

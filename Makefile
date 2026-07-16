@@ -6,6 +6,9 @@ VERSION ?= $(shell ./scripts/version.sh)
 
 LDFLAGS = -X codeberg.org/upPollo/parsec/cmd.Version=$(VERSION)
 
+OS := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
+
 .PHONY: init
 init: ## Initialize local development environment
 	git config core.hooksPath scripts
@@ -17,6 +20,13 @@ all: lint
 .PHONY: build
 build: ## Build the binary
 	go build -ldflags="$(LDFLAGS)" -o parsec main.go
+
+.PHONY: docker
+docker: ## Build the docker image locally
+	@echo "Building binary for Docker (TARGET: $(OS)-$(ARCH))..."
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags="$(LDFLAGS)" -o dist/parsec-$(OS)-$(ARCH) main.go
+	@echo "Building Docker image..."
+	docker build -f docker/Dockerfile -t uppollo/parsec:latest .
 
 vendor:
 	go mod tidy
