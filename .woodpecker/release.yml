@@ -11,7 +11,7 @@ variables:
     - &golang_cgo "golang:1.25"
     - &golangci_lint "golangci/golangci-lint:v2.12-alpine"
     - &release_plugin "codeberg.org/woodpecker-plugins/release"
-    - &docker_buildx "woodpeckerci/plugin-docker-buildx"
+    - &docker_buildx "woodpeckerci/plugin-docker-buildx:6.0.3"
     - &release_settings
       api_key:
           from_secret: PARSEC_FORGE_TOKEN
@@ -116,7 +116,7 @@ steps:
                       from_secret: DOCKERHUB_TOKEN
                 - registry: https://codeberg.org
                   username:
-                      from_secret: CODEBERG_USERNAME
+                      from_secret: CODEBERG_USER
                   password:
                       from_secret: CODEBERG_TOKEN
 
