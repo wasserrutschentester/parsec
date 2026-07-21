@@ -14,6 +14,9 @@ Use `uppollo/parsec:nightly` for nightly builds or a version tag such as `uppoll
 
 ## Build the Image Locally
 
+> [!NOTE]
+> The build dependencies listed in the [project README.md](../Readme.md#manual-installation) are required to build the image locally.
+
 We provide a convenient Makefile target that natively builds the binary for your architecture and creates the Docker image:
 
 ```bash

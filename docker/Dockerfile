@@ -44,3 +44,4 @@ WORKDIR /home/parsec
 
 # Set entrypoint
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]
+CMD ["idle"]

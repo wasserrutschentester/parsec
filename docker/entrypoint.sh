@@ -1,8 +1,5 @@
 #!/bin/sh
-set -eu
-
-PUID="${PUID:-1000}"
-PGID="${PGID:-1000}"
+set -eux
 
 case "$PUID" in
     ''|*[!0-9]*)
@@ -23,20 +20,20 @@ esac
 if [ "$(id -u)" -eq 0 ]; then
     mkdir -p "$HOME/.config/parsec"
     chown -R "$PUID:$PGID" "$HOME/.config/parsec"
+fi
 
-    # Keep the container running when no parsec command was supplied.
-    if [ "$#" -eq 0 ]; then
-        exec su-exec "$PUID:$PGID" tail -f /dev/null
-    fi
+# Keep the container running when the internal idle command was supplied.
+if [ "${1:-}" = "idle" ]; then
+    while true; do
+        sleep 1000;
+    done
+fi
 
-    # Forward all supplied arguments to parsec as PUID:PGID.
-    exec su-exec "$PUID:$PGID" /usr/local/bin/parsec "$@"
+# Forward all supplied arguments to parsec as PUID:PGID.
+if [ "$(id -u)" -eq 0 ]; then
+    exec su-exec "$PUID:$PGID" env HOME="$HOME" /usr/local/bin/parsec "$@"
 else
     # If Docker was configured with --user, PUID and PGID cannot be applied
     # because the entrypoint is no longer running as root.
-    if [ "$#" -eq 0 ]; then
-        exec tail -f /dev/null
-    fi
-
     exec /usr/local/bin/parsec "$@"
 fi
