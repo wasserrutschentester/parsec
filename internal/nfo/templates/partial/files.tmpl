@@ -1,0 +1,22 @@
+{{ define "files" }}
+  {{- include "files/content" . | padRight .LineWidth -}}
+{{- end }}
+
+{{ define "files/content" }}
+  {{- $ctx := . }}
+  {{- range .Files }}
+  {{- $name := .ReleaseName }}
+  {{- if gt (len .RawEpisodeResults) 0 }}
+    {{- $first := index .RawEpisodeResults 0 }}
+    {{- $name = printf "E%02d" $first.Episode }}
+    {{- if gt (len .RawEpisodeResults) 1 }}
+      {{- $last := index .RawEpisodeResults (sub (len .RawEpisodeResults) 1) }}
+      {{- $name = printf "%s-E%02d" $name $last.Episode }}
+    {{- end }}
+    {{- $name = printf "%s - %s" $name .EpisodeTitle }}
+  {{- else if .EpisodeTitle }}
+    {{- $name = .EpisodeTitle }}
+  {{- end }}
+  {{ $name | padRight (sub $ctx.LineWidth 28) "." }}: {{ .Size | padLeft 9 }} ({{ .Duration }})
+  {{- end }}
+{{- end }}

@@ -60,6 +60,8 @@ parsec nfogen file.mkv --dump-context
 - `{{ .Sources }}`: A `[]string` slice of all source names added via `--source`.
 - `{{ .ServiceName }}`: Expanded streaming service name (e.g. `"NF"` → `"Netflix"`). See the full context reference for a complete list.
 - `{{ .LineWidth }}`: The current line width (default `72`). Used by built-in partials.
+- `{{ .IsPack }}`: `true` if the NFO is being generated for a season pack directory.
+- `{{ .Files }}`: A list of individual file contexts if `.IsPack` is `true`.
 - `{{ .AppVersion }}`: The running Parsec version string.
 
 > [!NOTE]

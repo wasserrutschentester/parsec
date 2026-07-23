@@ -4,11 +4,13 @@ Parsec provides a robust `nfogen` command for generating XML or text `.nfo` file
 
 ## Basic Usage
 
-To generate an NFO file for a media file:
+To generate an NFO file for a media file or a directory (season pack):
 ```bash
 parsec nfogen "Movie.Name.2023.1080p.WEB-DL.x264-GROUP.mkv"
+# Or for a season pack directory:
+parsec nfogen "Show.Name.S01.1080p.WEB-DL.x264-GROUP"
 ```
-Parsec will automatically scan the file with `mediainfo`, fetch metadata from the configured databases, and write `Movie.Name.2023.1080p.WEB-DL.x264-GROUP.nfo` using the default NFO template.
+Parsec will automatically scan the file(s) with `mediainfo`, fetch metadata from the configured databases, and write the `.nfo` file using the default NFO template. If a directory is provided, Parsec aggregates the metadata across all contained media files to generate a comprehensive season pack NFO.
 
 ## Flags
 

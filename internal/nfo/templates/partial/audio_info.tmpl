@@ -4,7 +4,7 @@
 
 {{ define "audio_info/content" }}
   {{- range .Audio }}
-  {{ print (titleCase (languageName .Language)) " " | padRight 13 "." true }}: {{ .Codec }} | {{ .Channels  }} | {{ .Bitrate  }}
+  {{ print (titleCase (languageName .Language)) " " | padRight 13 "." true }}: {{ .Codec }} | {{ .Channels  }} | {{ if $.IsPack }}~{{ end }}{{ .Bitrate  }}
     {{- if .Atmos }} | Atmos{{ end }}
     {{- if .Flags.Default }} [Default]{{ end }}
     {{- if .Flags.Forced }} [Forced]{{ end }}

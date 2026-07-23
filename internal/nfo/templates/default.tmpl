@@ -21,6 +21,12 @@
 ║                                                                      ║
 {{ include "overview" . | applyBorder "║ " " ║" }}
 ║                                                                      ║
+{{- if .IsPack }}
+╠═ /// PACK CONTENTS //////////////////////////////////////////////////╢
+║                                                                      ║
+{{ include "files" . | applyBorder "║ " " ║" }}
+║                                                                      ║
+{{- end }}
 ╠═ /// VIDEO INFO /////////////////////////////////////////////////////╢
 ║                                                                      ║
 {{ include "video_info" . | applyBorder "║ " " ║" }}

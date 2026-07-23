@@ -3,6 +3,9 @@
 {{- end }}
 
 {{ define "overview/content" }}
+  {{- if .IsPack }}
+  {{ "Episodes " | padRight 13 "." }}: {{ len .Files }}
+  {{- end }}
   {{ "Size " | padRight 13 "." }}: {{ .Size }}
   {{ "Duration " | padRight 13 "." }}: {{ .Duration }}
   {{- if .Source }}

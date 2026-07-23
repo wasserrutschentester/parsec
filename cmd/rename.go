@@ -362,6 +362,7 @@ func renameGetEpisodeInfos(result *mdb.SearchResult, meta *metadata.Metadata) []
 	return episodes
 }
 
+//nolint:funlen // lots of flags to init
 func init() {
 	rootCmd.AddCommand(renameCmd)
 	// Metadata
@@ -386,20 +387,21 @@ func init() {
 	renameCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	renameCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	renameCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
-	// Other
-	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
-	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
+	// Output
 	renameCmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
 	renameCmd.Flags().BoolVarP(&releaseFolderFlag, "release-folder", "F", false, "move each release into a identivally named folder")
 	renameCmd.Flags().StringVarP(&outputPathFlag, "output", "O", "", "output path where to move the files after renaming")
+	// Other
+	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
+	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
 
 	// Group metadata flags
-	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
+	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title", "cut-edition", "hdr"}
 	for _, f := range metadataFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
 
-	p2pFlags := []string{"service", "source", "repack", "group"}
+	p2pFlags := []string{"service", "source", "repack", "subbed", "audio-description", "group"}
 	for _, f := range p2pFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
@@ -408,6 +410,12 @@ func init() {
 	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+	}
+
+	// Group Output flags
+	outputFlags := []string{"output", "season-pack", "release-folder"}
+	for _, f := range outputFlags {
+		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
 
 	_ = renameCmd.RegisterFlagCompletionFunc("source", completeSources)

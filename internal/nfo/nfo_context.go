@@ -1,4 +1,3 @@
-// Package nfo provides logic for generating and rendering NFO templates.
 package nfo
 
 import (
@@ -13,30 +12,40 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
-// Context holds template variables
-type Context struct {
+// FileContext holds everything strictly related to a single media file
+type FileContext struct {
 	metadata.Metadata
 
 	ReleaseName  string
 	EpisodeTitle string
 	Size         string
 	SizeBytes    int64
-	ImdbURL      string
-	TmdbURL      string
-	TvdbURL      string
 	Duration     string
 	DurationSec  int
-	Notes        string
 	Video        Video
 	Audio        []Audio
 	Subtitles    []Subtitle
 	Plot         string
-	Sources      []string
 
-	RawSearchResult   *mdb.SearchResult      `json:"RawSearchResult,omitempty"`
 	RawEpisodeResults []mdb.EpisodeResult    `json:"RawEpisodeResults,omitempty"`
 	RawMediaInfo      *mediainfo.MediaInfo   `json:"RawMediaInfo,omitempty"`
 	RawEbmlMetadata   *matroska.EbmlMetadata `json:"RawEbmlMetadata,omitempty"`
+}
+
+// Context holds template variables
+type Context struct {
+	FileContext
+
+	IsPack bool
+	Files  []FileContext
+
+	ImdbURL string
+	TmdbURL string
+	TvdbURL string
+	Notes   string
+	Sources []string
+
+	RawSearchResult *mdb.SearchResult `json:"RawSearchResult,omitempty"`
 
 	LineWidth   int
 	AppVersion  string
@@ -51,7 +60,6 @@ func (c *Context) SetLineWidth(width int) string {
 }
 
 // WithLineWidth returns a shallow copy of the Context with the LineWidth overridden.
-// This is incredibly useful for rendering partials with a custom width without mutating global state.
 func (c *Context) WithLineWidth(width int) *Context {
 	clone := *c
 	clone.LineWidth = width
@@ -145,54 +153,111 @@ func getTrackType(info *mediainfo.MediaInfo, trackType string) *mediainfo.Track 
 	return nil
 }
 
-// BuildContext builds the NFO template variables given metadata and mediainfo outputs.
-func BuildContext(meta *metadata.Metadata, info *mediainfo.MediaInfo, file string, notes string, searchResult *mdb.SearchResult, episodeResults []mdb.EpisodeResult, ebmlMeta *matroska.EbmlMetadata, appVersion string) *Context {
-	ctx := Context{
-		Metadata:          *meta,
-		ReleaseName:       strings.TrimSuffix(filepath.Base(file), filepath.Ext(file)),
-		EpisodeTitle:      strings.Join(meta.EpisodeTitles, " / "),
-		Notes:             notes,
-		RawSearchResult:   searchResult,
-		RawEpisodeResults: episodeResults,
-		RawMediaInfo:      info,
-		RawEbmlMetadata:   ebmlMeta,
-		LineWidth:         72, // Default line width
-		AppVersion:        appVersion,
-		ServiceName:       expandServiceName(meta.Service),
-	}
+// FileInput holds the raw parsed structures for a single media file.
+type FileInput struct {
+	Path           string
+	Meta           *metadata.Metadata
+	Info           *mediainfo.MediaInfo
+	Ebml           *matroska.EbmlMetadata
+	EpisodeResults []mdb.EpisodeResult
+}
 
-	populateFromMDB(&ctx, searchResult, episodeResults)
-
-	stat, err := os.Stat(file)
-	if err == nil {
-		ctx.SizeBytes = stat.Size()
-		ctx.Size = fmt.Sprintf("%.2f GiB", float64(stat.Size())/(1024*1024*1024))
-	}
-
-	if info == nil {
-		return &ctx
-	}
-
+func populateFileInfo(fctx *FileContext, info *mediainfo.MediaInfo, ebml *matroska.EbmlMetadata) {
 	if genTrack := getTrackType(info, "General"); genTrack != nil && genTrack.Duration != nil {
 		durSeconds := int(*genTrack.Duration)
-		ctx.DurationSec = durSeconds
+		fctx.DurationSec = durSeconds
 		h := durSeconds / 3600
 		m := (durSeconds % 3600) / 60
 		s := durSeconds % 60
 
 		if h > 0 {
-			ctx.Duration = fmt.Sprintf("%d h %d min", h, m)
+			fctx.Duration = fmt.Sprintf("%d h %d min", h, m)
 		} else {
-			ctx.Duration = fmt.Sprintf("%d min %d s", m, s)
+			fctx.Duration = fmt.Sprintf("%d min %d s", m, s)
 		}
 	}
 
 	if vTrack := getTrackType(info, "Video"); vTrack != nil {
-		populateVideoContext(&ctx, vTrack, ebmlMeta)
+		populateVideoContext(fctx, vTrack, ebml)
 	}
 
-	populateAudioContext(&ctx, info, ebmlMeta)
-	populateTextContext(&ctx, info, ebmlMeta)
+	populateAudioContext(fctx, info, ebml)
+	populateTextContext(fctx, info, ebml)
+}
+
+// BuildFileContext creates a FileContext for a single file
+func BuildFileContext(in FileInput) FileContext {
+	fctx := FileContext{
+		Metadata:          *in.Meta,
+		ReleaseName:       strings.TrimSuffix(filepath.Base(in.Path), filepath.Ext(in.Path)),
+		EpisodeTitle:      strings.Join(in.Meta.EpisodeTitles, " / "),
+		RawEpisodeResults: in.EpisodeResults,
+		RawMediaInfo:      in.Info,
+		RawEbmlMetadata:   in.Ebml,
+	}
+
+	populateFromEpisodeResults(&fctx, in.EpisodeResults)
+
+	stat, err := os.Stat(in.Path)
+	if err == nil {
+		fctx.SizeBytes = stat.Size()
+		fctx.Size = fmt.Sprintf("%.2f GiB", float64(stat.Size())/(1024*1024*1024))
+	}
+
+	if in.Info != nil {
+		populateFileInfo(&fctx, in.Info, in.Ebml)
+	}
+
+	return fctx
+}
+
+func buildSingleFileContext(ctx *Context, file FileInput) {
+	ctx.IsPack = false
+	fctx := BuildFileContext(file)
+
+	if fctx.Plot == "" {
+		fctx.Plot = ctx.Plot
+	}
+
+	title := ctx.Title
+	year := ctx.Year
+
+	date := ctx.Date
+	if fctx.Date != "" {
+		date = fctx.Date
+	}
+
+	ctx.FileContext = fctx
+
+	ctx.Title = title
+	if year > 0 {
+		ctx.Year = year
+	}
+
+	ctx.Date = date
+}
+
+// BuildContext builds the NFO template variables given metadata and mediainfo outputs.
+func BuildContext(releaseName string, baseMeta *metadata.Metadata, files []FileInput, notes string, searchResult *mdb.SearchResult, appVersion string) *Context {
+	ctx := Context{
+		FileContext: FileContext{
+			Metadata:    *baseMeta,
+			ReleaseName: releaseName,
+		},
+		Notes:           notes,
+		RawSearchResult: searchResult,
+		LineWidth:       72, // Default line width
+		AppVersion:      appVersion,
+		ServiceName:     expandServiceName(baseMeta.Service),
+	}
+
+	populateFromSearchResult(&ctx, searchResult)
+
+	if len(files) == 1 {
+		buildSingleFileContext(&ctx, files[0])
+	} else if len(files) > 1 {
+		buildPackFileContext(&ctx, files)
+	}
 
 	return &ctx
 }
@@ -217,11 +282,6 @@ func getEbmlTrackFlags(ebmlMeta *matroska.EbmlMetadata, ebmlType string, typeOrd
 	}
 
 	return defaultFlags
-}
-
-func populateFromMDB(ctx *Context, searchResult *mdb.SearchResult, episodeResults []mdb.EpisodeResult) {
-	populateFromSearchResult(ctx, searchResult)
-	populateFromEpisodeResults(ctx, episodeResults)
 }
 
 func populateFromSearchResult(ctx *Context, searchResult *mdb.SearchResult) {
@@ -291,7 +351,7 @@ func populateURLsFromSearchResult(ctx *Context, searchResult *mdb.SearchResult) 
 	}
 }
 
-func populateFromEpisodeResults(ctx *Context, episodeResults []mdb.EpisodeResult) {
+func populateFromEpisodeResults(fctx *FileContext, episodeResults []mdb.EpisodeResult) {
 	if len(episodeResults) == 0 {
 		return
 	}
@@ -306,43 +366,43 @@ func populateFromEpisodeResults(ctx *Context, episodeResults []mdb.EpisodeResult
 			plots = append(plots, ep.Overview)
 		}
 
-		if ctx.Date == "" { // Override date with airdate if first episode
-			ctx.Date = ep.Airdate
+		if fctx.Date == "" { // Override date with airdate if first episode
+			fctx.Date = ep.Airdate
 		}
 	}
 
 	if len(epNames) > 0 {
-		ctx.EpisodeTitle = strings.Join(epNames, " / ")
+		fctx.EpisodeTitle = strings.Join(epNames, " / ")
 	}
 
 	if len(plots) > 0 {
-		ctx.Plot = strings.Join(plots, "\n\n")
+		fctx.Plot = strings.Join(plots, "\n\n")
 	}
 }
 
-func populateVideoContext(ctx *Context, vTrack *mediainfo.Track, ebmlMeta *matroska.EbmlMetadata) {
-	ctx.Video.Title = vTrack.Title
-	ctx.Video.Codec = metadata.VideoCodecName(vTrack.Format, vTrack.FormatVersion, vTrack.CodecIDHint)
-	ctx.Video.CodecID = vTrack.CodecID
-	ctx.Video.Format = vTrack.Format
-	ctx.Video.Profile = vTrack.FormatProfile
-	ctx.Video.Level = vTrack.FormatLevel
-	ctx.Video.BitRateMode = vTrack.BitRateMode
-	ctx.Video.BitDepth = vTrack.BitDepth
-	ctx.Video.ChromaSubsampling = vTrack.ChromaSubsampling
-	ctx.Video.ScanType = vTrack.ScanType
+func populateVideoContext(fctx *FileContext, vTrack *mediainfo.Track, ebmlMeta *matroska.EbmlMetadata) {
+	fctx.Video.Title = vTrack.Title
+	fctx.Video.Codec = metadata.VideoCodecName(vTrack.Format, vTrack.FormatVersion, vTrack.CodecIDHint)
+	fctx.Video.CodecID = vTrack.CodecID
+	fctx.Video.Format = vTrack.Format
+	fctx.Video.Profile = vTrack.FormatProfile
+	fctx.Video.Level = vTrack.FormatLevel
+	fctx.Video.BitRateMode = vTrack.BitRateMode
+	fctx.Video.BitDepth = vTrack.BitDepth
+	fctx.Video.ChromaSubsampling = vTrack.ChromaSubsampling
+	fctx.Video.ScanType = vTrack.ScanType
 
 	if vTrack.HDRFormat != "" {
-		ctx.Video.HDRFormat = vTrack.HDRFormat
+		fctx.Video.HDRFormat = vTrack.HDRFormat
 	} else if vTrack.HDRFormatCompatibility != "" {
-		ctx.Video.HDRFormat = vTrack.HDRFormatCompatibility
+		fctx.Video.HDRFormat = vTrack.HDRFormatCompatibility
 	}
 
 	baseFlags := Flags{
 		Default: bool(vTrack.Default),
 		Forced:  bool(vTrack.Forced),
 	}
-	ctx.Video.Flags = getEbmlTrackFlags(ebmlMeta, "video", 1, baseFlags)
+	fctx.Video.Flags = getEbmlTrackFlags(ebmlMeta, "video", 1, baseFlags)
 
 	var settings []string
 	if cabac := vTrack.FormatSettingsCABAC; cabac == "Yes" {
@@ -353,18 +413,18 @@ func populateVideoContext(ctx *Context, vTrack *mediainfo.Track, ebmlMeta *matro
 		settings = append(settings, ref+" Ref Frames")
 	}
 
-	ctx.Video.Settings = strings.Join(settings, " / ")
+	fctx.Video.Settings = strings.Join(settings, " / ")
 
-	ctx.Video.Library = vTrack.EncodedLibrary
-	ctx.Video.LibrarySettings = vTrack.EncodedLibrarySettings
+	fctx.Video.Library = vTrack.EncodedLibrary
+	fctx.Video.LibrarySettings = vTrack.EncodedLibrarySettings
 
-	ctx.Video.Bitrate = fmt.Sprintf("%d kb/s", vTrack.BitRate/1000)
-	ctx.Video.Dimensions = fmt.Sprintf("%dx%d", vTrack.Width, vTrack.Height)
+	fctx.Video.Bitrate = fmt.Sprintf("%d kb/s", vTrack.BitRate/1000)
+	fctx.Video.Dimensions = fmt.Sprintf("%dx%d", vTrack.Width, vTrack.Height)
 
-	populateVideoAspectAndResolution(ctx, vTrack)
+	populateVideoAspectAndResolution(fctx, vTrack)
 }
 
-func populateVideoAspectAndResolution(ctx *Context, vTrack *mediainfo.Track) {
+func populateVideoAspectAndResolution(fctx *FileContext, vTrack *mediainfo.Track) {
 	// Calculate Aspect Ratio using GCD
 	a, b := vTrack.Width, vTrack.Height
 	for b != 0 {
@@ -374,26 +434,26 @@ func populateVideoAspectAndResolution(ctx *Context, vTrack *mediainfo.Track) {
 	}
 
 	if a > 0 {
-		ctx.Video.AspectRatio = fmt.Sprintf("%d:%d", vTrack.Width/a, vTrack.Height/a)
+		fctx.Video.AspectRatio = fmt.Sprintf("%d:%d", vTrack.Width/a, vTrack.Height/a)
 	} else if vTrack.DisplayAspectRatio > 0 {
-		ctx.Video.AspectRatio = fmt.Sprintf("%.3f", vTrack.DisplayAspectRatio)
+		fctx.Video.AspectRatio = fmt.Sprintf("%.3f", vTrack.DisplayAspectRatio)
 	}
 
-	ctx.Video.Resolution = metadata.HeightToResolution(vTrack.Height, vTrack.ScanType, vTrack.FrameRate)
-	if ctx.Video.Resolution == "" {
-		ctx.Video.Resolution = fmt.Sprintf("%vx%v", vTrack.Width, vTrack.Height)
+	fctx.Video.Resolution = metadata.HeightToResolution(vTrack.Height, vTrack.ScanType, vTrack.FrameRate)
+	if fctx.Video.Resolution == "" {
+		fctx.Video.Resolution = fmt.Sprintf("%vx%v", vTrack.Width, vTrack.Height)
 	}
 
 	if vTrack.FrameRate > 0 {
-		ctx.Video.Framerate = fmt.Sprintf("%.3f FPS", vTrack.FrameRate)
+		fctx.Video.Framerate = fmt.Sprintf("%.3f FPS", vTrack.FrameRate)
 	}
 
-	if ctx.Resolution == "" {
-		ctx.Resolution = ctx.Video.Resolution
+	if fctx.Resolution == "" {
+		fctx.Resolution = fctx.Video.Resolution
 	}
 }
 
-func populateAudioContext(ctx *Context, info *mediainfo.MediaInfo, ebmlMeta *matroska.EbmlMetadata) {
+func populateAudioContext(fctx *FileContext, info *mediainfo.MediaInfo, ebmlMeta *matroska.EbmlMetadata) {
 	for i, aTrack := range getTracksByType(info, "Audio") {
 		isAtmos := strings.Contains(strings.ToLower(aTrack.FormatCommercial), "atmos") ||
 			strings.Contains(strings.ToLower(aTrack.FormatCommercialIfAny), "atmos")
@@ -418,11 +478,11 @@ func populateAudioContext(ctx *Context, info *mediainfo.MediaInfo, ebmlMeta *mat
 			audio.SamplingRate = fmt.Sprintf("%.1f kHz", float64(aTrack.SamplingRate)/1000.0)
 		}
 
-		ctx.Audio = append(ctx.Audio, audio)
+		fctx.Audio = append(fctx.Audio, audio)
 	}
 }
 
-func populateTextContext(ctx *Context, info *mediainfo.MediaInfo, ebmlMeta *matroska.EbmlMetadata) {
+func populateTextContext(fctx *FileContext, info *mediainfo.MediaInfo, ebmlMeta *matroska.EbmlMetadata) {
 	for i, tTrack := range getTracksByType(info, "Text") {
 		isSDH := strings.Contains(strings.ToLower(tTrack.Title), "sdh") ||
 			strings.Contains(strings.ToLower(tTrack.Title), "hearing impaired")
@@ -432,7 +492,7 @@ func populateTextContext(ctx *Context, info *mediainfo.MediaInfo, ebmlMeta *matr
 			elemCount = *tTrack.ElementCount
 		}
 
-		ctx.Subtitles = append(ctx.Subtitles, Subtitle{
+		fctx.Subtitles = append(fctx.Subtitles, Subtitle{
 			Title:        tTrack.Title,
 			Language:     tTrack.Language,
 			Format:       tTrack.Format,
@@ -444,191 +504,4 @@ func populateTextContext(ctx *Context, info *mediainfo.MediaInfo, ebmlMeta *matr
 			SDH: isSDH,
 		})
 	}
-}
-
-// StreamingServiceNames maps streaming service tags to their full descriptive names.
-var StreamingServiceNames = map[string]string{
-	"3SAT":  "3Sat",
-	"9NOW":  "9Now",
-	"AND":   "Animation Digital Network",
-	"AE":    "A&E",
-	"AJAZ":  "Al Jazeera English",
-	"ALL4":  "All4 (Channel 4)",
-	"AMBC":  "ABC (US)",
-	"AMC":   "AMC",
-	"AMZN":  "Amazon",
-	"ANLB":  "AnimeLab",
-	"ANPL":  "Animal Planet",
-	"AOL":   "AOL",
-	"ARD":   "ARD Mediathek",
-	"ARDP":  "ARD Plus",
-	"ARTE":  "ARTE",
-	"AS":    "Adult Swim",
-	"ATK":   "America's Test Kitchen",
-	"ATV":   "Apple TV (channel content)",
-	"ATVP":  "Apple TV+ (original content)",
-	"AUBC":  "ABC (AU) iView",
-	"BCORE": "Sony Pictures Core",
-	"BKPL":  "Blackpills",
-	"BNGE":  "Binge",
-	"BOOM":  "Boomerang",
-	"BRAV":  "BravoTV",
-	"CANP":  "Canal+",
-	"CBC":   "CBC",
-	"CBS":   "CBS",
-	"CC":    "Comedy Central",
-	"CCGC":  "Comedians in Cars Getting Coffee",
-	"CHGD":  "CHRGD",
-	"CLBI":  "Club illico",
-	"CMAX":  "Cinemax",
-	"CMOR":  "C More",
-	"CMT":   "Country Music Television",
-	"CN":    "Cartoon Network",
-	"CNBC":  "CNBC",
-	"CNLP":  "Canal+",
-	"COOK":  "Cooking Channel",
-	"CR":    "Crunchy Roll",
-	"CRIT":  "Criterion Channel",
-	"CRKL":  "Crackle",
-	"CSPN":  "CSpan",
-	"CTV":   "CTV",
-	"CUR":   "CuriosityStream",
-	"CW":    "The CW",
-	"CWS":   "CWSeed",
-	"DCU":   "DC Universe",
-	"DDY":   "Digiturk Dilediğin Yerde",
-	"DEST":  "Destination America",
-	"DHF":   "Deadhouse Films",
-	"DISC":  "Discovery Channel",
-	"DIY":   "DIY Network",
-	"DOCC":  "Doc Club",
-	"DRPO":  "Dropout",
-	"DSCP":  "Discovery+",
-	"DSKI":  "Daisuki",
-	"DSNP":  "Disney+",
-	"DSNY":  "Disney",
-	"DTV":   "DirecTV Now",
-	"EPIX":  "EPIX",
-	"ESPN":  "ESPN",
-	"ESQ":   "Esquire",
-	"ETTV":  "El Trece",
-	"ETV":   "E!",
-	"FAM":   "Family",
-	"FJR":   "Family Jr",
-	"FOOD":  "Food Network",
-	"FOX":   "Fox",
-	"FPT":   "FPT Play",
-	"FREE":  "Freeform",
-	"FTV":   "France.tv",
-	"FUNI":  "Funimation",
-	"FXTL":  "Foxtel Now",
-	"FYI":   "FYI Network",
-	"GC":    "NHL GameCenter",
-	"GLBL":  "Global",
-	"GLBO":  "Globoplay",
-	"GO90":  "go90",
-	"HBO":   "HBO",
-	"HGTV":  "HGTV",
-	"HIDI":  "HIDIVE",
-	"HIST":  "History Channel",
-	"HLMK":  "Hallmark",
-	"HMAX":  "HBO Max",
-	"HULU":  "Hulu",
-	"ID":    "Investigation Discovery",
-	"IFC":   "IFC",
-	"IP":    "BBC iPlayer",
-	"IT":    "iTunes",
-	"ITV":   "ITV",
-	"JOYN":  "Joyn",
-	"KAYO":  "Kayo Sports",
-	"KIKA":  "KiKA",
-	"KNOW":  "Knowledge Network",
-	"KNPY":  "Kanopy",
-	"LIFE":  "Lifetime",
-	"LN":    "Loving Nature",
-	"MA":    "Movies Anywhere",
-	"MAX":   "Max (Warner Bros. Discovery)",
-	"MNBC":  "MSNBC",
-	"MTOD":  "Motor Trend OnDemand",
-	"MTV":   "MTV",
-	"NATG":  "National Geographic",
-	"NBA":   "NBA League Pass",
-	"NBC":   "NBC",
-	"NF":    "Netflix",
-	"NFL":   "NFL Network",
-	"NFLN":  "NFL Now",
-	"NICK":  "Nickelodeon",
-	"NOW":   "Now (Sky)",
-	"NRK":   "Norsk Rikskringkasting",
-	"PA":    "Project Alpha",
-	"PBS":   "PBS",
-	"PBSK":  "PBS Kids",
-	"PCOK":  "Peacock",
-	"PLAY":  "Google Play",
-	"PLUZ":  "Pluzz",
-	"PMNT":  "Paramount Network",
-	"PMTP":  "Paramount+",
-	"POGO":  "PokerGo",
-	"PSN":   "Playstation Network",
-	"PUHU":  "puhutv",
-	"RKTN":  "Rakuten TV",
-	"ROKU":  "The Roku Channel",
-	"RSTR":  "Rooster Teeth",
-	"RTE":   "RTÉ",
-	"RTL":   "RTL+",
-	"RTLP":  "RTL+",
-	"SBS":   "SBS (AU)",
-	"SESO":  "Seeso",
-	"SHDR":  "Shudder",
-	"SHMI":  "Shomi",
-	"SHO":   "Showtime",
-	"SKST":  "SkyShowtime",
-	"SNET":  "Sportsnet",
-	"SPIK":  "Spike",
-	"SPRT":  "Sprout",
-	"STAN":  "Stan",
-	"STRP":  "Star+",
-	"STZ":   "Starz",
-	"SVT":   "Sveriges Television",
-	"SWER":  "SwearNet",
-	"SYFY":  "SyFy",
-	"TBS":   "TBS",
-	"TEN":   "TenPlay",
-	"TFOU":  "TFOU",
-	"TIMV":  "TIMvision",
-	"TLC":   "TLC",
-	"TOU":   "Ici TOU.TV",
-	"TRVL":  "Travel Channel",
-	"TUBI":  "TubiTV",
-	"TV3":   "TV3 (IE)",
-	"TV4":   "TV4 (SE)",
-	"TVL":   "TVLand",
-	"UFC":   "UFC",
-	"UKTV":  "UKTV",
-	"UNIV":  "Univision",
-	"USAN":  "USA Network",
-	"VH1":   "VH1",
-	"VIAP":  "Viaplay",
-	"VICE":  "Viceland",
-	"VLCT":  "Velocity",
-	"VMEO":  "Vimeo",
-	"VRV":   "VRV",
-	"VTRN":  "VET Tv",
-	"WME":   "WatchMe",
-	"WNET":  "W Network",
-	"WOWTV": "WowTV (Sky)",
-	"WPU":   "Waipu",
-	"WWEN":  "WWE Network",
-	"XBOX":  "Xbox Video",
-	"YHOO":  "Yahoo",
-	"YT":    "YouTube",
-	"ZDF":   "ZDF Mediathek",
-}
-
-func expandServiceName(tag string) string {
-	if name, ok := StreamingServiceNames[strings.ToUpper(tag)]; ok {
-		return name
-	}
-
-	return tag
 }

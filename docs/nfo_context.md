@@ -22,6 +22,16 @@ Use `parsec nfogen file.mkv --dump-context` to inspect the exact values for a sp
 | `{{ .TmdbURL }}` | `string` | Full TMDB URL. Includes the correct `movie` or `tv` path based on media type. |
 | `{{ .TvdbURL }}` | `string` | Full TVDB URL. Uses a slug-based URL when available, otherwise falls back to `?id=` format. |
 
+### Pack/Multi-File Support
+
+| Template Field | Type | Description |
+| :--- | :--- | :--- |
+| `{{ .IsPack }}` | `bool` | `true` if the NFO is being generated for a directory containing multiple files (season pack). |
+| `{{ .Files }}` | `[]FileContext` | A slice of individual file contexts for each media file in a season pack. Each item contains its own `.Size`, `.Duration`, `.EpisodeTitle`, `.RawEpisodeResults`, etc. Empty if `.IsPack` is `false`. |
+
+> [!NOTE]
+> When `.IsPack` is `true`, the root-level technical fields (`.Video`, `.Audio`, `.Subtitles`, `.Resolution`, `.Bitrate`, etc.) represent an **aggregated average or mode** across all files in the pack. Boolean flags (`.Subbed`, `.DualAudio`, etc.) act as an `OR` gate across all files.
+
 ### Episode-Specific
 
 | Template Field | Type | Description |

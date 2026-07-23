@@ -5,7 +5,7 @@
 {{ define "video_info/content" }}
   {{ "Codec " | padRight 13 "." }}: {{ .Video.Codec }}
   {{ "Resolution " | padRight 13 "." }}: {{ .Video.Resolution }} ({{ .Video.Dimensions }})
-  {{ "Bitrate " | padRight 13 "." }}: {{ .Video.Bitrate }}
+  {{ "Bitrate " | padRight 13 "." }}: {{ if .IsPack }}~{{ end }}{{ .Video.Bitrate }}
   {{ "Framerate " | padRight 13 "." }}: {{ .Video.Framerate }}
   {{ "Aspect " | padRight 13 "." }}: {{ .Video.AspectRatio }}
   {{- if .Video.BitDepth }}

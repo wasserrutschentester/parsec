@@ -64,8 +64,6 @@ You can also pass a JSON check report file to render it.`),
 			viper.Set("original_language", originalLanguageFlag)
 		}
 
-		var allReports []types.CheckReport
-
 		expandedArgs := expandArgs(args)
 		batchMode := !individualReportsFlag && len(expandedArgs) > 1
 
@@ -76,48 +74,11 @@ You can also pass a JSON check report file to render it.`),
 			}
 		}
 
-		seasonEpisodes := make(map[seasonKey][]int)
-		seasonMetas := make(map[seasonKey]*metadata.Metadata)
-
 		ui.Println(ui.Banner(".: INTEGRITY VERIFICATION :."))
 
-		numJobs := getNumJobs(len(expandedArgs))
-		results := runChecksInParallel(cmd, expandedArgs, numJobs, batchMode)
-
-		for i, filePath := range expandedArgs {
-			res := results[i]
-
-			if res.err != nil {
-				ui.PrintError(res.err.Error())
-
-				return fmt.Errorf("%w for %s", errCheckDataCollection, filePath)
-			}
-
-			if !batchMode && !jsonOutputFlag {
-				filenameNoExt := filename.GetBaseName(filePath)
-
-				ui.Println("\n" + ui.Header.Render("VERIFYING NEW TARGET"))
-				ui.Println(filenameNoExt)
-			}
-
-			allReports = append(allReports, res.reports...)
-			meta := res.meta
-
-			if meta != nil && meta.IsTV && (meta.TvdbID > 0 || meta.TmdbID > 0) && meta.Season > 0 {
-				key := seasonKey{tvdbID: meta.TvdbID, tmdbID: meta.TmdbID, season: meta.Season}
-
-				if len(meta.Episodes) > 0 {
-					seasonEpisodes[key] = append(seasonEpisodes[key], meta.Episodes...)
-				}
-
-				seasonMetas[key] = meta
-			}
-
-			if !jsonOutputFlag && !batchMode {
-				for _, r := range res.reports {
-					ui.PrintInteractiveReport(r, unattendedFlag)
-				}
-			}
+		allReports, seasonEpisodes, seasonMetas, err := runBatchChecks(cmd, expandedArgs, batchMode)
+		if err != nil {
+			return err
 		}
 
 		if !jsonOutputFlag && batchMode {
@@ -135,6 +96,63 @@ You can also pass a JSON check report file to render it.`),
 
 		return nil
 	},
+}
+
+func runBatchChecks(cmd *cobra.Command, expandedArgs []string, batchMode bool) ([]types.CheckReport, map[seasonKey][]int, map[seasonKey]*metadata.Metadata, error) {
+	var allReports []types.CheckReport
+
+	seasonEpisodes := make(map[seasonKey][]int)
+	seasonMetas := make(map[seasonKey]*metadata.Metadata)
+
+	numJobs := getNumJobs(len(expandedArgs))
+	results := runChecksInParallel(cmd, expandedArgs, numJobs, batchMode)
+
+	for i, filePath := range expandedArgs {
+		if err := processCheckResult(filePath, results[i], batchMode, &allReports, seasonEpisodes, seasonMetas); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	return allReports, seasonEpisodes, seasonMetas, nil
+}
+
+func processCheckResult(filePath string, res checkJobResult, batchMode bool, allReports *[]types.CheckReport, seasonEpisodes map[seasonKey][]int, seasonMetas map[seasonKey]*metadata.Metadata) error {
+	if res.err != nil {
+		ui.PrintError(res.err.Error())
+
+		return fmt.Errorf("%w for %s", errCheckDataCollection, filePath)
+	}
+
+	if !batchMode && !jsonOutputFlag {
+		filenameNoExt := filename.GetBaseName(filePath)
+
+		ui.Println("\n" + ui.Header.Render("VERIFYING NEW TARGET"))
+		ui.Println(filenameNoExt)
+	}
+
+	*allReports = append(*allReports, res.reports...)
+
+	updateSeasonEpisodes(res.meta, seasonEpisodes, seasonMetas)
+
+	if !jsonOutputFlag && !batchMode {
+		for _, r := range res.reports {
+			ui.PrintInteractiveReport(r, unattendedFlag)
+		}
+	}
+
+	return nil
+}
+
+func updateSeasonEpisodes(meta *metadata.Metadata, seasonEpisodes map[seasonKey][]int, seasonMetas map[seasonKey]*metadata.Metadata) {
+	if meta != nil && meta.IsTV && (meta.TvdbID > 0 || meta.TmdbID > 0) && meta.Season > 0 {
+		key := seasonKey{tvdbID: meta.TvdbID, tmdbID: meta.TmdbID, season: meta.Season}
+
+		if len(meta.Episodes) > 0 {
+			seasonEpisodes[key] = append(seasonEpisodes[key], meta.Episodes...)
+		}
+
+		seasonMetas[key] = meta
+	}
 }
 
 func runSeasonCompletenessChecks(seasonEpisodes map[seasonKey][]int, seasonMetas map[seasonKey]*metadata.Metadata) {
@@ -319,19 +337,27 @@ func printJSONReports(reports []types.CheckReport) {
 
 func init() {
 	rootCmd.AddCommand(checkCmd)
+	// ID
 	checkCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	checkCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
-	checkCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "Override original language")
-	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
-	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
-	checkCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Verbose output")
+	// output
 	checkCmd.Flags().BoolVarP(&individualReportsFlag, "individual", "i", false, "Display the full individual reports for each file in the batch")
+	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
+	checkCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Verbose output")
+	// other
+	checkCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "Override original language")
+	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
 	checkCmd.Flags().IntVar(&jobsFlag, "jobs", 0, "Number of parallel jobs to run (default is number of CPUs)")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
 		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+	}
+
+	outputFlags := []string{"individual", "json", "verbose"}
+	for _, f := range outputFlags {
+		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
 
 	_ = checkCmd.RegisterFlagCompletionFunc("original-language", completeLanguages)

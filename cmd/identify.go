@@ -261,21 +261,22 @@ func init() {
 	identifyCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	identifyCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	identifyCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
-	// P2P Info
+	// Output
+	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
+	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")
+	// Tag flags
+	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
+	identifyCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate identification and preview tags without writing to the file")
+	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode (implies writing tags)")
+	// Deprecated
+	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 	identifyCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
 	identifyCmd.Flags().StringVarP(&sourceFlag, "source", "O", "", "source (e.g. BluRay, Web-DL)")
 	identifyCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
-	// Tag flags
-	identifyCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate identification and preview tags without writing to the file")
-	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 	_ = identifyCmd.Flags().MarkDeprecated("write-tags", "use --unattended instead")
 	_ = identifyCmd.Flags().MarkDeprecated("source", "source is not used by identify")
 	_ = identifyCmd.Flags().MarkDeprecated("service", "service is not used by identify")
 	_ = identifyCmd.Flags().MarkDeprecated("group", "group is not used by identify")
-	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
-	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode (implies writing tags)")
-	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
-	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")
 	// Group metadata flags
 	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title"}
 	for _, f := range metadataFlags {
@@ -286,6 +287,12 @@ func init() {
 	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
 		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+	}
+
+	// Group Output flags
+	outputFlags := []string{"releases", "best-release"}
+	for _, f := range outputFlags {
+		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
 
 	// Disable sorting to keep the defined order

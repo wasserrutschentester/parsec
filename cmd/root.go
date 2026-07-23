@@ -149,8 +149,9 @@ Available Commands:{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "he
 {{$metadataFlags := (filterFlags .LocalFlags "group" "metadata") -}}
 {{$p2pInfoFlags := (filterFlags .LocalFlags "group" "p2p") -}}
 {{$idFlags := (filterFlags .LocalFlags "group" "id") -}}
+{{$outputFlags := (filterFlags .LocalFlags "group" "output") -}}
 {{$otherFlags := (ungroupedFlags .LocalFlags) -}}
-{{if or (hasFlags $metadataFlags) (hasFlags $idFlags) }}
+{{if or (hasFlags $metadataFlags) (hasFlags $idFlags) (hasFlags $p2pInfoFlags) (hasFlags $outputFlags) }}
 {{- if (hasFlags $metadataFlags)}}
 
 Metadata Flags:
@@ -166,6 +167,12 @@ P2P Info Flags:
 
 ID Flags:
 {{$idFlags.FlagUsages | trimTrailingWhitespaces}}
+{{- end}}
+
+{{- if (hasFlags $outputFlags)}}
+
+Output Flags:
+{{$outputFlags.FlagUsages | trimTrailingWhitespaces}}
 {{- end}}
 {{- if (hasFlags $otherFlags)}}
 
