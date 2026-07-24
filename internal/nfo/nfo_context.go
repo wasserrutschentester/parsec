@@ -12,6 +12,14 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
+// EpisodeContext represents a distinct episode in a multi-episode file
+type EpisodeContext struct {
+	Number int
+	Title  string
+	Plot   string
+	Date   string
+}
+
 // FileContext holds everything strictly related to a single media file
 type FileContext struct {
 	metadata.Metadata
@@ -30,6 +38,8 @@ type FileContext struct {
 	RawEpisodeResults []mdb.EpisodeResult    `json:"RawEpisodeResults,omitempty"`
 	RawMediaInfo      *mediainfo.MediaInfo   `json:"RawMediaInfo,omitempty"`
 	RawEbmlMetadata   *matroska.EbmlMetadata `json:"RawEbmlMetadata,omitempty"`
+
+	EpisodeList []EpisodeContext
 }
 
 // Context holds template variables
@@ -92,6 +102,8 @@ type Video struct {
 	Library           string
 	LibrarySettings   string
 	Dimensions        string
+	Width             int
+	Height            int
 	AspectRatio       string
 	Resolution        string
 	Framerate         string
@@ -198,6 +210,10 @@ func BuildFileContext(in FileInput) FileContext {
 
 	populateFromEpisodeResults(&fctx, in.EpisodeResults)
 
+	if len(in.Meta.Episodes) > 0 {
+		buildEpisodeContext(&fctx, in)
+	}
+
 	stat, err := os.Stat(in.Path)
 	if err == nil {
 		fctx.SizeBytes = stat.Size()
@@ -209,6 +225,31 @@ func BuildFileContext(in FileInput) FileContext {
 	}
 
 	return fctx
+}
+
+func buildEpisodeContext(fctx *FileContext, in FileInput) {
+	fctx.EpisodeList = make([]EpisodeContext, len(in.Meta.Episodes))
+	for i, epNum := range in.Meta.Episodes {
+		epCtx := EpisodeContext{
+			Number: epNum,
+		}
+		if i < len(in.EpisodeResults) {
+			epCtx.Title = in.EpisodeResults[i].Name
+			epCtx.Plot = in.EpisodeResults[i].Overview
+			epCtx.Date = in.EpisodeResults[i].Airdate
+		} else {
+			if fctx.EpisodeTitle != "" {
+				epCtx.Title = fctx.EpisodeTitle
+			} else {
+				epCtx.Title = fmt.Sprintf("Episode %d", epNum)
+			}
+
+			epCtx.Plot = fctx.Plot
+			epCtx.Date = fctx.Date
+		}
+
+		fctx.EpisodeList[i] = epCtx
+	}
 }
 
 func buildSingleFileContext(ctx *Context, file FileInput) {
@@ -420,6 +461,8 @@ func populateVideoContext(fctx *FileContext, vTrack *mediainfo.Track, ebmlMeta *
 
 	fctx.Video.Bitrate = fmt.Sprintf("%d kb/s", vTrack.BitRate/1000)
 	fctx.Video.Dimensions = fmt.Sprintf("%dx%d", vTrack.Width, vTrack.Height)
+	fctx.Video.Width = vTrack.Width
+	fctx.Video.Height = vTrack.Height
 
 	populateVideoAspectAndResolution(fctx, vTrack)
 }

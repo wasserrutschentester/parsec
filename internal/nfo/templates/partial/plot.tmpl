@@ -1,5 +1,5 @@
 {{ define "plot" }}
-  {{- if gt (len .RawEpisodeResults) 0 }}
+  {{- if gt (len .EpisodeList) 0 }}
     {{- template "plot/episodes" . }}
   {{- else }}
 {{ .Plot | default "No plot available." | wordWrap (sub .LineWidth 2) | center .LineWidth }}
@@ -8,16 +8,15 @@
 
 {{ define "plot/episodes" }}
   {{- $ctx := . }}
-  {{- $multiEp := gt (len .RawEpisodeResults) 1 }}
-  {{- range $i, $ep := .RawEpisodeResults }}
+  {{- range $i, $ep := .EpisodeList }}
     {{- if gt $i 0 }}
 {{ "" | center $ctx.LineWidth }}
     {{- end }}
-      {{- $epTitle := printf "%s [S%02dE%02d]" $ep.Name $ep.Season $ep.Episode }}
+      {{- $epTitle := printf "%s [S%02dE%02d]" $ep.Title $ctx.Season $ep.Number }}
 {{ $epTitle | wordWrap (sub $ctx.LineWidth 2) | center $ctx.LineWidth }}
 {{ "" | center $ctx.LineWidth }}
-    {{- if $ep.Overview }}
-{{ $ep.Overview | wordWrap (sub $ctx.LineWidth 2) | center $ctx.LineWidth }}
+    {{- if $ep.Plot }}
+{{ $ep.Plot | wordWrap (sub $ctx.LineWidth 2) | center $ctx.LineWidth }}
     {{- end }}
   {{- end }}
 {{- end }}

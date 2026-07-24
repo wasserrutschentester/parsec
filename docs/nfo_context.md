@@ -40,6 +40,7 @@ Use `parsec nfogen file.mkv --dump-context` to inspect the exact values for a sp
 | `{{ .Episodes }}` | `[]int` | Slice of episode numbers (supports multi-episode files). |
 | `{{ .EpisodeTitle }}` | `string` | Episode title(s), joined with ` / ` for multi-episode files. Populated from the DB or EBML tags. |
 | `{{ .EpisodeTitles }}` | `[]string` | Raw slice of individual episode titles before joining. |
+| `{{ .EpisodeList }}` | `[]EpisodeContext` | Slice of detailed episode objects for the file (`.Number`, `.Title`, `.Plot`, `.Date`). Simplifies multi-episode iteration. |
 | `{{ .Date }}` | `string` | Air date in `YYYY-MM-DD` format, overridden by DB episode airdate. |
 | `{{ .IsTV }}` | `bool` | `true` if the media is identified as a TV show. |
 
@@ -109,6 +110,8 @@ Populated from MediaInfo data for the first (and typically only) video track.
 | `{{ .Video.BitRateMode }}` | `string` | Bitrate mode: `"VBR"` or `"CBR"`. |
 | `{{ .Video.BitDepth }}` | `int` | Bit depth (e.g. `8`, `10`, `12`). |
 | `{{ .Video.Dimensions }}` | `string` | Formatted pixel dimensions (e.g. `"1920x1080"`). |
+| `{{ .Video.Width }}` | `int` | Raw pixel width (e.g. `1920`). |
+| `{{ .Video.Height }}` | `int` | Raw pixel height (e.g. `1080`). |
 | `{{ .Video.AspectRatio }}` | `string` | Calculated aspect ratio (e.g. `"16:9"`). Computed using GCD; falls back to the decimal ratio from MediaInfo. |
 | `{{ .Video.Resolution }}` | `string` | Normalized resolution string (e.g. `"1080p"`, `"2160p"`, `"1080i"`). |
 | `{{ .Video.Framerate }}` | `string` | Formatted framerate (e.g. `"23.976 FPS"`). |

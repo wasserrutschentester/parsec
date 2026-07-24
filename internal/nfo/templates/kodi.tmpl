@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+{{- define "uniqueids" }}
+    {{- if .ImdbID }}
+    <uniqueid type="imdb">{{ .ImdbID }}</uniqueid>
+    {{- end }}
+    {{- if .TmdbID }}
+    <uniqueid type="tmdb" default="true">{{ .TmdbID }}</uniqueid>
+    {{- end }}
+    {{- if .TvdbID }}
+    <uniqueid type="tvdb">{{ .TvdbID }}</uniqueid>
+    {{- end }}
+{{- end }}
+
+{{- define "fileinfo" }}
+    <fileinfo>
+        <streamdetails>
+            <video>
+                <codec>{{ .Video.Codec }}</codec>
+                {{- if .Video.AspectRatio }}
+                <aspect>{{ .Video.AspectRatio }}</aspect>
+                {{- end }}
+                {{- if and .Video.Width .Video.Height }}
+                <width>{{ .Video.Width }}</width>
+                <height>{{ .Video.Height }}</height>
+                {{- end }}
+                <durationinseconds>{{ .DurationSec }}</durationinseconds>
+                {{- if .Video.ScanType }}
+                <scantype>{{ .Video.ScanType }}</scantype>
+                {{- end }}
+            </video>
+            {{- range .Audio }}
+            <audio>
+                <codec>{{ .Codec }}</codec>
+                <language>{{ .Language }}</language>
+                <channels>{{ .Channels }}</channels>
+            </audio>
+            {{- end }}
+            {{- range .Subtitles }}
+            <subtitle>
+                <language>{{ .Language }}</language>
+                {{- if or .SDH .Flags.HearingImpaired }}
+                <hearing_impaired>true</hearing_impaired>
+                {{- end }}
+                {{- if .Flags.Forced }}
+                <forced>true</forced>
+                {{- end }}
+                {{- if .Flags.Default }}
+                <default>true</default>
+                {{- end }}
+            </subtitle>
+            {{- end }}
+        </streamdetails>
+    </fileinfo>
+{{- end }}
+
+{{- define "movie" }}
+<movie>
+    <title>{{ .Title }}</title>
+    <originaltitle>{{ .Title }}</originaltitle>
+    <year>{{ .Year }}</year>
+    {{- if .Date }}
+    <premiered>{{ .Date }}</premiered>
+    {{- end }}
+    {{- if .Plot }}
+    <plot>{{ .Plot }}</plot>
+    {{- end }}
+    {{- template "uniqueids" . }}
+    {{- template "fileinfo" . }}
+</movie>
+{{- end }}
+
+{{- define "episodedetails" }}
+  {{- $root := . -}}
+  {{- range $index, $ep := .EpisodeList }}
+<episodedetails>
+    <title>{{ $ep.Title }}</title>
+    {{- if $ep.Plot }}
+    <plot>{{ $ep.Plot }}</plot>
+    {{- end }}
+    {{- if $ep.Date }}
+    <premiered>{{ $ep.Date }}</premiered>
+    {{- end }}
+    <showtitle>{{ $root.Title }}</showtitle>
+    <season>{{ $root.Season }}</season>
+    <episode>{{ $ep.Number }}</episode>
+    {{- template "uniqueids" $root }}
+    {{- if eq $index 0 }}
+        {{- template "fileinfo" $root }}
+    {{- end }}
+</episodedetails>
+  {{- end }}
+{{- end }}
+
+{{- if .IsTV -}}
+  {{- template "episodedetails" . }}
+{{- else -}}
+  {{- template "movie" . }}
+{{- end }}
