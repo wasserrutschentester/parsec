@@ -66,7 +66,7 @@ Flags can be used to override or provide missing information.`),
 func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, error) {
 	meta := initializeMetadata(cmd, filePath)
 
-	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag)
+	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag, false)
 	if err != nil {
 		ui.PrintError(err.Error())
 

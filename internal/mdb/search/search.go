@@ -30,25 +30,30 @@ var (
 )
 
 // InteractiveSearch performs a search by ID or title, prompting the user if multiple matches are found.
-func InteractiveSearch(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
+func InteractiveSearch(meta *metadata.Metadata, unattended bool, quietSearch bool) (*mdb.SearchResult, error) {
 	if meta.Title == "" && meta.ImdbID == "" && meta.TmdbID == 0 && meta.TvdbID == 0 {
 		return nil, errInput
 	}
 
 	if meta.ImdbID != "" || meta.TmdbID > 0 || meta.TvdbID > 0 {
-		return interactiveSearchByID(meta)
+		return interactiveSearchByID(meta, quietSearch)
 	}
 
-	return interactiveSearchByTitle(meta, unattended)
+	return interactiveSearchByTitle(meta, unattended, quietSearch)
 }
 
-func interactiveSearchByID(meta *metadata.Metadata) (*mdb.SearchResult, error) {
+func interactiveSearchByID(meta *metadata.Metadata, quietSearch bool) (*mdb.SearchResult, error) {
 	mediaType := "movie"
 	if meta.IsTV {
 		mediaType = "tv"
 	}
 
-	ui.Println(ui.Info.Render(fmt.Sprintf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)))
+	msg := fmt.Sprintf("Searching by ID: IMDB:%s TMDB:%d TVDB:%d [%s]...", meta.ImdbID, meta.TmdbID, meta.TvdbID, mediaType)
+	if quietSearch {
+		ui.PrintDebug(msg)
+	} else {
+		ui.Println(ui.Info.Render(msg))
+	}
 
 	result, err := searchByID(meta.ImdbID, meta.TmdbID, meta.TvdbID, meta.IsTV)
 	if err != nil {
@@ -64,7 +69,7 @@ func interactiveSearchByID(meta *metadata.Metadata) (*mdb.SearchResult, error) {
 	return result, nil
 }
 
-func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.SearchResult, error) {
+func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool, quietSearch bool) (*mdb.SearchResult, error) {
 	mediaType := "movie"
 	if meta.IsTV {
 		mediaType = "tv"
@@ -72,7 +77,13 @@ func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool) (*mdb.Se
 
 	// Replace dots with spaces for the search query
 	searchQuery := filename.DeobfuscateTitle(meta.Title)
-	ui.Println(ui.Info.Render(fmt.Sprintf("Searching for %s (%d) [%s]...", searchQuery, meta.Year, mediaType)))
+
+	msg := fmt.Sprintf("Searching for %s (%d) [%s]...", searchQuery, meta.Year, mediaType)
+	if quietSearch {
+		ui.PrintDebug(msg)
+	} else {
+		ui.Println(ui.Info.Render(msg))
+	}
 
 	results, err := fuzzySearch(searchQuery, meta.Year, meta.IsTV)
 	if err != nil {

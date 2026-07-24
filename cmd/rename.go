@@ -280,7 +280,7 @@ func renameGetMediaMetadata(filePath string, meta *metadata.Metadata) (*mediainf
 
 func renameApplyMdbSearch(meta *metadata.Metadata) {
 	meta.SetDefaults()
-	result, _ := mdbSearch.InteractiveSearch(meta, true)
+	result, _ := mdbSearch.InteractiveSearch(meta, true, false)
 
 	if result == nil {
 		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")

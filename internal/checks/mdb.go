@@ -21,7 +21,7 @@ import (
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 
-	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true)
+	searchResult, searchErr := mdbSearch.InteractiveSearch(meta, true, false)
 	if searchErr != nil {
 		return checkMdbError(searchErr)
 	}

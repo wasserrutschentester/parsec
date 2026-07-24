@@ -170,7 +170,7 @@ func runSeasonCompletenessChecks(seasonEpisodes map[seasonKey][]int, seasonMetas
 		ui.Println("\n" + ui.Header.Render("AGGREGATE CHECK: SEASON COMPLETENESS"))
 
 		meta := seasonMetas[key]
-		res, err := mdbSearch.InteractiveSearch(meta, true)
+		res, err := mdbSearch.InteractiveSearch(meta, true, true)
 
 		if err == nil && res != nil {
 			completenessResults := checks.RunSeasonCompletenessCheck(res, key.season, episodes)

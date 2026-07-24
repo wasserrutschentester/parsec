@@ -21,8 +21,11 @@ Parsec will automatically scan the file(s) with `mediainfo`, fetch metadata from
 | `--source` | | string | Add a source release name (can be used multiple times). Populates `{{ .Sources }}` in the template. |
 | `--source-map` | | string | Map tracks to a source (e.g., `v1,a1-3:Release-Name`). Sets `.Source` on the matched track structs. |
 | `--full-diff` | | boolean | Show the full context for NFO diffs instead of just changed lines. |
+| `--quiet` | `-q` | boolean | Hide the generated NFO preview. |
 | `--unattended` | `-u` | boolean | Run without interactive prompts. |
-| `--dry-run` | | boolean | Print the generated NFO to the console without writing to disk. |
+| `--force` | `-f` | boolean | Force overwrite of existing NFO files. |
+| `--per-file` | `-F` | boolean | Generate NFO per media file instead of per directory. |
+| `--dry-run` | `-d` | boolean | Print the generated NFO to the console without writing to disk. |
 | `--dump-context` | | boolean | Dump the template context data as JSON (hides raw fields) for debugging templates. |
 | `--dump-context-raw` | | boolean | Dump the template context data as JSON, including all raw database API responses. |
 

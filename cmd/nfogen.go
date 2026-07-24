@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aymanbagabas/go-udiff"
 	"github.com/spf13/cobra"
 
 	"codeberg.org/upPollo/parsec/internal/config"
@@ -30,6 +31,9 @@ var (
 	sourceMapFlag      []string
 	dumpContextFlag    bool
 	dumpContextRawFlag bool
+	nfogenPerFileFlag  bool
+	nfogenQuietFlag    bool
+	nfogenForceFlag    bool
 	errNoMediaFiles    = errors.New("no media files found in directory")
 )
 
@@ -43,9 +47,12 @@ func init() {
 	nfogenCmd.Flags().BoolVar(&dumpContextFlag, "dump-context", false, "dump the template context data as JSON (hides raw fields)")
 	nfogenCmd.Flags().BoolVar(&dumpContextRawFlag, "dump-context-raw", false, "dump the template context data as JSON including all raw provider data")
 	nfogenCmd.Flags().BoolVar(&nfogenFullDiffFlag, "full-diff", false, "show full context for NFO diffs instead of just changed lines")
+	nfogenCmd.Flags().BoolVarP(&nfogenQuietFlag, "quiet", "q", false, "hide the generated NFO preview")
 	// interaction
 	nfogenCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode")
 	nfogenCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "print NFO output to console without writing to disk")
+	nfogenCmd.Flags().BoolVarP(&nfogenPerFileFlag, "per-file", "F", false, "generate NFO per media file instead of per directory")
+	nfogenCmd.Flags().BoolVarP(&nfogenForceFlag, "force", "f", false, "force overwrite of existing NFO files")
 	// other
 	nfogenCmd.Flags().StringVarP(&nfogenTemplateFlag, "template", "t", "", "NFO template to use (builtin: default; or name of .tmpl in config dir, or default via config)")
 	_ = nfogenCmd.RegisterFlagCompletionFunc("template", completeTemplates)
@@ -56,60 +63,136 @@ func init() {
 		_ = nfogenCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
-	outputFlags := []string{"full-diff", "dump-context", "dump-context-raw"}
+	outputFlags := []string{"full-diff", "dump-context", "dump-context-raw", "quiet"}
 	for _, f := range outputFlags {
 		_ = nfogenCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
 }
 
 var nfogenCmd = &cobra.Command{
-	Use:   "nfogen <file|directory>",
+	Use:   "nfogen [path...]",
 	Short: "Generate an NFO file for a media file or pack",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		if !cmd.Flags().Changed("template") {
 			nfogenTemplateFlag = config.GetNfogenTemplate()
 		}
 
-		targetPath := args[0]
-
-		mediaFiles, releaseName, nfoFile, err := getTargetFiles(targetPath)
-		if err != nil {
-			ui.PrintError(err.Error())
-
-			return
+		var targets []string
+		if nfogenPerFileFlag {
+			targets = expandNfogenArgs(args)
+		} else {
+			targets = expandReleaseArgs(args)
 		}
 
-		baseMeta := filename.Parse(releaseName)
-		searchResult := performSearch(baseMeta, unattendedFlag)
-		fileInputs := parseMediaFiles(mediaFiles, searchResult)
-
-		ctx := nfo.BuildContext(releaseName, baseMeta, fileInputs, notesFlag, searchResult, Version)
-		ctx.Sources = sourcesFlag
-
-		if err := nfo.ApplySourceMap(ctx, sourceMapFlag); err != nil {
-			ui.PrintError("Failed to apply source map: " + err.Error())
-
-			return
-		}
-
-		if dumpContextFlag || dumpContextRawFlag {
-			dumpNfoContext(ctx, dumpContextRawFlag)
-
-			return
-		}
-
-		out, err := nfo.Render(ctx, nfogenTemplateFlag)
-		if err != nil {
-			ui.PrintError("Failed to render NFO: " + err.Error())
-
-			return
-		}
-
-		if err := handleNfoOutput(nfoFile, out, dryRunFlag, unattendedFlag, nfogenFullDiffFlag); err != nil {
-			ui.PrintError(err.Error())
+		for _, targetPath := range targets {
+			generateNfoForTarget(targetPath)
 		}
 	},
+}
+
+func generateNfoForTarget(targetPath string) {
+	ui.Println(ui.Info.Render("Generating NFO for:"), filepath.Base(targetPath))
+
+	mediaFiles, releaseName, nfoFile, err := getTargetFiles(targetPath)
+	if err != nil {
+		ui.PrintError(err.Error())
+
+		return
+	}
+
+	baseMeta := filename.Parse(releaseName)
+	searchResult := performSearch(baseMeta, unattendedFlag)
+	fileInputs := parseMediaFiles(mediaFiles, searchResult)
+
+	ctx := nfo.BuildContext(releaseName, baseMeta, fileInputs, notesFlag, searchResult, Version)
+	ctx.Sources = sourcesFlag
+
+	if err := nfo.ApplySourceMap(ctx, sourceMapFlag); err != nil {
+		ui.PrintError("Failed to apply source map: " + err.Error())
+
+		return
+	}
+
+	if dumpContextFlag || dumpContextRawFlag {
+		dumpNfoContext(ctx, dumpContextRawFlag)
+
+		return
+	}
+
+	out, err := nfo.Render(ctx, nfogenTemplateFlag)
+	if err != nil {
+		ui.PrintError("Failed to render NFO: " + err.Error())
+
+		return
+	}
+
+	if err := handleNfoOutput(nfoFile, out, dryRunFlag, unattendedFlag, nfogenFullDiffFlag, nfogenQuietFlag, nfogenForceFlag); err != nil {
+		ui.PrintError(err.Error())
+	}
+}
+
+func isMediaFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+
+	return ext == ".mkv" || ext == ".mp4" || ext == ".avi"
+}
+
+func dirContainsMedia(path string) bool {
+	entries, _ := os.ReadDir(path)
+	for _, e := range entries {
+		if !e.IsDir() && isMediaFile(e.Name()) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func expandNfogenArgs(args []string) []string {
+	var expanded []string
+
+	for _, arg := range args {
+		info, err := os.Stat(arg)
+		if err != nil || !info.IsDir() {
+			expanded = append(expanded, arg)
+
+			continue
+		}
+
+		_ = filepath.WalkDir(arg, func(path string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && isMediaFile(d.Name()) {
+				expanded = append(expanded, path)
+			}
+
+			return nil
+		})
+	}
+
+	return expanded
+}
+
+func expandReleaseArgs(args []string) []string {
+	var expanded []string
+
+	for _, arg := range args {
+		info, err := os.Stat(arg)
+		if err != nil || !info.IsDir() {
+			expanded = append(expanded, arg)
+
+			continue
+		}
+
+		_ = filepath.WalkDir(arg, func(path string, d os.DirEntry, err error) error {
+			if err == nil && d.IsDir() && dirContainsMedia(path) {
+				expanded = append(expanded, path)
+			}
+
+			return nil
+		})
+	}
+
+	return expanded
 }
 
 func getTargetFiles(targetPath string) (mediaFiles []string, releaseName string, nfoFile string, err error) {
@@ -161,7 +244,7 @@ func getTargetFilesFromDir(targetPath string) (mediaFiles []string, releaseName 
 func performSearch(baseMeta *metadata.Metadata, unattended bool) *mdb.SearchResult {
 	var searchResult *mdb.SearchResult
 
-	res, err := search.InteractiveSearch(baseMeta, unattended)
+	res, err := search.InteractiveSearch(baseMeta, unattended, true)
 	if err == nil && res != nil {
 		searchResult = res
 	} else if err != nil {
@@ -230,44 +313,78 @@ func dumpNfoContext(ctx *nfo.Context, raw bool) {
 	ui.Println(string(b))
 }
 
-func handleNfoOutput(nfoFile string, out string, dryRun bool, unattended bool, fullDiff bool) error {
-	if dryRun {
-		ui.Println("Dry run. NFO Output:")
-		ui.Println(out)
-
-		return nil
-	}
-
-	// Check if it already exists
+func checkExistingNfo(nfoFile string, out string, fullDiff bool, quiet bool) (exists bool, skip bool) {
 	if existing, err := os.ReadFile(nfoFile); err == nil {
 		existingNFO := string(existing)
 
 		if existingNFO == out {
 			ui.PrintSuccess("NFO file is already up to date.")
 
-			return nil
+			return true, true
 		}
 
 		ui.PrintWarning("NFO file already exists and differs from generated output.")
-		ui.Println("Diff:")
-		printNFODiff(existingNFO, out, fullDiff)
+
+		if !quiet {
+			printNFODiff(existingNFO, out, fullDiff)
+		}
+
+		return true, false
+	}
+
+	return false, false
+}
+
+func promptForGeneration(out string, unattended bool, quiet bool, exists bool, force bool) bool {
+	if unattended {
+		if exists && !force {
+			ui.Println(ui.Muted.Render("Skipping existing file..."))
+
+			return false
+		}
+
+		return true
+	}
+
+	if !quiet && !exists {
+		ui.Println(out)
+	}
+
+	prompt := "Proceed with generating NFO file? [y/N]"
+	if exists {
+		prompt = "Overwrite existing NFO file? [y/N] "
+	}
+
+	fmt.Print(ui.Info.Render(prompt))
+
+	var response string
+
+	_, _ = fmt.Scanln(&response)
+	if response != "y" && response != "Y" {
+		ui.Println(ui.Muted.Render("Skipping..."))
+
+		return false
+	}
+
+	return true
+}
+
+func handleNfoOutput(nfoFile string, out string, dryRun bool, unattended bool, fullDiff bool, quiet bool, force bool) error {
+	if dryRun {
+		if !quiet {
+			ui.Println(out)
+		}
 
 		return nil
 	}
 
-	if !unattended {
-		ui.Println("Generated NFO Preview:")
-		ui.Println(out)
-		fmt.Print(ui.Info.Render("Proceed with generating NFO? [y/N] "))
+	exists, skip := checkExistingNfo(nfoFile, out, fullDiff, quiet)
+	if skip {
+		return nil
+	}
 
-		var response string
-
-		_, _ = fmt.Scanln(&response)
-		if response != "y" && response != "Y" {
-			ui.Println(ui.Muted.Render("Skipping..."))
-
-			return nil
-		}
+	if !promptForGeneration(out, unattended, quiet, exists, force) {
+		return nil
 	}
 
 	err := os.WriteFile(nfoFile, []byte(out), 0o644)
@@ -284,34 +401,27 @@ func printNFODiff(oldStr, newStr string, showFull bool) {
 	oldStr = strings.ReplaceAll(oldStr, "\r\n", "\n")
 	newStr = strings.ReplaceAll(newStr, "\r\n", "\n")
 
-	oldLines := strings.Split(strings.TrimSpace(oldStr), "\n")
-	newLines := strings.Split(strings.TrimSpace(newStr), "\n")
+	var diffStr string
 
-	// Basic line-by-line comparison (not a full Myers diff, but good enough for static templates)
-	maxLines := max(len(newLines), len(oldLines))
+	if showFull {
+		edits := udiff.Lines(oldStr, newStr)
+		// Use a large number of context lines to show the full file
+		diffStr, _ = udiff.ToUnified("Existing", "Generated", oldStr, edits, 10000)
+	} else {
+		diffStr = udiff.Unified("Existing", "Generated", oldStr, newStr)
+	}
 
-	for i := range maxLines {
-		var oLine, nLine string
-		if i < len(oldLines) {
-			oLine = oldLines[i]
-		}
-
-		if i < len(newLines) {
-			nLine = newLines[i]
-		}
-
-		if oLine != nLine {
-			if i < len(oldLines) {
-				ui.Println("\033[31m- " + oLine + "\033[0m")
-			}
-
-			if i < len(newLines) {
-				ui.Println("\033[32m+ " + nLine + "\033[0m")
-			}
-		} else if showFull {
-			if i < len(oldLines) {
-				ui.Println("  " + oLine)
-			}
+	lines := strings.SplitSeq(strings.TrimSpace(diffStr), "\n")
+	for line := range lines {
+		switch {
+		case strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "@@"):
+			ui.Println(ui.Muted.Render(line))
+		case strings.HasPrefix(line, "-"):
+			ui.Println(ui.Error.Render(line))
+		case strings.HasPrefix(line, "+"):
+			ui.Println(ui.Success.Render(line))
+		default:
+			ui.Println(line)
 		}
 	}
 }
