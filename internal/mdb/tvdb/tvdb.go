@@ -48,6 +48,8 @@ type tvdbMedia struct {
 	Language           string   `json:"language"`         // language of this record
 	PrimaryLanguage    string   `json:"primary_language"` // search results
 	OriginalLanguage   string   `json:"originalLanguage"` // direct lookups
+	OriginalCountry    string   `json:"originalCountry"`  // direct lookups
+	Status             any      `json:"status"`           // search returns string, getByID returns object
 }
 
 func parseTvdbID(m *tvdbMedia) int {
@@ -102,6 +104,22 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		overview = m.OverviewTranslated[0]
 	}
 
+	var countries []string
+	if m.OriginalCountry != "" {
+		countries = append(countries, strings.ToUpper(m.OriginalCountry))
+	}
+
+	var statusName string
+
+	switch s := m.Status.(type) {
+	case string:
+		statusName = s
+	case map[string]any:
+		if name, ok := s["name"].(string); ok {
+			statusName = name
+		}
+	}
+
 	return mdb.SearchResult{
 		TvdbID:           tvdbID,
 		TvdbSlug:         m.Slug,
@@ -111,6 +129,8 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		IsTV:             m.Type == "series",
 		Overview:         overview,
 		OriginalLanguage: origLang,
+		Status:           mdb.NormalizeStatus(statusName),
+		Countries:        countries,
 	}
 }
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
-{{- define "uniqueids" }}
+{{- define "kodi/uniqueids" }}
     {{- if .ImdbID }}
     <uniqueid type="imdb">{{ .ImdbID }}</uniqueid>
     {{- end }}
@@ -12,7 +12,7 @@
     {{- end }}
 {{- end }}
 
-{{- define "fileinfo" }}
+{{- define "kodi/fileinfo" }}
     <fileinfo>
         <streamdetails>
             <video>
@@ -54,7 +54,27 @@
     </fileinfo>
 {{- end }}
 
-{{- define "movie" }}
+{{- define "kodi/descriptive" }}
+    {{- if .RawSearchResult }}
+        {{- if .RawSearchResult.Tagline }}
+    <tagline>{{ .RawSearchResult.Tagline }}</tagline>
+        {{- end }}
+        {{- if .RawSearchResult.Status }}
+    <status>{{ .RawSearchResult.Status }}</status>
+        {{- end }}
+        {{- range .RawSearchResult.Genres }}
+    <genre>{{ . }}</genre>
+        {{- end }}
+        {{- range .RawSearchResult.Studios }}
+    <studio>{{ . }}</studio>
+        {{- end }}
+        {{- range .RawSearchResult.Countries }}
+    <country>{{ . }}</country>
+        {{- end }}
+    {{- end }}
+{{- end }}
+
+{{- define "kodi/movie" }}
 <movie>
     <title>{{ .Title }}</title>
     <originaltitle>{{ .Title }}</originaltitle>
@@ -65,12 +85,13 @@
     {{- if .Plot }}
     <plot>{{ .Plot }}</plot>
     {{- end }}
-    {{- template "uniqueids" . }}
-    {{- template "fileinfo" . }}
+    {{- template "kodi/uniqueids" . }}
+    {{- template "kodi/descriptive" . }}
+    {{- template "kodi/fileinfo" . }}
 </movie>
 {{- end }}
 
-{{- define "episodedetails" }}
+{{- define "kodi/episodedetails" }}
   {{- $root := . -}}
   {{- range $index, $ep := .EpisodeList }}
 <episodedetails>
@@ -84,16 +105,16 @@
     <showtitle>{{ $root.Title }}</showtitle>
     <season>{{ $root.Season }}</season>
     <episode>{{ $ep.Number }}</episode>
-    {{- template "uniqueids" $root }}
+    {{- template "kodi/uniqueids" $root }}
     {{- if eq $index 0 }}
-        {{- template "fileinfo" $root }}
+        {{- template "kodi/fileinfo" $root }}
     {{- end }}
 </episodedetails>
   {{- end }}
 {{- end }}
 
 {{- if .IsTV -}}
-  {{- template "episodedetails" . }}
+  {{- template "kodi/episodedetails" . }}
 {{- else -}}
-  {{- template "movie" . }}
+  {{- template "kodi/movie" . }}
 {{- end }}

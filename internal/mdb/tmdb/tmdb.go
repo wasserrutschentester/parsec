@@ -40,6 +40,22 @@ type tmdbMedia struct {
 	Genres           []struct {
 		Name string `json:"name"`
 	} `json:"genres"`
+	Tagline string `json:"tagline"`
+	Status  string `json:"status"`
+
+	ProductionCompanies []struct {
+		Name string `json:"name"`
+	} `json:"production_companies"`
+
+	Networks []struct {
+		Name string `json:"name"`
+	} `json:"networks"` // Specific to TV shows
+
+	ProductionCountries []struct {
+		Iso31661 string `json:"iso_3166_1"`
+	} `json:"production_countries"` // Specific to Movies
+
+	OriginCountry []string `json:"origin_country"` // Specific to TV shows
 }
 
 func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
@@ -63,13 +79,10 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		origLang = "zxx"
 	}
 
-	var genres []string
-
-	for _, g := range m.Genres {
-		if g.Name != "" {
-			genres = append(genres, g.Name)
-		}
-	}
+	genres := extractGenres(m.Genres)
+	studios := extractNames(m.ProductionCompanies)
+	networks := extractNames(m.Networks)
+	countries := extractCountries(m.ProductionCountries, m.OriginCountry)
 
 	return mdb.SearchResult{
 		TmdbID:           m.ID,
@@ -82,7 +95,57 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		Popularity:       m.Popularity,
 		Overview:         m.Overview,
 		Genres:           genres,
+		Studios:          studios,
+		Networks:         networks,
+		Countries:        countries,
+		Tagline:          m.Tagline,
+		Status:           mdb.NormalizeStatus(m.Status),
 	}
+}
+
+// extractGenres extracts genre names.
+func extractGenres(input []struct {
+	Name string `json:"name"`
+},
+) []string {
+	genres := make([]string, 0, len(input))
+	for _, g := range input {
+		if g.Name != "" {
+			genres = append(genres, g.Name)
+		}
+	}
+
+	return genres
+}
+
+// extractNames extracts names from a list of structs.
+func extractNames(input []struct {
+	Name string `json:"name"`
+},
+) []string {
+	names := make([]string, 0, len(input))
+	for _, item := range input {
+		names = append(names, item.Name)
+	}
+
+	return names
+}
+
+// extractCountries extracts and normalizes country codes.
+func extractCountries(prodCountries []struct {
+	Iso31661 string `json:"iso_3166_1"`
+}, originCountries []string,
+) []string {
+	countries := make([]string, 0, len(prodCountries)+len(originCountries))
+	for _, country := range prodCountries {
+		countries = append(countries, strings.ToUpper(country.Iso31661))
+	}
+
+	for _, oc := range originCountries {
+		countries = append(countries, strings.ToUpper(oc))
+	}
+
+	return mdb.DeduplicateStrings(countries)
 }
 
 type tmdbSearchResponse struct {

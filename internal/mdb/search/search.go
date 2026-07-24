@@ -316,6 +316,37 @@ func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 	for _, alt := range tvdbRes.AltTitle {
 		res.AltTitle = addUniqueAltTitle(res.AltTitle, alt, res.Title, res.OriginalTitle)
 	}
+
+	mergeDescriptiveMetadata(res, tvdbRes)
+}
+
+//nolint:cyclop // merging requires many checks for missing properties
+func mergeDescriptiveMetadata(res, tvdbRes *mdb.SearchResult) {
+	if tvdbRes.Status != "" {
+		res.Status = tvdbRes.Status
+	} else if res.Status == "" {
+		res.Status = tvdbRes.Status
+	}
+
+	if len(tvdbRes.Countries) > 0 {
+		res.Countries = mdb.DeduplicateStrings(append(res.Countries, tvdbRes.Countries...))
+	}
+
+	if len(res.Genres) == 0 && len(tvdbRes.Genres) > 0 {
+		res.Genres = tvdbRes.Genres
+	}
+
+	if res.Tagline == "" && tvdbRes.Tagline != "" {
+		res.Tagline = tvdbRes.Tagline
+	}
+
+	if len(res.Studios) == 0 && len(tvdbRes.Studios) > 0 {
+		res.Studios = tvdbRes.Studios
+	}
+
+	if len(res.Networks) == 0 && len(tvdbRes.Networks) > 0 {
+		res.Networks = tvdbRes.Networks
+	}
 }
 
 func addUniqueAltTitle(titles []string, newTitle string, existingTitles ...string) []string {
