@@ -535,15 +535,36 @@ func executeSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool) (*mdb.Searc
 
 func initialSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool, mediaType string) (*mdb.SearchResult, error) {
 	if imdbID != "" {
-		return searchByImdbID(imdbID, isTV, mediaType)
+		ui.PrintDebug("Attempting ID lookup via IMDB ID: " + imdbID)
+
+		res, err := searchByImdbID(imdbID, isTV, mediaType)
+		if err == nil {
+			return res, nil
+		} else if !errors.Is(err, mdb.ErrNotFound) {
+			return nil, err
+		}
 	}
 
 	if tmdbID > 0 {
-		return tmdb.GetByID(tmdbID, mediaType)
+		ui.PrintDebug(fmt.Sprintf("Attempting ID lookup via TMDB ID: %d", tmdbID))
+
+		res, err := tmdb.GetByID(tmdbID, mediaType)
+		if err == nil {
+			return res, nil
+		} else if !errors.Is(err, mdb.ErrNotFound) {
+			return nil, err
+		}
 	}
 
 	if tvdbID > 0 {
-		return tvdb.GetByID(tvdbID, mediaType)
+		ui.PrintDebug(fmt.Sprintf("Attempting ID lookup via TVDB ID: %d", tvdbID))
+
+		res, err := tvdb.GetByID(tvdbID, mediaType)
+		if err == nil {
+			return res, nil
+		} else if !errors.Is(err, mdb.ErrNotFound) {
+			return nil, err
+		}
 	}
 
 	return nil, mdb.ErrNotFound
@@ -551,12 +572,10 @@ func initialSearchByID(imdbID string, tmdbID, tvdbID int, isTV bool, mediaType s
 
 func searchByImdbID(imdbID string, isTV bool, mediaType string) (*mdb.SearchResult, error) {
 	result, err := tmdb.GetByImdbID(imdbID, isTV)
-	if err != nil {
-		return nil, err
-	}
-
-	if result != nil {
+	if err == nil && result != nil {
 		return result, nil
+	} else if err != nil && !errors.Is(err, mdb.ErrNotFound) {
+		return nil, err
 	}
 
 	ui.PrintDebug(fmt.Sprintf("IMDB ID %s not found on TMDB as %s, trying TVDB...", imdbID, mediaType))
