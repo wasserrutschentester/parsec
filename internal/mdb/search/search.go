@@ -647,8 +647,8 @@ func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 // FindEpisodes attempts to identify an episode on TVDB or TMDB based on search results and metadata.
 func FindEpisodes(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) []mdb.EpisodeResult {
 	if len(meta.Episodes) == 0 {
-		ep := findSingleEpisode(result, meta, allowSpecials)
-		if ep.Name != "" {
+		ep, err := findSingleEpisode(result, meta, allowSpecials)
+		if err == nil {
 			return []mdb.EpisodeResult{ep}
 		}
 
@@ -661,8 +661,8 @@ func FindEpisodes(result mdb.SearchResult, meta *metadata.Metadata, allowSpecial
 		singleMeta := *meta
 		singleMeta.Episodes = []int{epNum}
 
-		epRes := findSingleEpisode(result, &singleMeta, allowSpecials)
-		if epRes.Name != "" {
+		epRes, err := findSingleEpisode(result, &singleMeta, allowSpecials)
+		if err == nil {
 			episodes = append(episodes, epRes)
 		}
 	}
@@ -670,7 +670,7 @@ func FindEpisodes(result mdb.SearchResult, meta *metadata.Metadata, allowSpecial
 	return episodes
 }
 
-func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) mdb.EpisodeResult {
+func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
 	epNum := 0
 	if len(meta.Episodes) > 0 {
 		epNum = meta.Episodes[0]
@@ -680,8 +680,8 @@ func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSp
 		ui.PrintDebug(fmt.Sprintf("Searching for episode on TVDB: ID=%d, S%02dE%02d", result.TvdbID, meta.Season, epNum))
 
 		data, err := tvdb.IdentifyEpisode(result, meta, allowSpecials)
-		if err == nil && data.Name != "" {
-			return data
+		if err == nil {
+			return data, nil
 		}
 	}
 
@@ -695,13 +695,13 @@ func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSp
 
 		for _, lang := range uniqueLangs {
 			data, err := tmdb.GetEpisodeMetadata(result.TmdbID, meta.Season, epNum, lang)
-			if err == nil && data.Name != "" {
-				return data
+			if err == nil {
+				return data, nil
 			}
 		}
 	}
 
-	return mdb.EpisodeResult{}
+	return mdb.EpisodeResult{}, mdb.ErrNotFound
 }
 
 // GetSeasonEpisodes retrieves all episodes for a specific season from TVDB or TMDB.
