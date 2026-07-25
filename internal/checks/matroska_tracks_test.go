@@ -14,10 +14,11 @@ func TestGetTrackPriority(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		track   matroska.EbmlTrack
-		wantMin int64
-		wantMax int64
+		name     string
+		track    matroska.EbmlTrack
+		origLang string
+		wantMin  int64
+		wantMax  int64
 	}{
 		{
 			name:    "German Audio Default",
@@ -44,10 +45,11 @@ func TestGetTrackPriority(t *testing.T) {
 			wantMax: priorityPreferred + (int64(1) << 60) - 1,
 		},
 		{
-			name:    "Original Language",
-			track:   matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fre", OriginalLanguage: true}},
-			wantMin: priorityOriginal,
-			wantMax: priorityOriginal + (int64(1) << 60) - 1,
+			name:     "Original Language",
+			track:    matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "fre"}},
+			origLang: "fre",
+			wantMin:  priorityOriginal,
+			wantMax:  priorityOriginal + (int64(1) << 60) - 1,
 		},
 		{
 			name:    "English Audio",
@@ -61,7 +63,7 @@ func TestGetTrackPriority(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := getTrackPriority(tt.track)
+			got := GetTrackPriority(tt.track, tt.origLang)
 			if got < tt.wantMin || got > tt.wantMax {
 				t.Errorf("getTrackPriority() = %v, want range [%v, %v]", got, tt.wantMin, tt.wantMax)
 			}
@@ -83,7 +85,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 	found := false
 
 	for _, r := range res {
-		if r.Identifier == "matroska_duplicate_tracks" {
+		if r.Identifier == config.CheckMatroskaDuplicateTracks {
 			found = true
 
 			if len(r.Tracks) != 2 {
@@ -108,7 +110,7 @@ func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 //nolint:paralleltest,funlen // depends on shared global state; comprehensive metrics tests
 func TestRunTrackChecksTrackMetrics(t *testing.T) {
 	config.InitDefaults()
-	viper.Set("enabled_checks", []string{"matroska_track_delay", "matroska_video_cropping"})
+	viper.Set("enabled_checks", []string{config.CheckMatroskaTrackDelay, config.CheckMatroskaVideoCropping})
 
 	t.Run("Track Delays", func(t *testing.T) {
 		tests := []struct {
@@ -124,7 +126,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 5000000, Language: "ger", Number: 1}},
 					},
 				},
-				identifier: "matroska_track_delay",
+				identifier: config.CheckMatroskaTrackDelay,
 				wantErr:    false,
 			},
 			{
@@ -134,7 +136,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{CodecDelay: 2000000000, Language: "ger", Number: 1}},
 					},
 				},
-				identifier: "matroska_track_delay",
+				identifier: config.CheckMatroskaTrackDelay,
 				wantErr:    true,
 			},
 		}
@@ -158,7 +160,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x1080"}},
 					},
 				},
-				identifier: "matroska_video_cropping",
+				identifier: config.CheckMatroskaVideoCropping,
 				wantErr:    false,
 			},
 			{
@@ -168,7 +170,7 @@ func TestRunTrackChecksTrackMetrics(t *testing.T) {
 						{ID: 1, Type: "video", Properties: matroska.EbmlTrackProperties{PixelDimensions: "1920x1080", DisplayDimensions: "1920x800"}},
 					},
 				},
-				identifier: "matroska_video_cropping",
+				identifier: config.CheckMatroskaVideoCropping,
 				wantErr:    true,
 			},
 		}

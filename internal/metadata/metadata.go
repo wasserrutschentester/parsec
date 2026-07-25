@@ -22,31 +22,32 @@ type Metadata struct {
 	Season   int
 	Episodes []int
 
-	Date          string
-	EpisodeTitles []string
-	Language      string
-	LanguageExt   string
-	Subbed        bool
-	CutEdition    string
-	Accessibility string
-	HasAudioDesc  bool
-	Repack        bool
-	Resolution    string
-	Service       string
-	Source        string
-	HDR           string
-	BitDepth      int
-	AudioCodec    string
-	AudioChannels string
-	AudioMeta     string
-	VideoCodec    string
-	DualAudio     bool
-	CRC32         string
-	Group         string
-	ImdbID        string
-	TmdbID        int
-	TvdbID        int
-	IsTV          bool
+	Date             string
+	EpisodeTitles    []string
+	Language         string
+	LanguageExt      string
+	Subbed           bool
+	CutEdition       string
+	Accessibility    string
+	HasAudioDesc     bool
+	Repack           bool
+	Resolution       string
+	Service          string
+	Source           string
+	HDR              string
+	BitDepth         int
+	AudioCodec       string
+	AudioChannels    string
+	OriginalLanguage string
+	AudioMeta        string
+	VideoCodec       string
+	DualAudio        bool
+	CRC32            string
+	Group            string
+	ImdbID           string
+	TmdbID           int
+	TvdbID           int
+	IsTV             bool
 }
 
 // MatchLanguage determines if two language tags match based on their base language.

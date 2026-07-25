@@ -12,9 +12,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -508,7 +511,7 @@ func extractTracksNoCache(filePath string, ids []int) (map[int][]byte, error) {
 
 	cmd.Stderr = &stderrBuf
 
-	ui.ResetProgress()
+	ui.ResetProgress("Demuxing")
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start mkvextract: %w", err)
@@ -893,6 +896,40 @@ func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
 	return false
 }
 
+// runMkvpropedit logs args at debug level (with args[0], the file path,
+// anonymized) then delegates to execMkvpropedit. Use this when no argument
+// besides the file path needs anonymizing; use execMkvpropedit directly with
+// custom debug logging otherwise (e.g. AddAttachments, whose args include
+// local file paths of their own).
+func runMkvpropedit(filePath string, args []string, actionMsg string) error {
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	return execMkvpropedit(args, actionMsg)
+}
+
+// execMkvpropedit runs mkvpropedit with args and wraps a not-found or
+// failure error with actionMsg and the command's combined output. This is
+// the single place that knows how to invoke mkvpropedit, shared by every
+// mutation below (tags, track/container properties, attachments, chapters)
+// so they don't each repeat the same
+// exec.CommandContext/exec.ErrNotFound/error-wrapping code.
+func execMkvpropedit(args []string, actionMsg string) error {
+	cmd := exec.CommandContext(context.Background(), "mkvpropedit", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+		}
+
+		return fmt.Errorf("failed to %s: %w: %s", actionMsg, err, output)
+	}
+
+	return nil
+}
+
 // SetGlobalTags uses mkvpropedit to set global tags (TITLE, IMDB, TMDB, TVDB) on a Matroska file.
 func SetGlobalTags(filePath string, tagSets []mdb.MatroskaTagSet) error {
 	err := CheckForMatroska(filePath)
@@ -906,18 +943,437 @@ func SetGlobalTags(filePath string, tagSets []mdb.MatroskaTagSet) error {
 	}
 	defer func() { _ = os.Remove(tagsXML) }()
 
-	ui.PrintDebug(fmt.Sprintf("Executing: mkvpropedit %s --tags global:%s", ui.AnonymizePath(filePath), tagsXML))
+	return runMkvpropedit(filePath, []string{filePath, "--tags", "global:" + tagsXML}, "set global tags")
+}
 
-	cmd := exec.CommandContext(context.Background(), "mkvpropedit", filePath, "--tags", "global:"+tagsXML)
-	if err := cmd.Run(); err != nil {
+// AddTrackStatisticsTags recomputes and writes statistics tags (DURATION,
+// NUMBER_OF_BYTES, etc.) for every track in the file using mkvpropedit.
+func AddTrackStatisticsTags(filePath string) error {
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	return runMkvpropedit(filePath, []string{filePath, "--add-track-statistics-tags"}, "add track statistics tags")
+}
+
+// ExtractTagsXML uses mkvextract to extract the raw tags XML (global and
+// per-track) from a Matroska file, in the same format mkvpropedit's --tags
+// all: expects for writing them back.
+func ExtractTagsXML(filePath string) ([]byte, error) {
+	if err := CheckForMatroska(filePath); err != nil {
+		return nil, err
+	}
+
+	tmpFilePath, err := runMkvextractTags(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = os.Remove(tmpFilePath) }()
+
+	xmlContent, err := os.ReadFile(tmpFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read extracted tags: %w", err)
+	}
+
+	return xmlContent, nil
+}
+
+func runMkvextractTags(filePath string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "parsec-tags-extract-*.xml")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpFilePath := tmpFile.Name()
+	_ = tmpFile.Close()
+
+	ui.PrintDebug(fmt.Sprintf("Executing: mkvextract %s tags %s", ui.AnonymizePath(filePath), tmpFilePath))
+
+	cmd := exec.CommandContext(context.Background(), "mkvextract", filePath, "tags", tmpFilePath)
+	if _, err := cmd.Output(); err != nil {
+		_ = os.Remove(tmpFilePath)
+
 		if errors.Is(err, exec.ErrNotFound) {
-			return fmt.Errorf("mkvpropedit is not installed or not available in PATH: %w", err)
+			return "", fmt.Errorf("mkvextract is not installed or not available in PATH: %w", err)
 		}
 
-		return fmt.Errorf("failed to set global tags: %w", err)
+		return "", fmt.Errorf("failed to extract tags: %w", err)
+	}
+
+	return tmpFilePath, nil
+}
+
+// SetTagsXML replaces a Matroska file's tags (global and per-track) in place
+// from xmlContent, which must be the full tags document (e.g. from
+// ExtractTagsXML with some entries removed) since this replaces all tags at
+// once via mkvpropedit's --tags all: selector.
+func SetTagsXML(filePath string, xmlContent []byte) error {
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	tmpFile, err := os.CreateTemp("", "parsec-tags-write-*.xml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpPath := tmpFile.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if _, err := tmpFile.Write(xmlContent); err != nil {
+		_ = tmpFile.Close()
+
+		return fmt.Errorf("failed to write tags XML: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to write tags XML: %w", err)
+	}
+
+	return runMkvpropedit(filePath, []string{filePath, "--tags", "all:" + tmpPath}, "set tags")
+}
+
+// TrackEdit describes a set of property changes for a single track, identified
+// by its track number (the "number" property reported by mkvmerge -J).
+type TrackEdit struct {
+	Number     int                 `json:"track_number"`
+	Properties []TrackPropertyEdit `json:"properties"`
+}
+
+// TrackPropertyEdit represents a change to a single track-level property.
+type TrackPropertyEdit struct {
+	Key    string `json:"key"`
+	Value  string `json:"value"`
+	Reason string `json:"reason"`
+}
+
+// SetTrackProperties applies the given per-track property edits to a Matroska
+// file in place using mkvpropedit.
+func SetTrackProperties(filePath string, edits []TrackEdit) error {
+	if len(edits) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := buildPropeditArgs(filePath, edits)
+
+	return runMkvpropedit(filePath, args, "set track properties")
+}
+
+// buildPropeditArgs builds the mkvpropedit argument list for the given edits.
+func buildPropeditArgs(filePath string, edits []TrackEdit) []string {
+	args := []string{filePath}
+
+	for _, edit := range edits {
+		args = append(args, "--edit", "track:@"+strconv.Itoa(edit.Number))
+
+		for _, prop := range edit.Properties {
+			if prop.Value == "" {
+				args = append(args, "--delete", prop.Key)
+			} else {
+				args = append(args, "--set", prop.Key+"="+prop.Value)
+			}
+		}
+	}
+
+	return args
+}
+
+// SetContainerProperties applies segment-level ("info") property edits in
+// place using mkvpropedit. An empty value deletes the property instead of
+// setting it (matching TrackEdit's convention); this is required for typed
+// properties like "date" (DateUTC), which mkvpropedit refuses to --set to an
+// empty string but will happily --delete.
+func SetContainerProperties(filePath string, props map[string]string) error {
+	if len(props) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath, "--edit", "info"}
+
+	for _, key := range slices.Sorted(maps.Keys(props)) {
+		if value := props[key]; value == "" {
+			args = append(args, "--delete", key)
+		} else {
+			args = append(args, "--set", key+"="+value)
+		}
+	}
+
+	return runMkvpropedit(filePath, args, "set container properties")
+}
+
+// DeleteAttachments removes attachments by mkvmerge attachment ID.
+func DeleteAttachments(filePath string, ids []int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath}
+	for _, id := range ids {
+		args = append(args, "--delete-attachment", strconv.Itoa(id))
+	}
+
+	return runMkvpropedit(filePath, args, "delete attachments")
+}
+
+// AttachmentAdd describes a new attachment to add to a Matroska file.
+type AttachmentAdd struct {
+	Path     string
+	Name     string
+	MIMEType string
+}
+
+// AddAttachments adds files as Matroska attachments in place using mkvpropedit.
+func AddAttachments(filePath string, attachments []AttachmentAdd) error {
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath}
+
+	for _, att := range attachments {
+		if att.Name != "" {
+			args = append(args, "--attachment-name", att.Name)
+		}
+
+		if att.MIMEType != "" {
+			args = append(args, "--attachment-mime-type", att.MIMEType)
+		}
+
+		args = append(args, "--add-attachment", att.Path)
+	}
+
+	debugArgs := slices.Clone(args)
+	debugArgs[0] = ui.AnonymizePath(filePath)
+
+	for i := 1; i < len(debugArgs); i++ {
+		if debugArgs[i-1] == "--add-attachment" {
+			debugArgs[i] = ui.AnonymizePath(debugArgs[i])
+		}
+	}
+
+	ui.PrintDebug("Executing: mkvpropedit " + strings.Join(debugArgs, " "))
+
+	return execMkvpropedit(args, "add attachments")
+}
+
+// RenameAttachments updates attachment display names without touching content.
+func RenameAttachments(filePath string, renames map[int]string) error {
+	if len(renames) == 0 {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	args := []string{filePath}
+	for _, id := range slices.Sorted(maps.Keys(renames)) {
+		args = append(args, "--update-attachment", strconv.Itoa(id), "--attachment-name", renames[id])
+	}
+
+	return runMkvpropedit(filePath, args, "rename attachments")
+}
+
+// RemuxOptions describes a lossless remux via mkvmerge.
+type RemuxOptions struct {
+	TrackOrder              []int
+	RemoveTrackIDs          []int
+	StripCompressionIDs     []int
+	DisableTrackCompression bool
+}
+
+// IsEmpty reports whether the options describe no work.
+func (o RemuxOptions) IsEmpty() bool {
+	return len(o.TrackOrder) == 0 && len(o.RemoveTrackIDs) == 0 && len(o.StripCompressionIDs) == 0
+}
+
+var errRemuxFailed = errors.New("mkvmerge remux failed")
+
+// RemuxTracks rewrites a Matroska file to reorder, drop, or adjust tracks.
+func RemuxTracks(filePath string, opts RemuxOptions) error {
+	if opts.IsEmpty() {
+		return nil
+	}
+
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	ebml, err := GetEbmlMetadata(filePath)
+	if err != nil {
+		return err
+	}
+
+	tmpPath := filepath.Join(filepath.Dir(filePath), "."+filepath.Base(filePath)+".parsec-remux.mkv")
+	args := buildRemuxArgs(tmpPath, filePath, opts, ebml.Tracks)
+
+	ui.PrintDebug("Executing: mkvmerge " + strings.Join(args, " "))
+
+	cmd := exec.CommandContext(context.Background(), "mkvmerge", args...)
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	var (
+		stdoutBuf bytes.Buffer
+		stderrBuf bytes.Buffer
+	)
+
+	cmd.Stderr = &stderrBuf
+
+	ui.ResetProgress("Remuxing")
+
+	if err := cmd.Start(); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("failed to start mkvmerge: %w", err)
+	}
+
+	tee := io.TeeReader(stdoutPipe, &stdoutBuf)
+	parseExtractionProgress(tee)
+
+	if runErr := cmd.Wait(); runErr != nil {
+		output := append(stdoutBuf.Bytes(), stderrBuf.Bytes()...)
+		if err := interpretMkvmergeError(runErr, output); err != nil {
+			_ = os.Remove(tmpPath)
+
+			return err
+		}
+	}
+
+	return replaceFile(filePath, tmpPath)
+}
+
+func interpretMkvmergeError(runErr error, output []byte) error {
+	if errors.Is(runErr, exec.ErrNotFound) {
+		return fmt.Errorf("mkvmerge is not installed or not available in PATH: %w", runErr)
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) && exitErr.ExitCode() == 1 {
+		return nil
+	}
+
+	return fmt.Errorf("%w: %w: %s", errRemuxFailed, runErr, output)
+}
+
+func replaceFile(filePath, tmpPath string) error {
+	if info, statErr := os.Stat(filePath); statErr == nil {
+		_ = os.Chmod(tmpPath, info.Mode())
+	}
+
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		_ = os.Remove(tmpPath)
+
+		return fmt.Errorf("failed to replace original after remux: %w", err)
 	}
 
 	return nil
+}
+
+func buildRemuxArgs(outPath, inPath string, opts RemuxOptions, tracks []EbmlTrack) []string {
+	args := []string{"-o", outPath}
+
+	removed := make(map[int]bool, len(opts.RemoveTrackIDs))
+	for _, id := range opts.RemoveTrackIDs {
+		removed[id] = true
+	}
+
+	args = append(args, buildRemovalArgs(opts.RemoveTrackIDs, tracks)...)
+	args = append(args, buildCompressionArgs(opts, tracks, removed)...)
+
+	if order := buildTrackOrder(opts.TrackOrder, removed); order != "" {
+		args = append(args, "--track-order", order)
+	}
+
+	return append(args, inPath)
+}
+
+func buildCompressionArgs(opts RemuxOptions, tracks []EbmlTrack, removed map[int]bool) []string {
+	if opts.DisableTrackCompression {
+		args := make([]string, 0, len(tracks)*2)
+		for _, track := range tracks {
+			if !removed[track.ID] {
+				args = append(args, "--compression", strconv.Itoa(track.ID)+":none")
+			}
+		}
+
+		return args
+	}
+
+	args := make([]string, 0, len(opts.StripCompressionIDs)*2)
+	for _, id := range opts.StripCompressionIDs {
+		if !removed[id] {
+			args = append(args, "--compression", strconv.Itoa(id)+":none")
+		}
+	}
+
+	return args
+}
+
+func buildRemovalArgs(removeIDs []int, tracks []EbmlTrack) []string {
+	if len(removeIDs) == 0 {
+		return nil
+	}
+
+	typeByID := make(map[int]string, len(tracks))
+	for _, track := range tracks {
+		typeByID[track.ID] = track.Type
+	}
+
+	byType := make(map[string][]string)
+	for _, id := range removeIDs {
+		byType[typeByID[id]] = append(byType[typeByID[id]], strconv.Itoa(id))
+	}
+
+	flagByType := map[string]string{
+		"video":     "--video-tracks",
+		"audio":     "--audio-tracks",
+		"subtitles": "--subtitle-tracks",
+	}
+
+	var args []string
+
+	for _, typ := range []string{"video", "audio", "subtitles"} {
+		if ids := byType[typ]; len(ids) > 0 {
+			args = append(args, flagByType[typ], "!"+strings.Join(ids, ","))
+		}
+	}
+
+	return args
+}
+
+func buildTrackOrder(trackOrder []int, removed map[int]bool) string {
+	var entries []string
+
+	for _, id := range trackOrder {
+		if !removed[id] {
+			entries = append(entries, "0:"+strconv.Itoa(id))
+		}
+	}
+
+	return strings.Join(entries, ",")
 }
 
 func createTagsXML(tagSets []mdb.MatroskaTagSet) (string, error) {
@@ -1091,6 +1547,183 @@ func ExtractChapters(filePath string) (*Chapters, error) {
 	}
 
 	return chapters, nil
+}
+
+// ExtractChaptersXML uses mkvextract to extract the raw chapters XML.
+func ExtractChaptersXML(filePath string) ([]byte, error) {
+	if err := CheckForMatroska(filePath); err != nil {
+		return nil, err
+	}
+
+	tmpFilePath, err := runMkvextractChapters(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = os.Remove(tmpFilePath) }()
+
+	xmlContent, err := os.ReadFile(tmpFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read extracted chapters: %w", err)
+	}
+
+	return xmlContent, nil
+}
+
+var (
+	chapterTimeStartRegex            = regexp.MustCompile(`<ChapterTimeStart>[^<]*</ChapterTimeStart>`)
+	chapterDisplayRegex              = regexp.MustCompile(`(?s)<ChapterDisplay>.*?</ChapterDisplay>`)
+	chapterLanguageRegex             = regexp.MustCompile(`<ChapterLanguage>[^<]*</ChapterLanguage>`)
+	chapterLanguageIETFRegex         = regexp.MustCompile(`<ChapLanguageIETF>[^<]*</ChapLanguageIETF>`)
+	errChapterTimestampCountMismatch = errors.New("chapter timestamp count mismatch")
+	errChapterDisplayCountMismatch   = errors.New("chapter display count mismatch")
+)
+
+// RewriteChapterTimestamps replaces each ChapterTimeStart value in document order.
+func RewriteChapterTimestamps(filePath string, newTimes []int64) error {
+	if len(newTimes) == 0 {
+		return nil
+	}
+
+	xmlContent, err := ExtractChaptersXML(filePath)
+	if err != nil {
+		return err
+	}
+
+	updated, err := replaceChapterTimestamps(xmlContent, newTimes)
+	if err != nil {
+		return err
+	}
+
+	return SetChaptersXML(filePath, updated)
+}
+
+func replaceChapterTimestamps(xmlContent []byte, newTimes []int64) ([]byte, error) {
+	matches := chapterTimeStartRegex.FindAllIndex(xmlContent, -1)
+	if len(matches) != len(newTimes) {
+		return nil, fmt.Errorf("%w: found %d, expected %d", errChapterTimestampCountMismatch, len(matches), len(newTimes))
+	}
+
+	var buf bytes.Buffer
+
+	last := 0
+
+	for i, m := range matches {
+		buf.Write(xmlContent[last:m[0]])
+		buf.WriteString("<ChapterTimeStart>" + formatChapterTimestamp(newTimes[i]) + "</ChapterTimeStart>")
+
+		last = m[1]
+	}
+
+	buf.Write(xmlContent[last:])
+
+	return buf.Bytes(), nil
+}
+
+// RewriteChapterLanguages replaces missing chapter display languages in
+// document order while preserving all unrelated chapter XML.
+func RewriteChapterLanguages(filePath string, languages []string) error {
+	if len(languages) == 0 {
+		return nil
+	}
+
+	xmlContent, err := ExtractChaptersXML(filePath)
+	if err != nil {
+		return err
+	}
+
+	updated, err := replaceChapterLanguages(xmlContent, languages)
+	if err != nil {
+		return err
+	}
+
+	return SetChaptersXML(filePath, updated)
+}
+
+func replaceChapterLanguages(xmlContent []byte, languages []string) ([]byte, error) {
+	matches := chapterDisplayRegex.FindAllIndex(xmlContent, -1)
+	if len(matches) != len(languages) {
+		return nil, fmt.Errorf("%w: found %d, expected %d", errChapterDisplayCountMismatch, len(matches), len(languages))
+	}
+
+	var buf bytes.Buffer
+
+	last := 0
+	for i, match := range matches {
+		buf.Write(xmlContent[last:match[0]])
+
+		block := xmlContent[match[0]:match[1]]
+		if languages[i] == "" {
+			buf.Write(block)
+		} else {
+			var escaped bytes.Buffer
+			if err := xml.EscapeText(&escaped, []byte(languages[i])); err != nil {
+				return nil, fmt.Errorf("escaping chapter language: %w", err)
+			}
+
+			legacy := []byte("<ChapterLanguage>" + escaped.String() + "</ChapterLanguage>")
+			ietf := []byte("<ChapLanguageIETF>" + escaped.String() + "</ChapLanguageIETF>")
+			block = replaceOrAppendChapterDisplayElement(block, chapterLanguageRegex, legacy)
+			block = replaceOrAppendChapterDisplayElement(block, chapterLanguageIETFRegex, ietf)
+			buf.Write(block)
+		}
+
+		last = match[1]
+	}
+
+	buf.Write(xmlContent[last:])
+
+	return buf.Bytes(), nil
+}
+
+func replaceOrAppendChapterDisplayElement(block []byte, elementRegex *regexp.Regexp, replacement []byte) []byte {
+	if elementRegex.Match(block) {
+		return elementRegex.ReplaceAll(block, replacement)
+	}
+
+	return bytes.Replace(block, []byte("</ChapterDisplay>"), append(replacement, []byte("</ChapterDisplay>")...), 1)
+}
+
+func formatChapterTimestamp(ns int64) string {
+	if ns < 0 {
+		ns = 0
+	}
+
+	hours := ns / 3_600_000_000_000
+	ns -= hours * 3_600_000_000_000
+	mins := ns / 60_000_000_000
+	ns -= mins * 60_000_000_000
+	secs := ns / 1_000_000_000
+	ns -= secs * 1_000_000_000
+
+	return fmt.Sprintf("%02d:%02d:%02d.%09d", hours, mins, secs, ns)
+}
+
+// SetChaptersXML replaces a Matroska file's chapters in place.
+func SetChaptersXML(filePath string, xmlContent []byte) error {
+	if err := CheckForMatroska(filePath); err != nil {
+		return err
+	}
+
+	tmpFile, err := os.CreateTemp("", "parsec-chapters-write-*.xml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tmpPath := tmpFile.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if _, err := tmpFile.Write(xmlContent); err != nil {
+		_ = tmpFile.Close()
+
+		return fmt.Errorf("failed to write chapters XML: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to write chapters XML: %w", err)
+	}
+
+	return runMkvpropedit(filePath, []string{filePath, "--chapters", tmpPath}, "set chapters")
 }
 
 func runMkvextractChapters(filePath string) (string, error) {

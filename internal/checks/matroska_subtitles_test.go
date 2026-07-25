@@ -14,7 +14,7 @@ import (
 
 func getUnusedFontsResult(res []CheckResult) *CheckResult {
 	for _, r := range res {
-		if r.Identifier == "matroska_unused_fonts" {
+		if r.Identifier == config.CheckMatroskaUnusedFonts {
 			rCopy := r
 
 			return &rCopy
@@ -67,11 +67,11 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 	foundArial := false
 
 	for _, row := range targetRes.Table.Rows {
-		if len(row) > 0 && row[0] == "UnusedFont.ttf" {
+		if len(row) > 1 && row[1] == "UnusedFont.ttf" {
 			foundUnused = true
 		}
 
-		if len(row) > 0 && row[0] == "Arial.ttf" {
+		if len(row) > 1 && row[1] == "Arial.ttf" {
 			foundArial = true
 		}
 	}
@@ -87,7 +87,7 @@ func TestRunTrackChecksUnusedFonts(t *testing.T) {
 
 func getFontComplianceResult(res []CheckResult) *CheckResult {
 	for _, r := range res {
-		if r.Identifier == "matroska_font_filename_compliance" {
+		if r.Identifier == config.CheckMatroskaFontFilenameCompliance {
 			rCopy := r
 
 			return &rCopy
@@ -179,7 +179,7 @@ func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 		{FamilyName: "Arial", Weight: 400, Italic: false},
 	}
 
-	res := checkSubtitleFonts(track, attachmentFonts, make(map[fontStyle]bool))
+	res := checkSubtitleFonts(track, attachmentFonts)
 	if res == nil || res.Passed {
 		t.Error("Expected validation failure when bold style uses only regular font")
 	}
@@ -189,7 +189,7 @@ func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 		{FamilyName: "Arial", Weight: 700, Italic: false},
 	}
 
-	res = checkSubtitleFonts(track, attachmentFonts, make(map[fontStyle]bool))
+	res = checkSubtitleFonts(track, attachmentFonts)
 	if res != nil {
 		t.Errorf("Expected validation pass when bold style has bold font attached: %v", res.Warning)
 	}
@@ -199,7 +199,7 @@ func TestCheckSubtitleFontsBoldStyle(t *testing.T) {
 		{FamilyName: "Arial", Weight: 400, Italic: false, IsVariable: true},
 	}
 
-	res = checkSubtitleFonts(track, attachmentFonts, make(map[fontStyle]bool))
+	res = checkSubtitleFonts(track, attachmentFonts)
 	if res != nil {
 		t.Errorf("Expected validation pass when bold style has variable font attached: %v", res.Warning)
 	}
@@ -226,7 +226,7 @@ func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
 		{FamilyName: "Arial", Weight: 400, Italic: false},
 	}
 
-	res := checkSubtitleInlineFontsWithContent(track, attachmentFonts, content, make(map[fontStyle]bool))
+	res := checkSubtitleInlineFontsWithContent(track, attachmentFonts, content)
 	if res == nil || res.Passed {
 		t.Error("Expected validation failure when inline bold tag only has regular font")
 	}
@@ -236,7 +236,7 @@ func TestCheckSubtitleInlineFontsWithContentBoldOverrides(t *testing.T) {
 		{FamilyName: "Arial", Weight: 700, Italic: false},
 	}
 
-	res = checkSubtitleInlineFontsWithContent(track, attachmentFonts, content, make(map[fontStyle]bool))
+	res = checkSubtitleInlineFontsWithContent(track, attachmentFonts, content)
 	if res != nil {
 		t.Errorf("Expected validation pass when inline bold tag has bold font attached: %v", res.Warning)
 	}
@@ -254,7 +254,7 @@ func TestCheckUnusedFontsStyleAware(t *testing.T) {
 	}
 
 	// Only regular Arial is used
-	allUsedFonts := map[fontStyle]bool{
+	allUsedFonts := map[FontStyle]bool{
 		{Family: "Arial", Weight: 400, Italic: false}: true,
 	}
 

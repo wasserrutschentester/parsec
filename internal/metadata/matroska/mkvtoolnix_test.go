@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"os"
+	"strings"
 	"testing"
 
 	"codeberg.org/upPollo/parsec/internal/mdb"
@@ -94,6 +95,33 @@ func TestCountTypes(t *testing.T) {
 	}
 }
 
+func TestBuildPropeditArgs(t *testing.T) {
+	t.Parallel()
+
+	edits := []TrackEdit{
+		{Number: 2, Properties: []TrackPropertyEdit{{Key: "flag-default", Value: "1"}, {Key: "name", Value: "German"}}},
+		{Number: 3, Properties: []TrackPropertyEdit{{Key: "name", Value: ""}}},
+	}
+
+	got := buildPropeditArgs("movie.mkv", edits)
+
+	want := []string{
+		"movie.mkv",
+		"--edit", "track:@2", "--set", "flag-default=1", "--set", "name=German",
+		"--edit", "track:@3", "--delete", "name",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(got), got)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("arg %d: expected %q, got %q", i, want[i], got[i])
+		}
+	}
+}
+
 func TestParseDimensions(t *testing.T) {
 	t.Parallel()
 
@@ -116,6 +144,163 @@ func TestParseDimensions(t *testing.T) {
 		w, h := ParseDimensions(tt.input)
 		if w != tt.wantW || h != tt.wantH {
 			t.Errorf("ParseDimensions(%q) = (%d, %d), want (%d, %d)", tt.input, w, h, tt.wantW, tt.wantH)
+		}
+	}
+}
+
+func TestFormatChapterTimestamp(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		ns   int64
+		want string
+	}{
+		{0, "00:00:00.000000000"},
+		{20_000_000_000, "00:00:20.000000000"},
+		{3_661_500_000_000, "01:01:01.500000000"},
+		{-1, "00:00:00.000000000"},
+	}
+
+	for _, tt := range tests {
+		if got := formatChapterTimestamp(tt.ns); got != tt.want {
+			t.Errorf("formatChapterTimestamp(%d) = %q, want %q", tt.ns, got, tt.want)
+		}
+	}
+}
+
+func TestReplaceChapterTimestamps(t *testing.T) {
+	t.Parallel()
+
+	xmlContent := []byte(`<?xml version="1.0"?>
+<Chapters>
+  <EditionEntry>
+    <EditionUID>1</EditionUID>
+    <ChapterAtom>
+      <ChapterUID>10</ChapterUID>
+      <ChapterTimeStart>00:00:00.000000000</ChapterTimeStart>
+      <ChapterFlagHidden>0</ChapterFlagHidden>
+      <ChapterDisplay>
+        <ChapterString>Intro</ChapterString>
+        <ChapterLanguage>eng</ChapterLanguage>
+      </ChapterDisplay>
+    </ChapterAtom>
+    <ChapterAtom>
+      <ChapterUID>11</ChapterUID>
+      <ChapterTimeStart>00:00:16.000000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Scene 2</ChapterString>
+        <ChapterLanguage>eng</ChapterLanguage>
+      </ChapterDisplay>
+    </ChapterAtom>
+  </EditionEntry>
+</Chapters>
+`)
+
+	got, err := replaceChapterTimestamps(xmlContent, []int64{0, 20_000_000_000})
+	if err != nil {
+		t.Fatalf("replaceChapterTimestamps() error = %v", err)
+	}
+
+	gotStr := string(got)
+
+	if !strings.Contains(gotStr, "<ChapterTimeStart>00:00:20.000000000</ChapterTimeStart>") {
+		t.Errorf("expected second chapter snapped to 20s, got:\n%s", gotStr)
+	}
+
+	if !strings.Contains(gotStr, "<ChapterUID>10</ChapterUID>") || !strings.Contains(gotStr, "<ChapterFlagHidden>0</ChapterFlagHidden>") {
+		t.Errorf("expected unrelated XML content to be preserved untouched, got:\n%s", gotStr)
+	}
+
+	if !strings.Contains(gotStr, "<ChapterString>Scene 2</ChapterString>") {
+		t.Errorf("expected display names to be preserved, got:\n%s", gotStr)
+	}
+}
+
+func TestReplaceChapterTimestampsCountMismatch(t *testing.T) {
+	t.Parallel()
+
+	xmlContent := []byte("<ChapterTimeStart>00:00:00.000000000</ChapterTimeStart>")
+
+	if _, err := replaceChapterTimestamps(xmlContent, []int64{0, 1}); err == nil {
+		t.Error("expected an error when newTimes doesn't match the number of ChapterTimeStart elements")
+	}
+}
+
+func TestReplaceChapterLanguages(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`<Chapters><EditionEntry>
+<ChapterAtom><ChapterDisplay><ChapterString>Intro</ChapterString><ChapterLanguage>deu</ChapterLanguage><ChapLanguageIETF>deu</ChapLanguageIETF></ChapterDisplay></ChapterAtom>
+<ChapterAtom><ChapterDisplay><ChapterString>Teil 2</ChapterString><ChapterLanguage>und</ChapterLanguage><ChapLanguageIETF>und</ChapLanguageIETF></ChapterDisplay></ChapterAtom>
+<ChapterAtom><ChapterDisplay><ChapterString>Ende</ChapterString></ChapterDisplay></ChapterAtom>
+</EditionEntry></Chapters>`)
+
+	got, err := replaceChapterLanguages(input, []string{"", "deu", "deu"})
+	if err != nil {
+		t.Fatalf("replaceChapterLanguages failed: %v", err)
+	}
+
+	if count := strings.Count(string(got), `<ChapterLanguage>deu</ChapterLanguage>`); count != 3 {
+		t.Errorf("expected 3 German language elements, got %d: %s", count, got)
+	}
+
+	if count := strings.Count(string(got), `<ChapLanguageIETF>deu</ChapLanguageIETF>`); count != 3 {
+		t.Errorf("expected 3 German IETF language elements, got %d: %s", count, got)
+	}
+}
+
+func TestBuildRemuxArgs(t *testing.T) {
+	t.Parallel()
+
+	tracks := []EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio"},
+		{ID: 2, Type: "audio"},
+	}
+
+	opts := RemuxOptions{
+		TrackOrder:              []int{0, 2, 1},
+		RemoveTrackIDs:          []int{1},
+		DisableTrackCompression: true,
+	}
+
+	got := buildRemuxArgs("out.mkv", "in.mkv", opts, tracks)
+
+	want := []string{
+		"-o", "out.mkv",
+		"--audio-tracks", "!1",
+		"--compression", "0:none",
+		"--compression", "2:none",
+		"--track-order", "0:0,0:2",
+		"in.mkv",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(got), got)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("arg %d: expected %q, got %q", i, want[i], got[i])
+		}
+	}
+}
+
+func TestBuildRemuxArgsDoesNotStripCompressionWhenNotRequested(t *testing.T) {
+	t.Parallel()
+
+	tracks := []EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio"},
+	}
+
+	opts := RemuxOptions{TrackOrder: []int{0, 1}}
+
+	got := buildRemuxArgs("out.mkv", "in.mkv", opts, tracks)
+
+	for _, arg := range got {
+		if strings.HasPrefix(arg, "--compression") || strings.HasSuffix(arg, ":none") {
+			t.Fatalf("unexpected compression argument without confirmation: %v", got)
 		}
 	}
 }

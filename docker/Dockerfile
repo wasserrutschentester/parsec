@@ -22,6 +22,7 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     su-exec \
+    cabextract \
     tini
 
 # Copy the pre-built binary for the specific architecture

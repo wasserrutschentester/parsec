@@ -8,12 +8,31 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
-var getMediaInfo = mediainfo.Get
+var (
+	getMediaInfo = mediainfo.Get
+
+	// titleJunkPatterns flags technical/release metadata noise in the global
+	// container title. Shared between checkTitleHygiene and the fix policy.
+	titleJunkPatterns = []string{
+		`\[.*\]`, // Bracketed info
+		`\(.*\)`, // Parenthesized info
+		`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
+		`\bWEB-DL\b`, `\bBlu-ray\b`, `\bBD\b`,
+		`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
+	}
+
+	appJunkPatterns = []string{
+		`[a-zA-Z]:\\`,            // Windows paths
+		`/(home|Users|var|tmp)/`, // Unix paths
+		`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
+	}
+)
 
 func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
 	if track.Type != "video" {
@@ -40,7 +59,7 @@ func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
 	if displayAR > pixelAR+0.01 {
 		warning := fmt.Sprintf("resolution-based black bars detected but no MKV crop values set (AR %.2f vs Display AR %.2f)", pixelAR, displayAR)
 
-		return newFailedTrackResult("matroska_video_cropping", "Missing MKV Cropping", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaVideoCropping, "Missing MKV Cropping", "warning", &track, warning)
 	}
 
 	return nil
@@ -48,39 +67,34 @@ func checkVideoCropping(track matroska.EbmlTrack) *CheckResult {
 
 func checkTitleHygiene(ebml *matroska.EbmlMetadata, meta *metadata.Metadata) *CheckResult {
 	title := ebml.Container.Properties.Title
-	if title == "" {
-		return nil
-	}
-
-	officialTitle := meta.Title
-	if officialTitle != "" {
-		if normalizeForComparison(title) == normalizeForComparison(officialTitle) {
-			return nil
-		}
-	}
-
-	junkPatterns := []string{
-		`\[.*\]`, // Bracketed info
-		`\(.*\)`, // Parenthesized info
-		`\b1080p\b`, `\b720p\b`, `\b2160p\b`,
-		`\bWEB-DL\b`, `\bBlu-ray\b`, `\bBD\b`,
-		`\bx264\b`, `\bx265\b`, `\bHEVC\b`,
-	}
-
-	for _, p := range junkPatterns {
-		re := regexp.MustCompile("(?i)" + p)
-		if re.MatchString(title) {
-			return &CheckResult{
-				Identifier: "matroska_title_hygiene",
-				Warning:    "Global Title contains technical metadata",
-				Passed:     false,
-				Severity:   "warning",
-				Actual:     title,
-			}
+	if TitleHygieneNeedsFix(title, meta) {
+		return &CheckResult{
+			Identifier: config.CheckMatroskaTitleHygiene,
+			Warning:    "Global Title contains technical metadata",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     title,
 		}
 	}
 
 	return nil
+}
+
+// TitleHygieneNeedsFix reports whether a container title should be cleared.
+// It mirrors checkTitleHygiene's metadata-aware exemption so fix never clears a
+// title that check would accept as the parsed/official title.
+func TitleHygieneNeedsFix(title string, meta *metadata.Metadata) bool {
+	if title == "" {
+		return false
+	}
+
+	if meta != nil && meta.Title != "" {
+		if normalizeForComparison(title) == normalizeForComparison(meta.Title) {
+			return false
+		}
+	}
+
+	return matchesAnyPattern(title, titleJunkPatterns)
 }
 
 func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
@@ -89,32 +103,42 @@ func checkAppHygiene(ebml *matroska.EbmlMetadata) *CheckResult {
 		return nil
 	}
 
-	junkPatterns := []string{
-		`[a-zA-Z]:\\`,            // Windows paths
-		`/(home|Users|var|tmp)/`, // Unix paths
-		`\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`, // UUID
-	}
-
-	for _, p := range junkPatterns {
-		re := regexp.MustCompile("(?i)" + p)
-		if re.MatchString(app) {
-			return &CheckResult{
-				Identifier: "matroska_app_hygiene",
-				Warning:    "Writing Application metadata contains potentially identifiable information",
-				Passed:     false,
-				Severity:   "warning",
-				Actual:     app,
-			}
+	if AppHygieneNeedsFix(app) {
+		return &CheckResult{
+			Identifier: config.CheckMatroskaAppHygiene,
+			Warning:    "Writing Application metadata contains potentially identifiable information",
+			Passed:     false,
+			Severity:   "warning",
+			Actual:     app,
 		}
 	}
 
 	return nil
 }
 
+// AppHygieneNeedsFix reports whether WritingApplication should be cleared.
+func AppHygieneNeedsFix(app string) bool {
+	if app == "" {
+		return false
+	}
+
+	return matchesAnyPattern(app, appJunkPatterns)
+}
+
+func matchesAnyPattern(value string, patterns []string) bool {
+	for _, p := range patterns {
+		if regexp.MustCompile("(?i)" + p).MatchString(value) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // checkTrueHDCompatibility checks if a Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/EAC3) in the same language.
 func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_truehd_compatibility",
+		Identifier: config.CheckMatroskaTruehdCompatibility,
 		Warning:    "TrueHD track is not followed by a lossy compatibility track",
 		Passed:     true,
 	}
@@ -174,7 +198,7 @@ func checkTrueHDCompatibility(tracks []matroska.EbmlTrack) *CheckResult {
 
 func checkCommentaryChannels(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_commentary_channels",
+		Identifier: config.CheckMatroskaCommentaryChannels,
 		Warning:    "Commentary audio track has more than 2 channels",
 		Passed:     true,
 	}
@@ -227,7 +251,7 @@ func checkCommentaryBitrate(filePath string, tracks []matroska.EbmlTrack) *Check
 	}
 
 	res := &CheckResult{
-		Identifier: "matroska_commentary_bitrate",
+		Identifier: config.CheckMatroskaCommentaryBitrate,
 		Warning:    "Commentary audio track bitrate exceeds 128 kbps",
 		Passed:     true,
 	}
@@ -273,11 +297,16 @@ func verifyCommentaryTrackBitrate(track *matroska.EbmlTrack, miAudioTracks map[s
 	return nil
 }
 
-var commentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
+var (
+	// CommentaryPrefixRegex matches standard commentary attribution prefixes.
+	CommentaryPrefixRegex = regexp.MustCompile(`^(?:.*/\s*)?(?:Commentary by|Isolated score with commentary by)\b`)
+	commentaryByRegex     = regexp.MustCompile(`(?i)commentary by`)
+	isolatedScoreRegex    = regexp.MustCompile(`(?i)isolated score`)
+)
 
 func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_commentary_prefix",
+		Identifier: config.CheckMatroskaCommentaryPrefix,
 		Warning:    "Commentary track name does not start with a standard prefix",
 		Passed:     true,
 	}
@@ -295,7 +324,7 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 				continue
 			}
 
-			if !commentaryPrefixRegex.MatchString(name) {
+			if !CommentaryPrefixRegex.MatchString(name) {
 				res.Passed = false
 				res.Severity = "warning"
 				res.Tracks = append(res.Tracks, ebmlTrackToResult(track, false, fmt.Sprintf("Track name %q does not start with standard prefix (e.g., \"Commentary by ...\")", name)))
@@ -310,19 +339,25 @@ func checkCommentaryPrefix(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
-func extractCoreCommentaryName(name string) string {
-	lowerName := strings.ToLower(name)
-	if idx := strings.Index(lowerName, "commentary by"); idx != -1 {
-		name = name[idx:]
-	} else if idx := strings.Index(lowerName, "isolated score"); idx != -1 {
-		name = name[idx:]
+// ExtractCommentaryCoreOriginalCase returns the core identifying part of a commentary
+// track name with original case preserved and without SDH stripping.
+func ExtractCommentaryCoreOriginalCase(name string) string {
+	if loc := commentaryByRegex.FindStringIndex(name); loc != nil {
+		name = name[loc[0]:]
+	} else if loc := isolatedScoreRegex.FindStringIndex(name); loc != nil {
+		name = name[loc[0]:]
 	} else {
-		if idx := strings.Index(name, "/"); idx != -1 {
-			name = name[idx+1:]
+		if _, after, ok := strings.Cut(name, "/"); ok {
+			name = after
 		}
 	}
 
-	name = strings.TrimSpace(name)
+	return strings.TrimSpace(name)
+}
+
+// ExtractCommentaryCore returns the core identifying part of a commentary track name.
+func ExtractCommentaryCore(name string) string {
+	name = ExtractCommentaryCoreOriginalCase(name)
 	name = strings.ReplaceAll(name, "(SDH)", "")
 	name = strings.ReplaceAll(name, "[SDH]", "")
 	name = strings.ReplaceAll(name, "SDH", "")
@@ -332,7 +367,7 @@ func extractCoreCommentaryName(name string) string {
 
 func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_commentary_pairing",
+		Identifier: config.CheckMatroskaCommentaryPairing,
 		Warning:    "Commentary subtitle track name does not match any audio commentary track name",
 		Passed:     true,
 	}
@@ -343,7 +378,7 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 		track := &tracks[i]
 
 		if track.Type == "audio" && track.Properties.Commentary {
-			core := extractCoreCommentaryName(track.Properties.Name)
+			core := ExtractCommentaryCore(track.Properties.Name)
 			audioCommentaries = append(audioCommentaries, core)
 		}
 	}
@@ -352,7 +387,7 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 		track := &tracks[i]
 
 		if track.Type == "subtitles" && track.Properties.Commentary {
-			core := extractCoreCommentaryName(track.Properties.Name)
+			core := ExtractCommentaryCore(track.Properties.Name)
 
 			if !slices.Contains(audioCommentaries, core) {
 				res.Passed = false
@@ -369,9 +404,66 @@ func checkCommentaryPairing(tracks []matroska.EbmlTrack) *CheckResult {
 	return nil
 }
 
+// CreationTimeTagKeys lists the raw Matroska tag Name values that
+// matroska_creation_time_privacy treats as an encode/creation-time privacy
+// concern when found in a track's or the file's global Tags. Shared with
+// internal/correct's tag-stripping fix so the two can never disagree about
+// which tag names carry creation-time metadata.
+var CreationTimeTagKeys = []string{
+	"creation_time",
+	"ENCODED_DATE",
+	"DATE_ENCODED",
+	"DATE_TAGGED",
+	"_STATISTICS_WRITING_DATE_UTC",
+	"DATE",
+}
+
+// ContainerCreationTimeNeedsFix reports whether the Segment-level DateUTC
+// (and its derived DateLocal display value) should be cleared, matching
+// matroska_creation_time_privacy's container-level criteria.
+func ContainerCreationTimeNeedsFix(ebml *matroska.EbmlMetadata) bool {
+	return ebml.Container.Properties.DateUtc != "" || ebml.Container.Properties.DateLocal != ""
+}
+
+// emptyTagRegex matches a <Tag> element left with a Targets child and no
+// remaining Simple entries, non-greedy up to the first closing Targets tag
+// (Targets elements don't nest, so this is unambiguous).
+var emptyTagRegex = regexp.MustCompile(`(?is)<Tag>\s*(<Targets\s*/>|<Targets>.*?</Targets>)\s*</Tag>`)
+
+// StripCreationTimeTags removes <Simple> tag entries (global or per-track)
+// whose <Name> is one of CreationTimeTagKeys from tagsXML (as extracted by
+// matroska.ExtractTagsXML), along with any <Tag> block left with no Simple
+// children as a result. Matching is done on the raw XML text rather than a
+// full parse and remarshal: the Tags schema's Targets element can carry
+// TrackUID/EditionUID/ChapterUID/AttachmentUID children this package
+// otherwise doesn't model, and a lossy round trip through an incomplete
+// struct could silently drop a tag's association with its track. Returns
+// the original content unchanged and a nil name list when nothing matched.
+func StripCreationTimeTags(tagsXML []byte) ([]byte, []string) {
+	content := tagsXML
+
+	var removed []string
+
+	for _, key := range CreationTimeTagKeys {
+		re := regexp.MustCompile(`(?is)\s*<Simple>\s*<Name>` + regexp.QuoteMeta(key) + `</Name>.*?</Simple>`)
+		if re.Match(content) {
+			removed = append(removed, key)
+			content = re.ReplaceAll(content, nil)
+		}
+	}
+
+	if len(removed) == 0 {
+		return tagsXML, nil
+	}
+
+	content = emptyTagRegex.ReplaceAll(content, nil)
+
+	return content, removed
+}
+
 func checkCreationTimePrivacy(filePath string, ebml *matroska.EbmlMetadata) *CheckResult {
 	res := &CheckResult{
-		Identifier: "matroska_creation_time_privacy",
+		Identifier: config.CheckMatroskaCreationTimePrivacy,
 		Warning:    "Privacy concern: file contains creation/encode time metadata",
 		Passed:     true,
 		Severity:   "info",
@@ -407,14 +499,12 @@ func appendMediaInfoCreationTimePrivacy(mi *mediainfo.MediaInfo, res *CheckResul
 		t := &mi.Media.Tracks[i]
 
 		fields := map[string]string{
-			"Encoded_Date":                 t.EncodedDate,
-			"Tagged_Date":                  t.TaggedDate,
-			"creation_time":                t.Extra.GetString("creation_time"),
-			"ENCODED_DATE":                 t.Extra.GetString("ENCODED_DATE"),
-			"DATE_ENCODED":                 t.Extra.GetString("DATE_ENCODED"),
-			"DATE_TAGGED":                  t.Extra.GetString("DATE_TAGGED"),
-			"_STATISTICS_WRITING_DATE_UTC": t.Extra.GetString("_STATISTICS_WRITING_DATE_UTC"),
-			"DATE":                         t.Extra.GetString("DATE"),
+			"Encoded_Date": t.EncodedDate,
+			"Tagged_Date":  t.TaggedDate,
+		}
+
+		for _, key := range CreationTimeTagKeys {
+			fields[key] = t.Extra.GetString(key)
 		}
 
 		for k, v := range fields {

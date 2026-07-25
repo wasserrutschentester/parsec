@@ -142,7 +142,7 @@ func TestCheckChaptersKeyframeAlignmentAligned(t *testing.T) {
 	res := runTrackChecks(filePath, ebml, xmlChs, nil, nil)
 
 	for _, r := range res {
-		if r.Identifier == "matroska_chapters_keyframe_alignment" {
+		if r.Identifier == config.CheckMatroskaChaptersKeyframeAlignment {
 			if !r.Passed {
 				t.Errorf("Expected alignment check to pass, got warning: %s", r.Warning)
 			}
@@ -188,7 +188,7 @@ func TestCheckChaptersKeyframeAlignmentNonAligned(t *testing.T) {
 	found := false
 
 	for _, r := range res {
-		if r.Identifier == "matroska_chapters_keyframe_alignment" {
+		if r.Identifier == config.CheckMatroskaChaptersKeyframeAlignment {
 			found = true
 
 			if r.Passed {
@@ -297,7 +297,7 @@ func runAsymmetricCheck(filePath string, timeStarts []int64) []CheckResult {
 
 func findAlignmentResult(res []CheckResult) *CheckResult {
 	for i := range res {
-		if res[i].Identifier == "matroska_chapters_keyframe_alignment" {
+		if res[i].Identifier == config.CheckMatroskaChaptersKeyframeAlignment {
 			return &res[i]
 		}
 	}

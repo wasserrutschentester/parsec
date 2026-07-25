@@ -51,7 +51,7 @@ func TestFormatStringDiff(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := formatStringDiff(tt.old, tt.new)
+			got := FormatStringDiff(tt.old, tt.new)
 			if got == "" {
 				t.Error("formatStringDiff returned empty string")
 			}

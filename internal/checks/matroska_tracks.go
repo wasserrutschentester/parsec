@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	dtsRegex        = regexp.MustCompile(`\bDTS\b`)
-	adRegex         = regexp.MustCompile(`\bAD\b`)
+	dtsRegex = regexp.MustCompile(`\bDTS\b`)
+	// ADRegex matches a standalone "AD" audio-description token in a track name.
+	ADRegex         = regexp.MustCompile(`\bAD\b`)
 	wordSplitRegex  = regexp.MustCompile(`[\s/.,;()]+`)
 	commonLangNames = map[string]string{
 		"english": "en", "german": "de", "french": "fr", "spanish": "es",
@@ -31,8 +32,10 @@ var (
 		"한국어": "ko", "русский": "ru",
 	}
 
-	junkKeywords = []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
-	simpleCodecs = []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
+	// JunkKeywords are stripped from track names by the name-quality fix policy.
+	JunkKeywords = []string{"STEREO", "SURROUND", "EXTERNAL", "UPLOADED", "ENCODED"}
+	// SimpleCodecs are simple codec-name tokens stripped from track names.
+	SimpleCodecs = []string{"AC3", "AAC", "E-AC3", "EAC3", "FLAC"}
 )
 
 const (
@@ -71,7 +74,7 @@ const (
 func checkTrackOrder(track, prevTrack *matroska.EbmlTrack, priority int64, lastPriority *int64, description string, reportedTracks map[int]bool) *CheckResult {
 	if priority < *lastPriority {
 		res := &CheckResult{
-			Identifier: "matroska_track_order",
+			Identifier: config.CheckMatroskaTrackOrder,
 			Warning:    description,
 			Passed:     false,
 			Severity:   "warning",
@@ -112,11 +115,11 @@ func formatPriority(p int64) string {
 
 func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
-	for _, junk := range junkKeywords {
+	for _, junk := range JunkKeywords {
 		if strings.Contains(nameUpper, junk) {
 			warning := fmt.Sprintf("junk keyword '%s' in Name", ui.Warning.Render(junk))
 
-			return newFailedTrackResult("matroska_name_quality", "Track Name contains junk keywords", "info", &track, warning)
+			return newFailedTrackResult(config.CheckMatroskaNameQuality, "Track Name contains junk keywords", "info", &track, warning)
 		}
 	}
 
@@ -125,11 +128,11 @@ func checkTrackNameQuality(track matroska.EbmlTrack) *CheckResult {
 
 func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 	nameUpper := strings.ToUpper(track.Properties.Name)
-	for _, codec := range simpleCodecs {
+	for _, codec := range SimpleCodecs {
 		if strings.Contains(nameUpper, codec) {
 			warning := fmt.Sprintf("simple codec '%s' in Name", ui.Warning.Render(codec))
 
-			return newFailedTrackResult("matroska_name_codecs", "Track Name contains simple codec", "info", &track, warning)
+			return newFailedTrackResult(config.CheckMatroskaNameCodecs, "Track Name contains simple codec", "info", &track, warning)
 		}
 	}
 	// Special handling for DTS (allow DTS-HD, DTS:X etc)
@@ -137,7 +140,7 @@ func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 		if dtsRegex.MatchString(nameUpper) {
 			warning := fmt.Sprintf("simple codec '%s' in Name", ui.Warning.Render("DTS"))
 
-			return newFailedTrackResult("matroska_name_codecs", "Track Name contains simple codec", "info", &track, warning)
+			return newFailedTrackResult(config.CheckMatroskaNameCodecs, "Track Name contains simple codec", "info", &track, warning)
 		}
 	}
 
@@ -146,7 +149,7 @@ func checkTrackNameCodecs(track matroska.EbmlTrack) *CheckResult {
 
 func checkTrackNameRedundantLang(track matroska.EbmlTrack) *CheckResult {
 	if isRedundantLanguageName(track.Properties.Name, track.Properties.Language) {
-		return newFailedTrackResult("matroska_name_redundant_lang", "Track Name contains redundant language name", "info", &track, ui.Warning.Render("redundant language in Name"))
+		return newFailedTrackResult(config.CheckMatroskaNameRedundantLang, "Track Name contains redundant language name", "info", &track, ui.Warning.Render("redundant language in Name"))
 	}
 
 	return nil
@@ -158,7 +161,7 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	target := base.String()
 
 	for _, word := range tokenizeTrackName(name) {
-		if getLanguageCodeFromName(word) == target {
+		if GetLanguageCodeFromName(word) == target {
 			return true
 		}
 	}
@@ -166,7 +169,8 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	return false
 }
 
-func countLanguagesInString(name string) int {
+// CountLanguagesInString counts recognizable language names found in a track name.
+func CountLanguagesInString(name string) int {
 	count := 0
 
 	for _, word := range tokenizeTrackName(name) {
@@ -187,10 +191,11 @@ func tokenizeTrackName(name string) []string {
 }
 
 func isLanguageName(word string) bool {
-	return getLanguageCodeFromName(word) != ""
+	return GetLanguageCodeFromName(word) != ""
 }
 
-func getLanguageCodeFromName(word string) string {
+// GetLanguageCodeFromName maps a language word to its BCP-47 base code.
+func GetLanguageCodeFromName(word string) string {
 	if len(word) <= 3 {
 		return ""
 	}
@@ -226,7 +231,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 
 	shouldBeDefault := false
 	if !isSpecialized {
-		shouldBeDefault = determineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
+		shouldBeDefault = DetermineShouldBeDefault(track, audioCounts, subCounts, seenAudioLangs, seenSubLangs)
 	}
 
 	if props.Default != shouldBeDefault {
@@ -241,7 +246,7 @@ func checkDefaultFlags(track matroska.EbmlTrack, audioCounts, subCounts map[stri
 			return nil
 		}
 
-		return newFailedTrackResult("matroska_default_flags", "Default flags aren't correctly Assigned", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaDefaultFlags, "Default flags aren't correctly Assigned", "warning", &track, warning)
 	}
 
 	return nil
@@ -268,13 +273,14 @@ func checkTrackDelay(track matroska.EbmlTrack) *CheckResult {
 	if absDelay > maxDelayNs {
 		warning := fmt.Sprintf("delay of %dms exceeds ±1001ms", track.Properties.CodecDelay/1000000)
 
-		return newFailedTrackResult("matroska_track_delay", "Excessive Container Delay", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaTrackDelay, "Excessive Container Delay", "warning", &track, warning)
 	}
 
 	return nil
 }
 
-func determineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
+// DetermineShouldBeDefault decides the default-flag policy for a track.
+func DetermineShouldBeDefault(track matroska.EbmlTrack, audioCounts, subCounts map[string]int, seenAudioLangs, seenSubLangs map[string]bool) bool {
 	switch track.Type {
 	case "audio":
 		return shouldTrackBeDefault(track, audioCounts, seenAudioLangs)
@@ -307,7 +313,7 @@ func shouldTrackBeDefault(track matroska.EbmlTrack, counts map[string]int, seenL
 func checkOriginalLanguageConsistency(track matroska.EbmlTrack, langHasOriginalFlag map[string]bool) *CheckResult {
 	lang := track.Properties.Language
 	if langHasOriginalFlag[lang] && !track.Properties.OriginalLanguage {
-		return newFailedTrackResult("matroska_original_language", "Some but not all Original language tracks have the flag set", "info", &track, "missing Original flag")
+		return newFailedTrackResult(config.CheckMatroskaOriginalLanguage, "Some but not all Original language tracks have the flag set", "info", &track, "missing Original flag")
 	}
 
 	return nil
@@ -322,7 +328,7 @@ func checkDuplicateTracks(track *matroska.EbmlTrack, seenTracks map[string]*matr
 		props.Commentary, props.OriginalLanguage, props.Name)
 	if firstTrack, ok := seenTracks[trackKey]; ok {
 		res := &CheckResult{
-			Identifier: "matroska_duplicate_tracks",
+			Identifier: config.CheckMatroskaDuplicateTracks,
 			Warning:    "Duplicate tracks (same Language, Flags and Name) were found",
 			Passed:     false,
 			Severity:   "warning",
@@ -358,14 +364,14 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 		return res
 	}
 
-	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || adRegex.MatchString(nameUpper)
+	hasVIKeyword := strings.Contains(nameUpper, "DESCRIPTIVE") || strings.Contains(nameUpper, "DESCRIPTION") || ADRegex.MatchString(nameUpper)
 	if res := checkFlagKeywordResult(track, props.VisualImpaired, "Visual Impaired", "Descriptive', 'Description', or 'AD", hasVIKeyword); res != nil {
 		return res
 	}
 
 	if props.Language == "mul" {
-		if countLanguagesInString(props.Name) < 2 {
-			return newFailedTrackResult("matroska_name_keywords", "Track Name and Flags don't match", "warning", &track, fmt.Sprintf("'mul' but Name has %s names", ui.Warning.Render("<2 language")))
+		if CountLanguagesInString(props.Name) < 2 {
+			return newFailedTrackResult(config.CheckMatroskaNameKeywords, "Track Name and Flags don't match", "warning", &track, fmt.Sprintf("'mul' but Name has %s names", ui.Warning.Render("<2 language")))
 		}
 	}
 
@@ -373,7 +379,7 @@ func checkNameKeywords(track matroska.EbmlTrack) *CheckResult {
 }
 
 func checkFlagKeywordResult(track matroska.EbmlTrack, flag bool, flagName, keywordStr string, hasKeyword bool) *CheckResult {
-	identifier := "matroska_name_keywords"
+	identifier := config.CheckMatroskaNameKeywords
 	checkWarning := "Track Name and Flags don't match"
 
 	if flag && !hasKeyword {
@@ -422,11 +428,19 @@ func getCommentarySubPriority(name string) int64 {
 	}
 }
 
-func getTrackPriority(track matroska.EbmlTrack) int64 {
-	langScore := calculateLangScore(track.Properties.Language, track.Properties.OriginalLanguage)
+// GetTrackPriority computes a sort priority for audio/subtitle tracks.
+func GetTrackPriority(track matroska.EbmlTrack, originalLang string) int64 {
+	isOriginal := false
+	if originalLang != "" {
+		isOriginal = metadata.MatchLanguage(language.Make(track.Properties.Language), language.Make(originalLang))
+	}
+
+	langScore := calculateLangScore(track.Properties.Language, isOriginal)
 	propertyScore := calculatePropertyScore(track) & maskProperty
 
-	if track.Properties.Commentary {
+	isCommentary := track.Properties.Commentary || strings.Contains(strings.ToUpper(track.Properties.Name), "COMMENTARY")
+
+	if isCommentary {
 		commentaryScore := getCommentaryPriority(track)
 		if track.Type == "audio" {
 			// Audio commentaries: Grouped at the absolute end, ordered strictly by notability & properties (ignoring language)
@@ -538,12 +552,12 @@ func validateTrackBasics(track matroska.EbmlTrack) *CheckResult {
 	lang := track.Properties.Language
 
 	tag := language.Make(lang)
-	if config.IsCheckEnabled("matroska_language_tag") && tag == language.Und {
-		return newFailedTrackResult("matroska_language_tag", "Track doesn't have valid language tag", "warning", &track, ui.Error.Render("missing or invalid language tag"))
+	if config.IsCheckEnabled(config.CheckMatroskaLanguageTag) && tag == language.Und {
+		return newFailedTrackResult(config.CheckMatroskaLanguageTag, "Track doesn't have valid language tag", "warning", &track, ui.Error.Render("missing or invalid language tag"))
 	}
 
-	if config.IsCheckEnabled("matroska_multi_lang") && metadata.MatchLanguage(tag, language.Make("mul")) && track.Properties.Name == "" {
-		return newFailedTrackResult("matroska_multi_lang", "Multi-language track must have a Name", "warning", &track, ui.Warning.Render("missing Name")+" for 'mul' language")
+	if config.IsCheckEnabled(config.CheckMatroskaMultiLang) && metadata.MatchLanguage(tag, language.Make("mul")) && track.Properties.Name == "" {
+		return newFailedTrackResult(config.CheckMatroskaMultiLang, "Multi-language track must have a Name", "warning", &track, ui.Warning.Render("missing Name")+" for 'mul' language")
 	}
 
 	return nil

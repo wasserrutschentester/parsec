@@ -46,6 +46,7 @@ video_codec_hevc = "H.265"
 [api_keys]
 tmdb = "your_tmdb_api_key"
 tvdb = "your_tvdb_api_key"
+google_fonts = "" # optional; only needed for missing subtitle font downloads
 
 [preset.marvel]
 description = "Pin metadata to Loki (2021)"
@@ -83,6 +84,7 @@ These options can only be set at the top level of the configuration file and are
 |-----|------|-------------|
 | `api_keys.tmdb` | string | API key for TMDB. |
 | `api_keys.tvdb` | string | API key for TVDB. |
+| `api_keys.google_fonts` | string | Optional Google Fonts Developer API key. Used by `correct` only when a missing subtitle font is not found locally or in the keyless Google Fonts GitHub repository. |
 
 #### Prowlarr Settings
 
@@ -166,6 +168,8 @@ Provide specific IDs to ensure the correct metadata is fetched from databases.
 
 You can enable or disable specific quality checks on a per-preset basis.
 See [Validation Checks](checks.md) for more details about what checks are availible
+
+This setting is also respected by the [`fix`](fix.md) command: a disabled check is neither reported nor auto-fixed.
 
 | Key | Type | Description |
 |-----|------|-------------|

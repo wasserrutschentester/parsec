@@ -18,7 +18,8 @@ var (
 	fontSeparatorReplacer = strings.NewReplacer(" ", "", "-", "", "_", "")
 )
 
-type fontStyle struct {
+// FontStyle identifies a font by family, weight and italic flag.
+type FontStyle struct {
 	Family string
 	Weight int
 	Italic bool
@@ -38,65 +39,35 @@ func checkSubtitleFormat(track matroska.EbmlTrack) *CheckResult {
 		warning := "text-based but codec is " + codec
 		track.Codec = ui.Warning.Render(track.Codec)
 
-		return newFailedTrackResult("matroska_subtitle_format", "Text subtitle track should converted to SRT", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaSubtitleFormat, "Text subtitle track should converted to SRT", "warning", &track, warning)
 	}
 
 	return nil
 }
 
-func checkSubtitleFonts(track matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
+func checkSubtitleFonts(track matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
 	if !isASSSubtitles(track) {
 		return nil
 	}
 
-	privateBytes, err := track.Properties.DecodeCodecPrivate()
-	if err != nil || len(privateBytes) == 0 {
-		return nil
-	}
-
-	usedFonts := make(map[fontStyle]bool)
-	lines := strings.Split(string(privateBytes), "\n")
-	parseFontsFromStyles(lines, usedFonts)
-
-	if len(usedFonts) == 0 {
-		return nil
-	}
-
-	for font := range usedFonts {
-		allUsedFonts[font] = true
-	}
-
-	missing := findMissingFonts(usedFonts, attachmentFonts)
+	missing := GetMissingFontsForTrack(track, nil, attachmentFonts, true, false)
 
 	if len(missing) > 0 {
 		warning := "missing fonts (Styles): " + strings.Join(missing, ", ")
 
-		return newFailedTrackResult("matroska_subtitle_fonts", "SSA/ASS subtitle track uses fonts in Styles not included as attachments", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaSubtitleFonts, "SSA/ASS subtitle track uses fonts in Styles not included as attachments", "warning", &track, warning)
 	}
 
 	return nil
 }
 
-func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo, content []byte, allUsedFonts map[fontStyle]bool) *CheckResult {
-	usedFonts := make(map[fontStyle]bool)
-	styleConfigs := parseStyleConfigs(content)
-
-	parseFontsFromInlineTagsWithState(content, styleConfigs, usedFonts)
-
-	if len(usedFonts) == 0 {
-		return nil
-	}
-
-	for font := range usedFonts {
-		allUsedFonts[font] = true
-	}
-
-	missing := findMissingFonts(usedFonts, attachmentFonts)
+func checkSubtitleInlineFontsWithContent(track matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo, content []byte) *CheckResult {
+	missing := GetMissingFontsForTrack(track, content, attachmentFonts, false, true)
 
 	if len(missing) > 0 {
 		warning := "missing fonts (Inline): " + strings.Join(missing, ", ")
 
-		return newFailedTrackResult("matroska_subtitle_inline_fonts", "SSA/ASS subtitle track uses fonts in inline tags not included as attachments", "warning", &track, warning)
+		return newFailedTrackResult(config.CheckMatroskaSubtitleInlineFonts, "SSA/ASS subtitle track uses fonts in inline tags not included as attachments", "warning", &track, warning)
 	}
 
 	return nil
@@ -112,7 +83,7 @@ func checkASSScriptInfo(track matroska.EbmlTrack, videoWidth, videoHeight int) *
 	errors := validateScriptInfo(info, videoWidth, videoHeight)
 
 	if len(errors) > 0 {
-		res := newFailedTrackResult("matroska_ass_script_info", "ASS Script Info missing recommended headers", "info", &track, "")
+		res := newFailedTrackResult(config.CheckMatroskaAssScriptInfo, "ASS Script Info missing recommended headers", "info", &track, "")
 		res.Tracks[0].List = errors
 
 		return res
@@ -247,7 +218,7 @@ func checkASSStyles(track matroska.EbmlTrack) *CheckResult {
 	rows := validateStyles(lines)
 
 	if len(rows) > 0 {
-		res := newFailedTrackResult("matroska_ass_styles", "ASS Style validation failed", "warning", &track, "See table below")
+		res := newFailedTrackResult(config.CheckMatroskaAssStyles, "ASS Style validation failed", "warning", &track, "See table below")
 		res.Tracks[0].Table = &types.TableData{
 			Headers: []string{"Line #", "Style Name", "Validation Issue"},
 			Rows:    rows,
@@ -410,7 +381,7 @@ func checkASSEvents(track matroska.EbmlTrack, content []byte) *CheckResult {
 	errors := validateEvents(lines, definedStyles)
 
 	if len(errors) > 0 {
-		res := newFailedTrackResult("matroska_ass_events", "ASS Event validation failed", "warning", &track, "")
+		res := newFailedTrackResult(config.CheckMatroskaAssEvents, "ASS Event validation failed", "warning", &track, "")
 		res.Tracks[0].List = errors
 
 		return res
@@ -588,7 +559,7 @@ func isSRTSubtitles(track matroska.EbmlTrack) bool {
 	return track.Type == "subtitles" && strings.Contains(track.Codec, "SRT")
 }
 
-func hasMatchingAttachmentNorm(font fontStyle, normalizedFamily string, normAtts []normalizedAttachmentFont) bool {
+func hasMatchingAttachmentNorm(font FontStyle, normalizedFamily string, normAtts []normalizedAttachmentFont) bool {
 	for _, att := range normAtts {
 		if att.normalizedPostScript == normalizedFamily {
 			return true
@@ -604,7 +575,7 @@ func hasMatchingAttachmentNorm(font fontStyle, normalizedFamily string, normAtts
 	return false
 }
 
-func formatMissingFontDesc(font fontStyle) string {
+func formatMissingFontDesc(font FontStyle) string {
 	styleDesc := ""
 
 	switch {
@@ -621,14 +592,14 @@ func formatMissingFontDesc(font fontStyle) string {
 	return fmt.Sprintf("%s%s", font.Family, styleDesc)
 }
 
-func findMissingFonts(usedFonts map[fontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo) []string {
+func findMissingFonts(usedFonts map[FontStyle]bool, attachmentFonts []matroska.AttachmentFontInfo) []string {
 	var missing []string
 
 	normAtts := make([]normalizedAttachmentFont, len(attachmentFonts))
 	for i, att := range attachmentFonts {
 		normAtts[i] = normalizedAttachmentFont{
-			normalizedPostScript: normalizeFontName(att.PostScriptName),
-			normalizedFamily:     normalizeFontName(att.FamilyName),
+			normalizedPostScript: NormalizeFontName(att.PostScriptName),
+			normalizedFamily:     NormalizeFontName(att.FamilyName),
 			italic:               att.Italic,
 			weight:               att.Weight,
 			isVariable:           att.IsVariable,
@@ -636,7 +607,7 @@ func findMissingFonts(usedFonts map[fontStyle]bool, attachmentFonts []matroska.A
 	}
 
 	for font := range usedFonts {
-		normalizedFamily := normalizeFontName(font.Family)
+		normalizedFamily := NormalizeFontName(font.Family)
 		if !hasMatchingAttachmentNorm(font, normalizedFamily, normAtts) {
 			missing = append(missing, formatMissingFontDesc(font))
 		}
@@ -659,12 +630,14 @@ func matchWeight(attWeight, requestedWeight int) bool {
 	return attWeight > 300 && attWeight < 600
 }
 
-func normalizeFontName(name string) string {
+// NormalizeFontName standardizes a font name for case-insensitive matching.
+func NormalizeFontName(name string) string {
 	// Remove common separators and convert to lowercase for robust matching
 	return strings.ToLower(fontSeparatorReplacer.Replace(name))
 }
 
-func isFontAttachment(att matroska.EbmlAttachment) bool {
+// IsFontAttachment detects font attachments by file extension or MIME type.
+func IsFontAttachment(att matroska.EbmlAttachment) bool {
 	lowerName := strings.ToLower(att.FileName)
 	if strings.HasSuffix(lowerName, ".ttf") || strings.HasSuffix(lowerName, ".otf") || strings.HasSuffix(lowerName, ".ttc") {
 		return true
@@ -713,14 +686,20 @@ func isAttachmentUsedNorm(attID int, normAtts []normalizedAttachmentFontID, norm
 	return false
 }
 
-func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) [][]string {
+// UnusedFont represents a font attachment that is either genuinely unused or a duplicate of another used font.
+type UnusedFont struct {
+	Attachment matroska.EbmlAttachment
+	Reason     string
+}
+
+func getUnusedFontsTableRows(unused []UnusedFont, attachmentFonts []matroska.AttachmentFontInfo) [][]string {
 	rows := make([][]string, 0, len(unused))
 
 	for _, u := range unused {
 		fontName := "-"
 
 		for _, fInfo := range attachmentFonts {
-			if fInfo.AttachmentID == u.ID {
+			if fInfo.AttachmentID == u.Attachment.ID {
 				if len(fInfo.FullNames) > 0 {
 					fontName = strings.Join(fInfo.FullNames, ", ")
 				} else if fInfo.FamilyName != "" {
@@ -736,31 +715,33 @@ func getUnusedFontsTableRows(unused []matroska.EbmlAttachment, attachmentFonts [
 		const unit = 1024
 
 		switch {
-		case u.Size < unit:
-			sizeStr = fmt.Sprintf("%d B", u.Size)
-		case u.Size < unit*unit:
-			sizeStr = fmt.Sprintf("%.1f KB", float64(u.Size)/float64(unit))
+		case u.Attachment.Size < unit:
+			sizeStr = fmt.Sprintf("%d B", u.Attachment.Size)
+		case u.Attachment.Size < unit*unit:
+			sizeStr = fmt.Sprintf("%.1f KB", float64(u.Attachment.Size)/float64(unit))
 		default:
-			sizeStr = fmt.Sprintf("%.1f MB", float64(u.Size)/float64(unit*unit))
+			sizeStr = fmt.Sprintf("%.1f MB", float64(u.Attachment.Size)/float64(unit*unit))
 		}
 
-		rows = append(rows, []string{u.FileName, fontName, sizeStr})
+		rows = append(rows, []string{strconv.Itoa(u.Attachment.ID), u.Attachment.FileName, fontName, sizeStr, u.Reason})
 	}
 
 	return rows
 }
 
-func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[fontStyle]bool) *CheckResult {
-	if len(attachments) == 0 {
-		return nil
-	}
-
-	var unused []matroska.EbmlAttachment
+// UnusedFontAttachments returns the font attachments not referenced by
+// any subtitle track, matching by PostScript name or by family+italic+weight
+// (variable fonts match any weight). This is the single source of truth for
+// "is this font attachment used": both the matroska_unused_fonts check and
+// internal/correct's removal/rename fix computations call this same
+// function, so they can never disagree about which attachments are unused.
+func UnusedFontAttachments(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[FontStyle]bool) []UnusedFont {
+	var unused []UnusedFont
 
 	normalizedUsed := make([]normalizedUsedFont, 0, len(allUsedFonts))
 	for font := range allUsedFonts {
 		normalizedUsed = append(normalizedUsed, normalizedUsedFont{
-			family: normalizeFontName(font.Family),
+			family: NormalizeFontName(font.Family),
 			italic: font.Italic,
 			weight: font.Weight,
 		})
@@ -770,33 +751,67 @@ func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []m
 	for i, att := range attachmentFonts {
 		normAtts[i] = normalizedAttachmentFontID{
 			attachmentID:         att.AttachmentID,
-			normalizedPostScript: normalizeFontName(att.PostScriptName),
-			normalizedFamily:     normalizeFontName(att.FamilyName),
+			normalizedPostScript: NormalizeFontName(att.PostScriptName),
+			normalizedFamily:     NormalizeFontName(att.FamilyName),
 			italic:               att.Italic,
 			weight:               att.Weight,
 			isVariable:           att.IsVariable,
 		}
 	}
 
+	usedProposed := make(map[string]matroska.EbmlAttachment)
+
 	for _, att := range attachments {
-		if isFontAttachment(att) && !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
-			unused = append(unused, att)
+		if !IsFontAttachment(att) {
+			continue
+		}
+
+		if !isAttachmentUsedNorm(att.ID, normAtts, normalizedUsed) {
+			unused = append(unused, UnusedFont{
+				Attachment: att,
+				Reason:     "Unused",
+			})
+
+			continue
+		}
+
+		proposed := ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
+		if proposed != "" {
+			proposedLower := strings.ToLower(proposed)
+			if original, ok := usedProposed[proposedLower]; ok {
+				unused = append(unused, UnusedFont{
+					Attachment: att,
+					Reason:     fmt.Sprintf("Duplicate of %s (ID %d)", original.FileName, original.ID),
+				})
+			} else {
+				usedProposed[proposedLower] = att
+			}
 		}
 	}
 
+	return unused
+}
+
+func checkUnusedFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo, allUsedFonts map[FontStyle]bool) *CheckResult {
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	unused := UnusedFontAttachments(attachments, attachmentFonts, allUsedFonts)
+
 	if len(unused) > 0 {
 		warning := "Font attachments not used by any subtitle track"
-		if !config.IsCheckEnabled("matroska_subtitle_inline_fonts") {
+		if !config.IsCheckEnabled(config.CheckMatroskaSubtitleInlineFonts) {
 			warning += " (some might be used by inline styles since matroska_subtitle_inline_fonts is disabled)"
 		}
 
 		return &CheckResult{
-			Identifier: "matroska_unused_fonts",
+			Identifier: config.CheckMatroskaUnusedFonts,
 			Warning:    warning,
 			Passed:     false,
 			Severity:   "warning",
 			Table: &types.TableData{
-				Headers: []string{"Attachment Name", "Full Name", "Size"},
+				Headers: []string{"ID", "Attachment Name", "Full Name", "Size", "Reason"},
 				Rows:    getUnusedFontsTableRows(unused, attachmentFonts),
 			},
 		}
@@ -835,7 +850,8 @@ func cleanFallbackFontName(fullName string, familyName string) string {
 	return strings.ReplaceAll(fullName, " ", "")
 }
 
-func getProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
+// ProposedFontFilename returns the compliant filename for a font attachment.
+func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matroska.AttachmentFontInfo) string {
 	var ext string
 
 	if idx := strings.LastIndex(attFileName, "."); idx != -1 {
@@ -861,17 +877,18 @@ func getProposedFontFilename(attFileName string, attID int, attachmentFonts []ma
 	return ""
 }
 
-func isAttachmentNameCompliant(attFileName string, names []string) bool {
+// FontFilenameCompliant reports whether an attachment filename matches an internal font name.
+func FontFilenameCompliant(attFileName string, names []string) bool {
 	baseName := attFileName
 
 	if idx := strings.LastIndex(baseName, "."); idx != -1 {
 		baseName = baseName[:idx]
 	}
 
-	normalizedFileName := normalizeFontName(baseName)
+	normalizedFileName := NormalizeFontName(baseName)
 
 	for _, internalName := range names {
-		if normalizeFontName(internalName) == normalizedFileName {
+		if NormalizeFontName(internalName) == normalizedFileName {
 			return true
 		}
 	}
@@ -879,17 +896,36 @@ func isAttachmentNameCompliant(attFileName string, names []string) bool {
 	return false
 }
 
-type fontComplianceRow struct {
-	attID    int
-	current  string
-	proposed string
+// ProposedFontRename contains a proposed rename for a non-compliant font attachment.
+type ProposedFontRename struct {
+	AttachmentID  int
+	CurrentName   string
+	ProposedName  string
+	InternalNames []string
 }
 
-func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []fontComplianceRow {
-	var nonCompliant []fontComplianceRow
+// ComputeProposedFontRenames computes the necessary font renames for non-compliant fonts.
+//
+//nolint:cyclop // Requires multiple passes and deduplication
+func ComputeProposedFontRenames(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) []ProposedFontRename {
+	var nonCompliant []ProposedFontRename
+
+	usedNewNames := make(map[string]bool)
+
+	// First pass: record names of compliant attachments
+	for _, att := range attachments {
+		if !IsFontAttachment(att) {
+			continue
+		}
+
+		names := getAttachmentFontNames(att.ID, attachmentFonts)
+		if len(names) > 0 && FontFilenameCompliant(att.FileName, names) {
+			usedNewNames[strings.ToLower(att.FileName)] = true
+		}
+	}
 
 	for _, att := range attachments {
-		if !isFontAttachment(att) {
+		if !IsFontAttachment(att) {
 			continue
 		}
 
@@ -898,16 +934,28 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 			continue
 		}
 
-		if !isAttachmentNameCompliant(att.FileName, names) {
-			proposed := getProposedFontFilename(att.FileName, att.ID, attachmentFonts)
-			if proposed == "" {
+		if !FontFilenameCompliant(att.FileName, names) {
+			proposed := ProposedFontFilename(att.FileName, att.ID, attachmentFonts)
+			if proposed != "" {
+				newName := proposed
+
+				counter := 2
+				for usedNewNames[strings.ToLower(newName)] {
+					newName = SuffixFontName(proposed, counter)
+					counter++
+				}
+
+				proposed = newName
+				usedNewNames[strings.ToLower(newName)] = true
+			} else {
 				proposed = "-"
 			}
 
-			nonCompliant = append(nonCompliant, fontComplianceRow{
-				attID:    att.ID,
-				current:  att.FileName,
-				proposed: proposed,
+			nonCompliant = append(nonCompliant, ProposedFontRename{
+				AttachmentID:  att.ID,
+				CurrentName:   att.FileName,
+				ProposedName:  proposed,
+				InternalNames: names,
 			})
 		}
 	}
@@ -915,8 +963,8 @@ func findNonCompliantFonts(attachments []matroska.EbmlAttachment, attachmentFont
 	return nonCompliant
 }
 
-func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
-	headers := []string{"Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
+func buildFontComplianceResult(nonCompliant []ProposedFontRename, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
+	headers := []string{"ID", "Attachment Name", "Full Name", "PostScript Name", "Proposed Name"}
 
 	var rows [][]string
 
@@ -924,7 +972,7 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 		var fInfo *matroska.AttachmentFontInfo
 
 		for _, f := range attachmentFonts {
-			if f.AttachmentID == row.attID {
+			if f.AttachmentID == row.AttachmentID {
 				fCopy := f
 				fInfo = &fCopy
 
@@ -944,16 +992,17 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 			}
 
 			rows = append(rows, []string{
-				row.current,
+				strconv.Itoa(row.AttachmentID),
+				row.CurrentName,
 				fullName,
 				psName,
-				row.proposed,
+				row.ProposedName,
 			})
 		}
 	}
 
 	return &CheckResult{
-		Identifier: "matroska_font_filename_compliance",
+		Identifier: config.CheckMatroskaFontFilenameCompliance,
 		Warning:    "Font attachment filenames do not match internal font names",
 		Passed:     false,
 		Severity:   "info",
@@ -965,7 +1014,7 @@ func buildFontComplianceResult(nonCompliant []fontComplianceRow, attachmentFonts
 }
 
 func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachmentFonts []matroska.AttachmentFontInfo) *CheckResult {
-	nonCompliant := findNonCompliantFonts(attachments, attachmentFonts)
+	nonCompliant := ComputeProposedFontRenames(attachments, attachmentFonts)
 	if len(nonCompliant) == 0 {
 		return nil
 	}
@@ -973,10 +1022,10 @@ func checkFontFilenameCompliance(attachments []matroska.EbmlAttachment, attachme
 	return buildFontComplianceResult(nonCompliant, attachmentFonts)
 }
 
-func parseSingleStyleLine(line string, formatFields []string) (string, fontStyle, bool) {
+func parseSingleStyleLine(line string, formatFields []string) (string, FontStyle, bool) {
 	rest, ok := strings.CutPrefix(line, "Style:")
 	if !ok {
-		return "", fontStyle{}, false
+		return "", FontStyle{}, false
 	}
 
 	values := strings.Split(rest, ",")
@@ -1004,18 +1053,18 @@ func parseSingleStyleLine(line string, formatFields []string) (string, fontStyle
 	}
 
 	if name != "" && family != "" {
-		return name, fontStyle{
+		return name, FontStyle{
 			Family: family,
 			Weight: parseBoldWeight(boldVal),
 			Italic: parseItalic(italicVal),
 		}, true
 	}
 
-	return "", fontStyle{}, false
+	return "", FontStyle{}, false
 }
 
-func parseStyleConfigs(codecPrivate []byte) map[string]fontStyle {
-	styleMap := make(map[string]fontStyle)
+func parseStyleConfigs(codecPrivate []byte) map[string]FontStyle {
+	styleMap := make(map[string]FontStyle)
 	lines := strings.Split(string(codecPrivate), "\n")
 
 	inStyles := false
@@ -1048,7 +1097,7 @@ func parseStyleConfigs(codecPrivate []byte) map[string]fontStyle {
 	return styleMap
 }
 
-func parseFontsFromStyles(lines []string, fonts map[fontStyle]bool) {
+func parseFontsFromStyles(lines []string, fonts map[FontStyle]bool) {
 	inStyles := false
 	formatFields := []string{}
 
@@ -1086,7 +1135,7 @@ func parseStyleFormat(rest string) []string {
 	return fields
 }
 
-func extractFontFromStyle(rest string, formatFields []string, fonts map[fontStyle]bool) {
+func extractFontFromStyle(rest string, formatFields []string, fonts map[FontStyle]bool) {
 	values := strings.Split(rest, ",")
 
 	var family string
@@ -1112,7 +1161,7 @@ func extractFontFromStyle(rest string, formatFields []string, fonts map[fontStyl
 	if family != "" {
 		weight := parseBoldWeight(boldVal)
 		isItalic := parseItalic(italicVal)
-		fonts[fontStyle{Family: family, Weight: weight, Italic: isItalic}] = true
+		fonts[FontStyle{Family: family, Weight: weight, Italic: isItalic}] = true
 	}
 }
 
@@ -1146,7 +1195,7 @@ func parseItalic(valStr string) bool {
 	return valStr == "1" || valStr == "-1"
 }
 
-func parseFontsFromInlineTagsWithState(content []byte, styleConfigs map[string]fontStyle, usedFonts map[fontStyle]bool) {
+func parseFontsFromInlineTagsWithState(content []byte, styleConfigs map[string]FontStyle, usedFonts map[FontStyle]bool) {
 	lines := strings.Split(string(content), "\n")
 	eventFormatFields := []string{}
 	inEvents := false
@@ -1176,7 +1225,7 @@ func parseFontsFromInlineTagsWithState(content []byte, styleConfigs map[string]f
 	}
 }
 
-func parseDialogueLine(rest string, formatFields []string, styleConfigs map[string]fontStyle, usedFonts map[fontStyle]bool) {
+func parseDialogueLine(rest string, formatFields []string, styleConfigs map[string]FontStyle, usedFonts map[FontStyle]bool) {
 	values := splitDialogueEventLine(rest, len(formatFields))
 
 	var styleName, textVal string
@@ -1196,7 +1245,7 @@ func parseDialogueLine(rest string, formatFields []string, styleConfigs map[stri
 
 	initialStyle, ok := styleConfigs[styleName]
 	if !ok {
-		initialStyle = fontStyle{Family: "Arial", Weight: 400, Italic: false}
+		initialStyle = FontStyle{Family: "Arial", Weight: 400, Italic: false}
 	}
 
 	parseInlineTagsAndText(textVal, initialStyle, styleConfigs, usedFonts)
@@ -1210,7 +1259,7 @@ func splitDialogueEventLine(line string, fieldCount int) []string {
 	return strings.SplitN(line, ",", fieldCount)
 }
 
-func parseInlineTagsAndText(text string, initialStyle fontStyle, styleConfigs map[string]fontStyle, usedFonts map[fontStyle]bool) {
+func parseInlineTagsAndText(text string, initialStyle FontStyle, styleConfigs map[string]FontStyle, usedFonts map[FontStyle]bool) {
 	active := initialStyle
 	inTag := false
 	tagStartIndex := -1
@@ -1246,7 +1295,7 @@ func isWhitespace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
 }
 
-func handleTagEnd(inTag bool, tagStartIndex int, textPrefix string, active, initialStyle fontStyle, styleConfigs map[string]fontStyle) (bool, fontStyle) {
+func handleTagEnd(inTag bool, tagStartIndex int, textPrefix string, active, initialStyle FontStyle, styleConfigs map[string]FontStyle) (bool, FontStyle) {
 	if inTag && tagStartIndex >= 0 {
 		parseTagsBlock(textPrefix[tagStartIndex:], &active, initialStyle, styleConfigs)
 
@@ -1256,7 +1305,7 @@ func handleTagEnd(inTag bool, tagStartIndex int, textPrefix string, active, init
 	return inTag, active
 }
 
-func parseTagsBlock(tagContent string, active *fontStyle, lineStyle fontStyle, styleConfigs map[string]fontStyle) {
+func parseTagsBlock(tagContent string, active *FontStyle, lineStyle FontStyle, styleConfigs map[string]FontStyle) {
 	parts := strings.SplitSeq(tagContent, "\\")
 	for part := range parts {
 		part = strings.TrimSpace(part)
@@ -1294,7 +1343,7 @@ func parseTagsBlock(tagContent string, active *fontStyle, lineStyle fontStyle, s
 func checkZlibCompression(track matroska.EbmlTrack) *CheckResult {
 	for algo := range strings.SplitSeq(track.Properties.ContentEncodingAlgorithms, ",") {
 		if algo == "0" { // 0 = zlib
-			return newFailedTrackResult("matroska_zlib_compression", "Track uses zlib compression", "warning", &track, ui.Warning.Render("zlib compression enabled"))
+			return newFailedTrackResult(config.CheckMatroskaZlibCompression, "Track uses zlib compression", "warning", &track, ui.Warning.Render("zlib compression enabled"))
 		}
 	}
 
@@ -1351,7 +1400,7 @@ func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckRes
 			msgs = appendFormattedErrors(msgs, "Alignment/positioning detected: ", parser.posWarnings)
 		}
 
-		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle validation failed", "warning", track, "")
+		res := newFailedTrackResult(config.CheckMatroskaSrtValidation, "SRT subtitle validation failed", "warning", track, "")
 		res.Tracks[0].List = msgs
 
 		return res
@@ -1360,7 +1409,7 @@ func buildSRTCheckResult(track *matroska.EbmlTrack, parser *srtParser) *CheckRes
 	if len(parser.posWarnings) > 0 {
 		msgs := appendFormattedErrors(nil, "Alignment/positioning detected: ", parser.posWarnings)
 
-		res := newFailedTrackResult("matroska_srt_validation", "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, "")
+		res := newFailedTrackResult(config.CheckMatroskaSrtValidation, "SRT subtitle contains alignment or positioning info (ASS should probably be used instead)", "info", track, "")
 		res.Tracks[0].List = msgs
 
 		return res
@@ -1621,4 +1670,114 @@ func validateSRTText(text string) (bool, string) {
 	}
 
 	return true, ""
+}
+
+// ExtractSubtitleTracks extracts ASS and/or SRT subtitle tracks.
+func ExtractSubtitleTracks(filePath string, tracks []matroska.EbmlTrack, includeASS, includeSRT bool) map[int][]byte {
+	var extractTrackIDs []int
+
+	for _, track := range tracks {
+		if IsRelevantTrack(track) {
+			if (includeASS && isASSSubtitles(track)) || (includeSRT && isSRTSubtitles(track)) {
+				extractTrackIDs = append(extractTrackIDs, track.ID)
+			}
+		}
+	}
+
+	if len(extractTrackIDs) == 0 {
+		return nil
+	}
+
+	extractedTracks, extractErr := matroska.ExtractTracks(filePath, extractTrackIDs)
+	if extractErr != nil {
+		ui.PrintDebug(fmt.Sprintf("Failed to extract tracks: %v", extractErr))
+	}
+
+	return extractedTracks
+}
+
+// ComputeAllUsedFonts gathers the fonts (family, weight, italic) referenced by
+// ASS/SSA subtitle tracks.
+func ComputeAllUsedFonts(tracks []matroska.EbmlTrack, extractedTracks map[int][]byte) map[FontStyle]bool {
+	allUsedFonts := make(map[FontStyle]bool)
+
+	for _, track := range tracks {
+		if !isASSSubtitles(track) {
+			continue
+		}
+
+		for font := range styleFontsFromTrack(track) {
+			allUsedFonts[font] = true
+		}
+
+		if content, ok := extractedTracks[track.ID]; ok {
+			for font := range inlineFontsFromContent(track, content) {
+				allUsedFonts[font] = true
+			}
+		}
+	}
+
+	return allUsedFonts
+}
+
+// GetMissingFontsForTrack gathers missing fonts for a given track.
+func GetMissingFontsForTrack(track matroska.EbmlTrack, content []byte, attachmentFonts []matroska.AttachmentFontInfo, checkStyles, checkInline bool) []string {
+	usedFonts := make(map[FontStyle]bool)
+
+	if checkStyles {
+		for font := range styleFontsFromTrack(track) {
+			usedFonts[font] = true
+		}
+	}
+
+	if checkInline && len(content) > 0 {
+		for font := range inlineFontsFromContent(track, content) {
+			usedFonts[font] = true
+		}
+	}
+
+	return findMissingFonts(usedFonts, attachmentFonts)
+}
+
+func styleFontsFromTrack(track matroska.EbmlTrack) map[FontStyle]bool {
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
+		return nil
+	}
+
+	usedFonts := make(map[FontStyle]bool)
+	parseFontsFromStyles(strings.Split(string(privateBytes), "\n"), usedFonts)
+
+	return usedFonts
+}
+
+func inlineFontsFromContent(track matroska.EbmlTrack, content []byte) map[FontStyle]bool {
+	usedFonts := make(map[FontStyle]bool)
+	styleConfigs := parseStyleConfigsFromTrack(track)
+	parseFontsFromInlineTagsWithState(content, styleConfigs, usedFonts)
+
+	return usedFonts
+}
+
+func parseStyleConfigsFromTrack(track matroska.EbmlTrack) map[string]FontStyle {
+	privateBytes, err := track.Properties.DecodeCodecPrivate()
+	if err != nil || len(privateBytes) == 0 {
+		return nil
+	}
+
+	return parseStyleConfigs(privateBytes)
+}
+
+// SuffixFontName appends _dupe suffixes for disambiguation.
+func SuffixFontName(name string, n int) string {
+	base, ext := name, ""
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		base, ext = name[:idx], name[idx:]
+	}
+
+	if n == 2 {
+		return fmt.Sprintf("%s_dupe%s", base, ext)
+	}
+
+	return fmt.Sprintf("%s_dupe%d%s", base, n, ext)
 }

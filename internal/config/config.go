@@ -36,6 +36,7 @@ func InitDefaults() {
 	viper.SetDefault("word_separator", ".")
 	viper.SetDefault("normalize_diacritics", true)
 	viper.SetDefault("output_path", "")
+	viper.SetDefault("api_keys.google_fonts", "")
 	viper.SetDefault("nfogen_template", "default")
 	viper.SetDefault("replacements.title", []map[string]any{
 		{
@@ -365,6 +366,11 @@ func GetTmdbAPIKey() string {
 // GetTvdbAPIKey returns the TVDB API key.
 func GetTvdbAPIKey() string {
 	return viper.GetString("api_keys.tvdb")
+}
+
+// GetGoogleFontsAPIKey returns the optional Google Fonts Developer API key.
+func GetGoogleFontsAPIKey() string {
+	return viper.GetString("api_keys.google_fonts")
 }
 
 // GetProwlarrURL returns the Prowlarr URL.

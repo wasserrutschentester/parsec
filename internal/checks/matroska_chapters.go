@@ -5,8 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/types"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 func formatNsToTime(ns int64) string {
@@ -31,7 +33,7 @@ func checkChaptersStartNonZero(chapters *matroska.Chapters) *CheckResult {
 		timeStr := formatNsToTime(firstChapter.TimeStart)
 
 		return &CheckResult{
-			Identifier: "matroska_chapters_start_non_zero",
+			Identifier: config.CheckMatroskaChaptersStartNonZero,
 			Warning:    "First chapter does not start at 00:00:00",
 			Passed:     false,
 			Severity:   "warning",
@@ -52,7 +54,7 @@ func checkChaptersNonMonotonic(chapters *matroska.Chapters) *CheckResult {
 	for _, ch := range chapters.Atoms {
 		if lastTime >= 0 && ch.TimeStart < lastTime {
 			return &CheckResult{
-				Identifier: "matroska_chapters_non_monotonic",
+				Identifier: config.CheckMatroskaChaptersNonMonotonic,
 				Warning:    "Chapter times are not strictly increasing",
 				Passed:     false,
 				Severity:   "error",
@@ -75,7 +77,7 @@ func checkChaptersDuplicate(chapters *matroska.Chapters) *CheckResult {
 	for _, ch := range chapters.Atoms {
 		if seenTimes[ch.TimeStart] {
 			return &CheckResult{
-				Identifier: "matroska_chapters_duplicate",
+				Identifier: config.CheckMatroskaChaptersDuplicate,
 				Warning:    "Duplicate chapter timestamps found",
 				Passed:     false,
 				Severity:   "error",
@@ -100,7 +102,7 @@ func checkChaptersTooClose(chapters *matroska.Chapters) *CheckResult {
 			diff := ch.TimeStart - lastTime
 			if diff < 10000000000 {
 				return &CheckResult{
-					Identifier: "matroska_chapters_too_close",
+					Identifier: config.CheckMatroskaChaptersTooClose,
 					Warning:    "Chapter interval is too short (< 10 seconds)",
 					Passed:     false,
 					Severity:   "warning",
@@ -128,7 +130,7 @@ func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata, chapters *matroska
 	for _, ch := range chapters.Atoms {
 		if ch.TimeStart > duration {
 			return &CheckResult{
-				Identifier: "matroska_chapters_exceed_duration",
+				Identifier: config.CheckMatroskaChaptersExceedDuration,
 				Warning:    "Chapter timestamp exceeds video duration",
 				Passed:     false,
 				Severity:   "error",
@@ -162,7 +164,7 @@ func checkConsecutiveDuplicateNames(currentNames, lastNames []string, timeStart 
 		for _, lastName := range lastNames {
 			if strings.EqualFold(currentName, lastName) {
 				return &CheckResult{
-					Identifier: "matroska_chapters_name_hygiene",
+					Identifier: config.CheckMatroskaChaptersNameHygiene,
 					Warning:    "Consecutive duplicate chapter names found",
 					Passed:     false,
 					Severity:   "warning",
@@ -185,7 +187,7 @@ func checkChaptersNameHygiene(chapters *matroska.Chapters) *CheckResult {
 	for i, ch := range chapters.Atoms {
 		if len(ch.Display) == 0 {
 			return &CheckResult{
-				Identifier: "matroska_chapters_name_hygiene",
+				Identifier: config.CheckMatroskaChaptersNameHygiene,
 				Warning:    "Chapter has no display name entry",
 				Passed:     false,
 				Severity:   "warning",
@@ -197,7 +199,7 @@ func checkChaptersNameHygiene(chapters *matroska.Chapters) *CheckResult {
 
 		if !hasNonEmpty {
 			return &CheckResult{
-				Identifier: "matroska_chapters_name_hygiene",
+				Identifier: config.CheckMatroskaChaptersNameHygiene,
 				Warning:    "Chapter display name is empty or only whitespace",
 				Passed:     false,
 				Severity:   "warning",
@@ -231,7 +233,7 @@ func getChapterLanguages(ch matroska.EbmlChapterAtom) (map[string]bool, *CheckRe
 			}
 
 			return nil, &CheckResult{
-				Identifier: "matroska_chapters_language_hygiene",
+				Identifier: config.CheckMatroskaChaptersLanguageHygiene,
 				Warning:    "Chapter display entry has undetermined or missing language",
 				Passed:     false,
 				Severity:   "warning",
@@ -274,7 +276,7 @@ func checkLanguagesInconsistent(firstLangs, currentLangs map[string]bool, timeSt
 		}
 
 		return &CheckResult{
-			Identifier: "matroska_chapters_language_hygiene",
+			Identifier: config.CheckMatroskaChaptersLanguageHygiene,
 			Warning:    "Inconsistent chapter languages in edition",
 			Passed:     false,
 			Severity:   "warning",
@@ -331,7 +333,8 @@ func findPrevNextKeyframes(timeStart int64, keyframes []int64) (int64, int64) {
 	return prevKF, nextKF
 }
 
-func isAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
+// IsAligned reports whether a chapter timestamp is close enough to a keyframe.
+func IsAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
 	closestDiff := int64(-1)
 	prevKF, nextKF := findPrevNextKeyframes(timeStart, keyframes)
 
@@ -363,7 +366,8 @@ func isAligned(timeStart int64, keyframes []int64) (bool, int64, int64, int64) {
 	return false, closestDiff, prevKF, nextKF
 }
 
-func getVideoTrackFromEBML(ebml *matroska.EbmlMetadata) *matroska.EbmlTrack {
+// GetVideoTrackFromEBML returns the first video track from the EBML metadata.
+func GetVideoTrackFromEBML(ebml *matroska.EbmlMetadata) *matroska.EbmlTrack {
 	for i, track := range ebml.Tracks {
 		if track.Type == "video" {
 			return &ebml.Tracks[i]
@@ -404,11 +408,14 @@ func formatNextKF(nextKF, timeStart int64, videoTrack *matroska.EbmlTrack) strin
 	return nextStr
 }
 
-func getAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTrack *matroska.EbmlTrack) [][]string {
+// GetAlignedTableRows generates the detailed table rows displaying chapter alignment status.
+//
+//nolint:cyclop,nestif,gocritic // Table formatting requires nested logic
+func GetAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTrack *matroska.EbmlTrack) [][]string {
 	var rows [][]string
 
 	for i, ch := range chapters.Atoms {
-		if aligned, _, prevKF, nextKF := isAligned(ch.TimeStart, keyframes); !aligned {
+		if aligned, _, prevKF, nextKF := IsAligned(ch.TimeStart, keyframes); !aligned {
 			name := "-"
 			if len(ch.Display) > 0 && ch.Display[0].String != "" {
 				name = ch.Display[0].String
@@ -423,12 +430,36 @@ func getAlignedTableRows(chapters *matroska.Chapters, keyframes []int64, videoTr
 
 			nextStr := formatNextKF(nextKF, ch.TimeStart, videoTrack)
 
+			diffPrev := int64(-1)
+			if prevKF != -1 {
+				diffPrev = ch.TimeStart - prevKF
+			}
+
+			diffNext := int64(-1)
+			if nextKF != -1 {
+				diffNext = nextKF - ch.TimeStart
+			}
+
+			// Highlight the nearest one
+			var direction string
+
+			if prevKF != -1 && (nextKF == -1 || diffPrev <= diffNext) {
+				prevStr = ui.Success.Render(prevStr)
+				direction = ui.Success.Render("<- Prev")
+			} else if nextKF != -1 {
+				nextStr = ui.Success.Render(nextStr)
+				direction = ui.Success.Render("Next ->")
+			} else {
+				direction = "-"
+			}
+
 			rows = append(rows, []string{
 				strconv.Itoa(i + 1),
 				name,
 				formatNsToTime(ch.TimeStart),
 				latencyStr,
 				prevStr,
+				direction,
 				nextStr,
 			})
 		}
@@ -442,7 +473,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	videoTrack := getVideoTrackFromEBML(ebml)
+	videoTrack := GetVideoTrackFromEBML(ebml)
 	if videoTrack == nil {
 		return nil
 	}
@@ -450,7 +481,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 	keyframes, err := matroska.ReadKeyframeTimestamps(filePath, uint64(videoTrack.Properties.Number), ebml.Container.Properties.TimestampScale)
 	if err != nil {
 		return &CheckResult{
-			Identifier: "matroska_chapters_keyframe_alignment",
+			Identifier: config.CheckMatroskaChaptersKeyframeAlignment,
 			Warning:    "Failed to read video cues index (SeekHead/Cues may be missing or invalid)",
 			Passed:     false,
 			Severity:   "warning",
@@ -460,7 +491,7 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 
 	if len(keyframes) == 0 {
 		return &CheckResult{
-			Identifier: "matroska_chapters_keyframe_alignment",
+			Identifier: config.CheckMatroskaChaptersKeyframeAlignment,
 			Warning:    "No video cues/index entries found (seeking might be slow or broken)",
 			Passed:     false,
 			Severity:   "warning",
@@ -472,16 +503,16 @@ func checkChaptersKeyframeAlignment(filePath string, ebml *matroska.EbmlMetadata
 		return nil
 	}
 
-	rows := getAlignedTableRows(chapters, keyframes, videoTrack)
+	rows := GetAlignedTableRows(chapters, keyframes, videoTrack)
 
 	if len(rows) > 0 {
 		return &CheckResult{
-			Identifier: "matroska_chapters_keyframe_alignment",
+			Identifier: config.CheckMatroskaChaptersKeyframeAlignment,
 			Warning:    "Chapters are not aligned with video keyframes",
 			Passed:     false,
 			Severity:   "warning",
 			Table: &types.TableData{
-				Headers: []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Next KF"},
+				Headers: []string{"#", "Name", "Timestamp", "Seek Latency", "Previous KF", "Closest", "Next KF"},
 				Rows:    rows,
 			},
 		}

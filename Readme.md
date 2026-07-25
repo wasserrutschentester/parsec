@@ -7,7 +7,7 @@
   </br>
 </div>
 
-`parsec` is a tool for managing media files, providing capabilities to identify, check, rename, and generate `.nfo` files according to specific standards and metadata from online databases.
+`parsec` is a tool for managing media files, providing capabilities to identify, check, and rename files according to specific standards and metadata from online databases.
 
 ## Installation
 
@@ -27,6 +27,7 @@ parsec update
 
 - **[MediaInfo](https://mediaarea.net/en/MediaInfo)**: Used for extracting technical metadata.
 - **[MKVToolNix](https://mkvtoolnix.download/)**: Specifically `mkvmerge` and `mkvpropedit` for handling Matroska files.
+- **[cabextract](https://www.cabextract.org.uk/)** (optional): Required to automatically download missing Windows Corefonts.
 
 ### Manual Installation
 
@@ -87,6 +88,17 @@ Rename files based on metadata and naming conventions.
 
 For more information see the [Rename Documentation](docs/rename.md)
 
+### `autocorrect`
+Automatically repair issues reported by `check` that can be resolved without re-encoding.
+
+**Features:**
+- **Unified Fix Plan**: Generates a comprehensive preview of all proposed changes before any files are modified.
+- **In-Place Track Fixes**: Corrects Matroska track flags and names directly, without rewriting the file.
+- **Container Remux**: Automatically remuxes the file when needed to fix track order, compression, and prune unwanted tracks.
+- **Guided Fixes**: Prompts for values that can't be derived automatically, such as missing language tags and flag/name mismatches.
+- **Safe by Default**: Remote-download and value-input corrections are safely skipped in unattended mode, though deterministic structural changes (including destructive removals) are applied.
+
+For more information see the [Autocorrect Documentation](docs/autocorrect.md)
 ### `nfogen`
 Generate an NFO file for a media file.
 

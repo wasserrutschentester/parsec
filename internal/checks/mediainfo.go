@@ -33,52 +33,52 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 	}
 
 	// 1. Interlaced WEB
-	if config.IsCheckEnabled("mediainfo_interlaced_web") {
+	if config.IsCheckEnabled(config.CheckMediainfoInterlacedWeb) {
 		results = append(results, checkInterlacedWeb(videoTrack, meta)...)
 	}
 
 	// 2. Non-standard Framerate
-	if config.IsCheckEnabled("mediainfo_framerate") {
+	if config.IsCheckEnabled(config.CheckMediainfoFramerate) {
 		results = append(results, checkFrameRate(videoTrack)...)
 	}
 
 	// 3. Low Bitrate
-	if config.IsCheckEnabled("mediainfo_bitrate") {
+	if config.IsCheckEnabled(config.CheckMediainfoBitrate) {
 		results = append(results, checkBitRate(videoTrack)...)
 	}
 
 	// 4. Inconsistent Track Durations
-	if config.IsCheckEnabled("mediainfo_durations") {
+	if config.IsCheckEnabled(config.CheckMediainfoDurations) {
 		results = append(results, checkDurations(mi)...)
 	}
 
 	// 5. Redundant Audio Tracks
-	if config.IsCheckEnabled("mediainfo_redundant_audio") {
+	if config.IsCheckEnabled(config.CheckMediainfoRedundantAudio) {
 		results = append(results, checkRedundantAudio(mi)...)
 	}
 
 	// 6. Non-standard Resolution
-	if config.IsCheckEnabled("mediainfo_resolution") {
+	if config.IsCheckEnabled(config.CheckMediainfoResolution) {
 		results = append(results, checkResolution(videoTrack)...)
 	}
 
 	// 7. Dialogue Normalization
-	if config.IsCheckEnabled("mediainfo_dialogue_normalization") {
+	if config.IsCheckEnabled(config.CheckMediainfoDialogueNorm) {
 		results = append(results, checkDialogueNormalization(mi)...)
 	}
 
 	// 8. Stereo/Mono Lossless Codec
-	if config.IsCheckEnabled("mediainfo_stereo_lossless") {
+	if config.IsCheckEnabled(config.CheckMediainfoStereoLossless) {
 		results = append(results, checkStereoLossless(mi)...)
 	}
 
 	// 9. Empty Tracks Check
-	if config.IsCheckEnabled("mediainfo_empty_tracks") {
+	if config.IsCheckEnabled(config.CheckMediainfoEmptyTracks) {
 		results = append(results, checkEmptyTracks(mi)...)
 	}
 
 	// 10. Missing Statistics
-	if config.IsCheckEnabled("mediainfo_missing_statistics") {
+	if config.IsCheckEnabled(config.CheckMediainfoMissingStatistics) {
 		results = append(results, checkMissingStatistics(mi)...)
 	}
 
@@ -87,7 +87,7 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 
 func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_dialogue_normalization",
+		Identifier: config.CheckMediainfoDialogueNorm,
 		Passed:     true,
 	}
 
@@ -118,7 +118,7 @@ func checkDialogueNormalization(mi *mediainfo.MediaInfo) []CheckResult {
 
 func checkInterlacedWeb(videoTrack *mediainfo.Track, meta *metadata.Metadata) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_interlaced_web",
+		Identifier: config.CheckMediainfoInterlacedWeb,
 		Passed:     true,
 	}
 
@@ -153,7 +153,7 @@ func miTrackToResult(t *mediainfo.Track, warning string) TrackCheckResult {
 
 func checkRedundantAudio(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_redundant_audio",
+		Identifier: config.CheckMediainfoRedundantAudio,
 		Passed:     true,
 	}
 	langCounts := make(map[string][]*mediainfo.Track)
@@ -200,7 +200,7 @@ func getRedundantAudioWarning(res *CheckResult, langCounts map[string][]*mediain
 
 func checkResolution(videoTrack *mediainfo.Track) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_resolution",
+		Identifier: config.CheckMediainfoResolution,
 		Passed:     true,
 	}
 	width := videoTrack.Width
@@ -245,7 +245,7 @@ func checkResolution(videoTrack *mediainfo.Track) []CheckResult {
 
 func checkFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_framerate",
+		Identifier: config.CheckMediainfoFramerate,
 		Passed:     true,
 	}
 
@@ -277,7 +277,7 @@ func checkFrameRate(videoTrack *mediainfo.Track) []CheckResult {
 
 func checkBitRate(videoTrack *mediainfo.Track) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_bitrate",
+		Identifier: config.CheckMediainfoBitrate,
 		Passed:     true,
 	}
 	bitrate := videoTrack.BitRate
@@ -311,7 +311,7 @@ func checkBitRate(videoTrack *mediainfo.Track) []CheckResult {
 
 func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_durations",
+		Identifier: config.CheckMediainfoDurations,
 		Passed:     true,
 	}
 
@@ -378,7 +378,7 @@ func getDurationWarning(track *mediainfo.Track, diff, percentDiff float64) strin
 
 func checkStereoLossless(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_stereo_lossless",
+		Identifier: config.CheckMediainfoStereoLossless,
 		Passed:     true,
 	}
 
@@ -415,7 +415,7 @@ func checkStereoLossless(mi *mediainfo.MediaInfo) []CheckResult {
 
 func checkEmptyTracks(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_empty_tracks",
+		Identifier: config.CheckMediainfoEmptyTracks,
 		Passed:     true,
 	}
 
@@ -476,35 +476,57 @@ func getEmptyTrackReasons(track *mediainfo.Track) []string {
 	return reasons
 }
 
+// TrackMissingStatistics reports which statistics tags (DURATION,
+// NUMBER_OF_BYTES, and for Text tracks ElementCount) mediainfo did not find
+// on track. Returns nil for General/Menu tracks (which don't carry these
+// tags) or when nothing is missing.
+func TrackMissingStatistics(track *mediainfo.Track) []string {
+	if track.Type == "General" || track.Type == "Menu" {
+		return nil
+	}
+
+	var missingStats []string
+
+	if track.Duration == nil {
+		missingStats = append(missingStats, "DURATION")
+	}
+
+	if track.StreamSize == nil {
+		missingStats = append(missingStats, "NUMBER_OF_BYTES")
+	}
+
+	if track.Type == "Text" && track.GetElementCount() == -1 {
+		missingStats = append(missingStats, "ElementCount")
+	}
+
+	return missingStats
+}
+
+// MissingStatisticsNeedsFix reports whether any track is missing statistics
+// tags, matching the mediainfo_missing_statistics check's criteria. The fix
+// (mkvpropedit --add-track-statistics-tags) recomputes every track's
+// statistics tags in one shot, so the fix policy only needs to know whether
+// any track needs it, not which ones or what's missing.
+func MissingStatisticsNeedsFix(mi *mediainfo.MediaInfo) bool {
+	for i := range mi.Media.Tracks {
+		if len(TrackMissingStatistics(&mi.Media.Tracks[i])) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func checkMissingStatistics(mi *mediainfo.MediaInfo) []CheckResult {
 	res := CheckResult{
-		Identifier: "mediainfo_missing_statistics",
+		Identifier: config.CheckMediainfoMissingStatistics,
 		Passed:     true,
 	}
 
 	for i := range mi.Media.Tracks {
 		track := &mi.Media.Tracks[i]
 
-		if track.Type == "General" || track.Type == "Menu" {
-			continue
-		}
-
-		missingStats := []string{}
-
-		if track.Duration == nil {
-			missingStats = append(missingStats, "DURATION")
-		}
-
-		if track.StreamSize == nil {
-			missingStats = append(missingStats, "NUMBER_OF_BYTES")
-		}
-
-		if track.Type == "Text" {
-			if track.GetElementCount() == -1 {
-				missingStats = append(missingStats, "ElementCount")
-			}
-		}
-
+		missingStats := TrackMissingStatistics(track)
 		if len(missingStats) > 0 {
 			res.Passed = false
 			res.Severity = "warning"

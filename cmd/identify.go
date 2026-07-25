@@ -47,20 +47,36 @@ Flags can be used to override or provide missing information.`),
 			return err
 		}
 
-		expandedArgs := expandArgs(args)
+		return runIdentifyBatch(cmd, expandArgs(args))
+	},
+}
 
-		var prevResult *mdb.SearchResult
-		for _, filePath := range expandedArgs {
-			result, err := identifyFile(cmd, filePath, prevResult)
-			if err != nil {
-				return err
-			}
+func runIdentifyBatch(cmd *cobra.Command, filePaths []string) error {
+	var prevResult *mdb.SearchResult
 
+	errs := make([]error, 0, len(filePaths))
+
+	for _, filePath := range filePaths {
+		result, err := identifyFile(cmd, filePath, prevResult)
+		errs = append(errs, err)
+
+		if err == nil {
 			prevResult = result
 		}
+	}
 
-		return nil
-	},
+	return batchIdentifyError(errs)
+}
+
+func batchIdentifyError(errs []error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+
+	// if all errs were nil
+	return nil
 }
 
 func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, error) {
