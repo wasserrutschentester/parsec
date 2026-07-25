@@ -21,6 +21,10 @@ steps:
                 echo "No new commits since last nightly build. Skipping."
                 exit 78
               fi
+              if git tag --points-at HEAD | grep -q "^v"; then
+                echo "Commit already has a release tag. Skipping."
+                exit 78
+              fi
             - git remote set-url origin https://parsec-bot:$GITEA_TOKEN@codeberg.org/upPollo/parsec.git
             - git tag -f nightly
             - git push -f origin nightly
