@@ -275,6 +275,10 @@ func renameApplyMdbSearch(meta *metadata.Metadata) {
 
 	if meta.IsTV {
 		episodes := renameGetEpisodeInfos(result, meta)
+		if len(episodes) == 0 {
+			ui.PrintWarning("Could not find matching Episode on TMDB or TVDB")
+		}
+
 		for _, ep := range episodes {
 			mdb.PrintCompactEpisodeResult(ep)
 		}
