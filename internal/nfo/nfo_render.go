@@ -671,9 +671,9 @@ func formatBitrateFunc(args ...any) (string, error) {
 	}
 }
 
-func formatDateFunc(formatStr, dateStr string) string {
-	if formatStr == "" || dateStr == "" {
-		return dateStr
+func parseDateFunc(dateStr string) time.Time {
+	if dateStr == "" {
+		return time.Time{}
 	}
 
 	var layout string
@@ -692,21 +692,11 @@ func formatDateFunc(formatStr, dateStr string) string {
 	t, err := time.Parse(layout, dateStr)
 	if err != nil {
 		if t, err = time.Parse(time.RFC3339, dateStr); err != nil {
-			return dateStr
+			return time.Time{}
 		}
 	}
 
-	return t.Format(formatStr)
-}
-
-func extractCRFFunc(settings string) string {
-	for part := range strings.SplitSeq(settings, " / ") {
-		if after, ok := strings.CutPrefix(strings.TrimSpace(part), "crf="); ok {
-			return " (crf" + after + ")"
-		}
-	}
-
-	return ""
+	return t
 }
 
 func replaceFunc(oldStr, newStr, s string) string {
@@ -884,8 +874,7 @@ func templateFuncs() template.FuncMap {
 		"formatDuration":    formatDurationFunc,
 		"formatSize":        formatSizeFunc,
 		"formatSizeDynamic": formatSizeDynamicFunc,
-		"formatDate":        formatDateFunc,
-		"extractCrf":        extractCRFFunc,
+		"parseDate":         parseDateFunc,
 		"formatBitrate":     formatBitrateFunc,
 		"titleCase":         cases.Title(language.Und).String,
 		"sum":               sumFunc,
@@ -909,7 +898,6 @@ func templateFuncs() template.FuncMap {
 		"humanize":          humanizeFunc,
 		"truncate":          truncateFunc,
 		"chomp":             chompFunc,
-		"now":               nowFunc,
 		"max":               maxFunc,
 		"min":               minFunc,
 		"round":             roundFunc,
@@ -1361,10 +1349,6 @@ func truncateFunc(size int, args ...any) (string, error) {
 
 func chompFunc(val any) string {
 	return strings.TrimRight(fmt.Sprint(val), "\r\n")
-}
-
-func nowFunc() time.Time {
-	return time.Now()
 }
 
 func isIntegerType(k reflect.Kind) bool {

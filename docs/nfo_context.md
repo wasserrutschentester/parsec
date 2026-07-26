@@ -57,6 +57,7 @@ Use `parsec nfogen file.mkv --dump-context` to inspect the exact values for a sp
 | `{{ .Notes }}` | `string` | Custom notes string, passed via `--notes`. |
 | `{{ .Sources }}` | `[]string` | Slice of source release names, one per `--source` flag. |
 | `{{ .AppVersion }}` | `string` | The running Parsec version string. |
+| `{{ .Today }}` | `time.Time` | The timestamp when the NFO was generated (can be formatted with `.Format`). |
 | `{{ .LineWidth }}` | `int` | Current line width (default `72`). Used by built-in partials for column alignment. Can be changed with `.SetLineWidth` or `.WithLineWidth`. |
 
 ### Technical Metadata (from filename / config)
@@ -120,6 +121,7 @@ Populated from MediaInfo data for the first (and typically only) video track.
 | `{{ .Video.ScanType }}` | `string` | Scan type: `"Progressive"` or `"Interlaced"`. |
 | `{{ .Video.Library }}` | `string` | Encoder library name (e.g. `"x264"`, `"x265"`). |
 | `{{ .Video.LibrarySettings }}` | `string` | Full encoder settings string from the library. |
+| `{{ .Video.CRF }}` | `string` | Extracted CRF value (e.g., `(crf21.0)`) if found in settings, or empty string. |
 | `{{ .Video.Settings }}` | `string` | Simplified settings summary (e.g. `"CABAC / 4 Ref Frames"`). |
 | `{{ .Video.Source }}` | `string` | Source name assigned via `--source-map v1:...`. |
 | `{{ .Video.Flags }}` | `Flags` | Track flags. See [Flags](#flags) below. |

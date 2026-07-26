@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
@@ -60,6 +61,7 @@ type Context struct {
 	LineWidth   int
 	AppVersion  string
 	ServiceName string
+	Today       time.Time
 }
 
 // SetLineWidth updates the global line width for the context.
@@ -101,6 +103,7 @@ type Video struct {
 	Settings          string
 	Library           string
 	LibrarySettings   string
+	CRF               string
 	Dimensions        string
 	Width             int
 	Height            int
@@ -290,6 +293,7 @@ func BuildContext(releaseName string, baseMeta *metadata.Metadata, files []FileI
 		LineWidth:       72, // Default line width
 		AppVersion:      appVersion,
 		ServiceName:     expandServiceName(baseMeta.Service),
+		Today:           time.Now(),
 	}
 
 	populateFromSearchResult(&ctx, searchResult)
@@ -458,6 +462,7 @@ func populateVideoContext(fctx *FileContext, vTrack *mediainfo.Track, ebmlMeta *
 
 	fctx.Video.Library = vTrack.EncodedLibrary
 	fctx.Video.LibrarySettings = vTrack.EncodedLibrarySettings
+	fctx.Video.CRF = extractCRF(vTrack.EncodedLibrarySettings)
 
 	fctx.Video.Bitrate = fmt.Sprintf("%d kb/s", vTrack.BitRate/1000)
 	fctx.Video.Dimensions = fmt.Sprintf("%dx%d", vTrack.Width, vTrack.Height)
@@ -523,6 +528,16 @@ func populateAudioContext(fctx *FileContext, info *mediainfo.MediaInfo, ebmlMeta
 
 		fctx.Audio = append(fctx.Audio, audio)
 	}
+}
+
+func extractCRF(settings string) string {
+	for part := range strings.SplitSeq(settings, " / ") {
+		if after, ok := strings.CutPrefix(strings.TrimSpace(part), "crf="); ok {
+			return " (crf" + after + ")"
+		}
+	}
+
+	return ""
 }
 
 func populateTextContext(fctx *FileContext, info *mediainfo.MediaInfo, ebmlMeta *matroska.EbmlMetadata) {

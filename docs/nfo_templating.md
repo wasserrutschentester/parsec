@@ -143,11 +143,9 @@ These functions are designed to help you align text into neat columns. They all 
 | `formatSize` | Converts bytes to GiB with a specific decimal precision. Parameters: `precision`, `input`. | Yes | `{{ .SizeBytes \| formatSize 2 }}` |
 | `formatSizeDynamic`| Converts bytes to KiB, MiB, GiB, TiB, or PiB dynamically based on scale. Parameters: `precision`, `input`. | Yes | `{{ .SizeBytes \| formatSizeDynamic 2 }}` |
 | `formatDuration` | Converts seconds to `HH:MM:SS` (default) or a custom layout string (e.g. `"h'h' m'm' s's'"`). Parameters: `[layout]`, `input`. | Yes | `{{ .DurationSec \| formatDuration "h'h' m'min'" }}` |
-| `formatDate` | Formats a date string using standard Go date formatting (based on the reference date `2006-01-02`). Passing `""` as `formatStr` returns the raw date string unchanged. Parameters: `formatStr`, `date`. | Yes | `{{ .Date \| formatDate "02.01.2006" }}` → `21.07.2023` |
+| `parseDate` | Parses a date string into a Go `time.Time` object, allowing you to use methods like `.Format "2006-01-02"` or `.Year`. Parameters: `date`. | Yes | `{{ (parseDate .Date).Format "02.01.2006" }}` → `21.07.2023` |
 | `languageName` | Converts an ISO-639 code to its full English name in uppercase. Special codes: `mul` → `MULTI`, `zxx` → `SILENT`. | Yes | `{{ "de" \| languageName }}` → `GERMAN` |
 | `formatBitrate` | Formats raw numeric bitrates into clean units (default `kb/s` with space separation, or `mbps`). Parameters: `[unit]`, `input`. | Yes | `{{ 5120000 \| formatBitrate "mbps" }}` → `5.12 Mbps` |
-| `extractCrf` | Extracts `(crfXX)` from an encoder settings string if a `crf=` token is present. Returns `""` if not found. | Yes | `{{ .Video.LibrarySettings \| extractCrf }}` |
-| `now` | Returns the current local time object. | No | `{{ now \| formatDate "2006-01-02" }}` |
 
 ### Array & Object Utilities
 | Function | Description | Pipe-friendly? | Example Usage |
