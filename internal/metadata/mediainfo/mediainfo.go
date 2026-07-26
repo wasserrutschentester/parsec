@@ -149,10 +149,15 @@ type Track struct {
 	FormatSettingsCABAC      string    `json:"Format_Settings_CABAC,omitempty"`
 	FormatSettingsRefFrames  string    `json:"Format_Settings_RefFrames,omitempty"`
 	Title                    string    `json:"Title,omitempty"`
+	Movie                    string    `json:"Movie,omitempty"`
+	TrackPosition            string    `json:"Track_Position,omitempty"`
+	TrackPositionTotal       string    `json:"Track_Position_Total,omitempty"`
+	ReleasedDate             string    `json:"Released_Date,omitempty"`
 	Language                 string    `json:"Language,omitempty"`
 	Duration                 *float64  `json:"Duration,string,omitempty"`
 	Channels                 int       `json:"Channels,string,omitempty"`
 	BitRate                  int       `json:"BitRate,string,omitempty"`
+	BitRateMaximum           string    `json:"BitRate_Maximum,omitempty"`
 	BitRateMode              string    `json:"BitRate_Mode,omitempty"`
 	HDRFormatCompatibility   string    `json:"HDR_Format_Compatibility,omitempty"`
 	HDRFormat                string    `json:"HDR_Format,omitempty"`
@@ -179,12 +184,13 @@ type Track struct {
 	Forced                   MediaBool `json:"Forced,omitempty"`
 
 	// General track specific
-	VideoCount     int    `json:"VideoCount,string,omitempty"`
-	AudioCount     int    `json:"AudioCount,string,omitempty"`
-	TextCount      int    `json:"TextCount,string,omitempty"`
-	FileSize       int64  `json:"FileSize,string,omitempty"`
-	FileExtension  string `json:"FileExtension,omitempty"`
-	OverallBitRate int    `json:"OverallBitRate,string,omitempty"`
+	VideoCount         int    `json:"VideoCount,string,omitempty"`
+	AudioCount         int    `json:"AudioCount,string,omitempty"`
+	TextCount          int    `json:"TextCount,string,omitempty"`
+	FileSize           int64  `json:"FileSize,string,omitempty"`
+	FileExtension      string `json:"FileExtension,omitempty"`
+	OverallBitRateMode string `json:"OverallBitRate_Mode,omitempty"`
+	OverallBitRate     int    `json:"OverallBitRate,string,omitempty"`
 
 	// Additional mapped fields from JSON output
 	BufferSize                     string `json:"BufferSize,omitempty"`
@@ -196,6 +202,7 @@ type Track struct {
 	ColourPrimariesSource          string `json:"colour_primaries_Source,omitempty"`
 	ColourRange                    string `json:"colour_range,omitempty"`
 	ColourRangeSource              string `json:"colour_range_Source,omitempty"`
+	ColourPrimaries                string `json:"colour_primaries,omitempty"`
 	CompressionMode                string `json:"Compression_Mode,omitempty"`
 	Delay                          string `json:"Delay,omitempty"`
 	DelaySource                    string `json:"Delay_Source,omitempty"`
