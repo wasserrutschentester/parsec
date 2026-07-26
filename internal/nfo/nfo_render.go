@@ -89,24 +89,28 @@ func LoadTemplate(tmplName string) (*template.Template, error) {
 
 	tmplLoaded := false
 
-	if b, err := builtinTemplates.ReadFile("templates/" + tmplName + ".tmpl"); err == nil {
-		tmpl, err = tmpl.New(tmplName + ".tmpl").Parse(string(b))
-		if err != nil {
-			return nil, FormatTemplateError(fmt.Errorf("failed to parse builtin template %s: %w", tmplName, err), configDirs)
-		}
+	var (
+		loadErr    error
+		parsedTmpl *template.Template
+	)
 
-		tmplLoaded = true
-	} else {
-		var loadErr error
-		var parsedTmpl *template.Template
+	parsedTmpl, tmplLoaded, loadErr = loadTemplateFromFile(tmpl, tmplName, configDirs)
+	if loadErr != nil {
+		return nil, loadErr
+	}
 
-		parsedTmpl, tmplLoaded, loadErr = loadTemplateFromFile(tmpl, tmplName, configDirs)
-		if loadErr != nil {
-			return nil, loadErr
-		}
-		
-		if parsedTmpl != nil {
-			tmpl = parsedTmpl
+	if parsedTmpl != nil {
+		tmpl = parsedTmpl
+	}
+
+	if !tmplLoaded {
+		if b, err := builtinTemplates.ReadFile("templates/" + tmplName + ".tmpl"); err == nil {
+			tmpl, err = tmpl.New(tmplName + ".tmpl").Parse(string(b))
+			if err != nil {
+				return nil, FormatTemplateError(fmt.Errorf("failed to parse builtin template %s: %w", tmplName, err), configDirs)
+			}
+
+			tmplLoaded = true
 		}
 	}
 
