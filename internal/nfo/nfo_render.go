@@ -98,10 +98,15 @@ func LoadTemplate(tmplName string) (*template.Template, error) {
 		tmplLoaded = true
 	} else {
 		var loadErr error
+		var parsedTmpl *template.Template
 
-		tmplLoaded, loadErr = loadTemplateFromFile(tmpl, tmplName, configDirs)
+		parsedTmpl, tmplLoaded, loadErr = loadTemplateFromFile(tmpl, tmplName, configDirs)
 		if loadErr != nil {
 			return nil, loadErr
+		}
+		
+		if parsedTmpl != nil {
+			tmpl = parsedTmpl
 		}
 	}
 
@@ -130,22 +135,23 @@ func getConfigDirs() []string {
 	return configDirs
 }
 
-func loadTemplateFromFile(tmpl *template.Template, tmplName string, configDirs []string) (bool, error) {
+func loadTemplateFromFile(tmpl *template.Template, tmplName string, configDirs []string) (*template.Template, bool, error) {
 	for _, dir := range configDirs {
 		tmplPath := filepath.Join(dir, "nfo", tmplName+".tmpl")
 		if _, statErr := os.Stat(tmplPath); statErr == nil {
 			b, readErr := os.ReadFile(tmplPath)
 			if readErr == nil {
-				if _, err := tmpl.New(tmplName + ".tmpl").Parse(string(b)); err != nil {
-					return true, FormatTemplateError(err, configDirs)
+				parsedTmpl, err := tmpl.New(tmplName + ".tmpl").Parse(string(b))
+				if err != nil {
+					return nil, true, FormatTemplateError(err, configDirs)
 				}
 
-				return true, nil
+				return parsedTmpl, true, nil
 			}
 		}
 	}
 
-	return false, nil
+	return nil, false, nil
 }
 
 func loadPartials(tmpl *template.Template, configDirs []string) error {
