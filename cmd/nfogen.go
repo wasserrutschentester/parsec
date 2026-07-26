@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/spf13/cobra"
@@ -287,6 +289,77 @@ func parseMediaFiles(mediaFiles []string, searchResult *mdb.SearchResult) []nfo.
 	return fileInputs
 }
 
+func stripJSONTags(v any) any {
+	if v == nil {
+		return nil
+	}
+
+	val := reflect.ValueOf(v)
+
+	if val.Kind() == reflect.Pointer {
+		return stripJSONTagsPtr(val)
+	}
+
+	if val.Type() == reflect.TypeFor[time.Time]() {
+		return val.Interface()
+	}
+
+	switch val.Kind() {
+	case reflect.Struct:
+		return stripJSONTagsStruct(val)
+	case reflect.Slice, reflect.Array:
+		return stripJSONTagsSlice(val)
+	case reflect.Map:
+		return stripJSONTagsMap(val)
+	default:
+		return val.Interface()
+	}
+}
+
+func stripJSONTagsPtr(val reflect.Value) any {
+	if val.IsNil() {
+		return nil
+	}
+
+	if val.Type() == reflect.TypeFor[*time.Time]() {
+		return val.Interface()
+	}
+
+	return stripJSONTags(val.Elem().Interface())
+}
+
+func stripJSONTagsStruct(val reflect.Value) map[string]any {
+	m := make(map[string]any)
+	typ := val.Type()
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.IsExported() {
+			m[field.Name] = stripJSONTags(val.Field(i).Interface())
+		}
+	}
+
+	return m
+}
+
+func stripJSONTagsSlice(val reflect.Value) []any {
+	var s []any
+	for i := 0; i < val.Len(); i++ {
+		s = append(s, stripJSONTags(val.Index(i).Interface()))
+	}
+
+	return s
+}
+
+func stripJSONTagsMap(val reflect.Value) map[string]any {
+	m := make(map[string]any)
+	for _, k := range val.MapKeys() {
+		m[fmt.Sprint(k.Interface())] = stripJSONTags(val.MapIndex(k).Interface())
+	}
+
+	return m
+}
+
 func dumpNfoContext(ctx *nfo.Context, raw bool) {
 	dumpCtx := *ctx
 	if !raw {
@@ -302,8 +375,9 @@ func dumpNfoContext(ctx *nfo.Context, raw bool) {
 		}
 	}
 
-	//nolint:musttag // debugging output doesn't need strict json tags on the entire tree
-	b, err := json.MarshalIndent(dumpCtx, "", "  ")
+	strippedCtx := stripJSONTags(dumpCtx)
+
+	b, err := json.MarshalIndent(strippedCtx, "", "  ")
 	if err != nil {
 		ui.PrintError("Failed to dump context: " + err.Error())
 
