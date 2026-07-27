@@ -177,7 +177,7 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 | `disabled_checks` | array of strings | Listed checks will be skipped. (Ignored if `enabled_checks` is set) |
 
 The checks disabled by default are:  
-`matroska_subtitle_inline_fonts`, `matroska_srt_validation`, `matroska_ass_events`, `matroska_ass_unused_styles` and `matroska_creation_time_privacy`
+`matroska_subtitle_inline_fonts`, `matroska_srt_validation`, `matroska_ass_events`, `matroska_ass_unused_styles`, `matroska_creation_time_privacy` and `matroska_chapters_existence`
 
 ##### Available Checks
 
@@ -224,6 +224,7 @@ The checks disabled by default are:
 -   `matroska_commentary_prefix`: Verify commentary track names start with a standard prefix.
 -   `matroska_commentary_pairing`: Verify that subtitle commentary tracks have a corresponding audio commentary track.
 -   `matroska_truehd_compatibility`: Verify Dolby TrueHD tracks are followed by a lossy compatibility track (AC3/E-AC3) in the same language.
+-   `matroska_chapters_existence`: Verify that there is at least one chapter in the file (Disabled by default).
 -   `matroska_chapters_start_non_zero`: Verify that the first chapter starts at exactly 00:00:00.000.
 -   `matroska_chapters_non_monotonic`: Verify that chapter start times are strictly increasing.
 -   `matroska_chapters_duplicate`: Check for duplicate chapter timestamps.

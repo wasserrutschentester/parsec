@@ -280,7 +280,12 @@ func runCommentaryChecks(filePath string, tracks []matroska.EbmlTrack, agg *trac
 	}
 }
 
+//nolint:cyclop // just a series of independent checks
 func runChaptersChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *matroska.Chapters, agg *trackResultAggregator) {
+	if config.IsCheckEnabled(config.CheckMatroskaChaptersExistence) {
+		agg.Add(checkChaptersExistence(xmlChapters))
+	}
+
 	if xmlChapters.Empty() {
 		return
 	}

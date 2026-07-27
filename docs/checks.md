@@ -146,6 +146,7 @@ These checks ensure the Matroska container and its components meet quality stand
 
 | Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
+| Chapter Existence | `checkChaptersExistence` | `matroska_chapters_existence` | ❌ | Verifies that there is at least one chapter in the file. (Disabled by default) |
 | Chapter Non-Zero Start | `checkChaptersStartNonZero` | `matroska_chapters_start_non_zero` | ✅ | Verifies that the first chapter starts at exactly `00:00:00.000`. |
 | Chapter Non-Monotonic Order | `checkChaptersNonMonotonic` | `matroska_chapters_non_monotonic` | ✅ | Verifies that chapter start times are strictly increasing. |
 | Chapter Duplicate Timestamps | `checkChaptersDuplicate` | `matroska_chapters_duplicate` | ✅ | Flags cases where multiple chapters share the exact same timestamp. |

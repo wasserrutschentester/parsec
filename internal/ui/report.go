@@ -172,6 +172,7 @@ var matroskaSubGroups = map[string]string{
 	"matroska_chapters_name_hygiene":       "Chapters",
 	"matroska_chapters_language_hygiene":   "Chapters",
 	"matroska_chapters_keyframe_alignment": "Chapters",
+	"matroska_chapters_existence":          "Chapters",
 }
 
 func getMatroskaSubGroupName(id string) string {

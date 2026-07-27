@@ -50,7 +50,7 @@ func InitDefaults() {
 	})
 	viper.SetDefault("prowlarr.movie_categories", []int{2000})
 	viper.SetDefault("prowlarr.tv_categories", []int{5000})
-	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events", "matroska_ass_unused_styles", "matroska_srt_validation", "matroska_creation_time_privacy"})
+	viper.SetDefault("disabled_checks", []string{"matroska_subtitle_inline_fonts", "matroska_ass_events", "matroska_ass_unused_styles", "matroska_srt_validation", "matroska_creation_time_privacy", "matroska_chapters_existence"})
 	viper.SetDefault("tag_preview", true)
 }
 

@@ -85,6 +85,7 @@ const (
 	CheckMatroskaChaptersNameHygiene       = "matroska_chapters_name_hygiene"
 	CheckMatroskaChaptersLanguageHygiene   = "matroska_chapters_language_hygiene"
 	CheckMatroskaChaptersKeyframeAlignment = "matroska_chapters_keyframe_alignment"
+	CheckMatroskaChaptersExistence         = "matroska_chapters_existence"
 )
 
 // AllChecks contains every check identifier available in the system.
@@ -156,4 +157,5 @@ var AllChecks = []string{
 	CheckMatroskaChaptersNameHygiene,
 	CheckMatroskaChaptersLanguageHygiene,
 	CheckMatroskaChaptersKeyframeAlignment,
+	CheckMatroskaChaptersExistence,
 }

@@ -23,6 +23,21 @@ func formatNsToTime(ns int64) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms)
 }
 
+func checkChaptersExistence(chapters *matroska.Chapters) *CheckResult {
+	if chapters == nil || len(chapters.Atoms) == 0 {
+		return &CheckResult{
+			Identifier: config.CheckMatroskaChaptersExistence,
+			Warning:    "No chapters found in the file",
+			Passed:     false,
+			Severity:   "error",
+			Actual:     "0 chapters",
+			Expected:   ">= 1 chapter",
+		}
+	}
+
+	return nil
+}
+
 func checkChaptersStartNonZero(chapters *matroska.Chapters) *CheckResult {
 	if chapters == nil || len(chapters.Atoms) == 0 {
 		return nil
