@@ -176,6 +176,9 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 | `enabled_checks` | array of strings | If set, only the listed checks will be performed. Use `["all"]` to enable all possible checks. |
 | `disabled_checks` | array of strings | Listed checks will be skipped. (Ignored if `enabled_checks` is set) |
 
+The checks disabled by default are:  
+`matroska_subtitle_inline_fonts`, `matroska_srt_validation`, `matroska_ass_events` and `matroska_creation_time_privacy`
+
 ##### Available Checks
 
 -   `filename_characters`: Check for disallowed characters in filename.
@@ -190,6 +193,7 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 -   `mediainfo_dialogue_normalization`: Check for dialogue normalization in lossless audio tracks.
 -   `mediainfo_stereo_lossless`: Warn if an audio track with 2 or less channels uses a different lossless codec than FLAC.
 -   `mediainfo_empty_tracks`: Warn (with error severity) if an audio track has zero channels or a subtitle track has zero elements.
+-   `mediainfo_missing_statistics`: Warn if a track is missing statistics tags.
 -   `matroska_track_order`: Verify track ordering rules.
 -   `matroska_language_tag`: Verify valid ISO language tags on tracks.
 -   `matroska_multi_lang`: Ensure 'mul' tracks have at least two full language names.
@@ -213,6 +217,11 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 -   `matroska_video_cropping`: Warn if resolution-based black bars are detected but no MKV crop values are set.
 -   `matroska_title_hygiene`: Verify container title doesn't contain technical metadata noise.
 -   `matroska_app_hygiene`: Verify writing application metadata is clean of local paths/UUIDs.
+-   `matroska_data_layout`: Verify that the Info and Tracks Elements are placed before the first Cluster.
+-   `matroska_commentary_channels`: Warn if a commentary audio track has more than 2 channels.
+-   `matroska_commentary_bitrate`: Warn if a commentary audio track has a bitrate exceeding 128 kbps.
+-   `matroska_commentary_prefix`: Verify commentary track names start with a standard prefix.
+-   `matroska_commentary_pairing`: Verify that subtitle commentary tracks have a corresponding audio commentary track.
 -   `matroska_truehd_compatibility`: Verify Dolby TrueHD tracks are followed by a lossy compatibility track (AC3/E-AC3) in the same language.
 -   `matroska_chapters_start_non_zero`: Verify that the first chapter starts at exactly 00:00:00.000.
 -   `matroska_chapters_non_monotonic`: Verify that chapter start times are strictly increasing.

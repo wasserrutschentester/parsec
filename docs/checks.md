@@ -55,34 +55,40 @@ Force identification using specific database IDs.
 
 This document lists all individual checks performed by the `parsec check` command. Most of these can be disabled in the [Config](config.md) if you don't want to use them.
 
+
+**Default Status:**
+- ✅ : Can be disabled (Enabled by default)
+- ❌ : Can be disabled (Disabled by default)
+- 🔒 : Cannot be disabled
+
 ### Filename Checks
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| Allowed Characters | `checkAllowedCharacters` | `filename_characters` | Yes | Ensures filename only contains `[a-zA-Z0-9\-\.]`. |
-| Disallowed Sequences | `checkCharacterSequences` | `filename_sequences` | Yes | Detects invalid patterns like `.-.`, `..`, or multiple dots/dashes. |
-| Missing Year | `checkYearMissing` | `filename_year_missing` | Yes | Ensures movies have a release year in the filename. |
-| Redundant Year | `checkYearRedundant` | `filename_year_redundant` | Yes | Checks if a year tag is redundant (e.g., when using S20YY style naming for episodes). |
-| Streaming Service | `checkStreamingService` | `filename_streaming` | Yes | Ensures a streaming service tag is present for WEB sources. |
-| TV Specials | `checkTvSpecial` | `filename_tv_special` | Yes | Requires air date and episode title for TV specials (Season 00). |
-| Name Mismatch | `checkNameMismatch` | `filename_generation_mismatch` | Yes | Verifies that the filename matches the name generated from its metadata. |
+| Allowed Characters | `checkAllowedCharacters` | `filename_characters` | ✅ | Ensures filename only contains `[a-zA-Z0-9\-\.]`. |
+| Disallowed Sequences | `checkCharacterSequences` | `filename_sequences` | ✅ | Detects invalid patterns like `.-.`, `..`, or multiple dots/dashes. |
+| Missing Year | `checkYearMissing` | `filename_year_missing` | ✅ | Ensures movies have a release year in the filename. |
+| Redundant Year | `checkYearRedundant` | `filename_year_redundant` | ✅ | Checks if a year tag is redundant (e.g., when using S20YY style naming for episodes). |
+| Streaming Service | `checkStreamingService` | `filename_streaming` | ✅ | Ensures a streaming service tag is present for WEB sources. |
+| TV Specials | `checkTvSpecial` | `filename_tv_special` | ✅ | Requires air date and episode title for TV specials (Season 00). |
+| Name Mismatch | `checkNameMismatch` | `filename_generation_mismatch` | ✅ | Verifies that the filename matches the name generated from its metadata. |
 
 ### Technical Quality Checks (MediaInfo)
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| Video Track Presence | `mediainfo.Get` | N/A | No | Verifies that the file contains at least one video track. Mandatory for processing. |
-| Audio Track Presence | `mediainfo.Get` | N/A | No | Verifies that the file contains at least one audio track. Mandatory for processing. |
-| Interlaced WEB | `checkInterlacedWeb` | `mediainfo_interlaced_web` | Yes | Issues a warning if a WEB source is detected as interlaced. |
-| Frame Rate | `checkFrameRate` | `mediainfo_framerate` | Yes | Validates against standard framerates (23.976, 24, 25, 29.97, 30, 50, 59.94, 60). |
-| Low Bitrate | `checkBitRate` | `mediainfo_bitrate` | Yes | Checks for minimum bitrate thresholds based on resolution (e.g., 2 Mbps for 1080p). |
-| Track Durations | `checkDurations` | `mediainfo_durations` | Yes | Detects significant timing discrepancies between video, audio, and subtitle tracks. |
-| Redundant Audio | `checkRedundantAudio` | `mediainfo_redundant_audio` | Yes | Identifies multiple standard audio tracks for the same language. |
-| Resolution | `checkResolution` | `mediainfo_resolution` | Yes | Checks for odd resolution, standard widths, and sane aspect ratios. |
-| Dialogue Normalization | `checkDialogueNormalization` | `mediainfo_dialogue_normalization` | Yes | Verifies that dialogue normalization is removed for lossless (TrueHD, DTS-HD MA) and DTS-HD HRA tracks. |
-| Stereo/Mono Lossless Codec | `checkStereoLossless` | `mediainfo_stereo_lossless` | Yes | Warns if an audio track with 2 or less channels uses a different lossless codec than FLAC (e.g., TrueHD, DTS-HD MA, or PCM). |
-| Empty Tracks | `checkEmptyTracks` | `mediainfo_empty_tracks` | Yes | Issues an error if a track is determined to be empty (e.g., duration is 0, size is 0 bytes, audio has 0 channels, or subtitles have 0 elements). |
-| Missing Statistics | `checkMissingStatistics` | `mediainfo_missing_statistics` | Yes | Warns if a track is missing statistics tags (e.g., DURATION, NUMBER_OF_BYTES, or ElementCount), making it difficult to determine if it is empty. |
+| Video Track Presence | `mediainfo.Get` | N/A | 🔒 | Verifies that the file contains at least one video track. Mandatory for processing. |
+| Audio Track Presence | `mediainfo.Get` | N/A | 🔒 | Verifies that the file contains at least one audio track. Mandatory for processing. |
+| Interlaced WEB | `checkInterlacedWeb` | `mediainfo_interlaced_web` | ✅ | Issues a warning if a WEB source is detected as interlaced. |
+| Frame Rate | `checkFrameRate` | `mediainfo_framerate` | ✅ | Validates against standard framerates (23.976, 24, 25, 29.97, 30, 50, 59.94, 60). |
+| Low Bitrate | `checkBitRate` | `mediainfo_bitrate` | ✅ | Checks for minimum bitrate thresholds based on resolution (e.g., 2 Mbps for 1080p). |
+| Track Durations | `checkDurations` | `mediainfo_durations` | ✅ | Detects significant timing discrepancies between video, audio, and subtitle tracks. |
+| Redundant Audio | `checkRedundantAudio` | `mediainfo_redundant_audio` | ✅ | Identifies multiple standard audio tracks for the same language. |
+| Resolution | `checkResolution` | `mediainfo_resolution` | ✅ | Checks for odd resolution, standard widths, and sane aspect ratios. |
+| Dialogue Normalization | `checkDialogueNormalization` | `mediainfo_dialogue_normalization` | ✅ | Verifies that dialogue normalization is removed for lossless (TrueHD, DTS-HD MA) and DTS-HD HRA tracks. |
+| Stereo/Mono Lossless Codec | `checkStereoLossless` | `mediainfo_stereo_lossless` | ✅ | Warns if an audio track with 2 or less channels uses a different lossless codec than FLAC (e.g., TrueHD, DTS-HD MA, or PCM). |
+| Empty Tracks | `checkEmptyTracks` | `mediainfo_empty_tracks` | ✅ | Issues an error if a track is determined to be empty (e.g., duration is 0, size is 0 bytes, audio has 0 channels, or subtitles have 0 elements). |
+| Missing Statistics | `checkMissingStatistics` | `mediainfo_missing_statistics` | ✅ | Warns if a track is missing statistics tags (e.g., DURATION, NUMBER_OF_BYTES, or ElementCount), making it difficult to determine if it is empty. |
 
 ### Matroska / EBML Checks
 
@@ -90,79 +96,79 @@ These checks ensure the Matroska container and its components meet quality stand
 
 #### Container & Audio
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| Matroska Format | `checkMatroskaFormat` | `matroska_ebml_error` | No | Verifies that the file is a valid Matroska (MKV) container. |
-| Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | Yes | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
-| Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | Yes | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
-| Matroska Format | `checkDataLayout` | `matroska_data_layout` | yes | Verifies that the Info and Tracks Elemnts are placed before the first Cluster |
-| Creation Time Privacy | `checkCreationTimePrivacy` | `matroska_creation_time_privacy` | Yes | Warns if the file contains creation/encode time metadata such as `DateUTC`, `DateLocal`, or track-level encoded dates, which might be a privacy concern. Disabled by default. |
-| Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | Yes | Warns if resolution-based black bars are detected but no MKV crop values are set. |
-| Track Delay | `checkTrackDelay` | `matroska_track_delay` | Yes | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
-| TrueHD Compatibility | `checkTrueHDCompatibility` | `matroska_truehd_compatibility` | Yes | Verifies that any Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/E-AC3) of the same language. |
-| Commentary Channels | `checkCommentaryChannels` | `matroska_commentary_channels` | Yes | Warns if a commentary audio track has more than 2 channels. |
-| Commentary Bitrate | `checkCommentaryBitrate` | `matroska_commentary_bitrate` | Yes | Warns if a commentary audio track has a bitrate exceeding 128 kbps (except for lossless codecs). |
-| Commentary Prefix | `checkCommentaryPrefix` | `matroska_commentary_prefix` | Yes | Verifies commentary track names start with a standard prefix like "Commentary by...". |
-| Commentary Pairing | `checkCommentaryPairing` | `matroska_commentary_pairing` | Yes | Verifies that subtitle commentary tracks have a corresponding audio commentary track. |
+| Matroska Format | `checkMatroskaFormat` | `matroska_ebml_error` | 🔒 | Verifies that the file is a valid Matroska (MKV) container. |
+| Title Hygiene | `checkTitleHygiene` | `matroska_title_hygiene` | ✅ | Verifies that the global container title is either empty or matches the official database title, and doesn't contain technical metadata noise. |
+| Metadata Privacy | `checkAppHygiene` | `matroska_app_hygiene` | ✅ | Verifies that the `WritingApplication` field doesn't contain potentially identifiable information like local file paths or UUIDs. |
+| Matroska Format | `checkDataLayout` | `matroska_data_layout` | ✅ | Verifies that the Info and Tracks Elemnts are placed before the first Cluster |
+| Creation Time Privacy | `checkCreationTimePrivacy` | `matroska_creation_time_privacy` | ❌ | Warns if the file contains creation/encode time metadata such as `DateUTC`, `DateLocal`, or track-level encoded dates, which might be a privacy concern. Disabled by default. |
+| Video Cropping | `checkVideoCropping` | `matroska_video_cropping` | ✅ | Warns if resolution-based black bars are detected but no MKV crop values are set. |
+| Track Delay | `checkTrackDelay` | `matroska_track_delay` | ✅ | Warns if a track has a container delay exceeding ±1001ms (excluding TrueHD audio). |
+| TrueHD Compatibility | `checkTrueHDCompatibility` | `matroska_truehd_compatibility` | ✅ | Verifies that any Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/E-AC3) of the same language. |
+| Commentary Channels | `checkCommentaryChannels` | `matroska_commentary_channels` | ✅ | Warns if a commentary audio track has more than 2 channels. |
+| Commentary Bitrate | `checkCommentaryBitrate` | `matroska_commentary_bitrate` | ✅ | Warns if a commentary audio track has a bitrate exceeding 128 kbps (except for lossless codecs). |
+| Commentary Prefix | `checkCommentaryPrefix` | `matroska_commentary_prefix` | ✅ | Verifies commentary track names start with a standard prefix like "Commentary by...". |
+| Commentary Pairing | `checkCommentaryPairing` | `matroska_commentary_pairing` | ✅ | Verifies that subtitle commentary tracks have a corresponding audio commentary track. |
 
 #### Tracks
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| Language Tags | `validateTrackBasics` | `matroska_language_tag` | Yes | Verifies that all tracks have a valid ISO language tag. |
-| 'mul' Track Name | `validateTrackBasics` | `matroska_multi_lang` | Yes | Ensures that tracks with language 'mul' (Multiple) have a Name field listing at least two full language names. |
-| Name Quality | `checkTrackNameQuality` | `matroska_name_quality` | Yes | Detects "junk" keywords (STEREO, ENCODED, SURROUND, etc.) in track names. |
-| Simple Codecs | `checkTrackNameCodecs` | `matroska_name_codecs` | Yes | Detects simple codecs (AC3, AAC, DTS) in track names that are easily identified from technical metadata. |
-| Redundant Language | `checkTrackNameRedundantLang` | `matroska_name_redundant_lang` | Yes | Flags full language names (e.g., "German") in the track title that match the track's language tag. |
-| Original Language Consistency | `checkOriginalLanguageConsistency` | `matroska_original_language` | Yes | Verifies that the `OriginalLanguage` flag is applied consistently. |
-| Duplicate Tracks | `checkDuplicateTracks` | `matroska_duplicate_tracks` | Yes | Identifies identical tracks (same language, flags, and name). |
-| Flag Keywords | `checkNameKeywords` | `matroska_name_keywords` | Yes | Enforces strict two-way correlation between flags and keywords (SDH, Forced, Commentary, Descriptive/AD) in track names. |
-| Default Flags | `checkDefaultFlags` | `matroska_default_flags` | Yes | Ensures specialized tracks (Forced, SDH, Commentary, etc.) are NOT marked as Default, and that the first standard track per language IS marked as Default. |
-| Track Order | `checkTrackOrder` | `matroska_track_order` | Yes | Ensures audio and subtitle tracks are sorted by language priority (preferred_language, Original, and then alphabetical by English language and dialect name ) and type (Forced, Standard/Default, SDH/Descriptive, Commentary). |
+| Language Tags | `validateTrackBasics` | `matroska_language_tag` | ✅ | Verifies that all tracks have a valid ISO language tag. |
+| 'mul' Track Name | `validateTrackBasics` | `matroska_multi_lang` | ✅ | Ensures that tracks with language 'mul' (Multiple) have a Name field listing at least two full language names. |
+| Name Quality | `checkTrackNameQuality` | `matroska_name_quality` | ✅ | Detects "junk" keywords (STEREO, ENCODED, SURROUND, etc.) in track names. |
+| Simple Codecs | `checkTrackNameCodecs` | `matroska_name_codecs` | ✅ | Detects simple codecs (AC3, AAC, DTS) in track names that are easily identified from technical metadata. |
+| Redundant Language | `checkTrackNameRedundantLang` | `matroska_name_redundant_lang` | ✅ | Flags full language names (e.g., "German") in the track title that match the track's language tag. |
+| Original Language Consistency | `checkOriginalLanguageConsistency` | `matroska_original_language` | ✅ | Verifies that the `OriginalLanguage` flag is applied consistently. |
+| Duplicate Tracks | `checkDuplicateTracks` | `matroska_duplicate_tracks` | ✅ | Identifies identical tracks (same language, flags, and name). |
+| Flag Keywords | `checkNameKeywords` | `matroska_name_keywords` | ✅ | Enforces strict two-way correlation between flags and keywords (SDH, Forced, Commentary, Descriptive/AD) in track names. |
+| Default Flags | `checkDefaultFlags` | `matroska_default_flags` | ✅ | Ensures specialized tracks (Forced, SDH, Commentary, etc.) are NOT marked as Default, and that the first standard track per language IS marked as Default. |
+| Track Order | `checkTrackOrder` | `matroska_track_order` | ✅ | Ensures audio and subtitle tracks are sorted by language priority (preferred_language, Original, and then alphabetical by English language and dialect name ) and type (Forced, Standard/Default, SDH/Descriptive, Commentary). |
 
 #### Subtitles
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | Yes | Verifies that all text subtitle tracks are in SRT or ASS format. All other text formats should be converted to SRT. |
-| Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | Yes | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle track *Styles* are included as attachments. Matching is done using internal font names (via `sfnt`), making it independent of attachment filenames. |
-| Subtitle Inline Fonts | `checkSubtitleInlineFonts` | `matroska_subtitle_inline_fonts` | Yes | Verifies fonts used in *inline tags* within SSA/ASS subtitle tracks. Uses internal font names for matching. Requires demuxing the track, which makes this check significantly slower. Disabled by default. |
-| SRT Validation | `checkSRTValidation` | `matroska_srt_validation` | Yes | Verifies that SRT subtitle tracks contain valid HTML formatting tags, all tags are properly nested and closed, and throws a warning if positioning/alignment information is present (which should use ASS instead). Disabled by default. |
-| Unused Fonts | `checkUnusedFonts` | `matroska_unused_fonts` | Yes | Identifies font attachments that are not used by any subtitle track. Uses internal font names to ensure accuracy. |
-| Font Filename Compliance | `checkFontFilenameCompliance` | `matroska_font_filename_compliance` | Yes | Verifies that the filename of a font attachment matches its internal font name (Family or Full Name). |
-| ASS Script Info | `checkASSScriptInfo` | `matroska_ass_script_info` | Yes | Verifies that the `[Script Info]` section of an ASS subtitle track contains recommended headers like `ScaledBorderAndShadow` and `YCbCr Matrix`. |
-| ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | Yes | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
-| ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | Yes | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. |
-| Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | Yes | Verifies that zlib compression is disabled for all tracks. |
+| Subtitle Format | `checkSubtitleFormat` | `matroska_subtitle_format` | ✅ | Verifies that all text subtitle tracks are in SRT or ASS format. All other text formats should be converted to SRT. |
+| Subtitle Fonts | `checkSubtitleFonts` | `matroska_subtitle_fonts` | ✅ | Verifies that all fonts used in SubStationAlpha (SSA/ASS) subtitle track *Styles* are included as attachments. Matching is done using internal font names (via `sfnt`), making it independent of attachment filenames. |
+| Subtitle Inline Fonts | `checkSubtitleInlineFontsWithContent` | `matroska_subtitle_inline_fonts` | ❌ | Verifies fonts used in *inline tags* within SSA/ASS subtitle tracks. Uses internal font names for matching. Requires demuxing the track, which makes this check significantly slower. Disabled by default. |
+| SRT Validation | `checkSRTValidation` | `matroska_srt_validation` | ❌ | Verifies that SRT subtitle tracks contain valid HTML formatting tags, all tags are properly nested and closed, and throws a warning if positioning/alignment information is present (which should use ASS instead). Disabled by default. |
+| Unused Fonts | `checkUnusedFonts` | `matroska_unused_fonts` | ✅ | Identifies font attachments that are not used by any subtitle track. Uses internal font names to ensure accuracy. |
+| Font Filename Compliance | `checkFontFilenameCompliance` | `matroska_font_filename_compliance` | ✅ | Verifies that the filename of a font attachment matches its internal font name (Family or Full Name). |
+| ASS Script Info | `checkASSScriptInfo` | `matroska_ass_script_info` | ✅ | Verifies that the `[Script Info]` section of an ASS subtitle track contains recommended headers like `ScaledBorderAndShadow` and `YCbCr Matrix`. |
+| ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | ✅ | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
+| ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | ❌ | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. Disabled by default. |
+| Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | ✅ | Verifies that zlib compression is disabled for all tracks. |
 
 #### Chapters
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| Chapter Non-Zero Start | `checkChaptersStartNonZero` | `matroska_chapters_start_non_zero` | Yes | Verifies that the first chapter starts at exactly `00:00:00.000`. |
-| Chapter Non-Monotonic Order | `checkChaptersNonMonotonic` | `matroska_chapters_non_monotonic` | Yes | Verifies that chapter start times are strictly increasing. |
-| Chapter Duplicate Timestamps | `checkChaptersDuplicate` | `matroska_chapters_duplicate` | Yes | Flags cases where multiple chapters share the exact same timestamp. |
-| Chapter Interval Too Short | `checkChaptersTooClose` | `matroska_chapters_too_close` | Yes | Flags consecutive chapters that are less than 10 seconds apart. |
-| Chapter Exceeds Duration | `checkChaptersExceedDuration` | `matroska_chapters_exceed_duration` | Yes | Ensures no chapter starts after the total duration of the video. |
-| Chapter Name Hygiene | `checkChaptersNameHygiene` | `matroska_chapters_name_hygiene` | Yes | Verifies chapter display names are present, and have no consecutive duplicate names. |
-| Chapter Language Hygiene | `checkChaptersLanguageHygiene` | `matroska_chapters_language_hygiene` | Yes | Ensures all chapter displays have valid, consistent language tags (and are not undetermined/missing). |
-| Chapter Keyframe Alignment | `checkChaptersKeyframeAlignment` | `matroska_chapters_keyframe_alignment` | Yes | Verifies that chapter timestamps fall exactly on video keyframes (seek points) using the container's Cues index. |
+| Chapter Non-Zero Start | `checkChaptersStartNonZero` | `matroska_chapters_start_non_zero` | ✅ | Verifies that the first chapter starts at exactly `00:00:00.000`. |
+| Chapter Non-Monotonic Order | `checkChaptersNonMonotonic` | `matroska_chapters_non_monotonic` | ✅ | Verifies that chapter start times are strictly increasing. |
+| Chapter Duplicate Timestamps | `checkChaptersDuplicate` | `matroska_chapters_duplicate` | ✅ | Flags cases where multiple chapters share the exact same timestamp. |
+| Chapter Interval Too Short | `checkChaptersTooClose` | `matroska_chapters_too_close` | ✅ | Flags consecutive chapters that are less than 10 seconds apart. |
+| Chapter Exceeds Duration | `checkChaptersExceedDuration` | `matroska_chapters_exceed_duration` | ✅ | Ensures no chapter starts after the total duration of the video. |
+| Chapter Name Hygiene | `checkChaptersNameHygiene` | `matroska_chapters_name_hygiene` | ✅ | Verifies chapter display names are present, and have no consecutive duplicate names. |
+| Chapter Language Hygiene | `checkChaptersLanguageHygiene` | `matroska_chapters_language_hygiene` | ✅ | Ensures all chapter displays have valid, consistent language tags (and are not undetermined/missing). |
+| Chapter Keyframe Alignment | `checkChaptersKeyframeAlignment` | `matroska_chapters_keyframe_alignment` | ✅ | Verifies that chapter timestamps fall exactly on video keyframes (seek points) using the container's Cues index. |
 
 ### Media Database (MDB) Consistency Checks
 
-| Check | Function | Identifier | Configurable | Description |
+| Check | Function | Identifier | Status | Description |
 |-------|----------|------------|--------------|-------------|
-| MDB Error | `checkMdbError` | `mdb_error` | No | Reports errors when communicating with TMDB/TVDB. |
-| No Match Found | `checkNoMatch` | `mdb_no_match` | No | Issued when the media cannot be found in the database. |
-| Title Match | `checkTitle` | `mdb_title` | Yes | Compares filename title with the official title from TMDB/TVDB. |
-| Movie Year Match | `checkMovieYear` | `mdb_movie_year` | Yes | Verifies release year against database records for movies. |
-| Series Year Match | `checkSeriesYear` | `mdb_series_year` | Yes | Verifies series start year against database records. |
-| Unknown Original Language | `checkUnknownOriginalLang` | `mdb_unknown_original_lang` | Yes | Warns if the original language from TMDB/TVDB is not recognized or missing (could cause issues with other language checks). |
-| Unwanted Audio Language | `checkUnwantedAudioLang` | `mdb_unwanted_audio_lang` | Yes | Flags audio tracks in languages that are neither the preferred nor the original language (often considered bloated) |
-| Episode Existence | `checkEpisode` | `mdb_episode_existence` | Yes | Verifies that the Season/Episode exists in the database. |
-| Episode Title Match | `checkEpisodeTitle` | `mdb_episode_title` | Yes | Compares filename episode title with the official database title. |
-| Special Date Match | `checkSpecialDate` | `mdb_episode_date` | Yes | Verifies air date for TV specials against database records. |
-| Track Languages | `checkTrackLanguages` | `mdb_track_languages` | Yes | Verifies presence of audio and subtitle tracks in both preferred and original languages. |
+| MDB Error | `checkMdbError` | `mdb_error` | 🔒 | Reports errors when communicating with TMDB/TVDB. |
+| No Match Found | `checkNoMatch` | `mdb_no_match` | 🔒 | Issued when the media cannot be found in the database. |
+| Title Match | `checkTitle` | `mdb_title` | ✅ | Compares filename title with the official title from TMDB/TVDB. |
+| Movie Year Match | `checkMovieYear` | `mdb_movie_year` | ✅ | Verifies release year against database records for movies. |
+| Series Year Match | `checkSeriesYear` | `mdb_series_year` | ✅ | Verifies series start year against database records. |
+| Unknown Original Language | `checkUnknownOriginalLang` | `mdb_unknown_original_lang` | ✅ | Warns if the original language from TMDB/TVDB is not recognized or missing (could cause issues with other language checks). |
+| Unwanted Audio Language | `checkUnwantedAudioLang` | `mdb_unwanted_audio_lang` | ✅ | Flags audio tracks in languages that are neither the preferred nor the original language (often considered bloated) |
+| Episode Existence | `checkEpisode` | `mdb_episode_existence` | ✅ | Verifies that the Season/Episode exists in the database. |
+| Episode Title Match | `checkEpisodeTitle` | `mdb_episode_title` | ✅ | Compares filename episode title with the official database title. |
+| Special Date Match | `checkSpecialDate` | `mdb_episode_date` | ✅ | Verifies air date for TV specials against database records. |
+| Track Languages | `checkTrackLanguages` | `mdb_track_languages` | ✅ | Verifies presence of audio and subtitle tracks in both preferred and original languages. |
 
 ## Aggregate Checks
 
