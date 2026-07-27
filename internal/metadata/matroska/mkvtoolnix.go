@@ -78,6 +78,8 @@ type EbmlChapterAtom struct {
 	UID          uint64        `json:"uid" xml:"ChapterUID"`
 	TimeStart    int64         `json:"time_start" xml:"-"`
 	TimeStartXML string        `json:"-" xml:"ChapterTimeStart"`
+	TimeEnd      int64         `json:"time_end,omitempty" xml:"-"`
+	TimeEndXML   string        `json:"-" xml:"ChapterTimeEnd"`
 	Display      []EbmlDisplay `json:"display" xml:"ChapterDisplay"`
 }
 
@@ -1762,6 +1764,14 @@ func parseXMLChapters(xmlCh EbmlChapters) []EbmlChapterAtom {
 			}
 
 			atom.TimeStart = ns
+
+			if atom.TimeEndXML != "" {
+				nsEnd, err := parseTimeToNs(atom.TimeEndXML)
+				if err == nil {
+					atom.TimeEnd = nsEnd
+				}
+			}
+
 			parsed = append(parsed, atom)
 		}
 	}

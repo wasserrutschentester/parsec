@@ -62,6 +62,16 @@ func checkChaptersNonMonotonic(chapters *matroska.Chapters) *CheckResult {
 			}
 		}
 
+		if ch.TimeEndXML != "" && ch.TimeEnd < ch.TimeStart {
+			return &CheckResult{
+				Identifier: config.CheckMatroskaChaptersNonMonotonic,
+				Warning:    "Chapter ends before it starts",
+				Passed:     false,
+				Severity:   "error",
+				Actual:     fmt.Sprintf("chapter ends at %s but starts at %s", formatNsToTime(ch.TimeEnd), formatNsToTime(ch.TimeStart)),
+			}
+		}
+
 		lastTime = ch.TimeStart
 	}
 
@@ -135,6 +145,16 @@ func checkChaptersExceedDuration(ebml *matroska.EbmlMetadata, chapters *matroska
 				Passed:     false,
 				Severity:   "error",
 				Actual:     fmt.Sprintf("chapter at %s (video duration is %s)", formatNsToTime(ch.TimeStart), formatNsToTime(duration)),
+			}
+		}
+
+		if ch.TimeEnd > duration {
+			return &CheckResult{
+				Identifier: config.CheckMatroskaChaptersExceedDuration,
+				Warning:    "Chapter end timestamp exceeds video duration",
+				Passed:     false,
+				Severity:   "error",
+				Actual:     fmt.Sprintf("chapter end at %s (video duration is %s)", formatNsToTime(ch.TimeEnd), formatNsToTime(duration)),
 			}
 		}
 	}
