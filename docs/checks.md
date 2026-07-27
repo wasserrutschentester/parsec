@@ -139,6 +139,7 @@ These checks ensure the Matroska container and its components meet quality stand
 | ASS Script Info | `checkASSScriptInfo` | `matroska_ass_script_info` | ✅ | Verifies that the `[Script Info]` section of an ASS subtitle track contains recommended headers like `ScaledBorderAndShadow` and `YCbCr Matrix`. |
 | ASS Style Validation | `checkASSStyles` | `matroska_ass_styles` | ✅ | Performs deep validation of ASS `[V4+ Styles]`, checking for valid font sizes, alignments, encodings, and avoiding trailing whitespace in style names. |
 | ASS Event Validation | `checkASSEvents` | `matroska_ass_events` | ❌ | Validates ASS `[Events]`, ensuring all used styles are defined, time formats are correct, and forbidden tags (like `\fe`) are avoided. Disabled by default. |
+| ASS Unused Styles | `checkASSUnusedStyles` | `matroska_ass_unused_styles` | ❌ | Identifies styles defined in the `[V4+ Styles]` section that are never referenced by any event (either as a base style or inline `\r` style override). Disabled by default. |
 | Zlib Compression | `checkZlibCompression` | `matroska_zlib_compression` | ✅ | Verifies that zlib compression is disabled for all tracks. |
 
 #### Chapters

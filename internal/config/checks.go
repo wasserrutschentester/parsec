@@ -58,6 +58,7 @@ const (
 	CheckMatroskaAssScriptInfo       = "matroska_ass_script_info"
 	CheckMatroskaAssStyles           = "matroska_ass_styles"
 	CheckMatroskaAssEvents           = "matroska_ass_events"
+	CheckMatroskaAssUnusedStyles     = "matroska_ass_unused_styles"
 	CheckMatroskaZlibCompression     = "matroska_zlib_compression"
 
 	// Matroska: Container & Attachments
@@ -131,6 +132,7 @@ var AllChecks = []string{
 	CheckMatroskaAssScriptInfo,
 	CheckMatroskaAssStyles,
 	CheckMatroskaAssEvents,
+	CheckMatroskaAssUnusedStyles,
 	CheckMatroskaZlibCompression,
 	CheckMatroskaTrackOrder,
 	CheckMatroskaUnusedFonts,

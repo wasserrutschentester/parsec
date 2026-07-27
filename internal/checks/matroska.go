@@ -506,7 +506,7 @@ func runASSSpecificChecks(
 		results = append(results, checkASSStyles(track))
 	}
 
-	needsExtraction := config.IsCheckEnabled(config.CheckMatroskaSubtitleInlineFonts) || config.IsCheckEnabled(config.CheckMatroskaAssEvents)
+	needsExtraction := config.IsCheckEnabled(config.CheckMatroskaSubtitleInlineFonts) || config.IsCheckEnabled(config.CheckMatroskaAssEvents) || config.IsCheckEnabled(config.CheckMatroskaAssUnusedStyles)
 	if !needsExtraction {
 		return results
 	}
@@ -528,6 +528,14 @@ func runASSSpecificChecks(
 		start := time.Now()
 		res := checkASSEvents(track, content)
 		ui.PrintDebug(fmt.Sprintf("checkASSEvents for track %d took %v", track.ID, time.Since(start)))
+
+		results = append(results, res)
+	}
+
+	if config.IsCheckEnabled(config.CheckMatroskaAssUnusedStyles) {
+		start := time.Now()
+		res := checkASSUnusedStyles(track, content)
+		ui.PrintDebug(fmt.Sprintf("checkASSUnusedStyles for track %d took %v", track.ID, time.Since(start)))
 
 		results = append(results, res)
 	}

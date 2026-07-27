@@ -485,7 +485,7 @@ func validateEventField(field, val string, definedStyles map[string]bool) []stri
 			errors = append(errors, "undefined style '"+val+"'")
 		}
 	case "Text":
-		errors = append(errors, validateEventText(val)...)
+		errors = append(errors, validateEventText(val, definedStyles)...)
 	case "Effect":
 		if val != "" {
 			errors = append(errors, validateEffect(val)...)
@@ -495,7 +495,7 @@ func validateEventField(field, val string, definedStyles map[string]bool) []stri
 	return errors
 }
 
-func validateEventText(val string) []string {
+func validateEventText(val string, definedStyles map[string]bool) []string {
 	var errors []string
 
 	if strings.Contains(val, "\\fe") {
@@ -506,7 +506,49 @@ func validateEventText(val string) []string {
 		errors = append(errors, "\\blur should be preferred over \\be")
 	}
 
+	// Parse inline tags and check referenced styles.
+	for _, styleName := range extractInlineReferencedStyles(val) {
+		if !definedStyles[styleName] {
+			errors = append(errors, "undefined inline style '"+styleName+"'")
+		}
+	}
+
 	return errors
+}
+
+func extractInlineReferencedStyles(text string) []string {
+	var styles []string
+
+	inTag := false
+	tagStartIndex := -1
+
+	for i := 0; i < len(text); i++ {
+		c := text[i]
+		switch c {
+		case '{':
+			inTag = true
+			tagStartIndex = i + 1
+		case '}':
+			if inTag && tagStartIndex >= 0 {
+				tagContent := text[tagStartIndex:i]
+
+				parts := strings.SplitSeq(tagContent, "\\")
+				for part := range parts {
+					part = strings.TrimSpace(part)
+					if strings.HasPrefix(part, "r") {
+						styleName := strings.TrimSpace(part[1:])
+						if styleName != "" {
+							styles = append(styles, styleName)
+						}
+					}
+				}
+			}
+
+			inTag = false
+		}
+	}
+
+	return styles
 }
 
 func splitEventLine(line string, fieldCount int) []string {
@@ -1780,4 +1822,119 @@ func SuffixFontName(name string, n int) string {
 	}
 
 	return fmt.Sprintf("%s_dupe%d%s", base, n, ext)
+}
+
+func collectUsedStyles(lines []string, definedStyles map[string]bool) map[string]bool {
+	usedStyles := make(map[string]bool)
+
+	remaining := len(definedStyles)
+	if remaining == 0 {
+		return usedStyles
+	}
+
+	inEvents := false
+
+	var eventFormatFields []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "[Events]" {
+			inEvents = true
+
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") && line != "[Events]" {
+			inEvents = false
+		}
+
+		if !inEvents {
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(line, "Format:"); ok {
+			eventFormatFields = parseStyleFormat(rest)
+		} else if rest, ok := strings.CutPrefix(line, "Dialogue:"); ok {
+			if processDialogueForUsedStyles(rest, eventFormatFields, usedStyles, definedStyles, &remaining) {
+				return usedStyles
+			}
+		}
+	}
+
+	return usedStyles
+}
+
+func processDialogueForUsedStyles(rest string, formatFields []string, usedStyles map[string]bool, definedStyles map[string]bool, remaining *int) bool {
+	for _, style := range getStylesFromDialogue(rest, formatFields) {
+		if !usedStyles[style] {
+			usedStyles[style] = true
+			if definedStyles[style] {
+				*remaining--
+				if *remaining <= 0 {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func getStylesFromDialogue(rest string, formatFields []string) []string {
+	values := splitDialogueEventLine(rest, len(formatFields))
+
+	var textVal string
+
+	var styles []string
+
+	for i, field := range formatFields {
+		if i < len(values) {
+			val := strings.TrimSpace(values[i])
+
+			switch field {
+			case "Style":
+				styles = append(styles, val)
+			case "Text":
+				textVal = values[i]
+			}
+		}
+	}
+
+	styles = append(styles, extractInlineReferencedStyles(textVal)...)
+
+	return styles
+}
+
+func checkASSUnusedStyles(track matroska.EbmlTrack, content []byte) *CheckResult {
+	lines := strings.Split(string(content), "\n")
+	definedStyles := parseDefinedStyles(lines)
+	usedStyles := collectUsedStyles(lines, definedStyles)
+
+	var unused []string
+
+	for style := range definedStyles {
+		if !usedStyles[style] {
+			unused = append(unused, style)
+		}
+	}
+
+	if len(unused) > 0 {
+		slices.Sort(unused)
+
+		rows := make([][]string, len(unused))
+		for i, style := range unused {
+			rows[i] = []string{style, "Unused"}
+		}
+
+		res := newFailedTrackResult(config.CheckMatroskaAssUnusedStyles, "Track contains unused ASS styles", "info", &track, "See table below")
+		res.Tracks[0].Table = &types.TableData{
+			Headers: []string{"Style Name", "Reason"},
+			Rows:    rows,
+		}
+
+		return res
+	}
+
+	return nil
 }

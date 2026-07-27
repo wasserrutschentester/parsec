@@ -177,7 +177,7 @@ This setting is also respected by the [`fix`](fix.md) command: a disabled check 
 | `disabled_checks` | array of strings | Listed checks will be skipped. (Ignored if `enabled_checks` is set) |
 
 The checks disabled by default are:  
-`matroska_subtitle_inline_fonts`, `matroska_srt_validation`, `matroska_ass_events` and `matroska_creation_time_privacy`
+`matroska_subtitle_inline_fonts`, `matroska_srt_validation`, `matroska_ass_events`, `matroska_ass_unused_styles` and `matroska_creation_time_privacy`
 
 ##### Available Checks
 
@@ -212,6 +212,7 @@ The checks disabled by default are:
 -   `matroska_ass_script_info`: Verify ASS Script Info headers.
 -   `matroska_ass_styles`: Deep validation of ASS styles.
 -   `matroska_ass_events`: Validation of ASS event lines.
+-   `matroska_ass_unused_styles`: Identifies styles defined but never used in events.
 -   `matroska_zlib_compression`: Detect tracks using zlib compression.
 -   `matroska_track_delay`: Warn if a track has container delay exceeding ±1001ms (excluding TrueHD audio).
 -   `matroska_video_cropping`: Warn if resolution-based black bars are detected but no MKV crop values are set.
