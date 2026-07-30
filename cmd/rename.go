@@ -97,7 +97,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	newPath := filepath.Join(destDir, newName)
 
 	if filePath == newPath {
-		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' is already has the correct name.", filepath.Base(filePath))))
+		ui.Println(ui.Success.Render(fmt.Sprintf("NOMINAL: File '%s' already has the correct name.", filepath.Base(filePath))))
 
 		return nil
 	}
