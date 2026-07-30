@@ -43,8 +43,8 @@ func init() {
 	rootCmd.AddCommand(nfogenCmd)
 	// P2P info
 	nfogenCmd.Flags().StringVar(&notesFlag, "notes", "", "custom notes to embed in the NFO")
-	nfogenCmd.Flags().StringSliceVar(&sourcesFlag, "source", []string{}, "add a source release name (can be used multiple times)")
-	nfogenCmd.Flags().StringSliceVar(&sourceMapFlag, "source-map", []string{}, "map tracks to a source (e.g., 'v1,a1-3:Release-Name')")
+	nfogenCmd.Flags().StringArrayVar(&sourcesFlag, "source", []string{}, "add a source release name (can be used multiple times)")
+	nfogenCmd.Flags().StringArrayVar(&sourceMapFlag, "source-map", []string{}, "map tracks to a source (e.g., 'v1,a1-3:Release-Name')")
 	// Output
 	nfogenCmd.Flags().BoolVar(&dumpContextFlag, "dump-context", false, "dump the template context data as JSON (hides raw fields)")
 	nfogenCmd.Flags().BoolVar(&dumpContextRawFlag, "dump-context-raw", false, "dump the template context data as JSON including all raw provider data")
