@@ -30,7 +30,7 @@ var (
 )
 
 // InteractiveSearch performs a search by ID or title, prompting the user if multiple matches are found.
-func InteractiveSearch(meta *metadata.Metadata, unattended bool, quietSearch bool) (*mdb.SearchResult, error) {
+func InteractiveSearch(meta *metadata.Metadata, unattended, quietSearch bool) (*mdb.SearchResult, error) {
 	if meta.Title == "" && meta.ImdbID == "" && meta.TmdbID == 0 && meta.TvdbID == 0 {
 		return nil, errInput
 	}
@@ -69,13 +69,7 @@ func interactiveSearchByID(meta *metadata.Metadata, quietSearch bool) (*mdb.Sear
 	return result, nil
 }
 
-func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool, quietSearch bool) (*mdb.SearchResult, error) {
-	mediaType := "movie"
-	if meta.IsTV {
-		mediaType = "tv"
-	}
-
-	// Replace dots with spaces for the search query
+func getTitleSearchResults(meta *metadata.Metadata, mediaType string, quietSearch bool) ([]mdb.SearchResult, error) {
 	searchQuery := filename.DeobfuscateTitle(meta.Title)
 
 	msg := fmt.Sprintf("Searching for %s (%d) [%s]...", searchQuery, meta.Year, mediaType)
@@ -86,6 +80,32 @@ func interactiveSearchByTitle(meta *metadata.Metadata, unattended bool, quietSea
 	}
 
 	results, err := fuzzySearch(searchQuery, meta.Year, meta.IsTV)
+	if err != nil || len(results) > 0 {
+		return results, err
+	}
+
+	fallbackQuery := strings.ReplaceAll(meta.Title, ".", " ")
+	if fallbackQuery == searchQuery {
+		return results, nil
+	}
+
+	msg = fmt.Sprintf("Searching for %s (%d) [%s] (fallback)...", fallbackQuery, meta.Year, mediaType)
+	if quietSearch {
+		ui.PrintDebug(msg)
+	} else {
+		ui.Println(ui.Info.Render(msg))
+	}
+
+	return fuzzySearch(fallbackQuery, meta.Year, meta.IsTV)
+}
+
+func interactiveSearchByTitle(meta *metadata.Metadata, unattended, quietSearch bool) (*mdb.SearchResult, error) {
+	mediaType := "movie"
+	if meta.IsTV {
+		mediaType = "tv"
+	}
+
+	results, err := getTitleSearchResults(meta, mediaType, quietSearch)
 	if err != nil {
 		return nil, err
 	}
