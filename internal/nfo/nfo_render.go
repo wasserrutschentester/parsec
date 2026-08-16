@@ -523,7 +523,7 @@ func replaceDurationPlaceholders(layout string, h, m, s int) string {
 	return sb.String()
 }
 
-func matchAndWritePlaceholder(runes []rune, i int, h, m, s int, sb *strings.Builder) int {
+func matchAndWritePlaceholder(runes []rune, i, h, m, s int, sb *strings.Builder) int {
 	r := runes[i]
 
 	switch r {
@@ -801,7 +801,7 @@ func uniqFunc(items any) []any {
 	return result
 }
 
-func containsFunc(search any, items any) bool {
+func containsFunc(search, items any) bool {
 	if items == nil {
 		return false
 	}
@@ -952,7 +952,7 @@ func isEmpty(val any) bool {
 	return false
 }
 
-func defaultFunc(defaultVal any, input any) any {
+func defaultFunc(defaultVal, input any) any {
 	if isEmpty(input) {
 		return defaultVal
 	}

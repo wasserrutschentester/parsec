@@ -636,7 +636,7 @@ func formatLanguageName(langCode string, track *matroska.EbmlTrack, plan *FixPla
 	return formatted
 }
 
-func formatSeekLatency(prevKF, timeStart int64, defaultDuration int64) string {
+func formatSeekLatency(prevKF, timeStart, defaultDuration int64) string {
 	if prevKF == -1 {
 		return "-"
 	}

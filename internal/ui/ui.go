@@ -760,7 +760,7 @@ func ConfirmContinue(msg string) bool {
 // If defaultOpt is "n" or "N", empty input returns false.
 //
 //nolint:cyclop // UI logic
-func PromptYN(msg string, defaultOpt string) bool {
+func PromptYN(msg, defaultOpt string) bool {
 	if IsSilent || !IsTerminal() {
 		return strings.ToLower(defaultOpt) == "y"
 	}
@@ -802,7 +802,7 @@ func readInput() string {
 // PromptYNI asks a yes/no/inspect question and returns "y", "n", or "i".
 //
 //nolint:cyclop // UI logic
-func PromptYNI(msg string, defaultOpt string) string {
+func PromptYNI(msg, defaultOpt string) string {
 	if IsSilent || !IsTerminal() {
 		return strings.ToLower(defaultOpt)
 	}
@@ -844,7 +844,7 @@ func PromptYNI(msg string, defaultOpt string) string {
 // PromptYNE asks a yes/no/edit question and returns "y", "n", or "e".
 //
 //nolint:cyclop // UI logic
-func PromptYNE(msg string, defaultOpt string) string {
+func PromptYNE(msg, defaultOpt string) string {
 	if IsSilent || !IsTerminal() {
 		return strings.ToLower(defaultOpt)
 	}

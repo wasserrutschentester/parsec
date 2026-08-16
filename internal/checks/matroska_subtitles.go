@@ -875,7 +875,7 @@ func getAttachmentFontNames(attID int, attachmentFonts []matroska.AttachmentFont
 	return uniqueStrings(names)
 }
 
-func cleanFallbackFontName(fullName string, familyName string) string {
+func cleanFallbackFontName(fullName, familyName string) string {
 	if familyName != "" && fullName != familyName && strings.HasPrefix(strings.ToLower(fullName), strings.ToLower(familyName)) {
 		// e.g. fullName: "Times New Roman Bold", familyName: "Times New Roman"
 		style := fullName[len(familyName):]
@@ -1865,7 +1865,7 @@ func collectUsedStyles(lines []string, definedStyles map[string]bool) map[string
 	return usedStyles
 }
 
-func processDialogueForUsedStyles(rest string, formatFields []string, usedStyles map[string]bool, definedStyles map[string]bool, remaining *int) bool {
+func processDialogueForUsedStyles(rest string, formatFields []string, usedStyles, definedStyles map[string]bool, remaining *int) bool {
 	for _, style := range getStylesFromDialogue(rest, formatFields) {
 		if !usedStyles[style] {
 			usedStyles[style] = true

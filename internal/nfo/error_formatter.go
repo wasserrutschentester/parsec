@@ -47,7 +47,7 @@ func FormatTemplateError(err error, configDirs []string) error {
 	return err
 }
 
-func formatExecutionError(matches []string, configDirs []string) error {
+func formatExecutionError(matches, configDirs []string) error {
 	tmplName := matches[1]
 	lineStr := matches[2]
 	token := matches[5]
@@ -68,7 +68,7 @@ func formatExecutionError(matches []string, configDirs []string) error {
 	return fmt.Errorf("%w\n%s", ErrTemplateExecution, sb.String())
 }
 
-func formatParseError(matches []string, configDirs []string) error {
+func formatParseError(matches, configDirs []string) error {
 	tmplName := matches[1]
 	lineStr := matches[2]
 	msg := matches[3]
