@@ -21,6 +21,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/metadata/resolve"
 	"codeberg.org/upPollo/parsec/internal/nfo"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
@@ -45,6 +46,12 @@ func init() {
 	nfogenCmd.Flags().StringVar(&notesFlag, "notes", "", "custom notes to embed in the NFO")
 	nfogenCmd.Flags().StringArrayVar(&sourcesFlag, "source", []string{}, "add a source release name (can be used multiple times)")
 	nfogenCmd.Flags().StringArrayVar(&sourceMapFlag, "source-map", []string{}, "map tracks to a source (e.g., 'v1,a1-3:Release-Name')")
+	// MDB ID
+	nfogenCmd.Flags().BoolVarP(&isTVFlag, "tv", "T", false, "identify as TV show")
+	nfogenCmd.Flags().BoolVarP(&isMovieFlag, "movie", "M", false, "identify as movie")
+	nfogenCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	nfogenCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
+	nfogenCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	// Output
 	nfogenCmd.Flags().BoolVar(&dumpContextFlag, "dump-context", false, "dump the template context data as JSON (hides raw fields)")
 	nfogenCmd.Flags().BoolVar(&dumpContextRawFlag, "dump-context-raw", false, "dump the template context data as JSON including all raw provider data")
@@ -65,6 +72,13 @@ func init() {
 		_ = nfogenCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
 
+	// Group ID flags
+	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
+	for _, f := range idFlags {
+		_ = nfogenCmd.Flags().SetAnnotation(f, "group", []string{"id"})
+	}
+
+	// group output flags
 	outputFlags := []string{"full-diff", "dump-context", "dump-context-raw", "quiet"}
 	for _, f := range outputFlags {
 		_ = nfogenCmd.Flags().SetAnnotation(f, "group", []string{"output"})
@@ -88,12 +102,12 @@ var nfogenCmd = &cobra.Command{
 		}
 
 		for _, targetPath := range targets {
-			generateNfoForTarget(targetPath)
+			generateNfoForTarget(cmd, targetPath)
 		}
 	},
 }
 
-func generateNfoForTarget(targetPath string) {
+func generateNfoForTarget(cmd *cobra.Command, targetPath string) {
 	ui.Println(ui.Info.Render("Generating NFO for:"), filepath.Base(targetPath))
 
 	mediaFiles, releaseName, nfoFile, err := getTargetFiles(targetPath)
@@ -103,7 +117,18 @@ func generateNfoForTarget(targetPath string) {
 		return
 	}
 
-	baseMeta := filename.Parse(releaseName)
+	res, _ := resolve.Metadata(resolve.Options{
+		FilePath:   targetPath,
+		ImdbID:     imdbIDFlag,
+		TmdbID:     tmdbIDFlag,
+		TvdbID:     tvdbIDFlag,
+		IsTVSet:    cmd.Flags().Changed("tv"),
+		IsMovieSet: cmd.Flags().Changed("movie"),
+		ParseEBML:  false,
+	})
+	baseMeta := res.Meta
+	baseMeta.SetDefaults()
+
 	searchResult := performSearch(baseMeta, unattendedFlag)
 	fileInputs := parseMediaFiles(mediaFiles, searchResult)
 
