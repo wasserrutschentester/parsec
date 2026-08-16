@@ -415,6 +415,21 @@ func matchEdition(filename string, meta *metadata.Metadata) {
 	}
 }
 
+var englishUmlautExceptions = map[string]bool{
+	"blue": true, "true": true, "shoes": true, "guest": true,
+	"phoenix": true, "does": true, "shoe": true, "clue": true,
+	"glue": true, "due": true, "sue": true, "rescue": true,
+	"issue": true, "value": true, "queue": true, "argue": true,
+	"revenue": true, "avenue": true, "statue": true, "league": true,
+	"plague": true, "vogue": true, "rogue": true, "fatigue": true,
+	"tongue": true, "poetry": true, "poem": true, "poet": true,
+	"goes": true, "toes": true, "heroes": true, "potatoes": true,
+	"tomatoes": true, "echoes": true, "duel": true, "duet": true,
+	"cruel": true, "fuel": true, "gruel": true, "fluent": true,
+	"influence": true, "sequence": true, "frequent": true, "quest": true,
+	"question": true, "request": true, "conquer": true, "bouquet": true,
+}
+
 // DeobfuscateTitle removes common obfuscation from titles (e.g. dots, umlaut replacements).
 func DeobfuscateTitle(title string) string {
 	result := title
@@ -423,20 +438,27 @@ func DeobfuscateTitle(title string) string {
 	// replace umlaut replacements (ae, oe, ue) with their corresponding characters
 	// We want to avoid replacing if preceded by a vowel.
 	// We also want to avoid replacing "oe" at the end of a word (like Monroe, Poe, Toe, Aloe)
-	re := regexp.MustCompile(`(?i)(^|[^aeiou])(ae|oe|ue)($|[^a-z]|.)`)
-	result = re.ReplaceAllStringFunc(result, func(m string) string {
-		match := re.FindStringSubmatch(m)
-		if len(match) < 4 {
-			return m
+	wordRe := regexp.MustCompile(`(?i)[a-z]+`)
+	umlautRe := regexp.MustCompile(`(?i)(^|[^aeiou])(ae|oe|ue)($|[^a-z]|.)`)
+
+	result = wordRe.ReplaceAllStringFunc(result, func(word string) string {
+		if englishUmlautExceptions[strings.ToLower(word)] {
+			return word
 		}
 
-		prefix := match[1]
-		umlautMatch := match[2]
-		suffix := match[3]
+		return umlautRe.ReplaceAllStringFunc(word, func(m string) string {
+			match := umlautRe.FindStringSubmatch(m)
+			if len(match) < 4 {
+				return m
+			}
 
-		r := getUmlautReplacement(umlautMatch, suffix)
+			prefix := match[1]
+			umlautMatch := match[2]
+			suffix := match[3]
+			r := getUmlautReplacement(umlautMatch, suffix)
 
-		return prefix + r + suffix
+			return prefix + r + suffix
+		})
 	})
 
 	return result
