@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -291,9 +292,8 @@ func renameApplyNormalization(meta *metadata.Metadata) {
 	// Apply normalization to Title, EpisodeTitle and Service
 	meta.Title = filename.NormalizeTitle(meta.Title)
 	if len(meta.EpisodeTitles) > 0 {
-		for i, t := range meta.EpisodeTitles {
-			meta.EpisodeTitles[i] = filename.NormalizeTitle(t)
-		}
+		combined := strings.Join(meta.EpisodeTitles, " / ")
+		meta.EpisodeTitles = []string{filename.NormalizeTitle(combined)}
 	}
 }
 

@@ -439,7 +439,7 @@ func (meta *Metadata) getReplacements() map[string]string {
 	replacements := map[string]string{
 		"{title}":          meta.Title,
 		"{date}":           meta.Date,
-		"{episode_title}":  strings.Join(meta.EpisodeTitles, " / "),
+		"{episode_title}":  strings.Join(meta.EpisodeTitles, " "),
 		"{language}":       LanguageName(meta.Language),
 		"{language_ext}":   meta.LanguageExt,
 		"{cut_edition}":    meta.CutEdition,
