@@ -296,8 +296,8 @@ func Get(filePath string) (*MediaInfo, error) {
 		}
 	}
 
-	ui.PrintDebug("Executing: mediainfo --Output=JSON --ParseSpeed=0 " + ui.AnonymizePath(filePath))
-	cmd := exec.CommandContext(context.Background(), "mediainfo", "--Output=JSON", "--ParseSpeed=0", filePath)
+	ui.PrintDebug("Executing: mediainfo --Output=JSON " + ui.AnonymizePath(filePath))
+	cmd := exec.CommandContext(context.Background(), "mediainfo", "--Output=JSON", filePath)
 
 	out, err := cmd.Output()
 	if err != nil {
