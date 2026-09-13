@@ -18,6 +18,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
+	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -732,7 +733,8 @@ func matchByAirDate(episodes []Episode, date string, allowSpecials bool) *Episod
 
 func matchByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Episode {
 	for _, ep := range episodes {
-		if metadata.Normalize(ep.Name) == normTitle {
+		epName := filename.ApplyTitleReplacements(ep.Name)
+		if metadata.Normalize(epName) == normTitle {
 			if ep.SeasonNumber == 0 && !allowSpecials {
 				continue
 			}
@@ -751,7 +753,9 @@ func matchByTitleFuzzy(episodes []Episode, normTitle string) *Episode {
 	found := false
 
 	for _, ep := range episodes {
-		sim := mdb.CalculateSimilarity(normTitle, metadata.Normalize(ep.Name))
+		epName := filename.ApplyTitleReplacements(ep.Name)
+
+		sim := mdb.CalculateSimilarity(normTitle, metadata.Normalize(epName))
 		if sim > maxSim {
 			maxSim = sim
 			bestMatch = ep
