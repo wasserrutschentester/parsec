@@ -45,7 +45,7 @@ body = """
   {% endfor %}
 {% endif %}
 {% if previous.version %}\
-    **Full Changelog**: https://codeberg.org/upPollo/parsec/compare/{{ previous.version }}...{% if "-dev" in version %}nightly{% else %}{{ version }}{% endif %}
+    **Full Changelog**: https://codeberg.org/upPollo/parsec/compare/{{ previous.version }}...{% if version and "-dev" in version %}nightly{% elif version %}{{ version }}{% else %}HEAD{% endif %}
 {% endif %}\n
 """
 
@@ -109,7 +109,5 @@ protect_breaking_commits = true
 filter_commits = false
 # glob pattern for matching git tags
 tag_pattern = "v[0-9]*"
-# sort the tags topologically
-topo_order = true
 # sort the commits inside sections by message
 sort_commits = "oldest"
