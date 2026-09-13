@@ -315,11 +315,7 @@ func renameGetEpisodeInfos(result *mdb.SearchResult, meta *metadata.Metadata) []
 	meta.EpisodeTitles = titles
 	meta.Season = episodes[0].Season
 	meta.Date = episodes[0].Airdate
-
-	// only set episode numbers if empty or [0]
-	if len(meta.Episodes) == 0 || (len(meta.Episodes) == 1 && meta.Episodes[0] == 0) {
-		meta.Episodes = mdb.ExtractEpisodeNumbers(episodes)
-	}
+	meta.Episodes = mdb.ExtractEpisodeNumbers(episodes)
 
 	return episodes
 }
