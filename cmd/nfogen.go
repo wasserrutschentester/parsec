@@ -222,7 +222,7 @@ func expandReleaseArgs(args []string) []string {
 	return expanded
 }
 
-func getTargetFiles(targetPath string) (mediaFiles []string, releaseName string, nfoFile string, err error) {
+func getTargetFiles(targetPath string) (mediaFiles []string, releaseName, nfoFile string, err error) {
 	stat, err := os.Stat(targetPath)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("cannot access target: %w", err)
@@ -239,7 +239,7 @@ func getTargetFiles(targetPath string) (mediaFiles []string, releaseName string,
 	return mediaFiles, releaseName, nfoFile, nil
 }
 
-func getTargetFilesFromDir(targetPath string) (mediaFiles []string, releaseName string, nfoFile string, err error) {
+func getTargetFilesFromDir(targetPath string) (mediaFiles []string, releaseName, nfoFile string, err error) {
 	releaseName = filepath.Base(targetPath)
 	nfoFile = filepath.Join(targetPath, releaseName+".nfo")
 
@@ -412,7 +412,7 @@ func dumpNfoContext(ctx *nfo.Context, raw bool) {
 	ui.Println(string(b))
 }
 
-func checkExistingNfo(nfoFile string, out string, fullDiff bool, quiet bool) (exists bool, skip bool) {
+func checkExistingNfo(nfoFile, out string, fullDiff, quiet bool) (exists, skip bool) {
 	if existing, err := os.ReadFile(nfoFile); err == nil {
 		existingNFO := string(existing)
 
@@ -434,7 +434,7 @@ func checkExistingNfo(nfoFile string, out string, fullDiff bool, quiet bool) (ex
 	return false, false
 }
 
-func promptForGeneration(out string, unattended bool, quiet bool, exists bool, force bool) bool {
+func promptForGeneration(out string, unattended, quiet, exists, force bool) bool {
 	if unattended {
 		if exists && !force {
 			ui.Println(ui.Muted.Render("Skipping existing file..."))
@@ -468,7 +468,7 @@ func promptForGeneration(out string, unattended bool, quiet bool, exists bool, f
 	return true
 }
 
-func handleNfoOutput(nfoFile string, out string, dryRun bool, unattended bool, fullDiff bool, quiet bool, force bool) error {
+func handleNfoOutput(nfoFile, out string, dryRun, unattended, fullDiff, quiet, force bool) error {
 	if dryRun {
 		if !quiet {
 			ui.Println(out)

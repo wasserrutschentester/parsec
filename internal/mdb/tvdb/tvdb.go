@@ -614,7 +614,7 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 
 		ui.PrintDebug(fmt.Sprintf("found %d episodes combined", len(episodes)))
 
-		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials)
+		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials, uniqueLangs)
 
 		if ep != nil {
 			return finalizeEpisodeResult(ep, episodes, uniqueLangs), nil
@@ -658,26 +658,52 @@ func finalizeEpisodeResult(ep *Episode, episodes []Episode, uniqueLangs []string
 	return res
 }
 
-func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool) *Episode {
-	var ep *Episode
+func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool, langs []string) *Episode {
 	// 1. Season/Episode Number Match
 	if meta.Season >= 0 && len(meta.Episodes) > 0 {
-		ep = matchBySeasonEpisode(episodes, meta.Season, meta.Episodes[0])
-	}
-	// 2. Air Date Match
-	if meta.Date != "" && ep == nil {
-		ep = matchByAirDate(episodes, meta.Date, allowSpecials)
-	}
-	// 3. Normalized Title Match
-	if normalizedQueryTitle != "" && ep == nil {
-		ep = matchByTitle(episodes, normalizedQueryTitle, allowSpecials)
-	}
-	// 4. Fuzzy Match (Fallback)
-	if normalizedQueryTitle != "" && ep == nil {
-		ep = matchByTitleFuzzy(episodes, normalizedQueryTitle)
+		if ep := matchBySeasonEpisode(episodes, meta.Season, meta.Episodes[0]); ep != nil {
+			return ep
+		}
 	}
 
-	return ep
+	// 2. Air Date Match
+	if meta.Date != "" {
+		if ep := matchByAirDate(episodes, meta.Date, allowSpecials); ep != nil {
+			return ep
+		}
+	}
+
+	if normalizedQueryTitle == "" {
+		return nil
+	}
+
+	enrichMissingTitles(episodes, langs)
+
+	// 3. Normalized Title Match
+	if ep := matchByTitle(episodes, normalizedQueryTitle, allowSpecials); ep != nil {
+		return ep
+	}
+
+	// 4. Fuzzy Match (Fallback)
+	return matchByTitleFuzzy(episodes, normalizedQueryTitle)
+}
+
+func enrichMissingTitles(episodes []Episode, langs []string) {
+	for i := range episodes {
+		if episodes[i].Name == "" {
+			var res mdb.EpisodeResult
+
+			for _, l := range langs {
+				fillEpisodeTranslation(&res, episodes[i].ID, l)
+
+				if res.Name != "" {
+					episodes[i].Name = res.Name
+
+					break
+				}
+			}
+		}
+	}
 }
 
 func matchBySeasonEpisode(episodes []Episode, season, episode int) *Episode {
@@ -733,7 +759,9 @@ func matchByTitleFuzzy(episodes []Episode, normTitle string) *Episode {
 		}
 	}
 
-	if found && maxSim > 0.8 {
+	ui.PrintDebug(fmt.Sprintf("Best match for %s (sim = %f): %+v", normTitle, maxSim, bestMatch))
+
+	if found && maxSim > 0.6 {
 		return &bestMatch
 	}
 
@@ -748,7 +776,9 @@ func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
 	}
 
 	translation, err := getTranslation(tvdbID, "episodes", lang)
-	ui.PrintDebug(fmt.Sprintf("translation: %+v, err: %v", translation, err))
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("failed to get translation (episode %d, %s): %v", tvdbID, lang, err))
+	}
 
 	if err == nil {
 		if res.Name == "" && translation.Data.Name != "" {
