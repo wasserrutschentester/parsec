@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -52,11 +53,6 @@ func SanitizeUTF8Bytes(b []byte) []byte {
 	}
 
 	return res.Bytes()
-}
-
-// SanitizeUTF8 ensures a string is valid UTF-8, converting invalid sequences from Windows-1252.
-func SanitizeUTF8(s string) string {
-	return string(SanitizeUTF8Bytes([]byte(s)))
 }
 
 // MediaInfo represents the complete JSON output from mediainfo.
@@ -399,23 +395,11 @@ func parseID(val string) (int, string) {
 }
 
 func (mi *MediaInfo) isVideo() bool {
-	for _, track := range mi.Media.Tracks {
-		if track.Type == "Video" {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(mi.Media.Tracks, func(t Track) bool { return t.Type == "Video" })
 }
 
 func (mi *MediaInfo) hasAudio() bool {
-	for _, track := range mi.Media.Tracks {
-		if track.Type == "Audio" {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(mi.Media.Tracks, func(t Track) bool { return t.Type == "Audio" })
 }
 
 // GetMetadata converts MediaInfo data into a normalized Metadata struct.

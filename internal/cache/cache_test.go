@@ -53,15 +53,6 @@ func TestCache(t *testing.T) {
 	if _, err := Get(key); err == nil {
 		t.Error("Expected error for expired key")
 	}
-
-	// Test Clear
-	_ = Set(key, data)
-
-	clearCache()
-
-	if _, err := Get(key); err == nil {
-		t.Error("Expected error after clear")
-	}
 }
 
 //nolint:paralleltest // modifies package-level state (cacheDir)
@@ -245,16 +236,6 @@ func testMoveAndClear(t *testing.T, key, newKey string, data []byte) {
 
 		if !bytes.Equal(newCached, data) {
 			t.Errorf("Expected %s, got %s for moved cache", data, newCached)
-		}
-	})
-
-	t.Run("ClearCacheRemovesMovedPersistent", func(t *testing.T) {
-		newPath := getMetaPath(newKey)
-
-		clearCache()
-
-		if _, err := os.Stat(newPath); !os.IsNotExist(err) {
-			t.Errorf("Moved persistent file should be removed by clearCache: %v", err)
 		}
 	})
 }

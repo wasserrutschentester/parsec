@@ -43,11 +43,6 @@ type MatroskaRemuxPlan struct {
 	RemovalCandidates []RemovalCandidate
 }
 
-// IsEmpty reports whether the plan contains no work.
-func (p MatroskaRemuxPlan) IsEmpty() bool {
-	return len(p.TrackOrder) == 0 && len(p.StripCompressionIDs) == 0 && len(p.RemovalCandidates) == 0
-}
-
 // ComputeMatroskaRemux returns the remux operations needed for track ordering,
 // compression removal, and pruning empty/unwanted audio tracks.
 func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) MatroskaRemuxPlan {

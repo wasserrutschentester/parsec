@@ -2,6 +2,7 @@
 package prowlarr
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,7 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -335,8 +336,8 @@ func PrintReleases(result *mdb.SearchResult, meta *metadata.Metadata, filter boo
 	if filter {
 		finalResults = filterBestReleases(pResults, meta.Resolution)
 	} else {
-		sort.Slice(finalResults, func(i, j int) bool {
-			return finalResults[i].Seeders > finalResults[j].Seeders
+		slices.SortFunc(finalResults, func(a, b ReleaseResource) int {
+			return cmp.Compare(b.Seeders, a.Seeders)
 		})
 	}
 
@@ -363,8 +364,8 @@ func filterBestReleases(results []ReleaseResource, targetRes string) []ReleaseRe
 		finalResults = getBestPerIndexer(results, "")
 	}
 
-	sort.Slice(finalResults, func(i, j int) bool {
-		return finalResults[i].Seeders > finalResults[j].Seeders
+	slices.SortFunc(finalResults, func(a, b ReleaseResource) int {
+		return cmp.Compare(b.Seeders, a.Seeders)
 	})
 
 	return finalResults

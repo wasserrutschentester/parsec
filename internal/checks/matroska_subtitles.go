@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -602,19 +603,17 @@ func isSRTSubtitles(track matroska.EbmlTrack) bool {
 }
 
 func hasMatchingAttachmentNorm(font FontStyle, normalizedFamily string, normAtts []normalizedAttachmentFont) bool {
-	for _, att := range normAtts {
+	return slices.ContainsFunc(normAtts, func(att normalizedAttachmentFont) bool {
 		if att.normalizedPostScript == normalizedFamily {
 			return true
 		}
 
 		if att.normalizedFamily == normalizedFamily && att.italic == font.Italic {
-			if att.isVariable || matchWeight(att.weight, font.Weight) {
-				return true
-			}
+			return att.isVariable || matchWeight(att.weight, font.Weight)
 		}
-	}
 
-	return false
+		return false
+	})
 }
 
 func formatMissingFontDesc(font FontStyle) string {
@@ -921,21 +920,12 @@ func ProposedFontFilename(attFileName string, attID int, attachmentFonts []matro
 
 // FontFilenameCompliant reports whether an attachment filename matches an internal font name.
 func FontFilenameCompliant(attFileName string, names []string) bool {
-	baseName := attFileName
-
-	if idx := strings.LastIndex(baseName, "."); idx != -1 {
-		baseName = baseName[:idx]
-	}
-
+	baseName := strings.TrimSuffix(attFileName, filepath.Ext(attFileName))
 	normalizedFileName := NormalizeFontName(baseName)
 
-	for _, internalName := range names {
-		if NormalizeFontName(internalName) == normalizedFileName {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(names, func(internalName string) bool {
+		return NormalizeFontName(internalName) == normalizedFileName
+	})
 }
 
 // ProposedFontRename contains a proposed rename for a non-compliant font attachment.

@@ -2,7 +2,7 @@ package nfo
 
 import (
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 )
 
@@ -87,7 +87,7 @@ func medianFunc(items any) float64 {
 		return 0
 	}
 
-	sort.Float64s(nums)
+	slices.Sort(nums)
 
 	n := len(nums)
 	if n%2 == 1 {

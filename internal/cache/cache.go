@@ -190,13 +190,6 @@ func removeExpiredFontFiles() {
 	}
 }
 
-func clearCache() {
-	_ = os.RemoveAll(cacheDir)
-	_ = os.RemoveAll(metaDir)
-	_ = os.RemoveAll(subDir)
-	_ = os.RemoveAll(fontDir)
-}
-
 // Get retrieves data from the cache for the given key.
 func Get(key string) ([]byte, error) {
 	return GetWithDuration(key, cacheDuration)

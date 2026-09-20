@@ -36,38 +36,6 @@ const (
 	ElementCRC32 ElementID = 0xBF
 )
 
-//nolint:cyclop // there's a lot of Element types
-func (id ElementID) String() string {
-	switch id {
-	case ElementEBML:
-		return "Header"
-	case ElementSegment:
-		return "Segment"
-	case ElementSeekHead:
-		return "SeekHead"
-	case ElementInfo:
-		return "Info"
-	case ElementTracks:
-		return "Tracks"
-	case ElementChapters:
-		return "Chapters"
-	case ElementTags:
-		return "Tags"
-	case ElementAttachments:
-		return "Attachments"
-	case ElementCues:
-		return "Cues"
-	case ElementCluster:
-		return "Cluster"
-	case ElementVoid:
-		return "Void"
-	case ElementCRC32:
-		return "CRC-32"
-	default:
-		return fmt.Sprintf("Unknown (0x%X)", uint32(id))
-	}
-}
-
 // ElementPosition defines the physical location of an EBML element in a file.
 type ElementPosition struct {
 	ID     ElementID

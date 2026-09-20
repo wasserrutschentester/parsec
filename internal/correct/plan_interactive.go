@@ -4,7 +4,6 @@ package correct
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -136,121 +135,6 @@ func confirmApplyWithPolicy(opts Options, prompt, skipMsg string) bool {
 // fixChapterAlignment snaps misaligned chapter start times to the nearest
 // video keyframe. Re-timing chapters changes seek/navigation points, so it is
 // always confirmed like the other container fixes above.
-
-// remuxMatroska previews the pending remux-only fixes (track order,
-// compression stripping, track removals) regardless of --remux, so a plain
-// `fix` run always shows what a rewrite would change. The actual mkvmerge
-// rewrite only runs with --remux, and each of the three pieces is then
-// confirmed independently, same as every other fix.
-func trackOrderTable(ebml *matroska.EbmlMetadata, newOrder []int) string {
-	oldOrder := make([]int, len(ebml.Tracks))
-	for i, t := range ebml.Tracks {
-		oldOrder[i] = t.ID
-	}
-
-	oldIndex := make(map[int]int, len(oldOrder))
-	for i, id := range oldOrder {
-		oldIndex[id] = i + 1
-	}
-
-	misplaced := misplacedTrackIDs(oldOrder, newOrder)
-
-	headers := []string{"Old #", "New #", "Type", "Lang", "Codec", "Name", "Flags"}
-	rows := make([][]string, 0, len(newOrder))
-
-	for i, id := range newOrder {
-		track := findTrackByID(ebml, id)
-
-		trackType, lang, codec, name, flags := trackColumns(track)
-		if misplaced[id] {
-			trackType = ui.Warning.Render(trackType)
-			lang = ui.Warning.Render(lang)
-			codec = ui.Warning.Render(codec)
-			name = ui.Warning.Render(name)
-			flags = ui.Warning.Render(flags)
-		}
-
-		rows = append(rows, []string{strconv.Itoa(oldIndex[id]), strconv.Itoa(i + 1), trackType, lang, codec, name, flags})
-	}
-
-	return ui.TrackTable(headers, rows)
-}
-
-// misplacedTrackIDs returns the track IDs that genuinely need to move:
-// everything in newOrder that isn't part of the longest common subsequence
-// with oldOrder. LCS members are already in correct relative order and only
-// change index because the misplaced ones move around them.
-func misplacedTrackIDs(oldOrder, newOrder []int) map[int]bool {
-	inLCS := make(map[int]bool)
-	for _, id := range longestCommonSubsequence(oldOrder, newOrder) {
-		inLCS[id] = true
-	}
-
-	misplaced := make(map[int]bool)
-
-	for _, id := range newOrder {
-		if !inLCS[id] {
-			misplaced[id] = true
-		}
-	}
-
-	return misplaced
-}
-
-// longestCommonSubsequence returns the longest common subsequence of a and b
-// via the standard O(len(a)*len(b)) DP table.
-func longestCommonSubsequence(a, b []int) []int {
-	dp := lcsTable(a, b)
-	lcs := backtrackLCS(a, b, dp)
-
-	slices.Reverse(lcs)
-
-	return lcs
-}
-
-func lcsTable(a, b []int) [][]int {
-	n, m := len(a), len(b)
-	dp := make([][]int, n+1)
-
-	for i := range dp {
-		dp[i] = make([]int, m+1)
-	}
-
-	for i := 1; i <= n; i++ {
-		for j := 1; j <= m; j++ {
-			switch {
-			case a[i-1] == b[j-1]:
-				dp[i][j] = dp[i-1][j-1] + 1
-			case dp[i-1][j] >= dp[i][j-1]:
-				dp[i][j] = dp[i-1][j]
-			default:
-				dp[i][j] = dp[i][j-1]
-			}
-		}
-	}
-
-	return dp
-}
-
-func backtrackLCS(a, b []int, dp [][]int) []int {
-	n, m := len(a), len(b)
-	lcs := make([]int, 0, dp[n][m])
-
-	for i, j := n, m; i > 0 && j > 0; {
-		switch {
-		case a[i-1] == b[j-1]:
-			lcs = append(lcs, a[i-1])
-			i--
-			j--
-		case dp[i-1][j] >= dp[i][j-1]:
-			i--
-		default:
-			j--
-		}
-	}
-
-	return lcs
-}
 
 // confirmCompressionStrip previews and confirms stripping zlib compression
 // from the flagged tracks, independently of track order and removals.

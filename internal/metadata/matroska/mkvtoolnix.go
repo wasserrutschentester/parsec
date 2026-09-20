@@ -887,15 +887,15 @@ func (metadata *EbmlMetadata) countTypes() {
 
 // HasVisualImpairedAudio returns true if the metadata contains an audio track with the visual impaired flag set.
 func (metadata *EbmlMetadata) HasVisualImpairedAudio() bool {
-	for _, track := range metadata.Tracks {
+	return slices.ContainsFunc(metadata.Tracks, func(track EbmlTrack) bool {
 		if track.Type == "audio" && track.Properties.VisualImpaired {
 			ui.PrintDebug("found Visual Impaired audio Track")
 
 			return true
 		}
-	}
 
-	return false
+		return false
+	})
 }
 
 // runMkvpropedit logs args at debug level (with args[0], the file path,
@@ -1438,13 +1438,7 @@ func createTagsXML(tagSets []mdb.MatroskaTagSet) (string, error) {
 
 // HasChapters returns true if mkvmerge detected any chapters in the file.
 func (metadata *EbmlMetadata) HasChapters() bool {
-	for _, ch := range metadata.Chapters {
-		if ch.NumEntries > 0 {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(metadata.Chapters, func(ch EbmlChapters) bool { return ch.NumEntries > 0 })
 }
 
 var (

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -364,7 +364,7 @@ func mergeDescriptiveMetadata(res, tvdbRes *mdb.SearchResult) {
 	}
 
 	if len(tvdbRes.Countries) > 0 {
-		res.Countries = mdb.DeduplicateStrings(append(res.Countries, tvdbRes.Countries...))
+		res.Countries = metadata.RemoveDuplicates(append(res.Countries, tvdbRes.Countries...))
 	}
 
 	if len(res.Genres) == 0 && len(tvdbRes.Genres) > 0 {
@@ -474,12 +474,24 @@ func sortBySimilarity(results []mdb.SearchResult, query string, year int) []mdb.
 	}
 
 	// Sort results by similarity, then popularity
-	sort.Slice(results, func(i, j int) bool {
-		if math.Abs(results[i].Similarity-results[j].Similarity) > 0.001 {
-			return results[i].Similarity > results[j].Similarity
+	slices.SortFunc(results, func(a, b mdb.SearchResult) int {
+		if math.Abs(a.Similarity-b.Similarity) > 0.001 {
+			if a.Similarity > b.Similarity {
+				return -1
+			}
+
+			return 1
 		}
 
-		return results[i].Popularity > results[j].Popularity
+		if a.Popularity > b.Popularity {
+			return -1
+		}
+
+		if a.Popularity < b.Popularity {
+			return 1
+		}
+
+		return 0
 	})
 
 	return results

@@ -2,6 +2,7 @@ package correct
 
 import (
 	"fmt"
+	"slices"
 
 	"golang.org/x/text/language"
 
@@ -69,15 +70,7 @@ func needsOriginalLanguageForUnwantedAudio(tracks []matroska.EbmlTrack) bool {
 		language.Make(""):    true,
 	}
 
-	for _, track := range tracks {
-		if track.Type != "audio" {
-			continue
-		}
-
-		if !allowedWithoutMDB[language.Make(track.Properties.Language)] {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(tracks, func(track matroska.EbmlTrack) bool {
+		return track.Type == "audio" && !allowedWithoutMDB[language.Make(track.Properties.Language)]
+	})
 }

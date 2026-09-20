@@ -534,42 +534,6 @@ func printMissingFontPlan(plan MissingFontAttachmentPlan, dryRun, downloadsDefer
 	}
 }
 
-func uniqueStrings(in []string) []string {
-	seen := make(map[string]bool)
-
-	var out []string
-
-	for _, v := range in {
-		if v != "" && !seen[v] {
-			seen[v] = true
-			out = append(out, v)
-		}
-	}
-
-	return out
-}
-
-// FontMappingFromFonts returns mapping from normalized font name to real name, and ID to all names.
-func FontMappingFromFonts(attachmentFonts []matroska.AttachmentFontInfo) (map[string]string, map[int][]string) {
-	fontMap := make(map[string]string)
-	attachmentNames := make(map[int][]string)
-
-	for _, font := range attachmentFonts {
-		names := make([]string, 0, 2+len(font.FullNames))
-		names = append(names, font.PostScriptName, font.FamilyName)
-		names = append(names, font.FullNames...)
-		attachmentNames[font.AttachmentID] = uniqueStrings(append(attachmentNames[font.AttachmentID], names...))
-	}
-
-	for _, names := range attachmentNames {
-		for _, name := range names {
-			fontMap[checks.NormalizeFontName(name)] = name
-		}
-	}
-
-	return fontMap, attachmentNames
-}
-
 // ComputeMissingFonts gathers ASS/SSA font descriptions that lack a matching attachment.
 // It returns a list of missing font names and a map of font names to the tracks that requested them.
 func ComputeMissingFonts(filePath string, tracks []matroska.EbmlTrack, attachmentFonts []matroska.AttachmentFontInfo) ([]string, map[string][]string) {

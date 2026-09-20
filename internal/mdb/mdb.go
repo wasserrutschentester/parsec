@@ -59,21 +59,6 @@ func NormalizeStatus(status string) string {
 	return status
 }
 
-// DeduplicateStrings removes duplicate strings from a slice, preserving order.
-func DeduplicateStrings(input []string) []string {
-	seen := make(map[string]bool, len(input))
-	result := make([]string, 0, len(input))
-
-	for _, v := range input {
-		if !seen[v] {
-			seen[v] = true
-			result = append(result, v)
-		}
-	}
-
-	return result
-}
-
 // ErrNotFound is returned when no results are found in the database.
 var ErrNotFound = errors.New("no result found")
 

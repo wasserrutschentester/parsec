@@ -53,22 +53,15 @@ func (b *fixBuilder) set(number int, key, value, reason string) {
 		b.order = append(b.order, number)
 	}
 
-	found := false
-
-	for i, e := range b.trackProps[number] {
-		if e.Key == key {
-			b.trackProps[number][i].Value = value
-			if reason != "" {
-				b.trackProps[number][i].Reason = reason
-			}
-
-			found = true
-
-			break
+	idx := slices.IndexFunc(b.trackProps[number], func(e matroska.TrackPropertyEdit) bool {
+		return e.Key == key
+	})
+	if idx >= 0 {
+		b.trackProps[number][idx].Value = value
+		if reason != "" {
+			b.trackProps[number][idx].Reason = reason
 		}
-	}
-
-	if !found {
+	} else {
 		b.trackProps[number] = append(b.trackProps[number], matroska.TrackPropertyEdit{
 			Key:    key,
 			Value:  value,

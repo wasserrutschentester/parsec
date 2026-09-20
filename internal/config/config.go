@@ -5,13 +5,12 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
 )
 
@@ -96,12 +95,8 @@ func ListPresets() []string {
 		}
 	}
 
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
-	}
-
-	sort.Strings(names)
+	names := slices.Collect(maps.Keys(seen))
+	slices.Sort(names)
 
 	completions := make([]string, 0, len(names))
 	for _, name := range names {
@@ -453,37 +448,19 @@ func GetTagProfile() ([]TagConfig, error) {
 		if profileName != "default" {
 			return nil, fmt.Errorf("could not find tag template '%s': %w", profileName, err)
 		}
-	}
-
-	tagContent, err := readTagContent(tagViper, profileName)
-	if err != nil {
-		return nil, err
+		// Fallback to embedded default if no file is found
+		if err := tagViper.ReadConfig(strings.NewReader(defaultTags)); err != nil {
+			return nil, fmt.Errorf("could not read embedded default tags: %w", err)
+		}
 	}
 
 	var configData struct {
-		Tags []TagConfig `toml:"tags"`
+		Tags []TagConfig `mapstructure:"tags"`
 	}
 
-	if err := toml.Unmarshal(tagContent, &configData); err != nil {
+	if err := tagViper.Unmarshal(&configData); err != nil {
 		return nil, fmt.Errorf("invalid tag template format: %w", err)
 	}
 
 	return configData.Tags, nil
-}
-
-func readTagContent(tagViper *viper.Viper, profileName string) ([]byte, error) {
-	if fileUsed := tagViper.ConfigFileUsed(); fileUsed != "" {
-		content, err := os.ReadFile(fileUsed)
-		if err != nil {
-			return nil, fmt.Errorf("could not read tag template file: %w", err)
-		}
-
-		return content, nil
-	}
-
-	if profileName == "default" {
-		return []byte(defaultTags), nil
-	}
-
-	return nil, ErrUnknownTagTemplateSource
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -159,10 +160,11 @@ func getTracksByType(info *mediainfo.MediaInfo, trackType string) []*mediainfo.T
 }
 
 func getTrackType(info *mediainfo.MediaInfo, trackType string) *mediainfo.Track {
-	for i := range info.Media.Tracks {
-		if info.Media.Tracks[i].Type == trackType {
-			return &info.Media.Tracks[i]
-		}
+	idx := slices.IndexFunc(info.Media.Tracks, func(t mediainfo.Track) bool {
+		return t.Type == trackType
+	})
+	if idx >= 0 {
+		return &info.Media.Tracks[idx]
 	}
 
 	return nil

@@ -16,11 +16,8 @@ import (
 // GetBaseName returns the filename without extension.
 func GetBaseName(filePath string) string {
 	name := filepath.Base(filePath)
-	if ext := filepath.Ext(name); ext != "" {
-		name = name[:len(name)-len(ext)]
-	}
 
-	return name
+	return strings.TrimSuffix(name, filepath.Ext(name))
 }
 
 // ApplyReplacements applies a slice of regex replacement rules to the input string.

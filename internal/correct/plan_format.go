@@ -2,10 +2,10 @@
 package correct
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -144,20 +144,20 @@ func formatAttachmentsTable(ebml *matroska.EbmlMetadata, plan *FixPlan) string {
 		})
 	}
 
-	sort.Slice(allOps, func(i, j int) bool {
-		if allOps[i].ID == -1 && allOps[j].ID != -1 {
-			return false
+	slices.SortFunc(allOps, func(a, b *op) int {
+		if a.ID == -1 && b.ID != -1 {
+			return 1
 		}
 
-		if allOps[j].ID == -1 && allOps[i].ID != -1 {
-			return true
+		if b.ID == -1 && a.ID != -1 {
+			return -1
 		}
 
-		if allOps[i].ID == -1 && allOps[j].ID == -1 {
-			return allOps[i].New < allOps[j].New
+		if a.ID == -1 && b.ID == -1 {
+			return cmp.Compare(a.New, b.New)
 		}
 
-		return allOps[i].ID < allOps[j].ID
+		return cmp.Compare(a.ID, b.ID)
 	})
 
 	rows := make([][]string, 0, len(allOps))
@@ -251,8 +251,8 @@ func formatChapterEventsTable(events []ChapterSnapEvent) [][]string {
 }
 
 func formatTracksTable(ebml *matroska.EbmlMetadata, edits []matroska.TrackEdit) string {
-	sort.Slice(edits, func(i, j int) bool {
-		return edits[i].Number < edits[j].Number
+	slices.SortFunc(edits, func(a, b matroska.TrackEdit) int {
+		return cmp.Compare(a.Number, b.Number)
 	})
 
 	headers := []string{"ID", "Type", "#", "Codec", "Lang", "Name", "Flags", "Reason"}
@@ -509,39 +509,6 @@ func formatRemuxReorderTable(ebml *matroska.EbmlMetadata, plan *FixPlan) string 
 	}
 
 	return ui.TrackTableWithSections(headers, rows, sectionStarts)
-}
-
-func formatContainerChange(key, oldValue, newValue, reason string) string {
-	arrow := ui.Muted.Render("->")
-	label := key
-
-	switch key {
-	case "title":
-		label = "Title"
-	case "writing-application":
-		label = "WritingApp"
-	case "muxing-application":
-		label = "MuxingApp"
-	case "date":
-		label = "Date"
-	}
-
-	var res string
-
-	switch {
-	case oldValue == "set" && newValue == "":
-		res = fmt.Sprintf("%s: %s %s %s", label, ui.Muted.Render("[present]"), arrow, ui.Muted.Render("[cleared]"))
-	case newValue == "":
-		res = fmt.Sprintf("%s: %s %s %s", label, quoteOrNone(oldValue), arrow, ui.Muted.Render("[cleared]"))
-	default:
-		res = fmt.Sprintf("%s: %s %s %s", label, quoteOrNone(oldValue), arrow, quoteOrNone(newValue))
-	}
-
-	if reason != "" {
-		res += ui.Muted.Render(" (" + reason + ")")
-	}
-
-	return res
 }
 
 func compactFlagName(key string) string {

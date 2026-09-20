@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -181,12 +182,8 @@ func completeGroups(_ *cobra.Command, _ []string, _ string) ([]string, cobra.She
 
 // formatMapCompletions converts a map of completions to a sorted slice of "key\tdescription" strings.
 func formatMapCompletions(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
+	keys := slices.Collect(maps.Keys(m))
+	slices.Sort(keys)
 
 	completions := make([]string, len(keys))
 	for i, k := range keys {

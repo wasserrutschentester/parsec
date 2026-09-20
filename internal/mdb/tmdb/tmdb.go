@@ -17,6 +17,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
 var (
@@ -153,7 +154,7 @@ func extractCountries(prodCountries []struct {
 		countries = append(countries, strings.ToUpper(oc))
 	}
 
-	return mdb.DeduplicateStrings(countries)
+	return metadata.RemoveDuplicates(countries)
 }
 
 type tmdbSearchResponse struct {

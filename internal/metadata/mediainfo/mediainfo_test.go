@@ -12,7 +12,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
-func TestSanitizeUTF8(t *testing.T) {
+func TestSanitizeUTF8Bytes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -46,9 +46,9 @@ func TestSanitizeUTF8(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := SanitizeUTF8(string(tt.input))
+			got := string(SanitizeUTF8Bytes(tt.input))
 			if got != tt.expected {
-				t.Errorf("SanitizeUTF8() = %q, want %q", got, tt.expected)
+				t.Errorf("SanitizeUTF8Bytes() = %q, want %q", got, tt.expected)
 			}
 		})
 	}

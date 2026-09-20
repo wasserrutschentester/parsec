@@ -513,9 +513,6 @@ func printUnexpectedDiffIndented(identifier, expected, actual, indent string) {
 
 func getBaseName(path string) string {
 	base := filepath.Base(path)
-	if idx := strings.LastIndex(base, "."); idx != -1 {
-		return base[:idx]
-	}
 
-	return base
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }

@@ -126,13 +126,9 @@ func AppHygieneNeedsFix(app string) bool {
 }
 
 func matchesAnyPattern(value string, patterns []string) bool {
-	for _, p := range patterns {
-		if regexp.MustCompile("(?i)" + p).MatchString(value) {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(patterns, func(p string) bool {
+		return regexp.MustCompile("(?i)" + p).MatchString(value)
+	})
 }
 
 // checkTrueHDCompatibility checks if a Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/EAC3) in the same language.

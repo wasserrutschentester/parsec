@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -263,7 +263,7 @@ func getTargetFilesFromDir(targetPath string) (mediaFiles []string, releaseName,
 		return nil, "", "", errNoMediaFiles
 	}
 
-	sort.Strings(mediaFiles)
+	slices.Sort(mediaFiles)
 
 	return mediaFiles, releaseName, nfoFile, nil
 }

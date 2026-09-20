@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -206,27 +208,24 @@ func printTagPreview(tags []mdb.MatroskaTagSet) {
 
 			fmt.Println(ui.Muted.Render(fmt.Sprintf("  TargetTypeValue: %d", tagSet.TargetTypeValue)))
 
-			keys := make([]string, 0, len(tagSet.Fields))
-			for k := range tagSet.Fields {
-				keys = append(keys, k)
-			}
+			keys := slices.Collect(maps.Keys(tagSet.Fields))
 
-			sort.Slice(keys, func(i, j int) bool {
-				rankI, okI := defaultTagOrder[keys[i]]
-				if !okI {
-					rankI = 1000
+			slices.SortFunc(keys, func(a, b string) int {
+				rankA, okA := defaultTagOrder[a]
+				if !okA {
+					rankA = 1000
 				}
 
-				rankJ, okJ := defaultTagOrder[keys[j]]
-				if !okJ {
-					rankJ = 1000
+				rankB, okB := defaultTagOrder[b]
+				if !okB {
+					rankB = 1000
 				}
 
-				if rankI == rankJ {
-					return keys[i] < keys[j]
+				if rankA != rankB {
+					return cmp.Compare(rankA, rankB)
 				}
 
-				return rankI < rankJ
+				return cmp.Compare(a, b)
 			})
 
 			for _, k := range keys {

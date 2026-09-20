@@ -3,6 +3,7 @@ package checks
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -160,13 +161,9 @@ func isRedundantLanguageName(name, trackLang string) bool {
 	base, _ := tag.Base()
 	target := base.String()
 
-	for _, word := range tokenizeTrackName(name) {
-		if GetLanguageCodeFromName(word) == target {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(tokenizeTrackName(name), func(word string) bool {
+		return GetLanguageCodeFromName(word) == target
+	})
 }
 
 // CountLanguagesInString counts recognizable language names found in a track name.
@@ -404,13 +401,7 @@ var (
 )
 
 func containsAny(s string, keywords []string) bool {
-	for _, kw := range keywords {
-		if strings.Contains(s, kw) {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(keywords, func(kw string) bool { return strings.Contains(s, kw) })
 }
 
 func getCommentarySubPriority(name string) int64 {

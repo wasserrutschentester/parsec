@@ -508,13 +508,9 @@ func TrackMissingStatistics(track *mediainfo.Track) []string {
 // statistics tags in one shot, so the fix policy only needs to know whether
 // any track needs it, not which ones or what's missing.
 func MissingStatisticsNeedsFix(mi *mediainfo.MediaInfo) bool {
-	for i := range mi.Media.Tracks {
-		if len(TrackMissingStatistics(&mi.Media.Tracks[i])) > 0 {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(mi.Media.Tracks, func(t mediainfo.Track) bool {
+		return len(TrackMissingStatistics(&t)) > 0
+	})
 }
 
 func checkMissingStatistics(mi *mediainfo.MediaInfo) []CheckResult {
