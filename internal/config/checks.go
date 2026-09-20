@@ -21,6 +21,7 @@ const (
 	CheckMdbEpisodeExistence  = "mdb_episode_existence"
 	CheckMdbEpisodeTitle      = "mdb_episode_title"
 	CheckMdbEpisodeDate       = "mdb_episode_date"
+	CheckMdbRuntime           = "mdb_runtime"
 
 	// MediaInfo checks
 	CheckMediainfoInterlacedWeb     = "mediainfo_interlaced_web"
@@ -107,6 +108,7 @@ var AllChecks = []string{
 	CheckMdbEpisodeExistence,
 	CheckMdbEpisodeTitle,
 	CheckMdbEpisodeDate,
+	CheckMdbRuntime,
 	CheckMediainfoInterlacedWeb,
 	CheckMediainfoFramerate,
 	CheckMediainfoBitrate,

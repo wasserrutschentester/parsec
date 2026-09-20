@@ -245,6 +245,7 @@ The checks disabled by default are:
 -   `mdb_episode_existence`: Check if episode exists in database.
 -   `mdb_episode_title`: Verify episode title.
 -   `mdb_episode_date`: Verify episode air date.
+-   `mdb_runtime`: Verify video duration matches expected TMDB/TVDB runtime.
 -   `mdb_track_languages`: Verify presence of preferred and original language tracks.
 
 ##### Examples

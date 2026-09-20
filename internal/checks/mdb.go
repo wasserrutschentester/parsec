@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 
 // RunMdbChecks performs checks against online media databases (TMDB/TVDB).
 //
-//nolint:cyclop // multi-step search and verification process against external databases requires many conditional paths
+//nolint:cyclop,funlen // multi-step search and verification process against external databases requires many conditional paths
 func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var results []CheckResult
 
@@ -78,6 +79,10 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 
 	if mi != nil && config.IsCheckEnabled(config.CheckMdbUnwantedAudioLang) {
 		results = append(results, checkUnwantedAudioLang(mi, searchResult)...)
+	}
+
+	if mi != nil && config.IsCheckEnabled(config.CheckMdbRuntime) {
+		results = append(results, checkRuntime(mi, meta, searchResult)...)
 	}
 
 	return results
@@ -295,11 +300,17 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 	}
 
 	// build combined dummy episode result for checks
+	var totalRuntime int
+	for _, ep := range episodes {
+		totalRuntime += ep.Runtime
+	}
+
 	epResult := mdb.EpisodeResult{
 		Name:    mdb.CombineEpisodeNames(episodes),
 		Airdate: episodes[0].Airdate,
 		Season:  episodes[0].Season,
 		Episode: episodes[0].Episode,
+		Runtime: totalRuntime,
 	}
 
 	results = append(results, existenceCheck)
@@ -417,4 +428,55 @@ func RunSeasonCompletenessCheck(result *mdb.SearchResult, season int, presentEpi
 	}
 
 	return []CheckResult{res}
+}
+
+func checkRuntime(mi *mediainfo.MediaInfo, meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
+	expectedRuntime := result.Runtime
+	if meta.IsTV {
+		episodes := mdbSearch.FindEpisodes(*result, meta, false)
+		expectedRuntime = 0
+
+		for _, ep := range episodes {
+			r := ep.Runtime
+			if r == 0 {
+				r = result.Runtime // fallback to show average
+			}
+
+			expectedRuntime += r
+		}
+	}
+
+	videoDurMins := getVideoDuration(mi) / 60.0
+
+	if expectedRuntime == 0 {
+		if videoDurMins > 0 && videoDurMins < 1.0 {
+			return []CheckResult{{
+				Identifier: config.CheckMdbRuntime,
+				Passed:     false,
+				Severity:   "warning",
+				Warning:    fmt.Sprintf("Video is suspiciously short (%.1f min) and MDB runtime is unknown", videoDurMins),
+			}}
+		}
+
+		return nil
+	}
+
+	expectedFloat := float64(expectedRuntime)
+
+	percentDiff := math.Abs(videoDurMins-expectedFloat) / expectedFloat
+	if percentDiff > 0.1 {
+		severity := "warning"
+		if percentDiff > 0.4 {
+			severity = "error"
+		}
+
+		return []CheckResult{{
+			Identifier: config.CheckMdbRuntime,
+			Passed:     false,
+			Severity:   severity,
+			Warning:    fmt.Sprintf("Runtime mismatch: MDB expects %d min, video is %.1f min", expectedRuntime, videoDurMins),
+		}}
+	}
+
+	return []CheckResult{{Identifier: config.CheckMdbRuntime, Passed: true}}
 }
