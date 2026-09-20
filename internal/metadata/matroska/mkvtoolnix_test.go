@@ -269,8 +269,7 @@ func TestBuildRemuxArgs(t *testing.T) {
 	want := []string{
 		"-o", "out.mkv",
 		"--audio-tracks", "!1",
-		"--compression", "0:none",
-		"--compression", "2:none",
+		"--compression", "-1:none",
 		"--track-order", "0:0,0:2",
 		"in.mkv",
 	}

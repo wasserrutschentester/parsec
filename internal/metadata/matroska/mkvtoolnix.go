@@ -1312,22 +1312,38 @@ func buildRemuxArgs(outPath, inPath string, opts RemuxOptions, tracks []EbmlTrac
 	return append(args, inPath)
 }
 
+//nolint:cyclop // flat loop with boolean conditions is not complex
 func buildCompressionArgs(opts RemuxOptions, tracks []EbmlTrack, removed map[int]bool) []string {
 	if opts.DisableTrackCompression {
-		args := make([]string, 0, len(tracks)*2)
-		for _, track := range tracks {
-			if !removed[track.ID] {
-				args = append(args, "--compression", strconv.Itoa(track.ID)+":none")
+		return []string{"--compression", "-1:none"}
+	}
+
+	stripSet := make(map[int]bool, len(opts.StripCompressionIDs))
+	for _, id := range opts.StripCompressionIDs {
+		stripSet[id] = true
+	}
+
+	var args []string
+
+	for _, track := range tracks {
+		if removed[track.ID] {
+			continue
+		}
+
+		isPgsOrVobsub := track.Properties.CodecID == "S_HDMV/PGS" || track.Properties.CodecID == "S_VOBSUB"
+		hasZlib := false
+
+		for algo := range strings.SplitSeq(track.Properties.ContentEncodingAlgorithms, ",") {
+			if algo == "0" {
+				hasZlib = true
+
+				break
 			}
 		}
 
-		return args
-	}
-
-	args := make([]string, 0, len(opts.StripCompressionIDs)*2)
-	for _, id := range opts.StripCompressionIDs {
-		if !removed[id] {
-			args = append(args, "--compression", strconv.Itoa(id)+":none")
+		// Always disable compression for uncompressed PGS/VobSub to prevent mkvmerge from enabling it by default
+		if stripSet[track.ID] || (isPgsOrVobsub && !hasZlib) {
+			args = append(args, "--compression", strconv.Itoa(track.ID)+":none")
 		}
 	}
 
