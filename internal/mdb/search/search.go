@@ -339,6 +339,10 @@ func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 		res.Year = tvdbRes.Year
 	}
 
+	if res.Runtime == 0 {
+		res.Runtime = tvdbRes.Runtime
+	}
+
 	// Merge Titles
 	if tvdbRes.Title != "" && tvdbRes.Title != res.Title {
 		res.AltTitle = addUniqueAltTitle(res.AltTitle, tvdbRes.Title, res.Title, res.OriginalTitle)

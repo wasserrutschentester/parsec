@@ -51,6 +51,7 @@ type tvdbMedia struct {
 	OriginalLanguage   string   `json:"originalLanguage"` // direct lookups
 	OriginalCountry    string   `json:"originalCountry"`  // direct lookups
 	Status             any      `json:"status"`           // search returns string, getByID returns object
+	Runtime            int      `json:"runtime"`
 }
 
 func parseTvdbID(m *tvdbMedia) int {
@@ -127,6 +128,7 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		TvdbType:         m.Type,
 		Title:            strings.TrimSpace(title),
 		Year:             resYear,
+		Runtime:          m.Runtime,
 		IsTV:             m.Type == "series",
 		Overview:         overview,
 		OriginalLanguage: origLang,
@@ -149,6 +151,7 @@ type Episode struct {
 	Number       int    `json:"number"`
 	Overview     string `json:"overview"`
 	FinaleType   string `json:"finaleType"`
+	Runtime      int    `json:"runtime"`
 }
 
 // ToEpisodeResult converts a TVDB Episode to an mdb.EpisodeResult.
@@ -159,6 +162,7 @@ func (e *Episode) ToEpisodeResult() mdb.EpisodeResult {
 		Overview: e.Overview,
 		Season:   e.SeasonNumber,
 		Episode:  e.Number,
+		Runtime:  e.Runtime,
 		TvdbID:   e.ID,
 		IsFinale: e.FinaleType == "season" || e.FinaleType == "series",
 	}

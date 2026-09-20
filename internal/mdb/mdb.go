@@ -31,6 +31,7 @@ type SearchResult struct {
 	OriginalLanguage string
 	AltTitle         []string
 	Year             int
+	Runtime          int
 	IsTV             bool
 	Popularity       float64
 	Similarity       float64
@@ -89,6 +90,7 @@ type EpisodeResult struct {
 	Overview      string
 	Season        int
 	Episode       int
+	Runtime       int
 	TvdbID        int
 	TotalEpisodes int
 	ImdbID        string

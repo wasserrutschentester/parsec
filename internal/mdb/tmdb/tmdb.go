@@ -40,8 +40,10 @@ type tmdbMedia struct {
 	Genres           []struct {
 		Name string `json:"name"`
 	} `json:"genres"`
-	Tagline string `json:"tagline"`
-	Status  string `json:"status"`
+	Tagline        string `json:"tagline"`
+	Status         string `json:"status"`
+	Runtime        int    `json:"runtime"`
+	EpisodeRunTime []int  `json:"episode_run_time"`
 
 	ProductionCompanies []struct {
 		Name string `json:"name"`
@@ -84,6 +86,11 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 	networks := extractNames(m.Networks)
 	countries := extractCountries(m.ProductionCountries, m.OriginCountry)
 
+	runtime := m.Runtime
+	if mediaType == "tv" && len(m.EpisodeRunTime) > 0 {
+		runtime = m.EpisodeRunTime[0]
+	}
+
 	return mdb.SearchResult{
 		TmdbID:           m.ID,
 		TmdbType:         mediaType,
@@ -91,6 +98,7 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		OriginalTitle:    originalTitle,
 		OriginalLanguage: origLang,
 		Year:             resYear,
+		Runtime:          runtime,
 		IsTV:             mediaType == "tv",
 		Popularity:       m.Popularity,
 		Overview:         m.Overview,
@@ -164,6 +172,7 @@ type tmdbEpisodeResponse struct {
 	EpisodeNumber int    `json:"episode_number"`
 	Overview      string `json:"overview"`
 	EpisodeType   string `json:"episode_type"`
+	Runtime       int    `json:"runtime"`
 	ExternalIDs   struct {
 		ImdbID string `json:"imdb_id"`
 	} `json:"external_ids"`
@@ -430,6 +439,7 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 		Overview: data.Overview,
 		Season:   season,
 		Episode:  episode,
+		Runtime:  data.Runtime,
 		ImdbID:   data.ExternalIDs.ImdbID,
 		IsFinale: data.EpisodeType == "finale" || data.EpisodeType == "series_finale",
 	}, nil
@@ -459,6 +469,7 @@ func GetSeasonMetadata(seriesID, season int, lang string) ([]mdb.EpisodeResult, 
 			Overview: ep.Overview,
 			Season:   ep.SeasonNumber,
 			Episode:  ep.EpisodeNumber,
+			Runtime:  ep.Runtime,
 			IsFinale: ep.EpisodeType == "finale" || ep.EpisodeType == "series_finale",
 		})
 	}
