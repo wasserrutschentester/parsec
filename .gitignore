@@ -12,3 +12,8 @@ dist/
 
 # docker
 docker/config/
+
+# schemas
+internal/mdb/imdb/SCHEMA.md
+internal/mdb/tmdb/tmdb-openapi.json
+internal/mdb/tvdb/tvdb_swagger.yml

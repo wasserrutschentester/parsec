@@ -349,6 +349,13 @@ func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
 }
 
 func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult {
+	// /find/ returns a slim search result — fetch full details for overview, runtime, studios, correct original_language, etc.
+	if full, err := GetByID(m.ID, mediaType); err == nil {
+		full.ImdbID = imdbID
+
+		return full
+	}
+
 	result := m.toSearchResult(mediaType)
 	result.ImdbID = imdbID
 	applyExternalIDs(&result, mediaType)
