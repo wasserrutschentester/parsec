@@ -292,7 +292,9 @@ func checkEpisode(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResu
 		if config.IsCheckEnabled(config.CheckMdbEpisodeExistence) {
 			existenceCheck.Passed = false
 			existenceCheck.Severity = "warning"
-			existenceCheck.Warning = fmt.Sprintf("Episode S%02dE%v not found on TVDB/TMDB.", meta.Season, meta.Episodes)
+			existenceCheck.Warning = "Episode not found on TVDB/TMDB"
+			existenceCheck.Expected = "Episode exists on TVDB/TMDB"
+			existenceCheck.Actual = fmt.Sprintf("S%02dE%v", meta.Season, meta.Episodes)
 			results = append(results, existenceCheck)
 		}
 
@@ -454,7 +456,9 @@ func checkRuntime(mi *mediainfo.MediaInfo, meta *metadata.Metadata, result *mdb.
 				Identifier: config.CheckMdbRuntime,
 				Passed:     false,
 				Severity:   "warning",
-				Warning:    fmt.Sprintf("Video is suspiciously short (%.1f min) and MDB runtime is unknown", videoDurMins),
+				Warning:    "Video is suspiciously short and MDB runtime is unknown",
+				Expected:   ">= 1.0 min",
+				Actual:     fmt.Sprintf("%.1f min", videoDurMins),
 			}}
 		}
 
@@ -466,15 +470,22 @@ func checkRuntime(mi *mediainfo.MediaInfo, meta *metadata.Metadata, result *mdb.
 	percentDiff := math.Abs(videoDurMins-expectedFloat) / expectedFloat
 	if percentDiff > 0.1 {
 		severity := "warning"
+		warning := "Runtime Mismatch"
+
 		if percentDiff > 0.4 {
 			severity = "error"
+			warning = "Significant Runtime Mismatch"
 		}
+
+		diffPercent := (videoDurMins - expectedFloat) / expectedFloat * 100
 
 		return []CheckResult{{
 			Identifier: config.CheckMdbRuntime,
 			Passed:     false,
 			Severity:   severity,
-			Warning:    fmt.Sprintf("Runtime mismatch: MDB expects %d min, video is %.1f min", expectedRuntime, videoDurMins),
+			Warning:    warning,
+			Expected:   fmt.Sprintf("%.1f min", expectedFloat),
+			Actual:     fmt.Sprintf("%.1f min (%+.1f%%)", videoDurMins, diffPercent),
 		}}
 	}
 

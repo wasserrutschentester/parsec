@@ -255,6 +255,7 @@ func countIssues(groups []types.IssueGroup) int {
 type issueKey struct {
 	category   string
 	identifier string
+	severity   string
 	warning    string
 }
 
@@ -392,6 +393,7 @@ func groupIssues(reports []types.CheckReport) ([]issueKey, map[issueKey]*aggIssu
 				k := issueKey{
 					category:   group.Category,
 					identifier: res.Identifier,
+					severity:   res.Severity,
 					warning:    res.Warning,
 				}
 

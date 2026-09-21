@@ -194,24 +194,18 @@ func TestCheckBitRate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			track := &mediainfo.Track{Height: tt.height, BitRate: tt.bitrate}
-			results := checkBitRate(track)
-			hasFailure := false
-
-			for _, r := range results {
-				if !r.Passed {
-					hasFailure = true
-
-					break
-				}
+			results := checkBitRate(&mediainfo.Track{Height: tt.height, BitRate: tt.bitrate})
+			if len(results) == 0 {
+				t.Fatalf("checkBitRate(%d, %d) returned no results", tt.height, tt.bitrate)
 			}
 
-			if tt.wantWarn && !hasFailure {
-				t.Errorf("checkBitRate(%d, %d) expected warning, got none", tt.height, tt.bitrate)
+			res := results[0]
+			if tt.wantWarn != !res.Passed {
+				t.Fatalf("checkBitRate(%d, %d) Passed = %v, want warning %v", tt.height, tt.bitrate, res.Passed, tt.wantWarn)
 			}
 
-			if !tt.wantWarn && hasFailure {
-				t.Errorf("checkBitRate(%d, %d) expected no warning, got failure", tt.height, tt.bitrate)
+			if tt.wantWarn && (res.Warning != "Low video bitrate" || len(res.Tracks) == 0) {
+				t.Errorf("checkBitRate(%d, %d) got Warning %q (tracks: %d)", tt.height, tt.bitrate, res.Warning, len(res.Tracks))
 			}
 		})
 	}

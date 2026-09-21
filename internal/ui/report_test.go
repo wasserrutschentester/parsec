@@ -266,3 +266,49 @@ func TestPrintAggregatedSummaryPrioritizeNoOutliers(t *testing.T) {
 		t.Error("Expected output to prioritize S03E02 as the representative file because it has no outliers")
 	}
 }
+
+func TestGroupIssuesDifferentSeverities(t *testing.T) {
+	t.Parallel()
+
+	reports := []types.CheckReport{
+		{
+			File: "/data/file1.mkv",
+			Issues: []types.IssueGroup{
+				{
+					Category: "MDB",
+					Results: []types.CheckResult{
+						{
+							Identifier: "mdb_runtime",
+							Severity:   "warning",
+							Warning:    "Runtime Mismatch",
+						},
+					},
+				},
+			},
+		},
+		{
+			File: "/data/file2.mkv",
+			Issues: []types.IssueGroup{
+				{
+					Category: "MDB",
+					Results: []types.CheckResult{
+						{
+							Identifier: "mdb_runtime",
+							Severity:   "error",
+							Warning:    "Runtime Mismatch",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	keysOrder, aggMap := groupIssues(reports)
+	if len(keysOrder) != 2 {
+		t.Fatalf("expected 2 separate groups for different severities, got %d", len(keysOrder))
+	}
+
+	if len(aggMap) != 2 {
+		t.Fatalf("expected 2 entries in aggMap, got %d", len(aggMap))
+	}
+}

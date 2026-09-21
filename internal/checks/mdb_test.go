@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
@@ -141,5 +143,109 @@ func TestCheckMovieYear(t *testing.T) {
 				t.Errorf("checkMovieYear() expected no warnings, got failure")
 			}
 		})
+	}
+}
+
+//nolint:cyclop,funlen,paralleltest // depends on shared global state
+func TestCheckRuntime(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"all"})
+
+	dur45Min := float64(45 * 60)
+	dur10Min := float64(10 * 60)
+	mi45 := &mediainfo.MediaInfo{
+		Media: mediainfo.Media{
+			Tracks: []mediainfo.Track{{Type: "Video", Duration: &dur45Min}},
+		},
+	}
+	mi10 := &mediainfo.MediaInfo{
+		Media: mediainfo.Media{
+			Tracks: []mediainfo.Track{{Type: "Video", Duration: &dur10Min}},
+		},
+	}
+
+	meta := &metadata.Metadata{IsTV: false}
+	searchRes := &mdb.SearchResult{Runtime: 45}
+
+	// Case 1: Runtime match
+	resMatch := checkRuntime(mi45, meta, searchRes)
+	if len(resMatch) == 0 || !resMatch[0].Passed {
+		t.Fatalf("expected runtime match, got: %+v", resMatch)
+	}
+
+	// Case 2: Moderate runtime mismatch (10% - 40%) -> warning
+	dur38Min := float64(38 * 60)
+	mi38 := &mediainfo.MediaInfo{
+		Media: mediainfo.Media{
+			Tracks: []mediainfo.Track{{Type: "Video", Duration: &dur38Min}},
+		},
+	}
+
+	resModerate := checkRuntime(mi38, meta, searchRes)
+	if len(resModerate) == 0 || resModerate[0].Passed {
+		t.Fatalf("expected moderate runtime mismatch failure, got: %+v", resModerate)
+	}
+
+	if resModerate[0].Severity != "warning" {
+		t.Errorf("expected Severity = 'warning', got %q", resModerate[0].Severity)
+	}
+
+	if resModerate[0].Actual != "38.0 min (-15.6%)" {
+		t.Errorf("expected Actual = '38.0 min (-15.6%%%%)', got %q", resModerate[0].Actual)
+	}
+
+	// Case 3: Significant runtime mismatch (> 40%) -> error
+	resSignificant := checkRuntime(mi10, meta, searchRes)
+	if len(resSignificant) == 0 || resSignificant[0].Passed {
+		t.Fatalf("expected significant runtime mismatch failure, got: %+v", resSignificant)
+	}
+
+	if resSignificant[0].Severity != "error" {
+		t.Errorf("expected Severity = 'error', got %q", resSignificant[0].Severity)
+	}
+
+	if resSignificant[0].Warning != "Significant Runtime Mismatch" {
+		t.Errorf("expected Warning = 'Significant Runtime Mismatch', got %q", resSignificant[0].Warning)
+	}
+
+	if resSignificant[0].Expected != "45.0 min" {
+		t.Errorf("expected Expected = '45.0 min', got %q", resSignificant[0].Expected)
+	}
+
+	if resSignificant[0].Actual != "10.0 min (-77.8%)" {
+		t.Errorf("expected Actual = '10.0 min (-77.8%%%%)', got %q", resSignificant[0].Actual)
+	}
+}
+
+//nolint:paralleltest // depends on shared global state
+func TestCheckEpisodeExistence(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("enabled_checks", []string{"all"})
+
+	meta := &metadata.Metadata{
+		IsTV:     true,
+		Season:   1,
+		Episodes: []int{99},
+	}
+	searchRes := &mdb.SearchResult{
+		Title: "Test Show",
+	}
+
+	results := checkEpisode(meta, searchRes)
+	if len(results) == 0 || results[0].Passed {
+		t.Fatalf("expected episode existence check failure, got: %+v", results)
+	}
+
+	r := results[0]
+	if r.Warning != "Episode not found on TVDB/TMDB" {
+		t.Errorf("expected Warning = 'Episode not found on TVDB/TMDB', got %q", r.Warning)
+	}
+
+	if r.Expected != "Episode exists on TVDB/TMDB" {
+		t.Errorf("expected Expected = 'Episode exists on TVDB/TMDB', got %q", r.Expected)
+	}
+
+	if r.Actual != "S01E[99]" {
+		t.Errorf("expected Actual = 'S01E[99]', got %q", r.Actual)
 	}
 }

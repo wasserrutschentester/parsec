@@ -303,7 +303,8 @@ func checkBitRate(videoTrack *mediainfo.Track) []CheckResult {
 	if threshold > 0 && bitrate < threshold {
 		res.Passed = false
 		res.Severity = "warning"
-		res.Warning = fmt.Sprintf("Low Video bitrate %.1f kb/s for %dp", bitrateKb, height)
+		res.Warning = "Low video bitrate"
+		res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, fmt.Sprintf("low bitrate: %.1f kb/s (expected >= %d kb/s for %dp)", bitrateKb, threshold/1000, height))}
 	}
 
 	return []CheckResult{res}
