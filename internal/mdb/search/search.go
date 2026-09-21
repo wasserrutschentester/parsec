@@ -726,7 +726,7 @@ func findSingleEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSp
 	langs := []string{preferred, result.OriginalLanguage, "en"}
 	uniqueLangs := metadata.RemoveDuplicates(langs)
 
-	if result.TmdbID > 0 {
+	if result.TmdbID > 0 && (meta.Season != 0 || epNum != 0) {
 		ui.PrintDebug(fmt.Sprintf("Searching for episode on TMDB: ID=%d, S%02dE%02d", result.TmdbID, meta.Season, epNum))
 
 		for _, lang := range uniqueLangs {

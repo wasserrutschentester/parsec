@@ -173,3 +173,50 @@ func TestIdentifyEpisodeSeason0(t *testing.T) {
 		t.Errorf("Expected TvdbID 100, got %d", result.TvdbID)
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestIdentifyEpisodeS00E00Placeholder(t *testing.T) {
+	config.InitDefaults()
+
+	config.NoCache = true
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [
+				{"id": 200, "number": 2, "seasonNumber": 2000, "aired": "2000-01-09", "name": "Stoever - 38 - Blaues Blut"}
+			]}, "links": {"next": ""}}`))
+		case "/episodes/200/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Stoever - 38 - Blaues Blut", "overview": "Overview"}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	// S00E00 with title "Blaues Blut" should match "Stoever - 38 - Blaues Blut"
+	meta := &metadata.Metadata{
+		Season:        0,
+		Episodes:      []int{0},
+		EpisodeTitles: []string{"Blaues Blut"},
+		IsTV:          true,
+	}
+
+	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	if err != nil {
+		t.Fatalf("IdentifyEpisode failed: %v", err)
+	}
+
+	if result.TvdbID != 200 {
+		t.Errorf("Expected TvdbID 200, got %d", result.TvdbID)
+	}
+}

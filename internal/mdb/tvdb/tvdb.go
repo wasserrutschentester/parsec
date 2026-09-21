@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"golang.org/x/text/language"
 
@@ -27,6 +30,8 @@ var (
 	BaseURL = "https://api4.thetvdb.com/v4"
 	// HTTPClient is the HTTP client used for TVDB requests.
 	HTTPClient = http.DefaultClient
+
+	enrichedEpisodesMemoryCache sync.Map
 )
 
 type loginResponse struct {
@@ -519,6 +524,24 @@ func getTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse
 	return data, nil
 }
 
+func getTranslationFromCache(tvdbID int, mediaType, lang string) (tvdbTranslationResponse, bool) {
+	tvdbType := toTvdbType(mediaType)
+	iso3 := getISO3(lang)
+	endpoint := fmt.Sprintf("%s/%d/translations/%s", tvdbType, tvdbID, iso3)
+
+	prefLang := config.GetPreferredLanguage()
+	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
+
+	var data tvdbTranslationResponse
+
+	ok, err := getFromCache(cacheKey, &data)
+	if ok && err == nil && data.Data.Name != "" {
+		return data, true
+	}
+
+	return tvdbTranslationResponse{}, false
+}
+
 func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 	externalIDs, err := getExternalIDs(tvdbID, mediaType)
 	if err == nil {
@@ -577,8 +600,57 @@ func getEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	return data, nil
 }
 
-// GetAllEpisodes retrieves all episodes for a given series from TVDB.
-func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
+func getEnrichedFromMemory(seriesID int, lang string) ([]Episode, bool) {
+	if config.NoCache {
+		return nil, false
+	}
+
+	memKey := fmt.Sprintf("%d:%s", seriesID, lang)
+	if val, ok := enrichedEpisodesMemoryCache.Load(memKey); ok {
+		if eps, ok := val.([]Episode); ok {
+			return slices.Clone(eps), true
+		}
+	}
+
+	return nil, false
+}
+
+func getEnrichedFromDisk(seriesID int, lang string) ([]Episode, bool) {
+	prefLang := config.GetPreferredLanguage()
+	diskKey := fmt.Sprintf("tvdb:%s:series:%d:enriched_episodes:%s", prefLang, seriesID, lang)
+
+	var cachedEpisodes []Episode
+
+	ok, err := getFromCache(diskKey, &cachedEpisodes)
+	if !ok || err != nil || len(cachedEpisodes) == 0 {
+		return nil, false
+	}
+
+	if !config.NoCache {
+		memKey := fmt.Sprintf("%d:%s", seriesID, lang)
+		enrichedEpisodesMemoryCache.Store(memKey, slices.Clone(cachedEpisodes))
+	}
+
+	return cachedEpisodes, true
+}
+
+func saveEnrichedEpisodes(seriesID int, lang string, episodes []Episode) {
+	memKey := fmt.Sprintf("%d:%s", seriesID, lang)
+	if !config.NoCache {
+		enrichedEpisodesMemoryCache.Store(memKey, slices.Clone(episodes))
+	}
+
+	data, err := json.Marshal(episodes)
+	if err != nil {
+		return
+	}
+
+	prefLang := config.GetPreferredLanguage()
+	diskKey := fmt.Sprintf("tvdb:%s:series:%d:enriched_episodes:%s", prefLang, seriesID, lang)
+	_ = cache.Set(diskKey, data)
+}
+
+func fetchRawEpisodes(seriesID int, lang string) ([]Episode, error) {
 	var episodes []Episode
 
 	for page := range 20 {
@@ -596,6 +668,27 @@ func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
 			break
 		}
 	}
+
+	return episodes, nil
+}
+
+// GetAllEpisodes retrieves all episodes for a given series from TVDB.
+func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
+	if eps, ok := getEnrichedFromMemory(seriesID, lang); ok {
+		return eps, nil
+	}
+
+	if eps, ok := getEnrichedFromDisk(seriesID, lang); ok {
+		return eps, nil
+	}
+
+	episodes, err := fetchRawEpisodes(seriesID, lang)
+	if err != nil {
+		return nil, err
+	}
+
+	enrichFromCacheOnly(episodes, []string{lang})
+	saveEnrichedEpisodes(seriesID, lang, episodes)
 
 	return episodes, nil
 }
@@ -620,8 +713,9 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 		ui.PrintDebug(fmt.Sprintf("found %d episodes combined", len(episodes)))
 
 		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials, uniqueLangs)
-
 		if ep != nil {
+			saveEnrichedEpisodes(result.TvdbID, lang, episodes)
+
 			return finalizeEpisodeResult(ep, episodes, uniqueLangs), nil
 		}
 	}
@@ -665,7 +759,9 @@ func finalizeEpisodeResult(ep *Episode, episodes []Episode, uniqueLangs []string
 
 func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool, langs []string) *Episode {
 	// 1. Season/Episode Number Match
-	if meta.Season >= 0 && len(meta.Episodes) > 0 {
+	// Note: S00E00 is a standard scene convention for an unknown season/episode placeholder.
+	isPlaceholder := meta.Season == 0 && len(meta.Episodes) == 1 && meta.Episodes[0] == 0
+	if meta.Season >= 0 && len(meta.Episodes) > 0 && !isPlaceholder {
 		if ep := matchBySeasonEpisode(episodes, meta.Season, meta.Episodes[0]); ep != nil {
 			return ep
 		}
@@ -682,33 +778,133 @@ func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQu
 		return nil
 	}
 
-	enrichMissingTitles(episodes, langs)
+	// 3. Lazy Title Matching
+	return matchByTitleLazy(episodes, normalizedQueryTitle, allowSpecials, langs)
+}
 
-	// 3. Normalized Title Match
-	if ep := matchByTitle(episodes, normalizedQueryTitle, allowSpecials); ep != nil {
+func matchByTitleLazy(episodes []Episode, normTitle string, allowSpecials bool, langs []string) *Episode {
+	// Pass 1: Try matching against existing names in the episode list first
+	if ep := matchEpisodeByTitle(episodes, normTitle, allowSpecials); ep != nil {
 		return ep
 	}
 
-	// 4. Fuzzy Match (Fallback)
-	return matchByTitleFuzzy(episodes, normalizedQueryTitle)
+	// Pass 2: Check local cache ONLY for missing episode names (zero network calls)
+	enrichFromCacheOnly(episodes, langs)
+
+	if ep := matchEpisodeByTitle(episodes, normTitle, allowSpecials); ep != nil {
+		return ep
+	}
+
+	// Pass 3: If still not found, fetch missing translations concurrently with bounded concurrency
+	enrichMissingTitlesConcurrent(episodes, langs, normTitle)
+
+	return matchEpisodeByTitle(episodes, normTitle, allowSpecials)
 }
 
-func enrichMissingTitles(episodes []Episode, langs []string) {
+func matchEpisodeByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Episode {
+	if ep := matchByTitle(episodes, normTitle, allowSpecials); ep != nil {
+		return ep
+	}
+
+	return matchByTitleFuzzy(episodes, normTitle)
+}
+
+func isTitleMatch(epName, normTitle string) bool {
+	cleaned := filename.ApplyTitleReplacements(epName)
+	if metadata.Normalize(cleaned) == normTitle {
+		return true
+	}
+
+	parts := strings.FieldsFunc(cleaned, func(r rune) bool {
+		return r == '-' || r == ':' || r == '–'
+	})
+	for _, p := range parts {
+		if metadata.Normalize(p) == normTitle {
+			return true
+		}
+	}
+
+	return false
+}
+
+func enrichFromCacheOnly(episodes []Episode, langs []string) {
 	for i := range episodes {
-		if episodes[i].Name == "" {
-			var res mdb.EpisodeResult
+		if episodes[i].Name != "" {
+			continue
+		}
 
-			for _, l := range langs {
-				fillEpisodeTranslation(&res, episodes[i].ID, l)
+		for _, l := range langs {
+			if trans, ok := getTranslationFromCache(episodes[i].ID, "episodes", l); ok {
+				episodes[i].Name = trans.Data.Name
 
-				if res.Name != "" {
-					episodes[i].Name = res.Name
-
-					break
-				}
+				break
 			}
 		}
 	}
+}
+
+const maxConcurrentTranslationRequests = 15
+
+func enrichMissingTitlesConcurrent(episodes []Episode, langs []string, normTitle string) {
+	var missingIndices []int
+
+	for i := range episodes {
+		if episodes[i].Name == "" {
+			missingIndices = append(missingIndices, i)
+		}
+	}
+
+	if len(missingIndices) == 0 {
+		return
+	}
+
+	jobs := make(chan int, len(missingIndices))
+	for _, idx := range missingIndices {
+		jobs <- idx
+	}
+
+	close(jobs)
+
+	numWorkers := min(maxConcurrentTranslationRequests, len(missingIndices))
+
+	var (
+		wg    sync.WaitGroup
+		found atomic.Bool
+	)
+
+	for range numWorkers {
+		wg.Go(func() {
+			for idx := range jobs {
+				if found.Load() {
+					return
+				}
+
+				if fetchAndSetTranslation(idx, episodes, langs, normTitle) {
+					found.Store(true)
+
+					return
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+}
+
+func fetchAndSetTranslation(idx int, episodes []Episode, langs []string, normTitle string) bool {
+	var res mdb.EpisodeResult
+
+	for _, l := range langs {
+		fillEpisodeTranslation(&res, episodes[idx].ID, l)
+
+		if res.Name != "" {
+			episodes[idx].Name = res.Name
+
+			return normTitle != "" && isTitleMatch(res.Name, normTitle)
+		}
+	}
+
+	return false
 }
 
 func matchBySeasonEpisode(episodes []Episode, season, episode int) *Episode {
@@ -737,12 +933,15 @@ func matchByAirDate(episodes []Episode, date string, allowSpecials bool) *Episod
 
 func matchByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Episode {
 	for _, ep := range episodes {
-		epName := filename.ApplyTitleReplacements(ep.Name)
-		if metadata.Normalize(epName) == normTitle {
-			if ep.SeasonNumber == 0 && !allowSpecials {
-				continue
-			}
+		if ep.Name == "" {
+			continue
+		}
 
+		if ep.SeasonNumber == 0 && !allowSpecials {
+			continue
+		}
+
+		if isTitleMatch(ep.Name, normTitle) {
 			return &ep
 		}
 	}
