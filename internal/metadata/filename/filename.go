@@ -13,6 +13,76 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+type serviceMapping struct {
+	re   *regexp.Regexp
+	code string
+}
+
+var (
+	// Streaming service detection patterns.
+	//nolint:misspell // "adn" is Animation Digital Network, not a misspelling of "and"
+	reStreamingService = regexp.MustCompile(`(?i)[ .](hmax|hbom|hbo[ ._-]?max|hbo|amzn|amazon(hd)?|atvp|aptv|apple[ ._-]?tv\+?|atv|cnlp|canp|canal\+|dsnp|dsny|disney(\+)?|hulu|itunes|nf|netflix(u?hd)?|pcok|peacock([ ._-]?tv)?|pmtp|paramount(\+)?|sho|showtime|stan|syfy|wowtv|cr|crunchyroll|adn|joyn|rtlp|rtl\+|ardp|ard\+|ard|br|hr|mdr|ndr|rbb|sr|swr|wdr|ardmediathek|3sat|kika|arte)([ .]|$)`)
+	reResolution       = regexp.MustCompile(`[ .]\d{3,4}p([ .]|$)`)
+	reWeb              = regexp.MustCompile(`[ .](\w+)[ .](WEB(?:-?DL|-?Rip)?)([ .]|$)`)
+
+	// Episode and season detection patterns.
+	reMultiEp   = regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
+	reTitleYear = regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,4}(?:(?:[ .\&-]E?\d{1,3})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
+	reSeason    = regexp.MustCompile(`(?i)S(\d{1,4})`)
+	reFirstEp   = regexp.MustCompile(`(?i)^[ .&-]*E(\d{1,4})`)
+	reNextEp    = regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
+
+	// Language and accessibility patterns.
+	reLanguage         = regexp.MustCompile(`(?i)[ .\[\(](GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:[ .](DL|ML|SUBBED))?([ .\]\)]|$)`)
+	reAudioDescription = regexp.MustCompile(`(?i)[ .\[\(](WiTH\.AD|with\.Audio\.Description)([ .\]\)]|$)`)
+
+	// Edition and 3D patterns.
+	reEdition = regexp.MustCompile(`(?i)[ .\[\(](Open[ .]Matte|((4K|8K)[ .]?)?REMASTERED|IMAX(?:[ .]Enhanced)?|DIRECTOR'?S[ .]CUT|DC|EXTENDED|THEATRICAL|CRITERION|UNCENSORED|SPECIAL[ .]EDITION)([ .\]\)]|$)`)
+	reThreeD  = regexp.MustCompile(`(?i)[ .\[\(](3D(?:[ .](?:HSBS|SBS|HOU))?)([ .\]\)]|$)`)
+
+	// Deobfuscation patterns.
+	reWord   = regexp.MustCompile(`(?i)[a-z]+`)
+	reUmlaut = regexp.MustCompile(`(?i)(^|[^aeiou])(ae|oe|ue)($|[^a-z]|.)`)
+	reAlpha  = regexp.MustCompile(`(?i)[a-z]`)
+
+	// Title normalization patterns.
+	reTitleUnwanted  = regexp.MustCompile(`[(),?!"_|'\:]`)
+	reTitleSequences = regexp.MustCompile(`[\. ](-|–|·)?[\. ]+`)
+	reTitleRemaining = regexp.MustCompile(`[^a-zA-Z0-9\-\. ]`)
+	reSpaces         = regexp.MustCompile(`\s+`)
+
+	// Metadata tags patterns.
+	reDate          = regexp.MustCompile(`[ .\[\(](\d{4}-\d{2}-\d{2})([ .\]\)]|$)`)
+	reRepack        = regexp.MustCompile(`[ .\[\(]REPACK([ .\]\)-]|$|\d)`)
+	reCRC32         = regexp.MustCompile(`[\[\(]([A-Fa-f0-9]{8})[\]\)]`)
+	reDualAudio     = regexp.MustCompile(`(?i)[ .\[\(]Dual[ -]Audio[ .\]\)]`)
+	reResolutionTag = regexp.MustCompile(`[ .\[\(](\d{3,4}[p|i])([ .\]\)-]|$| )`)
+	reAudioCodec    = regexp.MustCompile(`[ .\[\(](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .\]\)-]|$| )`)
+	reVideoCodec    = regexp.MustCompile(`[ .\[\(]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .\]\)-]|$| )`)
+	reSource        = regexp.MustCompile(`(?i)[ .\[\(](BD|WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .\]\)-]|$| )`)
+	reLeadingGroup  = regexp.MustCompile(`^\[([^\]]+)\]`)
+	reTrailingGroup = regexp.MustCompile(`\-([^-]+)$`)
+
+	// Precompiled streaming service patterns for NormalizeService.
+	servicePatterns = []serviceMapping{
+		{re: regexp.MustCompile(`^(hmax|hbom|hbo[ ._-]?max)$`), code: "HMAX"},
+		{re: regexp.MustCompile(`^(amzn|amazon(hd)?)$`), code: "AMZN"},
+		{re: regexp.MustCompile(`^(atvp|aptv|apple[ ._-]?tv\+?)$`), code: "ATVP"},
+		{re: regexp.MustCompile(`^(cnlp|canp|canal\+)$`), code: "CNLP"},
+		{re: regexp.MustCompile(`^(dsnp|dsny|disney(\+)?)$`), code: "DSNP"},
+		{re: regexp.MustCompile(`^(it|itunes)$`), code: "iT"},
+		{re: regexp.MustCompile(`^(nf|netflix(u?hd)?)$`), code: "NF"},
+		{re: regexp.MustCompile(`^(pcok|peacock([ ._-]?tv)?)$`), code: "PCOK"},
+		{re: regexp.MustCompile(`^(pmtp|paramount(\+)?)$`), code: "PMTP"},
+		{re: regexp.MustCompile(`^(sho|showtime)$`), code: "SHO"},
+		{re: regexp.MustCompile(`^(cr|crunchyroll)$`), code: "CR"},
+		{re: regexp.MustCompile(`^(rtlp|rtl\+)$`), code: "RTLP"},
+		{re: regexp.MustCompile(`^(ardp|ard\+)$`), code: "ARDP"},
+		{re: regexp.MustCompile(`^(ard(mediathek)?|br|hr|mdr|ndr|rbb|sr|swr|wdr|rbtv)$`), code: "ARD"},
+		{re: regexp.MustCompile(`^kika$`), code: "KiKA"},
+	}
+)
+
 // GetBaseName returns the filename without extension.
 func GetBaseName(filePath string) string {
 	name := filepath.Base(filePath)
@@ -165,20 +235,17 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 }
 
 func matchStreamingService(filename string) string {
-	serviceRegex := regexp.MustCompile(`(?i)[ .](hmax|hbom|hbo[ ._-]?max|hbo|amzn|amazon(hd)?|atvp|aptv|apple[ ._-]?tv\+?|atv|cnlp|canp|canal\+|dsnp|dsny|disney(\+)?|hulu|itunes|nf|netflix(u?hd)?|pcok|peacock([ ._-]?tv)?|pmtp|paramount(\+)?|sho|showtime|stan|syfy|wowtv|cr|crunchyroll|adn|joyn|rtlp|rtl\+|ardp|ard\+|ard|br|hr|mdr|ndr|rbb|sr|swr|wdr|ardmediathek|3sat|kika|arte)([ .]|$)`) //nolint:misspell // "adn" is Animation Digital Network, not a misspelling of "and"
-	if match := serviceRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reStreamingService.FindStringSubmatch(filename); len(match) > 1 {
 		return match[1]
 	}
 
 	// only match the filename after the resolution
-	resolutionRegex := regexp.MustCompile(`[ .]\d{3,4}p([ .]|$)`)
-	if loc := resolutionRegex.FindStringIndex(filename); loc != nil {
+	if loc := reResolution.FindStringIndex(filename); loc != nil {
 		filename = filename[loc[1]-1:]
 	}
 
 	// only use everything before the WEB-DL or WEBRip source tag
-	webRegex := regexp.MustCompile(`[ .](\w+)[ .](WEB(?:-?DL|-?Rip)?)([ .]|$)`)
-	if match := webRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reWeb.FindStringSubmatch(filename); len(match) > 1 {
 		return match[1]
 	}
 
@@ -211,12 +278,10 @@ func skipMultiEpisodeSpecification(filename string, startPos int, episodes []int
 	}
 
 	rest := filename[startPos:]
-	multiEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
-
 	pos := startPos
 
 	for {
-		match := multiEpRegex.FindStringSubmatchIndex(rest)
+		match := reMultiEp.FindStringSubmatchIndex(rest)
 		if match == nil {
 			break
 		}
@@ -287,9 +352,7 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 }
 
 func matchTitleYear(filename string) (string, int) {
-	re := regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,4}(?:(?:[ .\&-]E?\d{1,3})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
-
-	match := re.FindStringSubmatchIndex(filename)
+	match := reTitleYear.FindStringSubmatchIndex(filename)
 	if match != nil {
 		title := filename[match[2]:match[3]]
 		year := 0
@@ -307,9 +370,7 @@ func matchTitleYear(filename string) (string, int) {
 
 func matchSeasonEpisode(filenameStr string) (int, []int) {
 	// First, find S\d{1,4}
-	sRegex := regexp.MustCompile(`(?i)S(\d{1,4})`)
-
-	sMatch := sRegex.FindStringSubmatchIndex(filenameStr)
+	sMatch := reSeason.FindStringSubmatchIndex(filenameStr)
 	if sMatch == nil {
 		return 0, nil
 	}
@@ -322,9 +383,7 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 	var episodes []int
 
 	// We want to match an initial episode, e.g. E01, E01, -E01, etc.
-	firstEpRegex := regexp.MustCompile(`(?i)^[ .&-]*E(\d{1,4})`)
-	epMatch := firstEpRegex.FindStringSubmatchIndex(rest)
-
+	epMatch := reFirstEp.FindStringSubmatchIndex(rest)
 	if epMatch == nil {
 		return season, nil
 	}
@@ -336,10 +395,8 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 	rest = rest[epMatch[1]:]
 
 	// Now iteratively look for subsequent episodes
-	nextEpRegex := regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
-
 	for {
-		nextMatch := nextEpRegex.FindStringSubmatchIndex(rest)
+		nextMatch := reNextEp.FindStringSubmatchIndex(rest)
 		if nextMatch == nil {
 			break
 		}
@@ -374,9 +431,7 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 }
 
 func matchLanguage(filename string, meta *metadata.Metadata) {
-	re := regexp.MustCompile(`(?i)[ .\[\(](GERMAN|ENGLISH|FRENCH|SPANISH|ITALIAN|PORTUGUESE|DUTCH|SWEDISH|NORWEGIAN|FINNISH|GREEK|HEBREW|ARABIC|CHINESE|JAPANESE|KOREAN|THAI|VIETNAMESE|HUNGARIAN|ROMANIAN|POLISH|CZECH|SLOVAK|SLOVENIAN|MULTI|ZXX|SiLENT)(?:[ .](DL|ML|SUBBED))?([ .\]\)]|$)`)
-
-	if match := re.FindStringSubmatch(filename); len(match) > 0 {
+	if match := reLanguage.FindStringSubmatch(filename); len(match) > 0 {
 		meta.Language = match[1]
 		if len(match) > 2 && match[2] != "" {
 			meta.LanguageExt = match[2]
@@ -386,8 +441,7 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 		}
 	}
 
-	audioDescriptionRegex := regexp.MustCompile(`(?i)[ .\[\(](WiTH\.AD|with\.Audio\.Description)([ .\]\)]|$)`)
-	if match := audioDescriptionRegex.FindStringSubmatch(filename); len(match) > 0 {
+	if match := reAudioDescription.FindStringSubmatch(filename); len(match) > 0 {
 		meta.Accessibility = match[1]
 		meta.HasAudioDesc = true
 	}
@@ -395,14 +449,12 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 
 func matchEdition(filename string, meta *metadata.Metadata) {
 	// Regex for Editions
-	editionRegex := regexp.MustCompile(`(?i)[ .\[\(](Open[ .]Matte|((4K|8K)[ .]?)?REMASTERED|IMAX(?:[ .]Enhanced)?|DIRECTOR'?S[ .]CUT|DC|EXTENDED|THEATRICAL|CRITERION|UNCENSORED|SPECIAL[ .]EDITION)([ .\]\)]|$)`)
-	if match := editionRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reEdition.FindStringSubmatch(filename); len(match) > 1 {
 		meta.CutEdition = match[1]
 	}
 
 	// Regex for 3D
-	threeDRegex := regexp.MustCompile(`(?i)[ .\[\(](3D(?:[ .](?:HSBS|SBS|HOU))?)([ .\]\)]|$)`)
-	if match := threeDRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reThreeD.FindStringSubmatch(filename); len(match) > 1 {
 		tag := match[1]
 		if meta.CutEdition != "" {
 			meta.CutEdition += "." + tag
@@ -435,16 +487,13 @@ func DeobfuscateTitle(title string) string {
 	// replace umlaut replacements (ae, oe, ue) with their corresponding characters
 	// We want to avoid replacing if preceded by a vowel.
 	// We also want to avoid replacing "oe" at the end of a word (like Monroe, Poe, Toe, Aloe)
-	wordRe := regexp.MustCompile(`(?i)[a-z]+`)
-	umlautRe := regexp.MustCompile(`(?i)(^|[^aeiou])(ae|oe|ue)($|[^a-z]|.)`)
-
-	result = wordRe.ReplaceAllStringFunc(result, func(word string) string {
+	result = reWord.ReplaceAllStringFunc(result, func(word string) string {
 		if englishUmlautExceptions[strings.ToLower(word)] {
 			return word
 		}
 
-		return umlautRe.ReplaceAllStringFunc(word, func(m string) string {
-			match := umlautRe.FindStringSubmatch(m)
+		return reUmlaut.ReplaceAllStringFunc(word, func(m string) string {
+			match := reUmlaut.FindStringSubmatch(m)
 			if len(match) < 4 {
 				return m
 			}
@@ -496,7 +545,7 @@ func getUmlautReplacement(umlautMatch, suffix string) string {
 
 func isEnglishUmlautException(lowerUmlaut, suffix string) bool {
 	// Exception: English words ending in "oe" (e.g. Monroe, Poe, Toe, Aloe)
-	isEndOfWord := suffix == "" || !regexp.MustCompile(`(?i)[a-z]`).MatchString(suffix)
+	isEndOfWord := suffix == "" || !reAlpha.MatchString(suffix)
 
 	return lowerUmlaut == "oe" && isEndOfWord
 }
@@ -512,19 +561,15 @@ func NormalizeTitle(title string) string {
 	}
 
 	// remove unnecessary characters: [(),?!"_|\:] and '
-	reUnwanted := regexp.MustCompile(`[(),?!"_|'\:]`)
-	title = reUnwanted.ReplaceAllString(title, "")
+	title = reTitleUnwanted.ReplaceAllString(title, "")
 
 	// remove .-. or .. like stuff (including spaces)
-	reSequences := regexp.MustCompile(`[\. ](-|–|·)?[\. ]+`)
-	title = reSequences.ReplaceAllString(title, " ")
+	title = reTitleSequences.ReplaceAllString(title, " ")
 
 	// remove all remaining unwanted characters (preserving spaces)
-	reRemaining := regexp.MustCompile(`[^a-zA-Z0-9\-\. ]`)
-	title = reRemaining.ReplaceAllString(title, "")
+	title = reTitleRemaining.ReplaceAllString(title, "")
 
 	// collapse multiple spaces
-	reSpaces := regexp.MustCompile(`\s+`)
 	title = reSpaces.ReplaceAllString(title, " ")
 
 	return strings.Trim(title, ". ")
@@ -571,31 +616,8 @@ func RemoveDiacritics(title string) string {
 func NormalizeService(service string) string {
 	s := strings.ToLower(service)
 
-	type serviceMap struct {
-		pattern string
-		code    string
-	}
-
-	services := []serviceMap{
-		{`^(hmax|hbom|hbo[ ._-]?max)$`, "HMAX"},
-		{`^(amzn|amazon(hd)?)$`, "AMZN"},
-		{`^(atvp|aptv|apple[ ._-]?tv\+?)$`, "ATVP"},
-		{`^(cnlp|canp|canal\+)$`, "CNLP"},
-		{`^(dsnp|dsny|disney(\+)?)$`, "DSNP"},
-		{`^(it|itunes)$`, "iT"},
-		{`^(nf|netflix(u?hd)?)$`, "NF"},
-		{`^(pcok|peacock([ ._-]?tv)?)$`, "PCOK"},
-		{`^(pmtp|paramount(\+)?)$`, "PMTP"},
-		{`^(sho|showtime)$`, "SHO"},
-		{`^(cr|crunchyroll)$`, "CR"},
-		{`^(rtlp|rtl\+)$`, "RTLP"},
-		{`^(ardp|ard\+)$`, "ARDP"},
-		{`^(ard(mediathek)?|br|hr|mdr|ndr|rbb|sr|swr|wdr|rbtv)$`, "ARD"},
-		{`^kika$`, "KiKA"},
-	}
-
-	for _, sm := range services {
-		if regexp.MustCompile(sm.pattern).MatchString(s) {
+	for _, sm := range servicePatterns {
+		if sm.re.MatchString(s) {
 			return sm.code
 		}
 	}
@@ -608,43 +630,37 @@ func NormalizeService(service string) string {
 }
 
 func matchDate(filename string, meta *metadata.Metadata) {
-	dataRegex := regexp.MustCompile(`[ .\[\(](\d{4}-\d{2}-\d{2})([ .\]\)]|$)`)
-	if match := dataRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reDate.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Date = match[1]
 	}
 }
 
 func matchRepack(filename string, meta *metadata.Metadata) {
-	repackRegex := regexp.MustCompile(`[ .\[\(]REPACK([ .\]\)-]|$|\d)`)
-	if repackRegex.MatchString(filename) {
+	if reRepack.MatchString(filename) {
 		meta.Repack = true
 	}
 }
 
 func matchCRC32(filename string, meta *metadata.Metadata) {
-	crcRegex := regexp.MustCompile(`[\[\(]([A-Fa-f0-9]{8})[\]\)]`)
-	if match := crcRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reCRC32.FindStringSubmatch(filename); len(match) > 1 {
 		meta.CRC32 = match[1]
 	}
 }
 
 func matchDualAudio(filename string, meta *metadata.Metadata) {
-	dualAudioRegex := regexp.MustCompile(`(?i)[ .\[\(]Dual[ -]Audio[ .\]\)]`)
-	if dualAudioRegex.MatchString(filename) {
+	if reDualAudio.MatchString(filename) {
 		meta.DualAudio = true
 	}
 }
 
 func matchResolution(filename string, meta *metadata.Metadata) {
-	resRegex := regexp.MustCompile(`[ .\[\(](\d{3,4}[p|i])([ .\]\)-]|$| )`)
-	if match := resRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reResolutionTag.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Resolution = match[1]
 	}
 }
 
 func matchAudio(filename string, meta *metadata.Metadata) {
-	audioRegex := regexp.MustCompile(`[ .\[\(](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .\]\)-]|$| )`)
-	if match := audioRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reAudioCodec.FindStringSubmatch(filename); len(match) > 1 {
 		meta.AudioCodec = match[1]
 		if len(match) > 2 && match[2] != "" {
 			meta.AudioCodec += match[2]
@@ -666,31 +682,27 @@ func matchAudio(filename string, meta *metadata.Metadata) {
 }
 
 func matchVideo(filename string, meta *metadata.Metadata) {
-	videoRegex := regexp.MustCompile(`[ .\[\(]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .\]\)-]|$| )`)
-	if match := videoRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reVideoCodec.FindStringSubmatch(filename); len(match) > 1 {
 		meta.VideoCodec = match[1]
 	}
 }
 
 func matchSource(filename string, meta *metadata.Metadata) {
-	sourceRegex := regexp.MustCompile(`(?i)[ .\[\(](BD|WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .\]\)-]|$| )`)
-	if match := sourceRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reSource.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Source = match[1]
 	}
 }
 
 func matchGroup(filename string, meta *metadata.Metadata) {
 	// 1. match leading [Group]
-	leadingGroupRegex := regexp.MustCompile(`^\[([^\]]+)\]`)
-	if match := leadingGroupRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reLeadingGroup.FindStringSubmatch(filename); len(match) > 1 {
 		meta.Group = match[1]
 
 		return
 	}
 
 	// 2. match trailing -Group
-	groupRegex := regexp.MustCompile(`\-([^-]+)$`)
-	if match := groupRegex.FindStringSubmatch(filename); len(match) > 1 {
+	if match := reTrailingGroup.FindStringSubmatch(filename); len(match) > 1 {
 		group := match[1]
 		// Don't match WEB-DL as group if it's the source
 		isWebDL := (group == "DL" || strings.HasPrefix(group, "DL.")) && strings.HasSuffix(filename[:strings.LastIndex(filename, "-")], "WEB")

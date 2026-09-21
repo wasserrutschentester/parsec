@@ -15,6 +15,22 @@ import (
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
+var (
+	reDTSX = regexp.MustCompile(`\bX\b`)
+
+	reCleanKeys            = regexp.MustCompile(`\{[^}]*\}`)
+	reCleanEmptyEnclosures = []*regexp.Regexp{
+		regexp.MustCompile(`\(\s*[\.\-]*\s*\)`),
+		regexp.MustCompile(`\[\s*[\.\-]*\s*\]`),
+		regexp.MustCompile(`\{\s*[\.\-]*\s*\}`),
+	}
+	reMultipleDots   = regexp.MustCompile(`\.+`)
+	reMultipleDashes = regexp.MustCompile(`-+`)
+	reMultipleSpaces = regexp.MustCompile(`\s+`)
+
+	reNonAlphanumeric = regexp.MustCompile(`[^a-z0-9 ]`)
+)
+
 // Metadata represents the metadata for a media file.
 type Metadata struct {
 	Title    string
@@ -157,8 +173,7 @@ func detectDTS(uProfile, uFeatures string) string {
 	isXLL := strings.Contains(combined, "XLL")
 
 	// Check for "X" as a standalone word/token to avoid matching inside "XLL"
-	reX := regexp.MustCompile(`\bX\b`)
-	isX := reX.MatchString(combined)
+	isX := reDTSX.MatchString(combined)
 
 	if isXLL && isX {
 		return "DTS-X"
@@ -528,27 +543,17 @@ func (meta *Metadata) setEpisodeReplacements(replacements map[string]string) {
 
 func cleanName(name string) string {
 	// 0. remove remaining keys
-	reKeys := []*regexp.Regexp{
-		regexp.MustCompile(`\{[^}]*\}`),
-	}
-	for _, re := range reKeys {
-		name = re.ReplaceAllString(name, "")
-	}
+	name = reCleanKeys.ReplaceAllString(name, "")
 
 	// 1. Remove empty enclosures (parentheses, brackets, braces) that might contain only separators
-	reEmptyEnclosures := []*regexp.Regexp{
-		regexp.MustCompile(`\(\s*[\.\-]*\s*\)`),
-		regexp.MustCompile(`\[\s*[\.\-]*\s*\]`),
-		regexp.MustCompile(`\{\s*[\.\-]*\s*\}`),
-	}
-	for _, re := range reEmptyEnclosures {
+	for _, re := range reCleanEmptyEnclosures {
 		name = re.ReplaceAllString(name, "")
 	}
 
 	// 2. Collapse multiple separators
-	name = regexp.MustCompile(`\.+`).ReplaceAllString(name, ".")
-	name = regexp.MustCompile(`-+`).ReplaceAllString(name, "-")
-	name = regexp.MustCompile(`\s+`).ReplaceAllString(name, " ")
+	name = reMultipleDots.ReplaceAllString(name, ".")
+	name = reMultipleDashes.ReplaceAllString(name, "-")
+	name = reMultipleSpaces.ReplaceAllString(name, " ")
 
 	// 3. Clean up separator combinations
 	name = strings.ReplaceAll(name, ".-", "-")
@@ -569,11 +574,8 @@ func Normalize(s string) string {
 	s = strings.ReplaceAll(s, ".", " ")
 	s = strings.ReplaceAll(s, "-", " ")
 
-	re := regexp.MustCompile(`[^a-z0-9 ]`)
-	s = re.ReplaceAllString(s, "")
-
-	re = regexp.MustCompile(`\s+`)
-	s = re.ReplaceAllString(s, " ")
+	s = reNonAlphanumeric.ReplaceAllString(s, "")
+	s = reMultipleSpaces.ReplaceAllString(s, " ")
 
 	return strings.TrimSpace(s)
 }

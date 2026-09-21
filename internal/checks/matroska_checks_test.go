@@ -118,3 +118,55 @@ func TestStripCreationTimeTagsNoMatch(t *testing.T) {
 		t.Errorf("expected content unchanged when nothing matches, got:\n%s", got)
 	}
 }
+
+func TestMatchesAnyPattern(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		value    string
+		patterns []string
+		want     bool
+	}{
+		{
+			name:     "matching pattern",
+			value:    "Movie.1080p.mkv",
+			patterns: []string{`\b1080p\b`},
+			want:     true,
+		},
+		{
+			name:     "non-matching pattern",
+			value:    "Movie.720p.mkv",
+			patterns: []string{`\b1080p\b`},
+			want:     false,
+		},
+		{
+			name:     "invalid regex pattern does not panic",
+			value:    "sample value",
+			patterns: []string{"[unclosed_bracket", `(?i)nomatch`},
+			want:     false,
+		},
+		{
+			name:     "invalid regex followed by match",
+			value:    "valid sample",
+			patterns: []string{"[unclosed_bracket", `valid`},
+			want:     true,
+		},
+		{
+			name:     "empty patterns",
+			value:    "sample",
+			patterns: []string{},
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := matchesAnyPattern(tt.value, tt.patterns); got != tt.want {
+				t.Errorf("matchesAnyPattern() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

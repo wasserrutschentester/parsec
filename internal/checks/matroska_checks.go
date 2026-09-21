@@ -12,6 +12,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
+	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
 var (
@@ -126,9 +127,20 @@ func AppHygieneNeedsFix(app string) bool {
 }
 
 func matchesAnyPattern(value string, patterns []string) bool {
-	return slices.ContainsFunc(patterns, func(p string) bool {
-		return regexp.MustCompile("(?i)" + p).MatchString(value)
-	})
+	for _, p := range patterns {
+		re, err := regexp.Compile("(?i)" + p)
+		if err != nil {
+			ui.PrintDebug(fmt.Sprintf("skipping invalid regex pattern %q: %v", p, err))
+
+			continue
+		}
+
+		if re.MatchString(value) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // checkTrueHDCompatibility checks if a Dolby TrueHD audio track is followed by a lossy compatibility track (AC3/EAC3) in the same language.
