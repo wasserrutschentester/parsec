@@ -14,6 +14,7 @@ import (
 	"golang.org/x/text/language"
 
 	"codeberg.org/upPollo/parsec/internal/cache"
+	"codeberg.org/upPollo/parsec/internal/mdb"
 )
 
 const (
@@ -54,12 +55,7 @@ func getCachedGraphQL(operationName string, variables map[string]any, target any
 	return cacheKey, false
 }
 
-func postGraphQL(ctx context.Context, payload graphQLRequest) ([]byte, error) {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("imdb: marshal request: %w", err)
-	}
-
+func createGraphQLRequest(ctx context.Context, data []byte) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("imdb: create request: %w", err)
@@ -71,12 +67,10 @@ func postGraphQL(ctx context.Context, payload graphQLRequest) ([]byte, error) {
 	req.Header.Set("X-Imdb-Client-Name", imdbClientName)
 	req.Header.Set("X-Imdb-User-Country", imdbUserCountry)
 
-	resp, err := HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("imdb: execute request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
+	return req, nil
+}
 
+func readGraphQLResponse(resp *http.Response) ([]byte, error) {
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxGraphQLResponseSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("imdb: read response: %w", err)
@@ -87,6 +81,41 @@ func postGraphQL(ctx context.Context, payload graphQLRequest) ([]byte, error) {
 	}
 
 	return respBytes, nil
+}
+
+func postGraphQL(ctx context.Context, payload graphQLRequest) ([]byte, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("imdb: marshal request: %w", err)
+	}
+
+	for attempt := range 3 {
+		req, err := createGraphQLRequest(ctx, data)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := HTTPClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("imdb: execute request: %w", err)
+		}
+
+		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusAccepted) && attempt < 2 {
+			_ = resp.Body.Close()
+
+			if retryErr := mdb.WaitRetry(ctx, resp); retryErr != nil {
+				return nil, retryErr
+			}
+
+			continue
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		return readGraphQLResponse(resp)
+	}
+
+	return nil, fmt.Errorf("%w: max retries reached", ErrHTTPStatus)
 }
 
 func executeGraphQL(ctx context.Context, operationName, query string, variables map[string]any, target any) error {

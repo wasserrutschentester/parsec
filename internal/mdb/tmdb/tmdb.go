@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/text/language"
 
@@ -58,7 +59,18 @@ type tmdbMedia struct {
 		Iso31661 string `json:"iso_3166_1"`
 	} `json:"production_countries"` // Specific to Movies
 
-	OriginCountry []string `json:"origin_country"` // Specific to TV shows
+	OriginCountry     []string                `json:"origin_country"` // Specific to TV shows
+	ExternalIDs       tmdbExternalIDsResponse `json:"external_ids"`
+	AlternativeTitles struct {
+		Titles []struct {
+			Title string `json:"title"`
+			ISO   string `json:"iso_3166_1"`
+		} `json:"titles"` // Movies
+		Results []struct {
+			Title string `json:"title"`
+			ISO   string `json:"iso_3166_1"`
+		} `json:"results"` // TV
+	} `json:"alternative_titles"`
 }
 
 func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
@@ -197,12 +209,54 @@ var (
 	errTMDBStatus    = errors.New("TMDB API returned status")
 )
 
-func get(endpoint string, query url.Values, target any) error {
-	apiKey := config.GetTmdbAPIKey()
-	if apiKey == "" {
-		return errNotConfigured
+type tmdbErrorResponse struct {
+	StatusCode    int    `json:"status_code"`
+	StatusMessage string `json:"status_message"`
+	Success       bool   `json:"success"`
+}
+
+func parseErrorResponse(body []byte, statusCode int) error {
+	var errResp tmdbErrorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.StatusMessage != "" {
+		return fmt.Errorf("%w %d: %s", errTMDBStatus, statusCode, errResp.StatusMessage)
 	}
 
+	return fmt.Errorf("%w %d", errTMDBStatus, statusCode)
+}
+
+func executeRequest(ctx context.Context, u, apiKey string, isBearer bool) (*http.Response, error) {
+	for attempt := range 3 {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TMDB request: %w", err)
+		}
+
+		if isBearer {
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+		}
+
+		resp, err := HTTPClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("TMDB request failed: %w", err)
+		}
+
+		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusAccepted) && attempt < 2 {
+			_ = resp.Body.Close()
+
+			if retryErr := mdb.WaitRetry(ctx, resp); retryErr != nil {
+				return nil, retryErr
+			}
+
+			continue
+		}
+
+		return resp, nil
+	}
+
+	return nil, errTMDBStatus
+}
+
+func prepareQuery(apiKey string, query url.Values) (url.Values, string, bool) {
 	if query == nil {
 		query = url.Values{}
 	}
@@ -211,32 +265,44 @@ func get(endpoint string, query url.Values, target any) error {
 		query.Set("language", config.GetPreferredLanguage())
 	}
 
-	cacheKey := fmt.Sprintf("tmdb:%s?%s", endpoint, query.Encode())
+	cacheQuery := query.Encode()
+	isBearer := strings.HasPrefix(apiKey, "ey") || len(apiKey) > 40
+
+	if !isBearer {
+		query.Set("api_key", apiKey)
+	}
+
+	return query, cacheQuery, isBearer
+}
+
+func get(ctx context.Context, endpoint string, query url.Values, target any) error {
+	apiKey := config.GetTmdbAPIKey()
+	if apiKey == "" {
+		return errNotConfigured
+	}
+
+	query, cacheQuery, isBearer := prepareQuery(apiKey, query)
+	cacheKey := fmt.Sprintf("tmdb:%s?%s", endpoint, cacheQuery)
+
 	if ok, err := getFromCache(cacheKey, target); ok {
 		return err
 	}
 
-	query.Set("api_key", apiKey)
 	u := fmt.Sprintf("%s/%s?%s", BaseURL, endpoint, query.Encode())
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
+	resp, err := executeRequest(ctx, u, apiKey, isBearer)
 	if err != nil {
-		return fmt.Errorf("failed to create TMDB request: %w", err)
-	}
-
-	resp, err := HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("TMDB request failed: %w", err)
+		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w %d", errTMDBStatus, resp.StatusCode)
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read TMDB response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return parseErrorResponse(body, resp.StatusCode)
 	}
 
 	_ = cache.Set(cacheKey, body)
@@ -249,7 +315,7 @@ func get(endpoint string, query url.Values, target any) error {
 }
 
 // Search searches for media on TMDB by query and optionally by year.
-func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
+func Search(ctx context.Context, mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	params := url.Values{}
 	params.Add("query", query)
 
@@ -262,27 +328,45 @@ func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	}
 
 	var data tmdbSearchResponse
-	if err := get("search/"+mediaType, params, &data); err != nil {
+	if err := get(ctx, "search/"+mediaType, params, &data); err != nil {
 		return nil, err
 	}
 
-	results := make([]mdb.SearchResult, 0, len(data.Results))
-	for _, r := range data.Results {
-		result := r.toSearchResult(mediaType)
-		applyExternalIDs(&result, mediaType)
-		applyAltTitles(&result, mediaType)
-		results = append(results, result)
+	results := make([]mdb.SearchResult, len(data.Results))
+	for i, r := range data.Results {
+		results[i] = r.toSearchResult(mediaType)
+	}
+
+	// Fetch external IDs concurrently for top search results to allow cross-matching with TVDB.
+	maxLookups := min(len(results), 8)
+	if maxLookups > 0 {
+		var wg sync.WaitGroup
+
+		sem := make(chan struct{}, 4)
+
+		for i := range maxLookups {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+
+				select {
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-ctx.Done():
+					return
+				}
+
+				applyExternalIDs(ctx, &results[idx], mediaType)
+			}(i)
+		}
+
+		wg.Wait()
 	}
 
 	return results, nil
 }
 
-func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
-	externalIDs, err := getExternalIDs(result.TmdbID, mediaType)
-	if err != nil {
-		return
-	}
-
+func applyExternalIDsFromResponse(result *mdb.SearchResult, externalIDs tmdbExternalIDsResponse) {
 	if externalIDs.Imdb != "" {
 		result.ImdbID = externalIDs.Imdb
 	}
@@ -299,29 +383,93 @@ func applyExternalIDs(result *mdb.SearchResult, mediaType string) {
 	}
 }
 
-func applyAltTitles(result *mdb.SearchResult, mediaType string) {
-	altTitles, err := getAlternativeTitles(result.TmdbID, mediaType, result.OriginalLanguage)
+func applyExternalIDs(ctx context.Context, result *mdb.SearchResult, mediaType string) {
+	externalIDs, err := getExternalIDs(ctx, result.TmdbID, mediaType)
+	if err != nil {
+		return
+	}
+
+	applyExternalIDsFromResponse(result, externalIDs)
+}
+
+func parseAlternativeTitles(
+	titles []struct {
+		Title string `json:"title"`
+		ISO   string `json:"iso_3166_1"`
+	},
+	results []struct {
+		Title string `json:"title"`
+		ISO   string `json:"iso_3166_1"`
+	},
+	originalLanguage string,
+) []string {
+	prefTag := language.Make(config.GetPreferredLanguage())
+	origTag := language.Make(originalLanguage)
+
+	origCountry, _ := origTag.Region()
+	origCountryStr := origCountry.String()
+
+	altTitles := make([]string, 0, len(titles)+len(results))
+	process := func(title, iso string) {
+		iso = strings.ToUpper(iso)
+		isPreferred := iso == strings.ToUpper(prefTag.String())
+		isEnglish := iso == "US" || iso == "GB" || iso == "CA" || iso == "AU"
+		isOriginal := iso == origCountryStr
+
+		if isPreferred || isEnglish || isOriginal {
+			altTitles = append(altTitles, title)
+		}
+	}
+
+	for _, t := range titles {
+		process(t.Title, t.ISO)
+	}
+
+	for _, t := range results {
+		process(t.Title, t.ISO)
+	}
+
+	return altTitles
+}
+
+func applyAltTitles(ctx context.Context, result *mdb.SearchResult, mediaType string) {
+	altTitles, err := getAlternativeTitles(ctx, result.TmdbID, mediaType, result.OriginalLanguage)
 	if err == nil {
 		result.AltTitle = altTitles
 	}
 }
 
 // GetByID retrieves a single media item from TMDB by its ID.
-func GetByID(tmdbID int, mediaType string) (*mdb.SearchResult, error) {
+func GetByID(ctx context.Context, tmdbID int, mediaType string) (*mdb.SearchResult, error) {
+	params := url.Values{}
+	params.Set("append_to_response", "external_ids,alternative_titles")
+
 	var r tmdbMedia
-	if err := get(fmt.Sprintf("%s/%d", mediaType, tmdbID), nil, &r); err != nil {
+	if err := get(ctx, fmt.Sprintf("%s/%d", mediaType, tmdbID), params, &r); err != nil {
 		return nil, err
 	}
 
 	result := r.toSearchResult(mediaType)
-	applyExternalIDs(&result, mediaType)
-	applyAltTitles(&result, mediaType)
+
+	// If external IDs were provided in appended response, use them directly.
+	if r.ExternalIDs.Imdb != "" || r.ExternalIDs.Tvdb != 0 {
+		applyExternalIDsFromResponse(&result, r.ExternalIDs)
+	} else {
+		applyExternalIDs(ctx, &result, mediaType)
+	}
+
+	// If alternative titles were provided in appended response, parse them directly.
+	if len(r.AlternativeTitles.Titles) > 0 || len(r.AlternativeTitles.Results) > 0 {
+		result.AltTitle = parseAlternativeTitles(r.AlternativeTitles.Titles, r.AlternativeTitles.Results, result.OriginalLanguage)
+	} else {
+		applyAltTitles(ctx, &result, mediaType)
+	}
 
 	return &result, nil
 }
 
 // GetByImdbID retrieves a media item from TMDB using its IMDB ID.
-func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
+func GetByImdbID(ctx context.Context, imdbID string, isTV bool) (*mdb.SearchResult, error) {
 	params := url.Values{}
 	params.Set("external_source", "imdb_id")
 
@@ -330,17 +478,17 @@ func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
 		TVResults    []tmdbMedia `json:"tv_results"`
 	}
 
-	if err := get("find/"+imdbID, params, &data); err != nil {
+	if err := get(ctx, "find/"+imdbID, params, &data); err != nil {
 		return nil, err
 	}
 
 	if isTV {
 		if len(data.TVResults) > 0 {
-			return finalizeImdbResult(data.TVResults[0], "tv", imdbID), nil
+			return finalizeImdbResult(ctx, data.TVResults[0], "tv", imdbID), nil
 		}
 	} else {
 		if len(data.MovieResults) > 0 {
-			return finalizeImdbResult(data.MovieResults[0], "movie", imdbID), nil
+			return finalizeImdbResult(ctx, data.MovieResults[0], "movie", imdbID), nil
 		}
 	}
 
@@ -348,9 +496,9 @@ func GetByImdbID(imdbID string, isTV bool) (*mdb.SearchResult, error) {
 	return nil, mdb.ErrNotFound
 }
 
-func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult {
+func finalizeImdbResult(ctx context.Context, m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult {
 	// /find/ returns a slim search result — fetch full details for overview, runtime, studios, correct original_language, etc.
-	if full, err := GetByID(m.ID, mediaType); err == nil {
+	if full, err := GetByID(ctx, m.ID, mediaType); err == nil {
 		full.ImdbID = imdbID
 
 		return full
@@ -358,8 +506,8 @@ func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult
 
 	result := m.toSearchResult(mediaType)
 	result.ImdbID = imdbID
-	applyExternalIDs(&result, mediaType)
-	applyAltTitles(&result, mediaType)
+	applyExternalIDs(ctx, &result, mediaType)
+	applyAltTitles(ctx, &result, mediaType)
 
 	if result.IsTV {
 		result.TvdbType = "series"
@@ -370,16 +518,16 @@ func finalizeImdbResult(m tmdbMedia, mediaType, imdbID string) *mdb.SearchResult
 	return &result
 }
 
-func getExternalIDs(tmdbID int, mediaType string) (tmdbExternalIDsResponse, error) {
+func getExternalIDs(ctx context.Context, tmdbID int, mediaType string) (tmdbExternalIDsResponse, error) {
 	var data tmdbExternalIDsResponse
-	if err := get(fmt.Sprintf("%s/%d/external_ids", mediaType, tmdbID), nil, &data); err != nil {
+	if err := get(ctx, fmt.Sprintf("%s/%d/external_ids", mediaType, tmdbID), nil, &data); err != nil {
 		return tmdbExternalIDsResponse{}, err
 	}
 
 	return data, nil
 }
 
-func getAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]string, error) {
+func getAlternativeTitles(ctx context.Context, tmdbID int, mediaType, originalLanguage string) ([]string, error) {
 	var data struct {
 		Titles []struct {
 			Title string `json:"title"`
@@ -391,42 +539,15 @@ func getAlternativeTitles(tmdbID int, mediaType, originalLanguage string) ([]str
 		} `json:"results"` // TV
 	}
 
-	if err := get(fmt.Sprintf("%s/%d/alternative_titles", mediaType, tmdbID), nil, &data); err != nil {
+	if err := get(ctx, fmt.Sprintf("%s/%d/alternative_titles", mediaType, tmdbID), nil, &data); err != nil {
 		return nil, err
 	}
 
-	prefTag := language.Make(config.GetPreferredLanguage())
-	origTag := language.Make(originalLanguage)
-
-	// Determine country code for original language
-	origCountry, _ := origTag.Region()
-	origCountryStr := origCountry.String()
-
-	titles := []string{}
-	process := func(title, iso string) {
-		iso = strings.ToUpper(iso)
-		isPreferred := iso == strings.ToUpper(prefTag.String())
-		isEnglish := iso == "US" || iso == "GB" || iso == "CA" || iso == "AU"
-		isOriginal := iso == origCountryStr
-
-		if isPreferred || isEnglish || isOriginal {
-			titles = append(titles, title)
-		}
-	}
-
-	for _, t := range data.Titles {
-		process(t.Title, t.ISO)
-	}
-
-	for _, t := range data.Results {
-		process(t.Title, t.ISO)
-	}
-
-	return titles, nil
+	return parseAlternativeTitles(data.Titles, data.Results, originalLanguage), nil
 }
 
 // GetEpisodeMetadata retrieves detailed metadata for a specific TV episode from TMDB.
-func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.EpisodeResult, error) {
+func GetEpisodeMetadata(ctx context.Context, seriesID, season, episode int, lang string) (mdb.EpisodeResult, error) {
 	var data tmdbEpisodeResponse
 
 	params := url.Values{}
@@ -437,7 +558,7 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 	}
 
 	endpoint := fmt.Sprintf("tv/%d/season/%d/episode/%d", seriesID, season, episode)
-	if err := get(endpoint, params, &data); err != nil {
+	if err := get(ctx, endpoint, params, &data); err != nil {
 		return mdb.EpisodeResult{}, err
 	}
 
@@ -454,7 +575,7 @@ func GetEpisodeMetadata(seriesID, season, episode int, lang string) (mdb.Episode
 }
 
 // GetSeasonMetadata retrieves metadata for all episodes in a specific season from TMDB.
-func GetSeasonMetadata(seriesID, season int, lang string) ([]mdb.EpisodeResult, error) {
+func GetSeasonMetadata(ctx context.Context, seriesID, season int, lang string) ([]mdb.EpisodeResult, error) {
 	var data struct {
 		Episodes []tmdbEpisodeResponse `json:"episodes"`
 	}
@@ -465,7 +586,7 @@ func GetSeasonMetadata(seriesID, season int, lang string) ([]mdb.EpisodeResult, 
 	}
 
 	endpoint := fmt.Sprintf("tv/%d/season/%d", seriesID, season)
-	if err := get(endpoint, params, &data); err != nil {
+	if err := get(ctx, endpoint, params, &data); err != nil {
 		return nil, err
 	}
 

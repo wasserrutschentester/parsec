@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/mdb"
@@ -140,14 +142,14 @@ func TestGetByIDAndTitleDetails(t *testing.T) {
 	srv := newMockServer(t, parasiteResponse())
 	setBaseURL(t, srv.URL)
 
-	res, err := GetByID("tt6751668")
+	res, err := GetByID(t.Context(), "tt6751668")
 	if err != nil {
 		t.Fatalf("GetByID failed: %v", err)
 	}
 
 	checkParasiteSearchResult(t, res)
 
-	details, err := GetTitleDetails("tt6751668")
+	details, err := GetTitleDetails(t.Context(), "tt6751668")
 	if err != nil {
 		t.Fatalf("GetTitleDetails failed: %v", err)
 	}
@@ -254,7 +256,7 @@ func TestGetSeasonEpisodes(t *testing.T) {
 	srv := newMockServer(t, breakingBadResponse())
 	setBaseURL(t, srv.URL)
 
-	eps, err := GetSeasonEpisodes("tt0903747", 1)
+	eps, err := GetSeasonEpisodes(t.Context(), "tt0903747", 1)
 	if err != nil {
 		t.Fatalf("GetSeasonEpisodes failed: %v", err)
 	}
@@ -277,7 +279,7 @@ func TestIdentifyEpisode(t *testing.T) {
 
 	searchRes := mdb.SearchResult{ImdbID: "tt0903747", IsTV: true}
 
-	identified, err := IdentifyEpisode(searchRes, &metadata.Metadata{Season: 1, Episodes: []int{2}}, false)
+	identified, err := IdentifyEpisode(t.Context(), searchRes, &metadata.Metadata{Season: 1, Episodes: []int{2}}, false)
 	if err != nil {
 		t.Fatalf("IdentifyEpisode by S01E02 failed: %v", err)
 	}
@@ -286,7 +288,7 @@ func TestIdentifyEpisode(t *testing.T) {
 		t.Errorf("identified.Name = %q, want Cat's in the Bag...", identified.Name)
 	}
 
-	identifiedByDate, err := IdentifyEpisode(searchRes, &metadata.Metadata{Date: "2008-01-20"}, false)
+	identifiedByDate, err := IdentifyEpisode(t.Context(), searchRes, &metadata.Metadata{Date: "2008-01-20"}, false)
 	if err != nil {
 		t.Fatalf("IdentifyEpisode by Date failed: %v", err)
 	}
@@ -327,7 +329,7 @@ func TestSearch(t *testing.T) {
 	srv := newMockServer(t, shawshankSearchResponse())
 	setBaseURL(t, srv.URL)
 
-	results, err := Search("Shawshank", 1994, false)
+	results, err := Search(t.Context(), "Shawshank", 1994, false)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -342,5 +344,47 @@ func TestSearch(t *testing.T) {
 
 	if results[0].ImdbID != "tt0111161" {
 		t.Errorf("results[0].ImdbID = %q, want 'tt0111161'", results[0].ImdbID)
+	}
+}
+
+//nolint:paralleltest // mutates package-level BaseURL; cannot run in parallel
+func TestRetryAfter429(t *testing.T) {
+	setupTest(t)
+
+	var callCount atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		count := callCount.Add(1)
+		if count == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(shawshankSearchResponse())
+	}))
+	defer server.Close()
+
+	setBaseURL(t, server.URL)
+
+	start := time.Now()
+
+	results, err := Search(t.Context(), "Shawshank", 1994, false)
+	if err != nil {
+		t.Fatalf("Expected retry to succeed, got: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+
+	if callCount.Load() != 2 {
+		t.Errorf("Expected 2 calls (1 failure + 1 retry), got %d", callCount.Load())
+	}
+
+	if time.Since(start) < 900*time.Millisecond {
+		t.Errorf("Expected delay of at least ~1s for Retry-After, took %v", time.Since(start))
 	}
 }

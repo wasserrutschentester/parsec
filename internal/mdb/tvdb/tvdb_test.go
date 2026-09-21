@@ -1,22 +1,35 @@
 package tvdb
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 
+	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
-//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
-func TestIdentifyEpisodeByDate(t *testing.T) {
+func setupTest(t *testing.T) {
+	t.Helper()
+
 	config.InitDefaults()
 
 	config.NoCache = true
+
+	cache.SetDir(t.TempDir())
+}
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestIdentifyEpisodeByDate(t *testing.T) {
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 	viper.Set("preferred_language", "")
@@ -40,7 +53,7 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, false)
+	result, _ := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, false)
 
 	if result.TvdbID != 456 {
 		t.Errorf("Expected TvdbID 456, got %d", result.TvdbID)
@@ -53,9 +66,7 @@ func TestIdentifyEpisodeByDate(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeByTitle(t *testing.T) {
-	config.InitDefaults()
-
-	config.NoCache = true
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 	viper.Set("preferred_language", "")
@@ -79,7 +90,7 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	result, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{EpisodeTitles: []string{"Test Episode"}}, false)
+	result, _ := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{EpisodeTitles: []string{"Test Episode"}}, false)
 
 	if result.TvdbID != 789 {
 		t.Errorf("Expected TvdbID 789, got %d", result.TvdbID)
@@ -88,9 +99,7 @@ func TestIdentifyEpisodeByTitle(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
-	config.InitDefaults()
-
-	config.NoCache = true
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 
@@ -115,13 +124,13 @@ func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 	defer func() { BaseURL = originalBaseURL }()
 
 	// Case 1: Specials NOT allowed, should skip special and find regular
-	result1, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, false)
+	result1, _ := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, false)
 	if result1.TvdbID != 200 {
 		t.Errorf("Expected TvdbID 200 (Regular), got %d", result1.TvdbID)
 	}
 
 	// Case 2: Specials allowed
-	result2, _ := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, true)
+	result2, _ := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, &metadata.Metadata{Date: "2023-01-01"}, true)
 	if result2.TvdbID != 100 {
 		t.Errorf("Expected TvdbID 100 (Special), got %d", result2.TvdbID)
 	}
@@ -129,9 +138,7 @@ func TestIdentifyEpisodeIgnoreSpecialsByDate(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeSeason0(t *testing.T) {
-	config.InitDefaults()
-
-	config.NoCache = true
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 
@@ -156,15 +163,13 @@ func TestIdentifyEpisodeSeason0(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	// Test Case: Explicit Season 0, Episode 1.
-	// allowSpecials is false, but it SHOULD work because it's an explicit match.
 	meta := &metadata.Metadata{
 		Season:   0,
 		Episodes: []int{1},
 		IsTV:     true,
 	}
 
-	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	result, err := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
 	if err != nil {
 		t.Fatalf("IdentifyEpisode failed: %v", err)
 	}
@@ -176,9 +181,7 @@ func TestIdentifyEpisodeSeason0(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeS00E00Placeholder(t *testing.T) {
-	config.InitDefaults()
-
-	config.NoCache = true
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 
@@ -203,7 +206,6 @@ func TestIdentifyEpisodeS00E00Placeholder(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	// S00E00 with title "Blaues Blut" should match "Stoever - 38 - Blaues Blut"
 	meta := &metadata.Metadata{
 		Season:        0,
 		Episodes:      []int{0},
@@ -211,7 +213,7 @@ func TestIdentifyEpisodeS00E00Placeholder(t *testing.T) {
 		IsTV:          true,
 	}
 
-	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	result, err := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
 	if err != nil {
 		t.Fatalf("IdentifyEpisode failed: %v", err)
 	}
@@ -223,9 +225,7 @@ func TestIdentifyEpisodeS00E00Placeholder(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeSeasonAndTitle(t *testing.T) {
-	config.InitDefaults()
-
-	config.NoCache = true
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 
@@ -253,14 +253,13 @@ func TestIdentifyEpisodeSeasonAndTitle(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	// Should prioritize Season 2 episode over Season 1 episode with the same title
 	meta := &metadata.Metadata{
 		Season:        2,
 		EpisodeTitles: []string{"Special Episode"},
 		IsTV:          true,
 	}
 
-	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	result, err := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
 	if err != nil {
 		t.Fatalf("IdentifyEpisode failed: %v", err)
 	}
@@ -272,9 +271,7 @@ func TestIdentifyEpisodeSeasonAndTitle(t *testing.T) {
 
 //nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
 func TestIdentifyEpisodeSeasonAndTitleFallback(t *testing.T) {
-	config.InitDefaults()
-
-	config.NoCache = true
+	setupTest(t)
 
 	viper.Set("api_keys.tvdb", "dummy_key")
 
@@ -300,19 +297,135 @@ func TestIdentifyEpisodeSeasonAndTitleFallback(t *testing.T) {
 	BaseURL = server.URL
 	defer func() { BaseURL = originalBaseURL }()
 
-	// Search specifying Season 2, but title exists only in Season 1 -> should fall back to Season 1
 	meta := &metadata.Metadata{
 		Season:        2,
 		EpisodeTitles: []string{"Only In Season 1"},
 		IsTV:          true,
 	}
 
-	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	result, err := IdentifyEpisode(t.Context(), mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
 	if err != nil {
 		t.Fatalf("IdentifyEpisode failed: %v", err)
 	}
 
 	if result.TvdbID != 101 {
 		t.Errorf("Expected TvdbID 101 (Season 1 fallback), got %d", result.TvdbID)
+	}
+}
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestSearchRetryAfter429(t *testing.T) {
+	setupTest(t)
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	var searchAttempts atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/search":
+			if searchAttempts.Add(1) == 1 {
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(http.StatusTooManyRequests)
+
+				return
+			}
+
+			_, _ = w.Write([]byte(`{"status": "success", "data": [{"tvdb_id": "123", "name": "Test Series", "type": "series"}]}`))
+		case "/series/123/extended":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"remoteIds": []}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	results, err := Search(t.Context(), "tv", "Test Series", 0)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if searchAttempts.Load() != 2 {
+		t.Errorf("expected 2 search attempts, got %d", searchAttempts.Load())
+	}
+
+	if len(results) != 1 || results[0].TvdbID != 123 {
+		t.Errorf("unexpected results: %+v", results)
+	}
+}
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestStructuredError(t *testing.T) {
+	setupTest(t)
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"status": "failure", "message": "Invalid API key"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	_, err := Search(t.Context(), "movie", "Any", 0)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "Invalid API key") {
+		t.Errorf("expected error to contain 'Invalid API key', got %q", err.Error())
+	}
+}
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestContextCancellation(t *testing.T) {
+	setupTest(t)
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/search":
+			w.Header().Set("Retry-After", "10")
+			w.WriteHeader(http.StatusTooManyRequests)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := Search(ctx, "movie", "Any", 0)
+	if err == nil {
+		t.Fatal("expected error on cancelled context, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "context") {
+		t.Errorf("expected error to mention context, got %q", err.Error())
 	}
 }

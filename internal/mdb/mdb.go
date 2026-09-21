@@ -3,12 +3,15 @@ package mdb
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"golang.org/x/text/cases"
@@ -478,4 +481,30 @@ func levenshteinDistance(s1, s2 string) int {
 	}
 
 	return row[n]
+}
+
+// DefaultRetryDuration is the fallback backoff duration when Retry-After is absent.
+const DefaultRetryDuration = 2 * time.Second
+
+// ParseRetryAfter parses the Retry-After header as seconds, returning DefaultRetryDuration if absent or invalid.
+func ParseRetryAfter(resp *http.Response) time.Duration {
+	if val := resp.Header.Get("Retry-After"); val != "" {
+		if secs, err := strconv.Atoi(val); err == nil && secs > 0 {
+			return time.Duration(secs) * time.Second
+		}
+	}
+
+	return DefaultRetryDuration
+}
+
+// WaitRetry waits for the duration indicated by the Retry-After header or until ctx is canceled.
+func WaitRetry(ctx context.Context, resp *http.Response) error {
+	retryAfter := ParseRetryAfter(resp)
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context canceled during retry backoff: %w", ctx.Err())
+	case <-time.After(retryAfter):
+		return nil
+	}
 }

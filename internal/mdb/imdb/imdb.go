@@ -308,8 +308,8 @@ type searchResponse struct {
 }
 
 // GetByID retrieves a media item by IMDb ID and maps it to mdb.SearchResult.
-func GetByID(imdbID string) (*mdb.SearchResult, error) {
-	details, err := GetTitleDetails(imdbID)
+func GetByID(ctx context.Context, imdbID string) (*mdb.SearchResult, error) {
+	details, err := GetTitleDetails(ctx, imdbID)
 	if err != nil {
 		return nil, err
 	}
@@ -320,14 +320,14 @@ func GetByID(imdbID string) (*mdb.SearchResult, error) {
 }
 
 // GetTitleDetails retrieves full title metadata from IMDb.
-func GetTitleDetails(imdbID string) (*TitleDetails, error) {
+func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) {
 	id := FormatIMDbID(imdbID)
 	if id == "" {
 		return nil, ErrNotFound
 	}
 
 	var resp titleInfoResponse
-	if err := executeGraphQL(context.Background(), "GetTitleInfo", getTitleInfoQuery, map[string]any{"id": id}, &resp); err != nil {
+	if err := executeGraphQL(ctx, "GetTitleInfo", getTitleInfoQuery, map[string]any{"id": id}, &resp); err != nil {
 		return nil, err
 	}
 
@@ -364,7 +364,7 @@ func GetTitleDetails(imdbID string) (*TitleDetails, error) {
 }
 
 // Search searches for titles by query string and optional year/category.
-func Search(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
+func Search(ctx context.Context, query string, year int, isTV bool) ([]mdb.SearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, nil
@@ -383,7 +383,7 @@ func Search(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
 	}
 
 	var resp searchResponse
-	if err := executeGraphQL(context.Background(), "SearchTitles", searchTitlesQuery, map[string]any{"constraints": constraints}, &resp); err != nil {
+	if err := executeGraphQL(ctx, "SearchTitles", searchTitlesQuery, map[string]any{"constraints": constraints}, &resp); err != nil {
 		return nil, err
 	}
 
@@ -418,8 +418,8 @@ func Search(query string, year int, isTV bool) ([]mdb.SearchResult, error) {
 }
 
 // GetSeasonEpisodes returns all episodes for a specific season from a series.
-func GetSeasonEpisodes(imdbID string, season int) ([]mdb.EpisodeResult, error) {
-	details, err := GetTitleDetails(imdbID)
+func GetSeasonEpisodes(ctx context.Context, imdbID string, season int) ([]mdb.EpisodeResult, error) {
+	details, err := GetTitleDetails(ctx, imdbID)
 	if err != nil {
 		return nil, err
 	}
@@ -490,12 +490,12 @@ func matchEpisodeByTitle(episodes []EpisodeDetail, titles []string, allowSpecial
 }
 
 // IdentifyEpisode finds a matching episode for a series using metadata.
-func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
+func IdentifyEpisode(ctx context.Context, result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
 	if result.ImdbID == "" {
 		return mdb.EpisodeResult{}, ErrNotFound
 	}
 
-	details, err := GetTitleDetails(result.ImdbID)
+	details, err := GetTitleDetails(ctx, result.ImdbID)
 	if err != nil {
 		return mdb.EpisodeResult{}, err
 	}

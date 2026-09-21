@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -203,6 +204,11 @@ type tvdbExternalIDsResponse struct {
 	} `json:"data"`
 }
 
+type tvdbErrorResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
 var (
 	errNotConfigured = errors.New("TVDB API key not configured")
 	errLoginStatus   = errors.New("TVDB login failed with status")
@@ -210,8 +216,16 @@ var (
 	errNotFound      = errors.New("no episode found")
 )
 
-func login() (string, error) {
-	// Try to get cached token
+func parseErrorResponse(body []byte, statusCode int, baseErr error) error {
+	var errResp tvdbErrorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Message != "" {
+		return fmt.Errorf("%w %d: %s", baseErr, statusCode, errResp.Message)
+	}
+
+	return fmt.Errorf("%w %d", baseErr, statusCode)
+}
+
+func login(ctx context.Context) (string, error) {
 	tokenKey := "tvdb_token"
 	if cached, err := cache.Get(tokenKey); err == nil {
 		return string(cached), nil
@@ -222,14 +236,12 @@ func login() (string, error) {
 		return "", errNotConfigured
 	}
 
-	authData := map[string]string{"apikey": apiKey}
-
-	jsonData, err := json.Marshal(authData)
+	jsonData, err := json.Marshal(map[string]string{"apikey": apiKey})
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal login data: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, BaseURL+"/login", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseURL+"/login", bytes.NewReader(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to create login request: %w", err)
 	}
@@ -242,16 +254,20 @@ func login() (string, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read TVDB login response body: %w", err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%w %d", errLoginStatus, resp.StatusCode)
+		return "", parseErrorResponse(body, resp.StatusCode, errLoginStatus)
 	}
 
 	var data loginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		return "", fmt.Errorf("failed to decode login response: %w", err)
 	}
 
-	// Cache token (cache.Get already handles 6h expiration, but token might be shorter or we want to be safe)
 	_ = cache.Set(tokenKey, []byte(data.Data.Token))
 
 	return data.Data.Token, nil
@@ -264,8 +280,8 @@ func getISO3(lang string) string {
 	return base.ISO3()
 }
 
-func get(endpoint string, target any) error {
-	return getWithRetry(endpoint, target, true)
+func get(ctx context.Context, endpoint string, target any) error {
+	return getWithRetry(ctx, endpoint, target, true)
 }
 
 func getFromCache(key string, target any) (bool, error) {
@@ -281,10 +297,10 @@ func getFromCache(key string, target any) (bool, error) {
 	return true, nil
 }
 
-func doRequest(endpoint, token, prefLang string) (*http.Response, error) {
+func createTVDBRequest(ctx context.Context, endpoint, token, prefLang string) (*http.Request, error) {
 	u := fmt.Sprintf("%s/%s", BaseURL, endpoint)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TVDB request: %w", err)
 	}
@@ -295,46 +311,45 @@ func doRequest(endpoint, token, prefLang string) (*http.Response, error) {
 		req.Header.Set("Accept-Language", getISO3(prefLang))
 	}
 
-	resp, err := HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("TVDB request failed: %w", err)
-	}
-
-	return resp, nil
+	return req, nil
 }
 
-func getWithRetry(endpoint string, target any, allowRetry bool) error {
-	prefLang := config.GetPreferredLanguage()
-	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
+func doRequest(ctx context.Context, endpoint, token, prefLang string) (*http.Response, error) {
+	for attempt := range 3 {
+		req, err := createTVDBRequest(ctx, endpoint, token, prefLang)
+		if err != nil {
+			return nil, err
+		}
 
-	if ok, err := getFromCache(cacheKey, target); ok {
-		return err
+		resp, err := HTTPClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("TVDB request failed: %w", err)
+		}
+
+		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusAccepted) && attempt < 2 {
+			_ = resp.Body.Close()
+
+			if retryErr := mdb.WaitRetry(ctx, resp); retryErr != nil {
+				return nil, retryErr
+			}
+
+			continue
+		}
+
+		return resp, nil
 	}
 
-	token, err := login()
-	if err != nil {
-		return err
-	}
+	return nil, errTVDBStatus
+}
 
-	resp, err := doRequest(endpoint, token, prefLang)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusUnauthorized && allowRetry {
-		_ = cache.Remove("tvdb_token")
-
-		return getWithRetry(endpoint, target, false)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w %d", errTVDBStatus, resp.StatusCode)
-	}
-
+func handleTVDBResponse(resp *http.Response, cacheKey string, target any) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read TVDB response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return parseErrorResponse(body, resp.StatusCode, errTVDBStatus)
 	}
 
 	_ = cache.Set(cacheKey, body)
@@ -344,6 +359,34 @@ func getWithRetry(endpoint string, target any, allowRetry bool) error {
 	}
 
 	return nil
+}
+
+func getWithRetry(ctx context.Context, endpoint string, target any, allowRetry bool) error {
+	prefLang := config.GetPreferredLanguage()
+	cacheKey := fmt.Sprintf("tvdb:%s:%s", prefLang, endpoint)
+
+	if ok, err := getFromCache(cacheKey, target); ok {
+		return err
+	}
+
+	token, err := login(ctx)
+	if err != nil {
+		return err
+	}
+
+	resp, err := doRequest(ctx, endpoint, token, prefLang)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusUnauthorized && allowRetry {
+		_ = cache.Remove("tvdb_token")
+
+		return getWithRetry(ctx, endpoint, target, false)
+	}
+
+	return handleTVDBResponse(resp, cacheKey, target)
 }
 
 func toTvdbType(mediaType string) string {
@@ -358,23 +401,23 @@ func toTvdbType(mediaType string) string {
 }
 
 // Search searches for media on TVDB by query and optionally by year.
-func Search(mediaType, query string, year int) ([]mdb.SearchResult, error) {
+func Search(ctx context.Context, mediaType, query string, year int) ([]mdb.SearchResult, error) {
 	tvdbType := toTvdbType(mediaType)
 
-	endpoint := fmt.Sprintf("search?query=%s&type=%s", query, tvdbType)
+	endpoint := fmt.Sprintf("search?query=%s&type=%s", url.QueryEscape(query), tvdbType)
 	if year > 0 {
 		endpoint = fmt.Sprintf("%s&year=%d", endpoint, year)
 	}
 
 	var data tvdbSearchResponse
-	if err := get(endpoint, &data); err != nil {
+	if err := get(ctx, endpoint, &data); err != nil {
 		return nil, err
 	}
 
 	results := make([]mdb.SearchResult, 0, len(data.Data))
 	for _, r := range data.Data {
 		result := r.toSearchResult()
-		applyExternalIDs(&result, result.TvdbID, r.Type)
+		applyExternalIDs(ctx, &result, result.TvdbID, r.Type)
 		results = append(results, result)
 	}
 
@@ -392,11 +435,11 @@ type tvdbRemoteIDResponse struct {
 }
 
 // GetByRemoteID retrieves media from TVDB using a remote ID (e.g. IMDB ID).
-func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
-	endpoint := "search/remoteid/" + remoteID
+func GetByRemoteID(ctx context.Context, remoteID, mediaType string) (*mdb.SearchResult, error) {
+	endpoint := "search/remoteid/" + url.PathEscape(remoteID)
 
 	var data tvdbRemoteIDResponse
-	if err := get(endpoint, &data); err != nil {
+	if err := get(ctx, endpoint, &data); err != nil {
 		return nil, err
 	}
 
@@ -416,9 +459,9 @@ func GetByRemoteID(remoteID, mediaType string) (*mdb.SearchResult, error) {
 
 	// TVDB ID is sometimes nested under 'id' in these responses rather than 'tvdb_id'
 	tvdbID := parseTvdbID(r)
-	applyExternalIDs(&result, tvdbID, actualType)
+	applyExternalIDs(ctx, &result, tvdbID, actualType)
 
-	applyTranslation(&result, tvdbID, actualType)
+	applyTranslation(ctx, &result, tvdbID, actualType)
 
 	return &result, nil
 }
@@ -453,13 +496,13 @@ func selectBestRemoteMatch(data []tvdbRemoteMatch, mediaType string) (*tvdbMedia
 	return nil, ""
 }
 
-func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
+func applyTranslation(ctx context.Context, result *mdb.SearchResult, tvdbID int, mediaType string) {
 	prefLang := config.GetPreferredLanguage()
 	if prefLang == "" {
 		return
 	}
 
-	translation, err := getTranslation(tvdbID, mediaType, prefLang)
+	translation, err := getTranslation(ctx, tvdbID, mediaType, prefLang)
 	if err != nil {
 		return
 	}
@@ -474,14 +517,14 @@ func applyTranslation(result *mdb.SearchResult, tvdbID int, mediaType string) {
 }
 
 // GetByID retrieves a single media item from TVDB by its ID.
-func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
+func GetByID(ctx context.Context, tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 	endpoint := toTvdbType(mediaType)
 
 	var data struct {
 		Data tvdbMedia `json:"data"`
 	}
 
-	if err := get(fmt.Sprintf("%s/%d", endpoint, tvdbID), &data); err != nil {
+	if err := get(ctx, fmt.Sprintf("%s/%d", endpoint, tvdbID), &data); err != nil {
 		return nil, err
 	}
 
@@ -493,9 +536,9 @@ func GetByID(tvdbID int, mediaType string) (*mdb.SearchResult, error) {
 
 	result.IsTV = endpoint == "series"
 
-	applyTranslation(&result, tvdbID, endpoint)
+	applyTranslation(ctx, &result, tvdbID, endpoint)
 
-	applyExternalIDs(&result, tvdbID, endpoint)
+	applyExternalIDs(ctx, &result, tvdbID, endpoint)
 
 	return &result, nil
 }
@@ -509,7 +552,7 @@ type tvdbTranslationResponse struct {
 	} `json:"data"`
 }
 
-func getTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse, error) {
+func getTranslation(ctx context.Context, tvdbID int, mediaType, lang string) (tvdbTranslationResponse, error) {
 	tvdbType := toTvdbType(mediaType)
 	iso3 := getISO3(lang)
 
@@ -517,7 +560,7 @@ func getTranslation(tvdbID int, mediaType, lang string) (tvdbTranslationResponse
 
 	endpoint := fmt.Sprintf("%s/%d/translations/%s", tvdbType, tvdbID, iso3)
 
-	if err := get(endpoint, &data); err != nil {
+	if err := get(ctx, endpoint, &data); err != nil {
 		return tvdbTranslationResponse{}, err
 	}
 
@@ -542,8 +585,8 @@ func getTranslationFromCache(tvdbID int, mediaType, lang string) (tvdbTranslatio
 	return tvdbTranslationResponse{}, false
 }
 
-func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
-	externalIDs, err := getExternalIDs(tvdbID, mediaType)
+func applyExternalIDs(ctx context.Context, result *mdb.SearchResult, tvdbID int, mediaType string) {
+	externalIDs, err := getExternalIDs(ctx, tvdbID, mediaType)
 	if err == nil {
 		result.OriginalLanguage = externalIDs.Data.OriginalLanguage
 
@@ -574,18 +617,18 @@ func applyExternalIDs(result *mdb.SearchResult, tvdbID int, mediaType string) {
 	}
 }
 
-func getExternalIDs(tvdbID int, mediaType string) (tvdbExternalIDsResponse, error) {
+func getExternalIDs(ctx context.Context, tvdbID int, mediaType string) (tvdbExternalIDsResponse, error) {
 	endpoint := toTvdbType(mediaType)
 
 	var data tvdbExternalIDsResponse
-	if err := get(fmt.Sprintf("%s/%d/extended", endpoint, tvdbID), &data); err != nil {
+	if err := get(ctx, fmt.Sprintf("%s/%d/extended", endpoint, tvdbID), &data); err != nil {
 		return tvdbExternalIDsResponse{}, err
 	}
 
 	return data, nil
 }
 
-func getEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
+func getEpisodes(ctx context.Context, seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 	var data tvdbEpisodeResponse
 
 	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
@@ -593,7 +636,7 @@ func getEpisodes(seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
 		endpoint = fmt.Sprintf("%s/%s", endpoint, lang)
 	}
 
-	if err := get(fmt.Sprintf("%s?page=%d", endpoint, page), &data); err != nil {
+	if err := get(ctx, fmt.Sprintf("%s?page=%d", endpoint, page), &data); err != nil {
 		return tvdbEpisodeResponse{}, err
 	}
 
@@ -650,11 +693,11 @@ func saveEnrichedEpisodes(seriesID int, lang string, episodes []Episode) {
 	_ = cache.Set(diskKey, data)
 }
 
-func fetchRawEpisodes(seriesID int, lang string) ([]Episode, error) {
+func fetchRawEpisodes(ctx context.Context, seriesID int, lang string) ([]Episode, error) {
 	var episodes []Episode
 
 	for page := range 20 {
-		data, err := getEpisodes(seriesID, page, lang)
+		data, err := getEpisodes(ctx, seriesID, page, lang)
 		if err != nil {
 			if page == 0 {
 				return nil, err
@@ -673,7 +716,7 @@ func fetchRawEpisodes(seriesID int, lang string) ([]Episode, error) {
 }
 
 // GetAllEpisodes retrieves all episodes for a given series from TVDB.
-func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
+func GetAllEpisodes(ctx context.Context, seriesID int, lang string) ([]Episode, error) {
 	if eps, ok := getEnrichedFromMemory(seriesID, lang); ok {
 		return eps, nil
 	}
@@ -682,7 +725,7 @@ func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
 		return eps, nil
 	}
 
-	episodes, err := fetchRawEpisodes(seriesID, lang)
+	episodes, err := fetchRawEpisodes(ctx, seriesID, lang)
 	if err != nil {
 		return nil, err
 	}
@@ -694,7 +737,7 @@ func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
 }
 
 // IdentifyEpisode attempts to find a specific episode in a TVDB series based on metadata.
-func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
+func IdentifyEpisode(ctx context.Context, result mdb.SearchResult, meta *metadata.Metadata, allowSpecials bool) (mdb.EpisodeResult, error) {
 	preferred := config.GetPreferredLanguage()
 	langs := []string{preferred, result.OriginalLanguage, "en"}
 	uniqueLangs := metadata.RemoveDuplicates(langs)
@@ -705,25 +748,25 @@ func IdentifyEpisode(result mdb.SearchResult, meta *metadata.Metadata, allowSpec
 	}
 
 	for _, lang := range uniqueLangs {
-		episodes, err := GetAllEpisodes(result.TvdbID, lang)
+		episodes, err := GetAllEpisodes(ctx, result.TvdbID, lang)
 		if err != nil {
 			continue
 		}
 
 		ui.PrintDebug(fmt.Sprintf("found %d episodes combined", len(episodes)))
 
-		ep := findEpisodeInList(episodes, meta, normalizedQueryTitle, allowSpecials, uniqueLangs)
+		ep := findEpisodeInList(ctx, episodes, meta, normalizedQueryTitle, allowSpecials, uniqueLangs)
 		if ep != nil {
 			saveEnrichedEpisodes(result.TvdbID, lang, episodes)
 
-			return finalizeEpisodeResult(ep, episodes, uniqueLangs), nil
+			return finalizeEpisodeResult(ctx, ep, episodes, uniqueLangs), nil
 		}
 	}
 
 	return mdb.EpisodeResult{}, errNotFound
 }
 
-func finalizeEpisodeResult(ep *Episode, episodes []Episode, uniqueLangs []string) mdb.EpisodeResult {
+func finalizeEpisodeResult(ctx context.Context, ep *Episode, episodes []Episode, uniqueLangs []string) mdb.EpisodeResult {
 	res := ep.ToEpisodeResult()
 	hasFinale := false
 	totalEps := 0
@@ -749,10 +792,10 @@ func finalizeEpisodeResult(ep *Episode, episodes []Episode, uniqueLangs []string
 			break
 		}
 
-		fillEpisodeTranslation(&res, ep.ID, l)
+		fillEpisodeTranslation(ctx, &res, ep.ID, l)
 	}
 
-	fillEpisodeImdbID(&res, ep.ID)
+	fillEpisodeImdbID(ctx, &res, ep.ID)
 
 	return res
 }
@@ -777,7 +820,7 @@ func matchByNumberOrDate(episodes []Episode, meta *metadata.Metadata, allowSpeci
 	return nil
 }
 
-func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool, langs []string) *Episode {
+func findEpisodeInList(ctx context.Context, episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool, langs []string) *Episode {
 	if ep := matchByNumberOrDate(episodes, meta, allowSpecials); ep != nil {
 		return ep
 	}
@@ -790,16 +833,16 @@ func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQu
 	// If a season is specified, try matching within that season first to avoid
 	// collisions with similarly named episodes in other seasons.
 	if meta.Season > 0 {
-		if ep := matchByTitleLazy(episodes, normalizedQueryTitle, allowSpecials, langs, meta.Season); ep != nil {
+		if ep := matchByTitleLazy(ctx, episodes, normalizedQueryTitle, allowSpecials, langs, meta.Season); ep != nil {
 			return ep
 		}
 	}
 
 	// Fall back to searching all episodes across all seasons.
-	return matchByTitleLazy(episodes, normalizedQueryTitle, allowSpecials, langs, 0)
+	return matchByTitleLazy(ctx, episodes, normalizedQueryTitle, allowSpecials, langs, 0)
 }
 
-func matchByTitleLazy(episodes []Episode, normTitle string, allowSpecials bool, langs []string, seasonFilter int) *Episode {
+func matchByTitleLazy(ctx context.Context, episodes []Episode, normTitle string, allowSpecials bool, langs []string, seasonFilter int) *Episode {
 	// Pass 1: Try matching against existing names in the episode list first
 	if ep := matchByTitle(episodes, normTitle, allowSpecials, seasonFilter); ep != nil {
 		return ep
@@ -813,7 +856,7 @@ func matchByTitleLazy(episodes []Episode, normTitle string, allowSpecials bool, 
 	}
 
 	// Pass 3: If still not found, fetch missing translations concurrently with bounded concurrency
-	enrichMissingTitlesConcurrent(episodes, langs, normTitle, seasonFilter)
+	enrichMissingTitlesConcurrent(ctx, episodes, langs, normTitle, seasonFilter)
 
 	if ep := matchByTitle(episodes, normTitle, allowSpecials, seasonFilter); ep != nil {
 		return ep
@@ -879,7 +922,7 @@ func getMissingIndices(episodes []Episode, seasonFilter int) []int {
 	return missingIndices
 }
 
-func enrichMissingTitlesConcurrent(episodes []Episode, langs []string, normTitle string, seasonFilter int) {
+func enrichMissingTitlesConcurrent(ctx context.Context, episodes []Episode, langs []string, normTitle string, seasonFilter int) {
 	missingIndices := getMissingIndices(episodes, seasonFilter)
 	if len(missingIndices) == 0 {
 		return
@@ -902,11 +945,11 @@ func enrichMissingTitlesConcurrent(episodes []Episode, langs []string, normTitle
 	for range numWorkers {
 		wg.Go(func() {
 			for idx := range jobs {
-				if found.Load() {
+				if found.Load() || ctx.Err() != nil {
 					return
 				}
 
-				if fetchAndSetTranslation(idx, episodes, langs, normTitle) {
+				if fetchAndSetTranslation(ctx, idx, episodes, langs, normTitle) {
 					found.Store(true)
 
 					return
@@ -918,11 +961,11 @@ func enrichMissingTitlesConcurrent(episodes []Episode, langs []string, normTitle
 	wg.Wait()
 }
 
-func fetchAndSetTranslation(idx int, episodes []Episode, langs []string, normTitle string) bool {
+func fetchAndSetTranslation(ctx context.Context, idx int, episodes []Episode, langs []string, normTitle string) bool {
 	var res mdb.EpisodeResult
 
 	for _, l := range langs {
-		fillEpisodeTranslation(&res, episodes[idx].ID, l)
+		fillEpisodeTranslation(ctx, &res, episodes[idx].ID, l)
 
 		if res.Name != "" {
 			episodes[idx].Name = res.Name
@@ -1010,14 +1053,14 @@ func matchByTitleFuzzy(episodes []Episode, normTitle string, seasonFilter int) *
 	return nil
 }
 
-func fillEpisodeTranslation(res *mdb.EpisodeResult, tvdbID int, lang string) {
+func fillEpisodeTranslation(ctx context.Context, res *mdb.EpisodeResult, tvdbID int, lang string) {
 	if lang == "" {
 		ui.PrintDebug("no language specified, skipping translation")
 
 		return
 	}
 
-	translation, err := getTranslation(tvdbID, "episodes", lang)
+	translation, err := getTranslation(ctx, tvdbID, "episodes", lang)
 	if err != nil {
 		ui.PrintDebug(fmt.Sprintf("failed to get translation (episode %d, %s): %v", tvdbID, lang, err))
 	}
@@ -1055,13 +1098,13 @@ type tvdbEpisodeExtendedResponse struct {
 	} `json:"data"`
 }
 
-func fillEpisodeImdbID(res *mdb.EpisodeResult, tvdbID int) {
+func fillEpisodeImdbID(ctx context.Context, res *mdb.EpisodeResult, tvdbID int) {
 	if res.ImdbID != "" {
 		return
 	}
 
 	var data tvdbEpisodeExtendedResponse
-	if err := get(fmt.Sprintf("episodes/%d/extended", tvdbID), &data); err != nil {
+	if err := get(ctx, fmt.Sprintf("episodes/%d/extended", tvdbID), &data); err != nil {
 		ui.PrintDebug(fmt.Sprintf("failed to fetch extended episode for remote ids: %v", err))
 
 		return
