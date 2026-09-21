@@ -687,7 +687,7 @@ func GetAllEpisodes(seriesID int, lang string) ([]Episode, error) {
 		return nil, err
 	}
 
-	enrichFromCacheOnly(episodes, []string{lang})
+	enrichFromCacheOnly(episodes, []string{lang}, 0)
 	saveEnrichedEpisodes(seriesID, lang, episodes)
 
 	return episodes, nil
@@ -757,21 +757,29 @@ func finalizeEpisodeResult(ep *Episode, episodes []Episode, uniqueLangs []string
 	return res
 }
 
-func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool, langs []string) *Episode {
-	// 1. Season/Episode Number Match
-	// Note: S00E00 is a standard scene convention for an unknown season/episode placeholder.
-	isPlaceholder := meta.Season == 0 && len(meta.Episodes) == 1 && meta.Episodes[0] == 0
-	if meta.Season >= 0 && len(meta.Episodes) > 0 && !isPlaceholder {
+func isPlaceholderSeasonEpisode(meta *metadata.Metadata) bool {
+	return meta.Season == 0 && len(meta.Episodes) == 1 && meta.Episodes[0] == 0
+}
+
+func matchByNumberOrDate(episodes []Episode, meta *metadata.Metadata, allowSpecials bool) *Episode {
+	if meta.Season >= 0 && len(meta.Episodes) > 0 && !isPlaceholderSeasonEpisode(meta) {
 		if ep := matchBySeasonEpisode(episodes, meta.Season, meta.Episodes[0]); ep != nil {
 			return ep
 		}
 	}
 
-	// 2. Air Date Match
 	if meta.Date != "" {
 		if ep := matchByAirDate(episodes, meta.Date, allowSpecials); ep != nil {
 			return ep
 		}
+	}
+
+	return nil
+}
+
+func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQueryTitle string, allowSpecials bool, langs []string) *Episode {
+	if ep := matchByNumberOrDate(episodes, meta, allowSpecials); ep != nil {
+		return ep
 	}
 
 	if normalizedQueryTitle == "" {
@@ -779,34 +787,40 @@ func findEpisodeInList(episodes []Episode, meta *metadata.Metadata, normalizedQu
 	}
 
 	// 3. Lazy Title Matching
-	return matchByTitleLazy(episodes, normalizedQueryTitle, allowSpecials, langs)
+	// If a season is specified, try matching within that season first to avoid
+	// collisions with similarly named episodes in other seasons.
+	if meta.Season > 0 {
+		if ep := matchByTitleLazy(episodes, normalizedQueryTitle, allowSpecials, langs, meta.Season); ep != nil {
+			return ep
+		}
+	}
+
+	// Fall back to searching all episodes across all seasons.
+	return matchByTitleLazy(episodes, normalizedQueryTitle, allowSpecials, langs, 0)
 }
 
-func matchByTitleLazy(episodes []Episode, normTitle string, allowSpecials bool, langs []string) *Episode {
+func matchByTitleLazy(episodes []Episode, normTitle string, allowSpecials bool, langs []string, seasonFilter int) *Episode {
 	// Pass 1: Try matching against existing names in the episode list first
-	if ep := matchEpisodeByTitle(episodes, normTitle, allowSpecials); ep != nil {
+	if ep := matchByTitle(episodes, normTitle, allowSpecials, seasonFilter); ep != nil {
 		return ep
 	}
 
 	// Pass 2: Check local cache ONLY for missing episode names (zero network calls)
-	enrichFromCacheOnly(episodes, langs)
+	enrichFromCacheOnly(episodes, langs, seasonFilter)
 
-	if ep := matchEpisodeByTitle(episodes, normTitle, allowSpecials); ep != nil {
+	if ep := matchByTitle(episodes, normTitle, allowSpecials, seasonFilter); ep != nil {
 		return ep
 	}
 
 	// Pass 3: If still not found, fetch missing translations concurrently with bounded concurrency
-	enrichMissingTitlesConcurrent(episodes, langs, normTitle)
+	enrichMissingTitlesConcurrent(episodes, langs, normTitle, seasonFilter)
 
-	return matchEpisodeByTitle(episodes, normTitle, allowSpecials)
-}
-
-func matchEpisodeByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Episode {
-	if ep := matchByTitle(episodes, normTitle, allowSpecials); ep != nil {
+	if ep := matchByTitle(episodes, normTitle, allowSpecials, seasonFilter); ep != nil {
 		return ep
 	}
 
-	return matchByTitleFuzzy(episodes, normTitle)
+	// Pass 4: Fuzzy Match (Fallback)
+	return matchByTitleFuzzy(episodes, normTitle, seasonFilter)
 }
 
 func isTitleMatch(epName, normTitle string) bool {
@@ -827,8 +841,12 @@ func isTitleMatch(epName, normTitle string) bool {
 	return false
 }
 
-func enrichFromCacheOnly(episodes []Episode, langs []string) {
+func enrichFromCacheOnly(episodes []Episode, langs []string, seasonFilter int) {
 	for i := range episodes {
+		if seasonFilter > 0 && episodes[i].SeasonNumber != seasonFilter {
+			continue
+		}
+
 		if episodes[i].Name != "" {
 			continue
 		}
@@ -845,15 +863,24 @@ func enrichFromCacheOnly(episodes []Episode, langs []string) {
 
 const maxConcurrentTranslationRequests = 15
 
-func enrichMissingTitlesConcurrent(episodes []Episode, langs []string, normTitle string) {
+func getMissingIndices(episodes []Episode, seasonFilter int) []int {
 	var missingIndices []int
 
 	for i := range episodes {
+		if seasonFilter > 0 && episodes[i].SeasonNumber != seasonFilter {
+			continue
+		}
+
 		if episodes[i].Name == "" {
 			missingIndices = append(missingIndices, i)
 		}
 	}
 
+	return missingIndices
+}
+
+func enrichMissingTitlesConcurrent(episodes []Episode, langs []string, normTitle string, seasonFilter int) {
+	missingIndices := getMissingIndices(episodes, seasonFilter)
 	if len(missingIndices) == 0 {
 		return
 	}
@@ -931,8 +958,12 @@ func matchByAirDate(episodes []Episode, date string, allowSpecials bool) *Episod
 	return nil
 }
 
-func matchByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Episode {
+func matchByTitle(episodes []Episode, normTitle string, allowSpecials bool, seasonFilter int) *Episode {
 	for _, ep := range episodes {
+		if seasonFilter > 0 && ep.SeasonNumber != seasonFilter {
+			continue
+		}
+
 		if ep.Name == "" {
 			continue
 		}
@@ -949,13 +980,17 @@ func matchByTitle(episodes []Episode, normTitle string, allowSpecials bool) *Epi
 	return nil
 }
 
-func matchByTitleFuzzy(episodes []Episode, normTitle string) *Episode {
+func matchByTitleFuzzy(episodes []Episode, normTitle string, seasonFilter int) *Episode {
 	var bestMatch Episode
 
 	maxSim := 0.0
 	found := false
 
 	for _, ep := range episodes {
+		if seasonFilter > 0 && ep.SeasonNumber != seasonFilter {
+			continue
+		}
+
 		epName := filename.ApplyTitleReplacements(ep.Name)
 
 		sim := mdb.CalculateSimilarity(normTitle, metadata.Normalize(epName))

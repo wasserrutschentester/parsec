@@ -220,3 +220,99 @@ func TestIdentifyEpisodeS00E00Placeholder(t *testing.T) {
 		t.Errorf("Expected TvdbID 200, got %d", result.TvdbID)
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestIdentifyEpisodeSeasonAndTitle(t *testing.T) {
+	config.InitDefaults()
+
+	config.NoCache = true
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [
+				{"id": 101, "number": 1, "seasonNumber": 1, "aired": "2021-01-01", "name": "Special Episode"},
+				{"id": 202, "number": 1, "seasonNumber": 2, "aired": "2022-01-01", "name": "Special Episode"}
+			]}, "links": {"next": ""}}`))
+		case "/episodes/202/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Special Episode", "overview": "Season 2 overview"}}`))
+		case "/episodes/101/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Special Episode", "overview": "Season 1 overview"}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	// Should prioritize Season 2 episode over Season 1 episode with the same title
+	meta := &metadata.Metadata{
+		Season:        2,
+		EpisodeTitles: []string{"Special Episode"},
+		IsTV:          true,
+	}
+
+	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	if err != nil {
+		t.Fatalf("IdentifyEpisode failed: %v", err)
+	}
+
+	if result.TvdbID != 202 {
+		t.Errorf("Expected TvdbID 202 (Season 2), got %d", result.TvdbID)
+	}
+}
+
+//nolint:paralleltest // depends on shared global state (viper, config.NoCache, BaseURL)
+func TestIdentifyEpisodeSeasonAndTitleFallback(t *testing.T) {
+	config.InitDefaults()
+
+	config.NoCache = true
+
+	viper.Set("api_keys.tvdb", "dummy_key")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"token": "dummy_token"}}`))
+		case "/series/999/episodes/default/en":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"episodes": [
+				{"id": 101, "number": 1, "seasonNumber": 1, "aired": "2021-01-01", "name": "Only In Season 1"},
+				{"id": 202, "number": 1, "seasonNumber": 2, "aired": "2022-01-01", "name": "Season 2 Episode"}
+			]}, "links": {"next": ""}}`))
+		case "/episodes/101/translations/eng":
+			_, _ = w.Write([]byte(`{"status": "success", "data": {"name": "Only In Season 1", "overview": "Overview"}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	originalBaseURL := BaseURL
+
+	BaseURL = server.URL
+	defer func() { BaseURL = originalBaseURL }()
+
+	// Search specifying Season 2, but title exists only in Season 1 -> should fall back to Season 1
+	meta := &metadata.Metadata{
+		Season:        2,
+		EpisodeTitles: []string{"Only In Season 1"},
+		IsTV:          true,
+	}
+
+	result, err := IdentifyEpisode(mdb.SearchResult{TvdbID: 999, OriginalLanguage: "en"}, meta, false)
+	if err != nil {
+		t.Fatalf("IdentifyEpisode failed: %v", err)
+	}
+
+	if result.TvdbID != 101 {
+		t.Errorf("Expected TvdbID 101 (Season 1 fallback), got %d", result.TvdbID)
+	}
+}
