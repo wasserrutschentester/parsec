@@ -71,6 +71,16 @@
         {{- range .RawSearchResult.Countries }}
     <country>{{ . }}</country>
         {{- end }}
+        {{- if .RawSearchResult.Rating }}
+    <rating>{{ .RawSearchResult.Rating }}</rating>
+        {{- end }}
+        {{- if .RawSearchResult.Votes }}
+    <votes>{{ .RawSearchResult.Votes }}</votes>
+        {{- end }}
+        {{- if .RawSearchResult.Certificate }}
+    <mpaa>{{ .RawSearchResult.Certificate }}</mpaa>
+    <certification>{{ .RawSearchResult.Certificate }}</certification>
+        {{- end }}
     {{- end }}
 {{- end }}
 

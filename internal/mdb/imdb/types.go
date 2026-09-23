@@ -33,6 +33,9 @@ type TitleDetails struct {
 	Type             mdb.TitleType   `json:"type"`
 	RuntimeMinutes   int             `json:"runtimeMinutes"`
 	Overview         string          `json:"overview"`
+	Rating           float64         `json:"rating"`
+	Votes            int             `json:"votes"`
+	Certificate      string          `json:"certificate"`
 	Genres           []string        `json:"genres"`
 	Countries        []string        `json:"countries"`
 	AltTitles        []string        `json:"altTitles"`

@@ -2,8 +2,12 @@ package nfo
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"text/template"
+
+	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/metadata"
 )
 
 func renderTestHelper(t *testing.T, tmplStr string, data any) string {
@@ -197,5 +201,45 @@ func TestFuncMediaFormatting(t *testing.T) {
 	resBit3 := renderTestHelper(t, `{{ "5000 kb/s" | formatBitrate "mbps" }}`, nil)
 	if resBit3 != "5.00 Mbps" {
 		t.Errorf("Expected 5.00 Mbps, got %q", resBit3)
+	}
+}
+
+func TestKodiTemplateRatingsAndCertificate(t *testing.T) {
+	t.Parallel()
+
+	tmpl, err := LoadTemplate("kodi")
+	if err != nil {
+		t.Fatalf("LoadTemplate('kodi') failed: %v", err)
+	}
+
+	ctx := &Context{
+		FileContext: FileContext{
+			Metadata: metadata.Metadata{
+				Title: "Test Movie",
+				Year:  2024,
+			},
+		},
+		RawSearchResult: &mdb.SearchResult{
+			Rating:      8.7,
+			Votes:       123456,
+			Certificate: "PG-13",
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, ctx); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	out := buf.String()
+	for _, expected := range []string{
+		"<rating>8.7</rating>",
+		"<votes>123456</votes>",
+		"<mpaa>PG-13</mpaa>",
+		"<certification>PG-13</certification>",
+	} {
+		if !strings.Contains(out, expected) {
+			t.Errorf("output missing %q, got:\n%s", expected, out)
+		}
 	}
 }

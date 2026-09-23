@@ -22,6 +22,8 @@ const (
     titleType { id isSeries }
     runtime { seconds }
     plot { plotText { plainText } }
+    ratingsSummary { aggregateRating voteCount }
+    certificate { rating }
     titleGenres { genres { genre { text } } }
     countriesOfOrigin { countries { id text } }
     spokenLanguages { spokenLanguages { id text } }
@@ -98,6 +100,13 @@ type titleData struct {
 			PlainText string `json:"plainText"`
 		} `json:"plotText"`
 	} `json:"plot"`
+	RatingsSummary struct {
+		AggregateRating float64 `json:"aggregateRating"`
+		VoteCount       int     `json:"voteCount"`
+	} `json:"ratingsSummary"`
+	Certificate struct {
+		Rating string `json:"rating"`
+	} `json:"certificate"`
 	TitleGenres struct {
 		Genres []struct {
 			Genre struct {
@@ -357,6 +366,9 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 		Type:             mdb.TitleType(t.TitleType.ID),
 		RuntimeMinutes:   t.Runtime.Seconds / 60,
 		Overview:         t.Plot.PlotText.PlainText,
+		Rating:           t.RatingsSummary.AggregateRating,
+		Votes:            t.RatingsSummary.VoteCount,
+		Certificate:      t.Certificate.Rating,
 		Genres:           t.extractGenres(),
 		Countries:        t.extractCountries(),
 		AltTitles:        t.extractAltTitles(),
@@ -572,6 +584,9 @@ func (t *TitleDetails) ToSearchResult() mdb.SearchResult {
 		Runtime:          t.RuntimeMinutes,
 		IsTV:             t.IsTV,
 		TitleType:        t.Type,
+		Rating:           t.Rating,
+		Votes:            t.Votes,
+		Certificate:      t.Certificate,
 		Overview:         t.Overview,
 		Genres:           t.Genres,
 		Countries:        t.Countries,

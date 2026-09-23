@@ -39,6 +39,9 @@ type SearchResult struct {
 	TitleType        TitleType
 	Popularity       float64
 	Similarity       float64
+	Rating           float64
+	Votes            int
+	Certificate      string
 	Overview         string
 	Genres           []string
 	Studios          []string

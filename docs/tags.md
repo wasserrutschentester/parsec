@@ -201,6 +201,10 @@ Contains the metadata of the matched Movie or TV Show. Key fields include:
 - `.Media.TvdbType` (string)
 - `.Media.TvdbSlug` (string)
 - `.Media.IsTV` (bool)
+- `.Media.TitleType` (string)
+- `.Media.Rating` (float64)
+- `.Media.Votes` (int)
+- `.Media.Certificate` (string)
 
 ### `.Episode` (Present only for TV Episodes)
 If the file being tagged is an episode, `.Episode` contains its data. Otherwise, `.Episode` is `nil`.

@@ -108,6 +108,8 @@ func parasiteResponse() any {
 				"releaseYear":       map[string]any{"year": 2019, "endYear": nil},
 				"titleType":         map[string]any{"id": "movie", "isSeries": false},
 				"runtime":           map[string]any{"seconds": 7920},
+				"ratingsSummary":    map[string]any{"aggregateRating": 8.5, "voteCount": 950000},
+				"certificate":       map[string]any{"rating": "R"},
 				"plot":              map[string]any{"plotText": map[string]any{"plainText": "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan."}},
 				"titleGenres": map[string]any{
 					"genres": []any{
@@ -165,6 +167,10 @@ func TestGetByIDAndTitleDetails(t *testing.T) {
 	if len(details.AltTitles) != 1 || details.AltTitles[0] != "Parasite: Black & White Edition" {
 		t.Errorf("AltTitles = %v, want ['Parasite: Black & White Edition']", details.AltTitles)
 	}
+
+	if details.Rating != 8.5 || details.Votes != 950000 || details.Certificate != "R" {
+		t.Errorf("details rating=%v, votes=%v, certificate=%q, want 8.5, 950000, 'R'", details.Rating, details.Votes, details.Certificate)
+	}
 }
 
 func checkParasiteBasicFields(t *testing.T, res *mdb.SearchResult) {
@@ -192,6 +198,10 @@ func checkParasiteBasicFields(t *testing.T, res *mdb.SearchResult) {
 
 	if res.Runtime != 132 {
 		t.Errorf("Runtime = %d, want 132", res.Runtime)
+	}
+
+	if res.Rating != 8.5 || res.Votes != 950000 || res.Certificate != "R" {
+		t.Errorf("res rating=%v, votes=%v, certificate=%q, want 8.5, 950000, 'R'", res.Rating, res.Votes, res.Certificate)
 	}
 }
 

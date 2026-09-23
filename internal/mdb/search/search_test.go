@@ -319,3 +319,30 @@ func TestTitleTypePriorityAndRefinement(t *testing.T) {
 		}
 	})
 }
+
+func TestMergeRatingsAndCertificates(t *testing.T) {
+	t.Parallel()
+
+	baseRes := mdb.SearchResult{
+		TmdbID:      1,
+		Title:       "Movie",
+		Certificate: "",
+	}
+
+	imdbRes := mdb.SearchResult{
+		ImdbID:      "tt9999999",
+		Rating:      8.4,
+		Votes:       250000,
+		Certificate: "PG-13",
+	}
+
+	mergeImdbData(&baseRes, &imdbRes)
+
+	if baseRes.Rating != 8.4 || baseRes.Votes != 250000 {
+		t.Errorf("expected IMDb rating/votes, got %v (%d votes)", baseRes.Rating, baseRes.Votes)
+	}
+
+	if baseRes.Certificate != "PG-13" {
+		t.Errorf("expected Certificate 'PG-13', got %q", baseRes.Certificate)
+	}
+}

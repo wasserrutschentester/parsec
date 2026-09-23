@@ -761,6 +761,8 @@ func searchByImdbID(imdbID string, isTV bool, mediaType string) (*mdb.SearchResu
 // mergeImdbData folds IMDB result fields into the primary result.
 // IMDB is authoritative for OriginalLanguage (derived from spoken languages) and provides
 // overview/alt title fallbacks when TMDB/TVDB lack translations.
+//
+//nolint:cyclop // merging requires many checks for missing properties
 func mergeImdbData(res, imdbRes *mdb.SearchResult) {
 	if res.ImdbID == "" {
 		res.ImdbID = imdbRes.ImdbID
@@ -769,6 +771,15 @@ func mergeImdbData(res, imdbRes *mdb.SearchResult) {
 	// IMDb is authoritative for TitleType; overwrite existing or contradicting types.
 	if imdbRes.TitleType != "" {
 		res.TitleType = imdbRes.TitleType
+	}
+
+	if imdbRes.Rating > 0 {
+		res.Rating = imdbRes.Rating
+		res.Votes = imdbRes.Votes
+	}
+
+	if imdbRes.Certificate != "" {
+		res.Certificate = imdbRes.Certificate
 	}
 
 	// IMDB's OriginalLanguage comes from spoken language data (e.g. "zxx" for silent films),
