@@ -21,6 +21,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
+	"codeberg.org/upPollo/parsec/internal/mdb/imdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
 	"codeberg.org/upPollo/parsec/internal/ui"
@@ -856,6 +857,7 @@ func finalizeEpisodeResult(ctx context.Context, ep *Episode, episodes []Episode,
 	}
 
 	fillEpisodeImdbID(ctx, &res, ep.ID)
+	backfillEpisodeFromIMDb(ctx, &res)
 
 	return res
 }
@@ -1177,5 +1179,50 @@ func fillEpisodeImdbID(ctx context.Context, res *mdb.EpisodeResult, tvdbID int) 
 
 			break
 		}
+	}
+}
+
+// backfillEpisodeFromIMDb fills missing Name, Overview, and Runtime on a TVDB episode result
+// using the episode's own IMDb ID. It validates that the ID belongs to an individual episode or
+// special (not the parent series) before applying any data.
+//
+//nolint:cyclop // bunch of if statements are needed to compare all the values
+func backfillEpisodeFromIMDb(ctx context.Context, res *mdb.EpisodeResult) {
+	if res.ImdbID == "" {
+		return
+	}
+
+	if res.Name != "" && res.Overview != "" && res.Runtime > 0 {
+		return // nothing to fill
+	}
+
+	details, err := imdb.GetTitleDetails(ctx, res.ImdbID)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("imdb episode backfill: failed to fetch %s: %v", res.ImdbID, err))
+
+		return
+	}
+
+	// Reject if the ID resolves to a series or any non-episode type; TVDB sometimes
+	// attaches a parent series tt* to episodes that lack their own IMDb entry.
+	switch details.Type {
+	case mdb.TitleTypeTVEpisode, mdb.TitleTypeTVPilot, mdb.TitleTypeTVSpecial:
+		// valid episode-level entry — proceed
+	default:
+		ui.PrintDebug(fmt.Sprintf("imdb episode backfill: %s is type %q, not an episode — skipping", res.ImdbID, details.Type))
+
+		return
+	}
+
+	if res.Name == "" && details.Title != "" {
+		res.Name = details.Title
+	}
+
+	if res.Overview == "" && details.Overview != "" {
+		res.Overview = details.Overview
+	}
+
+	if res.Runtime == 0 && details.RuntimeMinutes > 0 {
+		res.Runtime = details.RuntimeMinutes
 	}
 }
