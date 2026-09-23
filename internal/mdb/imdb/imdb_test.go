@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -98,6 +99,37 @@ func TestFormatIMDbID(t *testing.T) {
 	}
 }
 
+func parasitePrincipalCredits() []any {
+	return []any{
+		map[string]any{
+			"category": map[string]any{"id": "director", "text": "Director"},
+			"credits": []any{
+				map[string]any{"name": map[string]any{"id": "nm0094435", "nameText": map[string]any{"text": "Bong Joon Ho"}}},
+			},
+		},
+		map[string]any{
+			"category": map[string]any{"id": "writer", "text": "Writers"},
+			"credits": []any{
+				map[string]any{"name": map[string]any{"id": "nm0094435", "nameText": map[string]any{"text": "Bong Joon Ho"}}},
+				map[string]any{"name": map[string]any{"id": "nm8243301", "nameText": map[string]any{"text": "Han Jin-won"}}},
+			},
+		},
+		map[string]any{
+			"category": map[string]any{"id": "cast", "text": "Stars"},
+			"credits": []any{
+				map[string]any{
+					"characters": []any{map[string]any{"name": "Ki Taek"}},
+					"name":       map[string]any{"id": "nm0814280", "nameText": map[string]any{"text": "Song Kang-ho"}},
+				},
+				map[string]any{
+					"characters": []any{map[string]any{"name": "Dong Ik"}},
+					"name":       map[string]any{"id": "nm1310525", "nameText": map[string]any{"text": "Lee Sun-kyun"}},
+				},
+			},
+		},
+	}
+}
+
 func parasiteResponse() any {
 	return map[string]any{
 		"data": map[string]any{
@@ -110,6 +142,7 @@ func parasiteResponse() any {
 				"runtime":           map[string]any{"seconds": 7920},
 				"ratingsSummary":    map[string]any{"aggregateRating": 8.5, "voteCount": 950000},
 				"certificate":       map[string]any{"rating": "R"},
+				"principalCredits":  parasitePrincipalCredits(),
 				"plot":              map[string]any{"plotText": map[string]any{"plainText": "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan."}},
 				"titleGenres": map[string]any{
 					"genres": []any{
@@ -168,8 +201,35 @@ func TestGetByIDAndTitleDetails(t *testing.T) {
 		t.Errorf("AltTitles = %v, want ['Parasite: Black & White Edition']", details.AltTitles)
 	}
 
-	if details.Rating != 8.5 || details.Votes != 950000 || details.Certificate != "R" {
-		t.Errorf("details rating=%v, votes=%v, certificate=%q, want 8.5, 950000, 'R'", details.Rating, details.Votes, details.Certificate)
+	checkParasiteRatings(t, details.Rating, details.Votes, details.Certificate)
+	checkParasiteCredits(t, details.Directors, details.Writers, details.Cast)
+}
+
+func checkParasiteRatings(t *testing.T, rating float64, votes int, cert string) {
+	t.Helper()
+
+	if rating != 8.5 || votes != 950000 || cert != "R" {
+		t.Errorf("rating=%v, votes=%v, certificate=%q, want 8.5, 950000, 'R'", rating, votes, cert)
+	}
+}
+
+func checkParasiteCredits(t *testing.T, directors, writers []string, cast []mdb.CastMember) {
+	t.Helper()
+
+	if !slices.Equal(directors, []string{"Bong Joon Ho"}) {
+		t.Errorf("directors = %v, want ['Bong Joon Ho']", directors)
+	}
+
+	if !slices.Equal(writers, []string{"Bong Joon Ho", "Han Jin-won"}) {
+		t.Errorf("writers = %v, want ['Bong Joon Ho', 'Han Jin-won']", writers)
+	}
+
+	wantCast := []mdb.CastMember{
+		{Name: "Song Kang-ho", Role: "Ki Taek"},
+		{Name: "Lee Sun-kyun", Role: "Dong Ik"},
+	}
+	if !slices.Equal(cast, wantCast) {
+		t.Errorf("cast = %+v, want %+v", cast, wantCast)
 	}
 }
 
@@ -200,9 +260,7 @@ func checkParasiteBasicFields(t *testing.T, res *mdb.SearchResult) {
 		t.Errorf("Runtime = %d, want 132", res.Runtime)
 	}
 
-	if res.Rating != 8.5 || res.Votes != 950000 || res.Certificate != "R" {
-		t.Errorf("res rating=%v, votes=%v, certificate=%q, want 8.5, 950000, 'R'", res.Rating, res.Votes, res.Certificate)
-	}
+	checkParasiteRatings(t, res.Rating, res.Votes, res.Certificate)
 }
 
 func checkParasiteMetaFields(t *testing.T, res *mdb.SearchResult) {
@@ -219,6 +277,8 @@ func checkParasiteMetaFields(t *testing.T, res *mdb.SearchResult) {
 	if len(res.Genres) != 2 || res.Genres[0] != "Drama" {
 		t.Errorf("Genres = %v, want ['Drama', 'Thriller']", res.Genres)
 	}
+
+	checkParasiteCredits(t, res.Directors, res.Writers, res.Cast)
 }
 
 func checkParasiteSearchResult(t *testing.T, res *mdb.SearchResult) {

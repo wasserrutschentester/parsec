@@ -24,6 +24,20 @@ const (
     plot { plotText { plainText } }
     ratingsSummary { aggregateRating voteCount }
     certificate { rating }
+    principalCredits {
+      category { id text }
+      credits {
+        ... on Cast {
+          characters {
+            name
+          }
+        }
+        name {
+          id
+          nameText { text }
+        }
+      }
+    }
     titleGenres { genres { genre { text } } }
     countriesOfOrigin { countries { id text } }
     spokenLanguages { spokenLanguages { id text } }
@@ -107,6 +121,23 @@ type titleData struct {
 	Certificate struct {
 		Rating string `json:"rating"`
 	} `json:"certificate"`
+	PrincipalCredits []struct {
+		Category struct {
+			ID   string `json:"id"`
+			Text string `json:"text"`
+		} `json:"category"`
+		Credits []struct {
+			Characters []struct {
+				Name string `json:"name"`
+			} `json:"characters"`
+			Name struct {
+				ID       string `json:"id"`
+				NameText struct {
+					Text string `json:"text"`
+				} `json:"nameText"`
+			} `json:"name"`
+		} `json:"credits"`
+	} `json:"principalCredits"`
 	TitleGenres struct {
 		Genres []struct {
 			Genre struct {
@@ -185,6 +216,49 @@ func (t *titleData) computeStatus() string {
 	}
 
 	return ""
+}
+
+func appendCastMember(cast []mdb.CastMember, name string, chars []struct {
+	Name string `json:"name"`
+},
+) []mdb.CastMember {
+	if slices.ContainsFunc(cast, func(cm mdb.CastMember) bool { return cm.Name == name }) {
+		return cast
+	}
+
+	role := ""
+	if len(chars) > 0 {
+		role = strings.TrimSpace(chars[0].Name)
+	}
+
+	return append(cast, mdb.CastMember{Name: name, Role: role})
+}
+
+func (t *titleData) extractCredits() (directors, writers []string, cast []mdb.CastMember) {
+	for _, pc := range t.PrincipalCredits {
+		cat := strings.ToLower(pc.Category.ID)
+		for _, c := range pc.Credits {
+			name := strings.TrimSpace(c.Name.NameText.Text)
+			if name == "" {
+				continue
+			}
+
+			switch cat {
+			case "director":
+				if !slices.Contains(directors, name) {
+					directors = append(directors, name)
+				}
+			case "writer", "creator":
+				if !slices.Contains(writers, name) {
+					writers = append(writers, name)
+				}
+			case "cast", "actor", "actress":
+				cast = appendCastMember(cast, name, c.Characters)
+			}
+		}
+	}
+
+	return directors, writers, cast
 }
 
 func (t *titleData) extractGenres() []string {
@@ -353,6 +427,7 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 	}
 
 	spokenLanguages, primaryLang := t.extractLanguages()
+	directors, writers, cast := t.extractCredits()
 
 	return &TitleDetails{
 		IMDbID:           t.ID,
@@ -373,6 +448,9 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 		Countries:        t.extractCountries(),
 		AltTitles:        t.extractAltTitles(),
 		Status:           t.computeStatus(),
+		Directors:        directors,
+		Writers:          writers,
+		Cast:             cast,
 		Episodes:         t.extractEpisodes(),
 	}, nil
 }
@@ -591,6 +669,9 @@ func (t *TitleDetails) ToSearchResult() mdb.SearchResult {
 		Genres:           t.Genres,
 		Countries:        t.Countries,
 		Status:           t.Status,
+		Directors:        t.Directors,
+		Writers:          t.Writers,
+		Cast:             t.Cast,
 	}
 }
 

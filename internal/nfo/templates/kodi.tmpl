@@ -81,6 +81,20 @@
     <mpaa>{{ .RawSearchResult.Certificate }}</mpaa>
     <certification>{{ .RawSearchResult.Certificate }}</certification>
         {{- end }}
+        {{- range .RawSearchResult.Directors }}
+    <director>{{ . }}</director>
+        {{- end }}
+        {{- range .RawSearchResult.Writers }}
+    <credits>{{ . }}</credits>
+        {{- end }}
+        {{- range .RawSearchResult.Cast }}
+    <actor>
+        <name>{{ .Name }}</name>
+        {{- if .Role }}
+        <role>{{ .Role }}</role>
+        {{- end }}
+    </actor>
+        {{- end }}
     {{- end }}
 {{- end }}
 
@@ -116,6 +130,7 @@
     <season>{{ $root.Season }}</season>
     <episode>{{ $ep.Number }}</episode>
     {{- template "kodi/uniqueids" $root }}
+    {{- template "kodi/descriptive" $root }}
     {{- if eq $index 0 }}
         {{- template "kodi/fileinfo" $root }}
     {{- end }}

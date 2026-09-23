@@ -803,6 +803,10 @@ func mergeImdbData(res, imdbRes *mdb.SearchResult) {
 	if len(res.Genres) == 0 && len(imdbRes.Genres) > 0 {
 		res.Genres = imdbRes.Genres
 	}
+
+	res.Directors = imdbRes.Directors
+	res.Writers = imdbRes.Writers
+	res.Cast = imdbRes.Cast
 }
 
 func addMissingTvdbInfo(result *mdb.SearchResult, mediaType string) {

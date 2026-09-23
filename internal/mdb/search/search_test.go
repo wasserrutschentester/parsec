@@ -346,3 +346,36 @@ func TestMergeRatingsAndCertificates(t *testing.T) {
 		t.Errorf("expected Certificate 'PG-13', got %q", baseRes.Certificate)
 	}
 }
+
+func TestMergePrincipalCredits(t *testing.T) {
+	t.Parallel()
+
+	baseRes := mdb.SearchResult{
+		TmdbID: 1,
+		Title:  "Movie",
+	}
+
+	imdbRes := mdb.SearchResult{
+		ImdbID:    "tt9999999",
+		Directors: []string{"Director One"},
+		Writers:   []string{"Writer One", "Writer Two"},
+		Cast: []mdb.CastMember{
+			{Name: "Actor One", Role: "Character One"},
+			{Name: "Actor Two", Role: "Character Two"},
+		},
+	}
+
+	mergeImdbData(&baseRes, &imdbRes)
+
+	if len(baseRes.Directors) != 1 || baseRes.Directors[0] != "Director One" {
+		t.Errorf("expected Directors, got %v", baseRes.Directors)
+	}
+
+	if len(baseRes.Writers) != 2 || baseRes.Writers[0] != "Writer One" {
+		t.Errorf("expected Writers, got %v", baseRes.Writers)
+	}
+
+	if len(baseRes.Cast) != 2 || baseRes.Cast[0].Name != "Actor One" || baseRes.Cast[0].Role != "Character One" {
+		t.Errorf("expected Cast, got %v", baseRes.Cast)
+	}
+}

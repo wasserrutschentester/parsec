@@ -223,6 +223,11 @@ func TestKodiTemplateRatingsAndCertificate(t *testing.T) {
 			Rating:      8.7,
 			Votes:       123456,
 			Certificate: "PG-13",
+			Directors:   []string{"Bong Joon Ho"},
+			Writers:     []string{"Han Jin-won"},
+			Cast: []mdb.CastMember{
+				{Name: "Song Kang-ho", Role: "Ki Taek"},
+			},
 		},
 	}
 
@@ -237,6 +242,9 @@ func TestKodiTemplateRatingsAndCertificate(t *testing.T) {
 		"<votes>123456</votes>",
 		"<mpaa>PG-13</mpaa>",
 		"<certification>PG-13</certification>",
+		"<director>Bong Joon Ho</director>",
+		"<credits>Han Jin-won</credits>",
+		"<actor>\n        <name>Song Kang-ho</name>\n        <role>Ki Taek</role>\n    </actor>",
 	} {
 		if !strings.Contains(out, expected) {
 			t.Errorf("output missing %q, got:\n%s", expected, out)

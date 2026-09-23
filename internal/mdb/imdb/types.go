@@ -22,25 +22,28 @@ type EpisodeDetail struct {
 
 // TitleDetails contains the title metadata collected from IMDb.
 type TitleDetails struct {
-	IMDbID           string          `json:"imdbId"`
-	Title            string          `json:"title"`
-	OriginalTitle    string          `json:"originalTitle"`
-	OriginalLanguage string          `json:"originalLanguage"`
-	SpokenLanguages  []LanguageItem  `json:"spokenLanguages"`
-	Year             int             `json:"year"`
-	EndYear          int             `json:"endYear"`
-	IsTV             bool            `json:"isTv"`
-	Type             mdb.TitleType   `json:"type"`
-	RuntimeMinutes   int             `json:"runtimeMinutes"`
-	Overview         string          `json:"overview"`
-	Rating           float64         `json:"rating"`
-	Votes            int             `json:"votes"`
-	Certificate      string          `json:"certificate"`
-	Genres           []string        `json:"genres"`
-	Countries        []string        `json:"countries"`
-	AltTitles        []string        `json:"altTitles"`
-	Status           string          `json:"status"`
-	Episodes         []EpisodeDetail `json:"episodes"`
+	IMDbID           string           `json:"imdbId"`
+	Title            string           `json:"title"`
+	OriginalTitle    string           `json:"originalTitle"`
+	OriginalLanguage string           `json:"originalLanguage"`
+	SpokenLanguages  []LanguageItem   `json:"spokenLanguages"`
+	Year             int              `json:"year"`
+	EndYear          int              `json:"endYear"`
+	IsTV             bool             `json:"isTv"`
+	Type             mdb.TitleType    `json:"type"`
+	RuntimeMinutes   int              `json:"runtimeMinutes"`
+	Overview         string           `json:"overview"`
+	Rating           float64          `json:"rating"`
+	Votes            int              `json:"votes"`
+	Certificate      string           `json:"certificate"`
+	Genres           []string         `json:"genres"`
+	Countries        []string         `json:"countries"`
+	AltTitles        []string         `json:"altTitles"`
+	Status           string           `json:"status"`
+	Directors        []string         `json:"directors"`
+	Writers          []string         `json:"writers"`
+	Cast             []mdb.CastMember `json:"cast"`
+	Episodes         []EpisodeDetail  `json:"episodes"`
 }
 
 // Internal GraphQL protocol types

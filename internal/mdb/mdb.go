@@ -49,6 +49,15 @@ type SearchResult struct {
 	Tagline          string
 	Status           string
 	Countries        []string
+	Directors        []string
+	Writers          []string
+	Cast             []CastMember
+}
+
+// CastMember represents an actor and their character/role.
+type CastMember struct {
+	Name string
+	Role string
 }
 
 // NormalizeStatus normalizes a TV/Movie status string.

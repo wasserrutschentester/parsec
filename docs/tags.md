@@ -205,6 +205,9 @@ Contains the metadata of the matched Movie or TV Show. Key fields include:
 - `.Media.Rating` (float64)
 - `.Media.Votes` (int)
 - `.Media.Certificate` (string)
+- `.Media.Directors` ([]string)
+- `.Media.Writers` ([]string)
+- `.Media.Cast` (`[]CastMember` with `.Name` and `.Role`)
 
 ### `.Episode` (Present only for TV Episodes)
 If the file being tagged is an episode, `.Episode` contains its data. Otherwise, `.Episode` is `nil`.
