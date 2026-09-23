@@ -151,6 +151,15 @@ func getResultBody(result SearchResult) string {
 		props = append(props, [2]string{"Title Type", FormatTitleType(result.TitleType)})
 	}
 
+	if result.Rating > 0 {
+		ratingStr := fmt.Sprintf("%.1f", result.Rating)
+		if result.Votes > 0 {
+			ratingStr += fmt.Sprintf(" (%s votes)", formatVotes(result.Votes))
+		}
+
+		props = append(props, [2]string{"IMDb Rating", ratingStr})
+	}
+
 	if len(result.AltTitle) > 0 {
 		props = append(props, [2]string{"Alt Titles", strings.Join(result.AltTitle, ", ")})
 	}
@@ -448,6 +457,16 @@ func evaluateSingleContext(cfg config.TagConfig, ctx TagTemplateContext) (*Matro
 	}
 
 	return tagSet, nil
+}
+
+// formatVotes formats a vote count with thousands separators (e.g. 1234567 → "1,234,567").
+func formatVotes(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+
+	return s
 }
 
 // CalculateSimilarity calculates the Levenshtein similarity between two strings (0.0 to 1.0).

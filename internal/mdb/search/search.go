@@ -528,7 +528,7 @@ func sortBySimilarity(results []mdb.SearchResult, query string, year int) []mdb.
 			results[i].Title, results[i].Year, results[i].Similarity, titleSim, origSim))
 	}
 
-	// Sort results by similarity, then popularity
+	// Sort results by similarity, then popularity (votes as primary signal, TMDB popularity as fallback)
 	slices.SortFunc(results, func(a, b mdb.SearchResult) int {
 		if math.Abs(a.Similarity-b.Similarity) > 0.001 {
 			if a.Similarity > b.Similarity {
@@ -538,11 +538,15 @@ func sortBySimilarity(results []mdb.SearchResult, query string, year int) []mdb.
 			return 1
 		}
 
-		if a.Popularity > b.Popularity {
+		// ponytail: log scale keeps vote count from drowning out Popularity on very popular titles
+		aScore := math.Log1p(float64(a.Votes)) + a.Popularity
+		bScore := math.Log1p(float64(b.Votes)) + b.Popularity
+
+		if aScore > bScore {
 			return -1
 		}
 
-		if a.Popularity < b.Popularity {
+		if aScore < bScore {
 			return 1
 		}
 

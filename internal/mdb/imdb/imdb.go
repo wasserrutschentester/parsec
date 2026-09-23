@@ -83,6 +83,7 @@ const (
           titleType { id isSeries }
           releaseYear { year }
           plot { plotText { plainText } }
+          ratingsSummary { voteCount }
         }
       }
     }
@@ -377,6 +378,9 @@ type searchTitleNode struct {
 			PlainText string `json:"plainText"`
 		} `json:"plotText"`
 	} `json:"plot"`
+	RatingsSummary struct {
+		VoteCount int `json:"voteCount"`
+	} `json:"ratingsSummary"`
 }
 
 type searchResponse struct {
@@ -482,6 +486,7 @@ func parseSearchTitle(t searchTitleNode, isTV bool) (mdb.SearchResult, bool) {
 		IsTV:          t.TitleType.IsSeries,
 		TitleType:     titleType,
 		Overview:      t.Plot.PlotText.PlainText,
+		Votes:         t.RatingsSummary.VoteCount,
 	}, true
 }
 
