@@ -22,6 +22,7 @@ const (
 	CheckMdbEpisodeTitle      = "mdb_episode_title"
 	CheckMdbEpisodeDate       = "mdb_episode_date"
 	CheckMdbRuntime           = "mdb_runtime"
+	CheckMdbTitleTypeMismatch = "mdb_title_type_mismatch"
 
 	// MediaInfo checks
 	CheckMediainfoInterlacedWeb     = "mediainfo_interlaced_web"
@@ -109,6 +110,7 @@ var AllChecks = []string{
 	CheckMdbEpisodeTitle,
 	CheckMdbEpisodeDate,
 	CheckMdbRuntime,
+	CheckMdbTitleTypeMismatch,
 	CheckMediainfoInterlacedWeb,
 	CheckMediainfoFramerate,
 	CheckMediainfoBitrate,

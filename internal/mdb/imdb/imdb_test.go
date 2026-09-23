@@ -425,6 +425,51 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+func makeSearchTitleNode(id, typeID string, isSeries bool) searchTitleNode {
+	var n searchTitleNode
+
+	n.ID = id
+	n.TitleText.Text = "Sample Title"
+	n.TitleType.ID = typeID
+	n.TitleType.IsSeries = isSeries
+
+	return n
+}
+
+func TestParseSearchTitleExclusions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		node     searchTitleNode
+		isTV     bool
+		wantOK   bool
+		wantType mdb.TitleType
+	}{
+		{"tvEpisode excluded for TV", makeSearchTitleNode("tt1", "tvEpisode", false), true, false, ""},
+		{"tvEpisode allowed for movie", makeSearchTitleNode("tt1", "tvEpisode", false), false, true, mdb.TitleTypeTVEpisode},
+		{"audiobook excluded for TV", makeSearchTitleNode("tt2", "audiobook", false), true, false, ""},
+		{"audiobook excluded for movie", makeSearchTitleNode("tt2", "audiobook", false), false, false, ""},
+		{"movie allowed for movie", makeSearchTitleNode("tt3", "movie", false), false, true, mdb.TitleTypeMovie},
+		{"tvSeries allowed for TV", makeSearchTitleNode("tt4", "tvSeries", true), true, true, mdb.TitleTypeTVSeries},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			res, ok := parseSearchTitle(tt.node, tt.isTV)
+			if ok != tt.wantOK {
+				t.Fatalf("parseSearchTitle() ok = %v, want %v", ok, tt.wantOK)
+			}
+
+			if ok && res.TitleType != tt.wantType {
+				t.Errorf("res.TitleType = %v, want %v", res.TitleType, tt.wantType)
+			}
+		})
+	}
+}
+
 //nolint:paralleltest // mutates package-level BaseURL; cannot run in parallel
 func TestRetryAfter429(t *testing.T) {
 	setupTest(t)

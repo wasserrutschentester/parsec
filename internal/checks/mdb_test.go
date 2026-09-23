@@ -249,3 +249,54 @@ func TestCheckEpisodeExistence(t *testing.T) {
 		t.Errorf("expected Actual = 'S01E[99]', got %q", r.Actual)
 	}
 }
+
+func TestCheckTitleTypeMismatch_Movie(t *testing.T) {
+	t.Parallel()
+
+	assertTitleTypeMismatch(t, false, mdb.TitleTypeUnknown, true, "", "", "")
+	assertTitleTypeMismatch(t, false, mdb.TitleTypeMovie, true, "", "", "")
+	assertTitleTypeMismatch(t, false, mdb.TitleTypeTVMovie, true, "", "", "")
+	assertTitleTypeMismatch(t, false, mdb.TitleTypeTVEpisode, false, "Title Type Mismatch", "Movie", "TV Episode")
+	assertTitleTypeMismatch(t, false, mdb.TitleTypeTVSeries, false, "Title Type Mismatch", "Movie", "TV Series")
+	assertTitleTypeMismatch(t, false, mdb.TitleTypeTVMiniSeries, false, "Title Type Mismatch", "Movie", "Mini-Series")
+}
+
+func TestCheckTitleTypeMismatch_TV(t *testing.T) {
+	t.Parallel()
+
+	assertTitleTypeMismatch(t, true, mdb.TitleTypeTVSeries, true, "", "", "")
+	assertTitleTypeMismatch(t, true, mdb.TitleTypeTVMiniSeries, true, "", "", "")
+	assertTitleTypeMismatch(t, true, mdb.TitleTypeMovie, false, "Title Type Mismatch", "TV Series", "Movie")
+	assertTitleTypeMismatch(t, true, mdb.TitleTypeTVMovie, false, "Title Type Mismatch", "TV Series", "TV Movie")
+}
+
+func assertTitleTypeMismatch(t *testing.T, isTV bool, titleType mdb.TitleType, wantPassed bool, wantWarn, wantExp, wantAct string) {
+	t.Helper()
+
+	meta := &metadata.Metadata{IsTV: isTV}
+	searchRes := &mdb.SearchResult{TitleType: titleType}
+
+	results := checkTitleTypeMismatch(meta, searchRes)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	r := results[0]
+	if r.Passed != wantPassed {
+		t.Errorf("expected Passed = %v, got %v", wantPassed, r.Passed)
+	}
+
+	if !wantPassed {
+		if r.Warning != wantWarn {
+			t.Errorf("expected Warning = %q, got %q", wantWarn, r.Warning)
+		}
+
+		if r.Expected != wantExp {
+			t.Errorf("expected Expected = %q, got %q", wantExp, r.Expected)
+		}
+
+		if r.Actual != wantAct {
+			t.Errorf("expected Actual = %q, got %q", wantAct, r.Actual)
+		}
+	}
+}

@@ -61,6 +61,10 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		results = append(results, checkTitle(meta, searchResult)...)
 	}
 
+	if config.IsCheckEnabled(config.CheckMdbTitleTypeMismatch) {
+		results = append(results, checkTitleTypeMismatch(meta, searchResult)...)
+	}
+
 	if config.IsCheckEnabled(config.CheckMdbMovieYear) {
 		results = append(results, checkMovieYear(meta, searchResult)...)
 	}
@@ -363,6 +367,36 @@ func checkTitle(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult
 			res.Passed = false
 			res.Severity = "warning"
 			res.Warning = "Title Mismatch"
+		}
+	}
+
+	return []CheckResult{res}
+}
+
+func checkTitleTypeMismatch(meta *metadata.Metadata, result *mdb.SearchResult) []CheckResult {
+	res := CheckResult{
+		Identifier: config.CheckMdbTitleTypeMismatch,
+		Passed:     true,
+	}
+
+	tt := result.TitleType
+
+	if meta.IsTV && (tt == mdb.TitleTypeMovie || tt == mdb.TitleTypeTVMovie || tt == mdb.TitleTypeShort) {
+		res.Passed = false
+		res.Severity = "warning"
+		res.Warning = "Title Type Mismatch"
+		res.Expected = "TV Series"
+		res.Actual = mdb.FormatTitleType(tt)
+	}
+
+	if !meta.IsTV {
+		switch tt {
+		case mdb.TitleTypeTVEpisode, mdb.TitleTypeTVSeries, mdb.TitleTypeTVMiniSeries, mdb.TitleTypeTVPilot:
+			res.Passed = false
+			res.Severity = "warning"
+			res.Warning = "Title Type Mismatch"
+			res.Expected = "Movie"
+			res.Actual = mdb.FormatTitleType(tt)
 		}
 	}
 

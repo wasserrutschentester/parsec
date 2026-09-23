@@ -22,16 +22,54 @@ func TestTitleTypeIsExcludedFromSearch(t *testing.T) {
 		{mdb.TitleTypeShort, false},
 		{mdb.TitleTypeVideo, false},
 		{mdb.TitleTypeUnknown, false},
+		{mdb.TitleTypeTVEpisode, false},
+		{mdb.TitleTypeTVPilot, false},
 		{mdb.TitleTypePodcastSeries, true},
 		{mdb.TitleTypePodcastEpisode, true},
 		{mdb.TitleTypeMusicVideo, true},
 		{mdb.TitleTypeVideoGame, true},
+		{mdb.TitleTypeAudiobook, true},
 	}
 
 	for _, tt := range tests {
 		got := tt.titleType.IsExcludedFromSearch()
 		if got != tt.excluded {
 			t.Errorf("TitleType(%q).IsExcludedFromSearch() = %v, want %v", tt.titleType, got, tt.excluded)
+		}
+	}
+}
+
+func TestTitleTypeIsExcludedFromSearchWithContext(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		titleType mdb.TitleType
+		isTV      bool
+		excluded  bool
+	}{
+		// TV search exclusions
+		{mdb.TitleTypeTVEpisode, true, true},
+		{mdb.TitleTypeAudiobook, true, true},
+		{mdb.TitleTypePodcastSeries, true, true},
+		{mdb.TitleTypeVideoGame, true, true},
+		{mdb.TitleTypeTVSeries, true, false},
+		{mdb.TitleTypeTVMiniSeries, true, false},
+		{mdb.TitleTypeTVPilot, true, false},
+
+		// Movie search exclusions (tvEpisode is allowed for movie search)
+		{mdb.TitleTypeTVEpisode, false, false},
+		{mdb.TitleTypeAudiobook, false, true},
+		{mdb.TitleTypePodcastSeries, false, true},
+		{mdb.TitleTypeVideoGame, false, true},
+		{mdb.TitleTypeMovie, false, false},
+		{mdb.TitleTypeTVMovie, false, false},
+		{mdb.TitleTypeShort, false, false},
+	}
+
+	for _, tt := range tests {
+		got := tt.titleType.IsExcludedFromSearch(tt.isTV)
+		if got != tt.excluded {
+			t.Errorf("TitleType(%q).IsExcludedFromSearch(%v) = %v, want %v", tt.titleType, tt.isTV, got, tt.excluded)
 		}
 	}
 }
@@ -50,10 +88,13 @@ func TestTitleTypeIsSpecific(t *testing.T) {
 		{mdb.TitleTypePodcastEpisode, false},
 		{mdb.TitleTypeMusicVideo, false},
 		{mdb.TitleTypeVideoGame, false},
+		{mdb.TitleTypeAudiobook, false},
 		{mdb.TitleTypeTVMiniSeries, true},
 		{mdb.TitleTypeTVSpecial, true},
 		{mdb.TitleTypeTVMovie, true},
 		{mdb.TitleTypeTVShort, true},
+		{mdb.TitleTypeTVEpisode, true},
+		{mdb.TitleTypeTVPilot, true},
 		{mdb.TitleTypeShort, true},
 		{mdb.TitleTypeVideo, true},
 	}
@@ -85,6 +126,9 @@ func TestFormatTitleType(t *testing.T) {
 		{mdb.TitleTypePodcastSeries, "Podcast Series"},
 		{mdb.TitleTypePodcastEpisode, "Podcast Episode"},
 		{mdb.TitleTypeMusicVideo, "Music Video"},
+		{mdb.TitleTypeTVEpisode, "TV Episode"},
+		{mdb.TitleTypeTVPilot, "TV Pilot"},
+		{mdb.TitleTypeAudiobook, "Audiobook"},
 		{mdb.TitleType("custom"), "custom"},
 	}
 
@@ -117,6 +161,9 @@ func TestShouldDisplayTitleType(t *testing.T) {
 		{"non-standard: TV special for TV file", mdb.TitleTypeTVSpecial, true, true},
 		{"non-standard: short film for movie file", mdb.TitleTypeShort, false, true},
 		{"non-standard: video for movie file", mdb.TitleTypeVideo, false, true},
+		{"non-standard: TV episode for movie file", mdb.TitleTypeTVEpisode, false, true},
+		{"non-standard: TV episode for TV file", mdb.TitleTypeTVEpisode, true, true},
+		{"non-standard: TV pilot for TV file", mdb.TitleTypeTVPilot, true, true},
 	}
 
 	for _, tt := range tests {

@@ -461,7 +461,7 @@ func parseSearchTitle(t searchTitleNode, isTV bool) (mdb.SearchResult, bool) {
 	}
 
 	titleType := mdb.TitleType(t.TitleType.ID)
-	if titleType.IsExcludedFromSearch() {
+	if titleType.IsExcludedFromSearch(isTV) {
 		return mdb.SearchResult{}, false
 	}
 

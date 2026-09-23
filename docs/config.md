@@ -246,6 +246,7 @@ The checks disabled by default are:
 -   `mdb_episode_title`: Verify episode title.
 -   `mdb_episode_date`: Verify episode air date.
 -   `mdb_runtime`: Verify video duration matches expected TMDB/TVDB runtime.
+-   `mdb_title_type_mismatch`: Warn if the file's movie/TV packaging contradicts the title type from IMDb/TMDB.
 -   `mdb_track_languages`: Verify presence of preferred and original language tracks.
 
 ##### Examples

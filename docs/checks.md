@@ -171,6 +171,7 @@ These checks ensure the Matroska container and its components meet quality stand
 | Episode Title Match | `checkEpisodeTitle` | `mdb_episode_title` | ✅ | Compares filename episode title with the official database title. |
 | Special Date Match | `checkSpecialDate` | `mdb_episode_date` | ✅ | Verifies air date for TV specials against database records. |
 | Runtime Match | `checkRuntime` | `mdb_runtime` | ✅ | Checks if the video duration differs significantly (>10%) from the expected runtime on TMDB/TVDB. |
+| Title Type Mismatch | `checkTitleTypeMismatch` | `mdb_title_type_mismatch` | ✅ | Warns if the file's packaging (movie vs. episodic) contradicts the title type from IMDb/TMDB (e.g. a movie file matched to a TV Episode, or a TV file matched to a Movie). |
 | Track Languages | `checkTrackLanguages` | `mdb_track_languages` | ✅ | Verifies presence of audio and subtitle tracks in both preferred and original languages. |
 
 ## Aggregate Checks
