@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +45,8 @@ type tmdbMedia struct {
 	} `json:"genres"`
 	Tagline        string `json:"tagline"`
 	Status         string `json:"status"`
+	Type           string `json:"type"`  // TV: "Miniseries", "Scripted", "Documentary", etc.
+	Video          bool   `json:"video"` // Movie: direct-to-video flag
 	Runtime        int    `json:"runtime"`
 	EpisodeRunTime []int  `json:"episode_run_time"`
 
@@ -104,6 +107,8 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		runtime = m.EpisodeRunTime[0]
 	}
 
+	titleType := determineTitleType(mediaType, m.Type, genres, m.Video)
+
 	return mdb.SearchResult{
 		TmdbID:           m.ID,
 		TmdbType:         mediaType,
@@ -113,6 +118,7 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		Year:             resYear,
 		Runtime:          runtime,
 		IsTV:             mediaType == "tv",
+		TitleType:        titleType,
 		Popularity:       m.Popularity,
 		Overview:         m.Overview,
 		Genres:           genres,
@@ -122,6 +128,29 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		Tagline:          m.Tagline,
 		Status:           mdb.NormalizeStatus(m.Status),
 	}
+}
+
+func determineTitleType(mediaType, tmdbType string, genres []string, video bool) mdb.TitleType {
+	if mediaType == "tv" {
+		switch strings.ToLower(strings.TrimSpace(tmdbType)) {
+		case "miniseries":
+			return mdb.TitleTypeTVMiniSeries
+		case "video":
+			return mdb.TitleTypeVideo
+		default:
+			return mdb.TitleTypeTVSeries
+		}
+	}
+
+	if slices.Contains(genres, "TV Movie") {
+		return mdb.TitleTypeTVMovie
+	}
+
+	if video {
+		return mdb.TitleTypeVideo
+	}
+
+	return mdb.TitleTypeMovie
 }
 
 // extractGenres extracts genre names.

@@ -158,6 +158,10 @@ func TestGetByIDAndTitleDetails(t *testing.T) {
 		t.Errorf("details.Title = %q, want 'Parasite'", details.Title)
 	}
 
+	if details.Type != mdb.TitleTypeMovie {
+		t.Errorf("details.Type = %q, want %q", details.Type, mdb.TitleTypeMovie)
+	}
+
 	if len(details.AltTitles) != 1 || details.AltTitles[0] != "Parasite: Black & White Edition" {
 		t.Errorf("AltTitles = %v, want ['Parasite: Black & White Edition']", details.AltTitles)
 	}
@@ -168,6 +172,10 @@ func checkParasiteBasicFields(t *testing.T, res *mdb.SearchResult) {
 
 	if res.Title != "Parasite" {
 		t.Errorf("Title = %q, want 'Parasite'", res.Title)
+	}
+
+	if res.TitleType != mdb.TitleTypeMovie {
+		t.Errorf("TitleType = %q, want %q", res.TitleType, mdb.TitleTypeMovie)
 	}
 
 	if res.OriginalTitle != "Gisaengchung" {
@@ -386,5 +394,124 @@ func TestRetryAfter429(t *testing.T) {
 
 	if time.Since(start) < 900*time.Millisecond {
 		t.Errorf("Expected delay of at least ~1s for Retry-After, took %v", time.Since(start))
+	}
+}
+
+//nolint:funlen // mock response data
+func mixedSearchResponse() any {
+	return map[string]any{
+		"data": map[string]any{
+			"advancedTitleSearch": map[string]any{
+				"total": 6,
+				"edges": []any{
+					map[string]any{
+						"node": map[string]any{
+							"title": map[string]any{
+								"id":                "tt1000001",
+								"titleText":         map[string]any{"text": "Sample Feature Movie"},
+								"originalTitleText": map[string]any{"text": "Sample Feature Movie"},
+								"titleType":         map[string]any{"id": "movie", "isSeries": false},
+								"releaseYear":       map[string]any{"year": 2021},
+								"plot":              map[string]any{"plotText": map[string]any{"plainText": "A movie."}},
+							},
+						},
+					},
+					map[string]any{
+						"node": map[string]any{
+							"title": map[string]any{
+								"id":                "tt1000002",
+								"titleText":         map[string]any{"text": "Sample TV Series"},
+								"originalTitleText": map[string]any{"text": "Sample TV Series"},
+								"titleType":         map[string]any{"id": "tvSeries", "isSeries": true},
+								"releaseYear":       map[string]any{"year": 2021},
+								"plot":              map[string]any{"plotText": map[string]any{"plainText": "A TV series."}},
+							},
+						},
+					},
+					map[string]any{
+						"node": map[string]any{
+							"title": map[string]any{
+								"id":                "tt1000003",
+								"titleText":         map[string]any{"text": "Sample Music Video"},
+								"originalTitleText": map[string]any{"text": "Sample Music Video"},
+								"titleType":         map[string]any{"id": "musicVideo", "isSeries": false},
+								"releaseYear":       map[string]any{"year": 2021},
+								"plot":              map[string]any{"plotText": map[string]any{"plainText": "Music video clip."}},
+							},
+						},
+					},
+					map[string]any{
+						"node": map[string]any{
+							"title": map[string]any{
+								"id":                "tt1000004",
+								"titleText":         map[string]any{"text": "Sample Podcast Show"},
+								"originalTitleText": map[string]any{"text": "Sample Podcast Show"},
+								"titleType":         map[string]any{"id": "podcastSeries", "isSeries": true},
+								"releaseYear":       map[string]any{"year": 2021},
+								"plot":              map[string]any{"plotText": map[string]any{"plainText": "A podcast show."}},
+							},
+						},
+					},
+					map[string]any{
+						"node": map[string]any{
+							"title": map[string]any{
+								"id":                "tt1000005",
+								"titleText":         map[string]any{"text": "Sample Podcast Episode"},
+								"originalTitleText": map[string]any{"text": "Sample Podcast Episode"},
+								"titleType":         map[string]any{"id": "podcastEpisode", "isSeries": false},
+								"releaseYear":       map[string]any{"year": 2021},
+								"plot":              map[string]any{"plotText": map[string]any{"plainText": "A podcast episode."}},
+							},
+						},
+					},
+					map[string]any{
+						"node": map[string]any{
+							"title": map[string]any{
+								"id":                "tt1000006",
+								"titleText":         map[string]any{"text": "Sample Video Game"},
+								"originalTitleText": map[string]any{"text": "Sample Video Game"},
+								"titleType":         map[string]any{"id": "videoGame", "isSeries": false},
+								"releaseYear":       map[string]any{"year": 2021},
+								"plot":              map[string]any{"plotText": map[string]any{"plainText": "A video game."}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+//nolint:paralleltest // mutates package-level BaseURL; cannot run in parallel
+func TestSearchExcludesMusicVideosAndPodcasts(t *testing.T) {
+	setupTest(t)
+
+	srv := newMockServer(t, mixedSearchResponse())
+	setBaseURL(t, srv.URL)
+
+	movieResults, err := Search(t.Context(), "Sample", 2021, false)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(movieResults) != 1 {
+		t.Fatalf("len(movieResults) = %d, want 1", len(movieResults))
+	}
+
+	if movieResults[0].Title != "Sample Feature Movie" || movieResults[0].TitleType != mdb.TitleTypeMovie {
+		t.Errorf("got %+v, want Sample Feature Movie with TitleTypeMovie", movieResults[0])
+	}
+
+	tvResults, err := Search(t.Context(), "Sample", 2021, true)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(tvResults) != 1 {
+		t.Fatalf("len(tvResults) = %d, want 1", len(tvResults))
+	}
+
+	if tvResults[0].Title != "Sample TV Series" || tvResults[0].TitleType != mdb.TitleTypeTVSeries {
+		t.Errorf("got %+v, want Sample TV Series with TitleTypeTVSeries", tvResults[0])
 	}
 }

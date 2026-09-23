@@ -36,6 +36,7 @@ type SearchResult struct {
 	Year             int
 	Runtime          int
 	IsTV             bool
+	TitleType        TitleType
 	Popularity       float64
 	Similarity       float64
 	Overview         string
@@ -132,6 +133,10 @@ func getResultBody(result SearchResult) string {
 
 	if result.OriginalLanguage != "" {
 		props = append(props, [2]string{"Origin Lang", FormatLanguage(result.OriginalLanguage)})
+	}
+
+	if ShouldDisplayTitleType(result.TitleType, result.IsTV) {
+		props = append(props, [2]string{"Title Type", FormatTitleType(result.TitleType)})
 	}
 
 	if len(result.AltTitle) > 0 {

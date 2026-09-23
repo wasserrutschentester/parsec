@@ -58,6 +58,7 @@ type tvdbMedia struct {
 	OriginalCountry    string   `json:"originalCountry"`  // direct lookups
 	Status             any      `json:"status"`           // search returns string, getByID returns object
 	Runtime            int      `json:"runtime"`
+	Genres             []string `json:"genres"`
 }
 
 func parseTvdbID(m *tvdbMedia) int {
@@ -128,6 +129,8 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		}
 	}
 
+	titleType := determineTitleType(m.Type, m.Genres)
+
 	return mdb.SearchResult{
 		TvdbID:           tvdbID,
 		TvdbSlug:         m.Slug,
@@ -136,10 +139,34 @@ func (m *tvdbMedia) toSearchResult() mdb.SearchResult {
 		Year:             resYear,
 		Runtime:          m.Runtime,
 		IsTV:             m.Type == "series",
+		TitleType:        titleType,
 		Overview:         overview,
 		OriginalLanguage: origLang,
 		Status:           mdb.NormalizeStatus(statusName),
 		Countries:        countries,
+	}
+}
+
+func determineTitleType(mediaType string, genres []string) mdb.TitleType {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "series":
+		for _, g := range genres {
+			if strings.EqualFold(g, "Mini-Series") || strings.EqualFold(g, "Miniseries") {
+				return mdb.TitleTypeTVMiniSeries
+			}
+		}
+
+		return mdb.TitleTypeTVSeries
+	case "movie", "movies":
+		for _, g := range genres {
+			if strings.EqualFold(g, "Made for TV") || strings.EqualFold(g, "TV Movie") {
+				return mdb.TitleTypeTVMovie
+			}
+		}
+
+		return mdb.TitleTypeMovie
+	default:
+		return mdb.TitleTypeUnknown
 	}
 }
 
@@ -201,6 +228,9 @@ type tvdbExternalIDsResponse struct {
 			Language string `json:"language"`
 		} `json:"alias"`
 		RemoteIDs []remoteID `json:"remoteIds"`
+		Genres    []struct {
+			Name string `json:"name"`
+		} `json:"genres"`
 	} `json:"data"`
 }
 
@@ -535,6 +565,12 @@ func GetByID(ctx context.Context, tvdbID int, mediaType string) (*mdb.SearchResu
 	}
 
 	result.IsTV = endpoint == "series"
+	if result.TitleType == mdb.TitleTypeUnknown {
+		result.TitleType = mdb.TitleTypeMovie
+		if result.IsTV {
+			result.TitleType = mdb.TitleTypeTVSeries
+		}
+	}
 
 	applyTranslation(ctx, &result, tvdbID, endpoint)
 
@@ -587,31 +623,55 @@ func getTranslationFromCache(tvdbID int, mediaType, lang string) (tvdbTranslatio
 
 func applyExternalIDs(ctx context.Context, result *mdb.SearchResult, tvdbID int, mediaType string) {
 	externalIDs, err := getExternalIDs(ctx, tvdbID, mediaType)
-	if err == nil {
-		result.OriginalLanguage = externalIDs.Data.OriginalLanguage
+	if err != nil {
+		return
+	}
 
-		prefLang := config.GetPreferredLanguage()
-		origLang := externalIDs.Data.OriginalLanguage
+	result.OriginalLanguage = externalIDs.Data.OriginalLanguage
 
-		for _, alias := range externalIDs.Data.Aliases {
-			if isLanguageMatch(alias.Language, prefLang, "en", origLang) {
-				result.AltTitle = append(result.AltTitle, alias.Name)
-			}
+	prefLang := config.GetPreferredLanguage()
+	origLang := externalIDs.Data.OriginalLanguage
+
+	for _, alias := range externalIDs.Data.Aliases {
+		if isLanguageMatch(alias.Language, prefLang, "en", origLang) {
+			result.AltTitle = append(result.AltTitle, alias.Name)
 		}
+	}
 
-		for _, ext := range externalIDs.Data.RemoteIDs {
-			switch ext.SourceName {
-			case "IMDB":
-				result.ImdbID = ext.ID
-			case "TheMovieDB.com", "TMDB":
-				tmdbID, _ := strconv.Atoi(ext.ID)
+	refineTitleTypeFromGenres(result, externalIDs.Data.Genres)
+	applyRemoteIDs(result, externalIDs.Data.RemoteIDs)
+}
 
-				result.TmdbID = tmdbID
-				if result.IsTV {
-					result.TmdbType = "tv"
-				} else {
-					result.TmdbType = "movie"
-				}
+func refineTitleTypeFromGenres(result *mdb.SearchResult, genres []struct {
+	Name string `json:"name"`
+},
+) {
+	for _, g := range genres {
+		if result.IsTV && (strings.EqualFold(g.Name, "Mini-Series") || strings.EqualFold(g.Name, "Miniseries")) {
+			result.TitleType = mdb.TitleTypeTVMiniSeries
+
+			return
+		} else if !result.IsTV && (strings.EqualFold(g.Name, "Made for TV") || strings.EqualFold(g.Name, "TV Movie")) {
+			result.TitleType = mdb.TitleTypeTVMovie
+
+			return
+		}
+	}
+}
+
+func applyRemoteIDs(result *mdb.SearchResult, remoteIDs []remoteID) {
+	for _, ext := range remoteIDs {
+		switch ext.SourceName {
+		case "IMDB":
+			result.ImdbID = ext.ID
+		case "TheMovieDB.com", "TMDB":
+			tmdbID, _ := strconv.Atoi(ext.ID)
+
+			result.TmdbID = tmdbID
+			if result.IsTV {
+				result.TmdbType = "tv"
+			} else {
+				result.TmdbType = "movie"
 			}
 		}
 	}

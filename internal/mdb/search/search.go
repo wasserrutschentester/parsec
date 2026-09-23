@@ -408,6 +408,10 @@ func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 
 //nolint:cyclop // merging requires many checks for missing properties
 func mergeDescriptiveMetadata(res, tvdbRes *mdb.SearchResult) {
+	if tvdbRes.TitleType.IsSpecific() || res.TitleType == "" {
+		res.TitleType = tvdbRes.TitleType
+	}
+
 	if tvdbRes.Status != "" {
 		res.Status = tvdbRes.Status
 	} else if res.Status == "" {
@@ -760,6 +764,11 @@ func searchByImdbID(imdbID string, isTV bool, mediaType string) (*mdb.SearchResu
 func mergeImdbData(res, imdbRes *mdb.SearchResult) {
 	if res.ImdbID == "" {
 		res.ImdbID = imdbRes.ImdbID
+	}
+
+	// IMDb is authoritative for TitleType; overwrite existing or contradicting types.
+	if imdbRes.TitleType != "" {
+		res.TitleType = imdbRes.TitleType
 	}
 
 	// IMDB's OriginalLanguage comes from spoken language data (e.g. "zxx" for silent films),

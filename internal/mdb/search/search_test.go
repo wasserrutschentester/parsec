@@ -185,9 +185,8 @@ func imdbExclusiveSearchResponse() any {
 	}
 }
 
+//nolint:paralleltest // mutates package-level imdb.BaseURL; cannot run in parallel
 func TestExecuteSearchImdbFallback(t *testing.T) {
-	t.Parallel()
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(imdbExclusiveSearchResponse())
@@ -215,4 +214,108 @@ func TestExecuteSearchImdbFallback(t *testing.T) {
 	if results[0].Title != "IMDb Exclusive Movie" {
 		t.Errorf("expected Title 'IMDb Exclusive Movie', got %s", results[0].Title)
 	}
+
+	if results[0].TitleType != mdb.TitleTypeMovie {
+		t.Errorf("expected TitleType %q, got %q", mdb.TitleTypeMovie, results[0].TitleType)
+	}
+}
+
+func TestMergeIMDbResultsTitleType(t *testing.T) {
+	t.Parallel()
+
+	merged := []mdb.SearchResult{
+		{
+			Title:  "Existing Film",
+			ImdbID: "tt0000001",
+		},
+	}
+
+	imdbResults := []mdb.SearchResult{
+		{
+			Title:     "Existing Film",
+			ImdbID:    "tt0000001",
+			TitleType: mdb.TitleTypeMovie,
+		},
+		{
+			Title:     "IMDb Standalone Special",
+			ImdbID:    "tt0000004",
+			TitleType: mdb.TitleTypeTVSpecial,
+		},
+	}
+
+	res := mergeIMDbResults(merged, imdbResults)
+
+	if len(res) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(res))
+	}
+
+	if res[0].ImdbID != "tt0000001" || res[0].TitleType != mdb.TitleTypeMovie {
+		t.Errorf("expected Existing Film to have TitleTypeMovie, got %+v", res[0])
+	}
+
+	if res[1].ImdbID != "tt0000004" || res[1].TitleType != mdb.TitleTypeTVSpecial {
+		t.Errorf("expected IMDb Standalone Special to have TitleTypeTVSpecial, got %+v", res[1])
+	}
+}
+
+func TestTitleTypePriorityAndRefinement(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TVDB refines generic TMDB title type", func(t *testing.T) {
+		t.Parallel()
+
+		tmdbRes := mdb.SearchResult{
+			TmdbID:    1,
+			Title:     "Chernobyl",
+			TitleType: mdb.TitleTypeTVSeries,
+		}
+		tvdbRes := mdb.SearchResult{
+			TvdbID:    101,
+			Title:     "Chernobyl",
+			TitleType: mdb.TitleTypeTVMiniSeries,
+		}
+
+		mergeMatchedResult(&tmdbRes, &tvdbRes)
+
+		if tmdbRes.TitleType != mdb.TitleTypeTVMiniSeries {
+			t.Errorf("expected TitleTypeTVMiniSeries, got %q", tmdbRes.TitleType)
+		}
+	})
+
+	t.Run("IMDb overrides contradicting TMDB/TVDB title type", func(t *testing.T) {
+		t.Parallel()
+
+		baseRes := mdb.SearchResult{
+			TmdbID:    1,
+			Title:     "Some Movie",
+			TitleType: mdb.TitleTypeMovie,
+		}
+		imdbRes := mdb.SearchResult{
+			ImdbID:    "tt1234567",
+			Title:     "Some Movie",
+			TitleType: mdb.TitleTypeTVMovie,
+		}
+
+		mergeImdbData(&baseRes, &imdbRes)
+
+		if baseRes.TitleType != mdb.TitleTypeTVMovie {
+			t.Errorf("expected TitleTypeTVMovie from IMDb, got %q", baseRes.TitleType)
+		}
+
+		seriesBase := mdb.SearchResult{
+			TmdbID:    2,
+			Title:     "Series",
+			TitleType: mdb.TitleTypeTVMiniSeries,
+		}
+		imdbSeries := mdb.SearchResult{
+			ImdbID:    "tt7654321",
+			Title:     "Series",
+			TitleType: mdb.TitleTypeTVSeries,
+		}
+		mergeImdbData(&seriesBase, &imdbSeries)
+
+		if seriesBase.TitleType != mdb.TitleTypeTVSeries {
+			t.Errorf("expected TitleTypeTVSeries from IMDb priority, got %q", seriesBase.TitleType)
+		}
+	})
 }

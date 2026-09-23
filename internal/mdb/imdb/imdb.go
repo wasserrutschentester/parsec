@@ -274,33 +274,35 @@ type titleInfoResponse struct {
 	} `json:"data"`
 }
 
+type searchTitleNode struct {
+	ID        string `json:"id"`
+	TitleText struct {
+		Text string `json:"text"`
+	} `json:"titleText"`
+	OriginalTitleText struct {
+		Text string `json:"text"`
+	} `json:"originalTitleText"`
+	TitleType struct {
+		ID       string `json:"id"`
+		IsSeries bool   `json:"isSeries"`
+	} `json:"titleType"`
+	ReleaseYear struct {
+		Year int `json:"year"`
+	} `json:"releaseYear"`
+	Plot struct {
+		PlotText struct {
+			PlainText string `json:"plainText"`
+		} `json:"plotText"`
+	} `json:"plot"`
+}
+
 type searchResponse struct {
 	Data struct {
 		AdvancedTitleSearch struct {
 			Total int `json:"total"`
 			Edges []struct {
 				Node struct {
-					Title struct {
-						ID        string `json:"id"`
-						TitleText struct {
-							Text string `json:"text"`
-						} `json:"titleText"`
-						OriginalTitleText struct {
-							Text string `json:"text"`
-						} `json:"originalTitleText"`
-						TitleType struct {
-							ID       string `json:"id"`
-							IsSeries bool   `json:"isSeries"`
-						} `json:"titleType"`
-						ReleaseYear struct {
-							Year int `json:"year"`
-						} `json:"releaseYear"`
-						Plot struct {
-							PlotText struct {
-								PlainText string `json:"plainText"`
-							} `json:"plotText"`
-						} `json:"plot"`
-					} `json:"title"`
+					Title searchTitleNode `json:"title"`
 				} `json:"node"`
 			} `json:"edges"`
 		} `json:"advancedTitleSearch"`
@@ -352,7 +354,7 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 		Year:             t.ReleaseYear.Year,
 		EndYear:          t.ReleaseYear.EndYear,
 		IsTV:             t.TitleType.IsSeries,
-		Type:             t.TitleType.ID,
+		Type:             mdb.TitleType(t.TitleType.ID),
 		RuntimeMinutes:   t.Runtime.Seconds / 60,
 		Overview:         t.Plot.PlotText.PlainText,
 		Genres:           t.extractGenres(),
@@ -361,6 +363,36 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 		Status:           t.computeStatus(),
 		Episodes:         t.extractEpisodes(),
 	}, nil
+}
+
+func parseSearchTitle(t searchTitleNode, isTV bool) (mdb.SearchResult, bool) {
+	if t.ID == "" {
+		return mdb.SearchResult{}, false
+	}
+
+	titleType := mdb.TitleType(t.TitleType.ID)
+	if titleType.IsExcludedFromSearch() {
+		return mdb.SearchResult{}, false
+	}
+
+	if isTV != t.TitleType.IsSeries && (isTV || t.TitleType.IsSeries) {
+		return mdb.SearchResult{}, false
+	}
+
+	orig := t.OriginalTitleText.Text
+	if orig == "" {
+		orig = t.TitleText.Text
+	}
+
+	return mdb.SearchResult{
+		ImdbID:        t.ID,
+		Title:         t.TitleText.Text,
+		OriginalTitle: orig,
+		Year:          t.ReleaseYear.Year,
+		IsTV:          t.TitleType.IsSeries,
+		TitleType:     titleType,
+		Overview:      t.Plot.PlotText.PlainText,
+	}, true
 }
 
 // Search searches for titles by query string and optional year/category.
@@ -390,28 +422,9 @@ func Search(ctx context.Context, query string, year int, isTV bool) ([]mdb.Searc
 	var results []mdb.SearchResult
 
 	for _, edge := range resp.Data.AdvancedTitleSearch.Edges {
-		t := edge.Node.Title
-		if t.ID == "" {
-			continue
+		if res, ok := parseSearchTitle(edge.Node.Title, isTV); ok {
+			results = append(results, res)
 		}
-
-		if isTV != t.TitleType.IsSeries && (isTV || t.TitleType.IsSeries) {
-			continue
-		}
-
-		orig := t.OriginalTitleText.Text
-		if orig == "" {
-			orig = t.TitleText.Text
-		}
-
-		results = append(results, mdb.SearchResult{
-			ImdbID:        t.ID,
-			Title:         t.TitleText.Text,
-			OriginalTitle: orig,
-			Year:          t.ReleaseYear.Year,
-			IsTV:          t.TitleType.IsSeries,
-			Overview:      t.Plot.PlotText.PlainText,
-		})
 	}
 
 	return results, nil
@@ -558,6 +571,7 @@ func (t *TitleDetails) ToSearchResult() mdb.SearchResult {
 		Year:             t.Year,
 		Runtime:          t.RuntimeMinutes,
 		IsTV:             t.IsTV,
+		TitleType:        t.Type,
 		Overview:         t.Overview,
 		Genres:           t.Genres,
 		Countries:        t.Countries,

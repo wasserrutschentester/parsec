@@ -429,3 +429,33 @@ func TestContextCancellation(t *testing.T) {
 		t.Errorf("expected error to mention context, got %q", err.Error())
 	}
 }
+
+func TestDetermineTitleType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		mediaType string
+		genres    []string
+		want      mdb.TitleType
+	}{
+		{"Series Default", "series", nil, mdb.TitleTypeTVSeries},
+		{"Series Miniseries", "series", []string{"Drama", "Mini-Series"}, mdb.TitleTypeTVMiniSeries},
+		{"Movie Default", "movie", []string{"Action"}, mdb.TitleTypeMovie},
+		{"Movie Made for TV", "movie", []string{"Drama", "Made for TV"}, mdb.TitleTypeTVMovie},
+		{"Movie TV Movie", "movie", []string{"TV Movie"}, mdb.TitleTypeTVMovie},
+		{"Unknown", "company", nil, mdb.TitleTypeUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := determineTitleType(tt.mediaType, tt.genres)
+			if got != tt.want {
+				t.Errorf("determineTitleType(%q, %v) = %q, want %q",
+					tt.mediaType, tt.genres, got, tt.want)
+			}
+		})
+	}
+}

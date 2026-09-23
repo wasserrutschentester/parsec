@@ -13,6 +13,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
+	"codeberg.org/upPollo/parsec/internal/mdb"
 )
 
 func setupTest(t *testing.T) {
@@ -284,5 +285,38 @@ func TestStructuredErrorDecoding(t *testing.T) {
 	expectedMsg := "Invalid API key: You must be granted a valid key."
 	if !strings.Contains(err.Error(), expectedMsg) {
 		t.Errorf("Expected error message to contain %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestDetermineTitleType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		mediaType string
+		tmdbType  string
+		genres    []string
+		video     bool
+		want      mdb.TitleType
+	}{
+		{"TV Miniseries", "tv", "Miniseries", nil, false, mdb.TitleTypeTVMiniSeries},
+		{"TV Video", "tv", "Video", nil, false, mdb.TitleTypeVideo},
+		{"TV Scripted", "tv", "Scripted", nil, false, mdb.TitleTypeTVSeries},
+		{"TV Default", "tv", "", nil, false, mdb.TitleTypeTVSeries},
+		{"Movie Standard", "movie", "", []string{"Action", "Sci-Fi"}, false, mdb.TitleTypeMovie},
+		{"Movie TV Movie Genre", "movie", "", []string{"Drama", "TV Movie"}, false, mdb.TitleTypeTVMovie},
+		{"Movie Direct to Video", "movie", "", []string{"Action"}, true, mdb.TitleTypeVideo},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := determineTitleType(tt.mediaType, tt.tmdbType, tt.genres, tt.video)
+			if got != tt.want {
+				t.Errorf("determineTitleType(%q, %q, %v, %v) = %q, want %q",
+					tt.mediaType, tt.tmdbType, tt.genres, tt.video, got, tt.want)
+			}
+		})
 	}
 }

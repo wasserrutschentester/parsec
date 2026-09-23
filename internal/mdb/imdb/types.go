@@ -1,6 +1,8 @@
 // Package imdb provides a client for IMDb's GraphQL API.
 package imdb
 
+import "codeberg.org/upPollo/parsec/internal/mdb"
+
 // LanguageItem represents a spoken language with its normalized ISO code and display text.
 type LanguageItem struct {
 	ID   string `json:"id"`
@@ -28,7 +30,7 @@ type TitleDetails struct {
 	Year             int             `json:"year"`
 	EndYear          int             `json:"endYear"`
 	IsTV             bool            `json:"isTv"`
-	Type             string          `json:"type"`
+	Type             mdb.TitleType   `json:"type"`
 	RuntimeMinutes   int             `json:"runtimeMinutes"`
 	Overview         string          `json:"overview"`
 	Genres           []string        `json:"genres"`
