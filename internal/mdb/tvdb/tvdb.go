@@ -1192,7 +1192,8 @@ func backfillEpisodeFromIMDb(ctx context.Context, res *mdb.EpisodeResult) {
 		return
 	}
 
-	if res.Name != "" && res.Overview != "" && res.Runtime > 0 {
+	if res.Name != "" && res.Overview != "" && res.Runtime > 0 &&
+		len(res.Directors) > 0 && len(res.Writers) > 0 && len(res.Genres) > 0 && res.Rating > 0 {
 		return // nothing to fill
 	}
 
@@ -1224,5 +1225,22 @@ func backfillEpisodeFromIMDb(ctx context.Context, res *mdb.EpisodeResult) {
 
 	if res.Runtime == 0 && details.RuntimeMinutes > 0 {
 		res.Runtime = details.RuntimeMinutes
+	}
+
+	if len(res.Directors) == 0 && len(details.Directors) > 0 {
+		res.Directors = details.Directors
+	}
+
+	if len(res.Writers) == 0 && len(details.Writers) > 0 {
+		res.Writers = details.Writers
+	}
+
+	if len(res.Genres) == 0 && len(details.Genres) > 0 {
+		res.Genres = details.Genres
+	}
+
+	if res.Rating == 0 && details.Rating > 0 {
+		res.Rating = details.Rating
+		res.Votes = details.Votes
 	}
 }

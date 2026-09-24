@@ -623,10 +623,34 @@ func IdentifyEpisode(ctx context.Context, result mdb.SearchResult, meta *metadat
 	}
 
 	if match != nil {
-		return match.ToEpisodeResult(countSeasonEpisodes(details.Episodes, match.Season)), nil
+		epRes := match.ToEpisodeResult(countSeasonEpisodes(details.Episodes, match.Season))
+		enrichEpisodeDetails(ctx, &epRes, match.ID)
+
+		return epRes, nil
 	}
 
 	return mdb.EpisodeResult{}, ErrNotFound
+}
+
+func enrichEpisodeDetails(ctx context.Context, epRes *mdb.EpisodeResult, imdbID string) {
+	epDetails, err := GetTitleDetails(ctx, imdbID)
+	if err != nil || epDetails == nil {
+		return
+	}
+
+	epRes.Directors = epDetails.Directors
+	epRes.Writers = epDetails.Writers
+	epRes.Genres = epDetails.Genres
+	epRes.Rating = epDetails.Rating
+	epRes.Votes = epDetails.Votes
+
+	if epRes.Overview == "" {
+		epRes.Overview = epDetails.Overview
+	}
+
+	if epRes.Runtime == 0 {
+		epRes.Runtime = epDetails.RuntimeMinutes
+	}
 }
 
 func countSeasonEpisodes(episodes []EpisodeDetail, season int) int {
