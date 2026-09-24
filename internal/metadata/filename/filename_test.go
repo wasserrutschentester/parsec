@@ -591,6 +591,25 @@ func TestParse(t *testing.T) {
 				IsTV:          true,
 			},
 		},
+		{
+			input: "Tatort.1970.S00E1.Stoever.38.Blaues.Blut.GERMAN.1080p.ARDP.WEB-DL.AAC2.0.H.264-KOMET",
+			expected: metadata.Metadata{
+				Title:         "Tatort",
+				Year:          1970,
+				Season:        0,
+				Episodes:      []int{1},
+				EpisodeTitles: []string{"Stoever.38.Blaues.Blut"},
+				Language:      "GERMAN",
+				Resolution:    "1080p",
+				Service:       "ARDP",
+				Source:        "WEB-DL",
+				AudioCodec:    "AAC",
+				AudioChannels: "2.0",
+				VideoCodec:    "H.264",
+				Group:         "KOMET",
+				IsTV:          true,
+			},
+		},
 	}
 
 	runTableTest(t, tests, func(s string) metadata.Metadata {

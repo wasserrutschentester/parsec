@@ -27,7 +27,7 @@ var (
 
 	// Episode and season detection patterns.
 	reMultiEp   = regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
-	reTitleYear = regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,4}(?:(?:[ .\&-]E?\d{1,3})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
+	reTitleYear = regexp.MustCompile(`(?i)^(.*?)(?:[ .](\d{4})|[ .]S\d{1,4}(?:E\d{1,4}(?:(?:[ .\&-]E?\d{1,4})*)?)?|(?:[ .]\d{4}-\d{2}-\d{2}))([ .]|$)`)
 	reSeason    = regexp.MustCompile(`(?i)S(\d{1,4})`)
 	reFirstEp   = regexp.MustCompile(`(?i)^[ .&-]*E(\d{1,4})`)
 	reNextEp    = regexp.MustCompile(`(?i)^([ .&-]*)E?(\d{1,4})`)
@@ -307,16 +307,9 @@ func skipMultiEpisodeSpecification(filename string, startPos int, episodes []int
 func findEpisodeTitleStart(filename string, meta *metadata.Metadata) int {
 	start := 0
 
-	if meta.Season != 0 || len(meta.Episodes) != 0 {
-		ep := 0
-		if len(meta.Episodes) > 0 {
-			ep = meta.Episodes[0]
-		}
-
-		tag := fmt.Sprintf("S%02dE%02d", meta.Season, ep)
-
-		re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(tag))
-		if loc := re.FindStringIndex(filename); loc != nil {
+	if len(meta.Episodes) > 0 {
+		pattern := fmt.Sprintf(`(?i)S0*%d[ .&-]*E0*%d\b`, meta.Season, meta.Episodes[0])
+		if loc := regexp.MustCompile(pattern).FindStringIndex(filename); loc != nil {
 			start = loc[1]
 			start = skipMultiEpisodeSpecification(filename, start, meta.Episodes)
 		}
