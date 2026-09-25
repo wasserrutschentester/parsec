@@ -68,6 +68,52 @@ func TestCheckUnwantedAudioLangKeepsZxxAlongsideForeign(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // depends on shared global config state
+func TestCheckTrackLanguagesSilentFilm(t *testing.T) {
+	config.InitDefaults() // preferred language is "de"
+
+	// MediaInfo with only subtitles in German, no audio tracks
+	mi := &mediainfo.MediaInfo{
+		Media: mediainfo.Media{
+			Tracks: []mediainfo.Track{
+				{Type: "Text", Language: "ger"},
+			},
+		},
+	}
+
+	// Case 1: Silent film (e.g. Metropolis: origLang "de", SpokenLanguages has "zxx")
+	resSilent := &mdb.SearchResult{
+		OriginalLanguage: "de",
+		SpokenLanguages:  []string{"de", "zxx"},
+	}
+	results1 := checkTrackLanguages(mi, resSilent)
+
+	for _, r := range results1 {
+		if strings.Contains(r.Identifier, "audio") && !r.Passed {
+			t.Errorf("silent film should not fail audio track checks, got: %+v", r)
+		}
+	}
+
+	// Case 2: Non-silent film (e.g. German talkie: origLang "de", SpokenLanguages has "de")
+	resTalkie := &mdb.SearchResult{
+		OriginalLanguage: "de",
+		SpokenLanguages:  []string{"de"},
+	}
+	results2 := checkTrackLanguages(mi, resTalkie)
+
+	hasAudioFailure := false
+
+	for _, r := range results2 {
+		if strings.Contains(r.Identifier, "audio") && !r.Passed {
+			hasAudioFailure = true
+		}
+	}
+
+	if !hasAudioFailure {
+		t.Errorf("talkie missing audio track should fail audio check")
+	}
+}
+
 //nolint:paralleltest // depends on shared global state
 func TestCheckTitle(t *testing.T) {
 	tests := []struct {

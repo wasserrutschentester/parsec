@@ -3,6 +3,7 @@ package checks
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -152,11 +153,19 @@ func checkTrackLanguages(mi *mediainfo.MediaInfo, result *mdb.SearchResult) []Ch
 		results = append(results, res)
 	}
 
-	check("Audio", audioLangs, prefTag, prefLang, "preferred")
+	isSilent := origLang == "zxx" || slices.Contains(result.SpokenLanguages, "zxx")
+
+	if !isSilent {
+		check("Audio", audioLangs, prefTag, prefLang, "preferred")
+	}
+
 	check("Subtitle", subLangs, prefTag, prefLang, "preferred")
 
 	if origLang != "" && !metadata.MatchLanguage(origTag, prefTag) {
-		check("Audio", audioLangs, origTag, origLang, "original")
+		if !isSilent {
+			check("Audio", audioLangs, origTag, origLang, "original")
+		}
+
 		check("Subtitle", subLangs, origTag, origLang, "original")
 	}
 
