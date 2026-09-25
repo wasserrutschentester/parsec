@@ -330,10 +330,11 @@ func TestMergeRatingsAndCertificates(t *testing.T) {
 	}
 
 	imdbRes := mdb.SearchResult{
-		ImdbID:      "tt9999999",
-		Rating:      8.4,
-		Votes:       250000,
-		Certificate: "PG-13",
+		ImdbID:          "tt9999999",
+		Rating:          8.4,
+		Votes:           250000,
+		Certificate:     "PG-13",
+		SpokenLanguages: []string{"en", "de", "fr", "it"},
 	}
 
 	mergeImdbData(&baseRes, &imdbRes)
@@ -344,6 +345,10 @@ func TestMergeRatingsAndCertificates(t *testing.T) {
 
 	if baseRes.Certificate != "PG-13" {
 		t.Errorf("expected Certificate 'PG-13', got %q", baseRes.Certificate)
+	}
+
+	if !slices.Equal(baseRes.SpokenLanguages, []string{"en", "de", "fr", "it"}) {
+		t.Errorf("expected SpokenLanguages, got %v", baseRes.SpokenLanguages)
 	}
 }
 
@@ -377,5 +382,55 @@ func TestMergePrincipalCredits(t *testing.T) {
 
 	if len(baseRes.Cast) != 2 || baseRes.Cast[0].Name != "Actor One" || baseRes.Cast[0].Role != "Character One" {
 		t.Errorf("expected Cast, got %v", baseRes.Cast)
+	}
+}
+
+func TestMergeImdbDataZxx(t *testing.T) {
+	t.Parallel()
+
+	// Case 1: base has language "en", IMDb has "zxx" -> base retains "en"
+	base1 := mdb.SearchResult{
+		OriginalLanguage: "en",
+	}
+	imdb1 := mdb.SearchResult{
+		ImdbID:           "tt123",
+		OriginalLanguage: "zxx",
+		SpokenLanguages:  []string{"zxx"},
+	}
+	mergeImdbData(&base1, &imdb1)
+
+	if base1.OriginalLanguage != "en" {
+		t.Errorf("expected OriginalLanguage 'en', got %q", base1.OriginalLanguage)
+	}
+
+	if !slices.Equal(base1.SpokenLanguages, []string{"zxx"}) {
+		t.Errorf("expected SpokenLanguages [zxx], got %v", base1.SpokenLanguages)
+	}
+
+	// Case 2: base has empty language, IMDb has "zxx" -> base becomes "zxx"
+	base2 := mdb.SearchResult{}
+	imdb2 := mdb.SearchResult{
+		ImdbID:           "tt123",
+		OriginalLanguage: "zxx",
+		SpokenLanguages:  []string{"zxx"},
+	}
+	mergeImdbData(&base2, &imdb2)
+
+	if base2.OriginalLanguage != "zxx" {
+		t.Errorf("expected OriginalLanguage 'zxx', got %q", base2.OriginalLanguage)
+	}
+
+	// Case 3: base has "en", IMDb has "de" -> base becomes "de"
+	base3 := mdb.SearchResult{
+		OriginalLanguage: "en",
+	}
+	imdb3 := mdb.SearchResult{
+		ImdbID:           "tt123",
+		OriginalLanguage: "de",
+	}
+	mergeImdbData(&base3, &imdb3)
+
+	if base3.OriginalLanguage != "de" {
+		t.Errorf("expected OriginalLanguage 'de', got %q", base3.OriginalLanguage)
 	}
 }

@@ -382,6 +382,10 @@ func mergeMatchedResult(res, tvdbRes *mdb.SearchResult) {
 		res.OriginalLanguage = tvdbRes.OriginalLanguage
 	}
 
+	if len(res.SpokenLanguages) == 0 && len(tvdbRes.SpokenLanguages) > 0 {
+		res.SpokenLanguages = tvdbRes.SpokenLanguages
+	}
+
 	if res.Overview == "" {
 		res.Overview = tvdbRes.Overview
 	}
@@ -787,9 +791,14 @@ func mergeImdbData(res, imdbRes *mdb.SearchResult) {
 	}
 
 	// IMDB's OriginalLanguage comes from spoken language data (e.g. "zxx" for silent films),
-	// which is more accurate than TMDB's original_language field.
-	if imdbRes.OriginalLanguage != "" {
+	// which is more accurate than TMDB's original_language field, unless it is "zxx" and
+	// another database has already identified a dialogue language.
+	if imdbRes.OriginalLanguage != "" && (imdbRes.OriginalLanguage != "zxx" || res.OriginalLanguage == "") {
 		res.OriginalLanguage = imdbRes.OriginalLanguage
+	}
+
+	if len(imdbRes.SpokenLanguages) > 0 {
+		res.SpokenLanguages = imdbRes.SpokenLanguages
 	}
 
 	if res.Overview == "" && imdbRes.Overview != "" {
@@ -838,28 +847,35 @@ func addMissingTvdbInfo(result *mdb.SearchResult, mediaType string) {
 	}
 }
 
+//nolint:cyclop // merging requires checking multiple fields
 func addMissingTmdbInfo(result *mdb.SearchResult, mediaType string) {
 	tmdbResult, err := tmdb.GetByID(context.Background(), result.TmdbID, mediaType)
-	if err == nil && tmdbResult != nil {
-		if result.TmdbType == "" {
-			result.TmdbType = tmdbResult.TmdbType
-		}
+	if err != nil || tmdbResult == nil {
+		return
+	}
 
-		if result.ImdbID == "" {
-			result.ImdbID = tmdbResult.ImdbID
-		}
+	if result.TmdbType == "" {
+		result.TmdbType = tmdbResult.TmdbType
+	}
 
-		if result.OriginalLanguage == "" {
-			result.OriginalLanguage = tmdbResult.OriginalLanguage
-		}
+	if result.ImdbID == "" {
+		result.ImdbID = tmdbResult.ImdbID
+	}
 
-		if tmdbResult.Title != "" && tmdbResult.Title != result.Title {
-			result.AltTitle = addUniqueAltTitle(result.AltTitle, tmdbResult.Title, result.Title, result.OriginalTitle)
-		}
+	if result.OriginalLanguage == "" {
+		result.OriginalLanguage = tmdbResult.OriginalLanguage
+	}
 
-		for _, alt := range tmdbResult.AltTitle {
-			result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
-		}
+	if len(result.SpokenLanguages) == 0 && len(tmdbResult.SpokenLanguages) > 0 {
+		result.SpokenLanguages = tmdbResult.SpokenLanguages
+	}
+
+	if tmdbResult.Title != "" && tmdbResult.Title != result.Title {
+		result.AltTitle = addUniqueAltTitle(result.AltTitle, tmdbResult.Title, result.Title, result.OriginalTitle)
+	}
+
+	for _, alt := range tmdbResult.AltTitle {
+		result.AltTitle = addUniqueAltTitle(result.AltTitle, alt, result.Title, result.OriginalTitle)
 	}
 }
 

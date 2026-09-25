@@ -62,7 +62,10 @@ type tmdbMedia struct {
 		Iso31661 string `json:"iso_3166_1"`
 	} `json:"production_countries"` // Specific to Movies
 
-	OriginCountry     []string                `json:"origin_country"` // Specific to TV shows
+	OriginCountry   []string `json:"origin_country"` // Specific to TV shows
+	SpokenLanguages []struct {
+		Iso6391 string `json:"iso_639_1"`
+	} `json:"spoken_languages"`
 	ExternalIDs       tmdbExternalIDsResponse `json:"external_ids"`
 	AlternativeTitles struct {
 		Titles []struct {
@@ -108,6 +111,7 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 	}
 
 	titleType := determineTitleType(mediaType, m.Type, genres, m.Video)
+	spokenLangs := extractSpokenLanguages(m.SpokenLanguages)
 
 	return mdb.SearchResult{
 		TmdbID:           m.ID,
@@ -115,6 +119,7 @@ func (m *tmdbMedia) toSearchResult(mediaType string) mdb.SearchResult {
 		Title:            title,
 		OriginalTitle:    originalTitle,
 		OriginalLanguage: origLang,
+		SpokenLanguages:  spokenLangs,
 		Year:             resYear,
 		Runtime:          runtime,
 		IsTV:             mediaType == "tv",
@@ -196,6 +201,26 @@ func extractCountries(prodCountries []struct {
 	}
 
 	return metadata.RemoveDuplicates(countries)
+}
+
+func extractSpokenLanguages(spokenLangs []struct {
+	Iso6391 string `json:"iso_639_1"`
+},
+) []string {
+	var res []string
+
+	for _, sl := range spokenLangs {
+		code := strings.TrimSpace(strings.ToLower(sl.Iso6391))
+		if code == "xx" {
+			code = "zxx"
+		}
+
+		if code != "" && !slices.Contains(res, code) {
+			res = append(res, code)
+		}
+	}
+
+	return res
 }
 
 type tmdbSearchResponse struct {

@@ -58,6 +58,7 @@ const (
             releaseDate { year month day }
             plot { plotText { plainText } }
             runtime { seconds }
+            spokenLanguages { spokenLanguages { id text } }
             series {
               displayableEpisodeNumber {
                 displayableSeason { season }
@@ -187,6 +188,12 @@ type titleData struct {
 					Runtime struct {
 						Seconds int `json:"seconds"`
 					} `json:"runtime"`
+					SpokenLanguages struct {
+						SpokenLanguages []struct {
+							ID   string `json:"id"`
+							Text string `json:"text"`
+						} `json:"spokenLanguages"`
+					} `json:"spokenLanguages"`
 					Series struct {
 						DisplayableEpisodeNumber struct {
 							DisplayableSeason struct {
@@ -304,7 +311,7 @@ func (t *titleData) extractLanguages() ([]LanguageItem, string) {
 				Text: l.Text,
 			})
 
-			if primaryLang == "" {
+			if primaryLang == "" || (primaryLang == "zxx" && iso != "zxx") {
 				primaryLang = iso
 			}
 		}
@@ -334,14 +341,23 @@ func (t *titleData) extractEpisodes() []EpisodeDetail {
 		seasonVal, _ := strconv.Atoi(epNode.Series.DisplayableEpisodeNumber.DisplayableSeason.Season)
 		epVal, _ := strconv.Atoi(epNode.Series.DisplayableEpisodeNumber.EpisodeNumber.Text)
 
+		var spokenLangs []string
+
+		for _, l := range epNode.SpokenLanguages.SpokenLanguages {
+			if iso := NormalizeLanguage(l.ID, l.Text); iso != "" {
+				spokenLangs = append(spokenLangs, iso)
+			}
+		}
+
 		episodes = append(episodes, EpisodeDetail{
-			ID:          epNode.ID,
-			Title:       epNode.TitleText.Text,
-			ReleaseDate: formatDate(epNode.ReleaseDate.Year, epNode.ReleaseDate.Month, epNode.ReleaseDate.Day),
-			Season:      seasonVal,
-			Episode:     epVal,
-			Runtime:     epNode.Runtime.Seconds / 60,
-			Overview:    epNode.Plot.PlotText.PlainText,
+			ID:              epNode.ID,
+			Title:           epNode.TitleText.Text,
+			ReleaseDate:     formatDate(epNode.ReleaseDate.Year, epNode.ReleaseDate.Month, epNode.ReleaseDate.Day),
+			Season:          seasonVal,
+			Episode:         epVal,
+			Runtime:         epNode.Runtime.Seconds / 60,
+			Overview:        epNode.Plot.PlotText.PlainText,
+			SpokenLanguages: spokenLangs,
 		})
 	}
 
@@ -651,6 +667,13 @@ func enrichEpisodeDetails(ctx context.Context, epRes *mdb.EpisodeResult, imdbID 
 	if epRes.Runtime == 0 {
 		epRes.Runtime = epDetails.RuntimeMinutes
 	}
+
+	if len(epRes.SpokenLanguages) == 0 && len(epDetails.SpokenLanguages) > 0 {
+		epRes.SpokenLanguages = make([]string, 0, len(epDetails.SpokenLanguages))
+		for _, l := range epDetails.SpokenLanguages {
+			epRes.SpokenLanguages = append(epRes.SpokenLanguages, l.ID)
+		}
+	}
 }
 
 func countSeasonEpisodes(episodes []EpisodeDetail, season int) int {
@@ -668,24 +691,34 @@ func countSeasonEpisodes(episodes []EpisodeDetail, season int) int {
 // ToEpisodeResult converts an EpisodeDetail to an mdb.EpisodeResult.
 func (e EpisodeDetail) ToEpisodeResult(totalSeasonEpisodes int) mdb.EpisodeResult {
 	return mdb.EpisodeResult{
-		Name:          e.Title,
-		Airdate:       e.ReleaseDate,
-		Overview:      e.Overview,
-		Season:        e.Season,
-		Episode:       e.Episode,
-		Runtime:       e.Runtime,
-		ImdbID:        e.ID,
-		TotalEpisodes: totalSeasonEpisodes,
+		Name:            e.Title,
+		Airdate:         e.ReleaseDate,
+		Overview:        e.Overview,
+		Season:          e.Season,
+		Episode:         e.Episode,
+		Runtime:         e.Runtime,
+		ImdbID:          e.ID,
+		TotalEpisodes:   totalSeasonEpisodes,
+		SpokenLanguages: e.SpokenLanguages,
 	}
 }
 
 // ToSearchResult maps TitleDetails to mdb.SearchResult.
 func (t *TitleDetails) ToSearchResult() mdb.SearchResult {
+	var spoken []string
+	if len(t.SpokenLanguages) > 0 {
+		spoken = make([]string, 0, len(t.SpokenLanguages))
+		for _, l := range t.SpokenLanguages {
+			spoken = append(spoken, l.ID)
+		}
+	}
+
 	return mdb.SearchResult{
 		ImdbID:           t.IMDbID,
 		Title:            t.Title,
 		OriginalTitle:    t.OriginalTitle,
 		OriginalLanguage: t.OriginalLanguage,
+		SpokenLanguages:  spoken,
 		AltTitle:         t.AltTitles,
 		Year:             t.Year,
 		Runtime:          t.RuntimeMinutes,

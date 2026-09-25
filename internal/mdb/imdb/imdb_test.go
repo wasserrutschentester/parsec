@@ -252,6 +252,10 @@ func checkParasiteBasicFields(t *testing.T, res *mdb.SearchResult) {
 		t.Errorf("OriginalLanguage = %q, want 'ko'", res.OriginalLanguage)
 	}
 
+	if !slices.Equal(res.SpokenLanguages, []string{"ko", "en"}) {
+		t.Errorf("SpokenLanguages = %v, want ['ko', 'en']", res.SpokenLanguages)
+	}
+
 	if res.Year != 2019 {
 		t.Errorf("Year = %d, want 2019", res.Year)
 	}
@@ -304,6 +308,12 @@ func breakingBadResponse() any {
 								"releaseDate": map[string]any{"year": 2008, "month": 1, "day": 20},
 								"runtime":     map[string]any{"seconds": 3480},
 								"plot":        map[string]any{"plotText": map[string]any{"plainText": "Pilot episode."}},
+								"spokenLanguages": map[string]any{
+									"spokenLanguages": []any{
+										map[string]any{"id": "en", "text": "English"},
+										map[string]any{"id": "es", "text": "Spanish"},
+									},
+								},
 								"series": map[string]any{"displayableEpisodeNumber": map[string]any{
 									"displayableSeason": map[string]any{"season": "1"},
 									"episodeNumber":     map[string]any{"text": "1"},
@@ -345,6 +355,10 @@ func TestGetSeasonEpisodes(t *testing.T) {
 
 	if eps[0].TotalEpisodes != 2 {
 		t.Errorf("TotalEpisodes = %d, want 2", eps[0].TotalEpisodes)
+	}
+
+	if !slices.Equal(eps[0].SpokenLanguages, []string{"en", "es"}) {
+		t.Errorf("SpokenLanguages = %v, want ['en', 'es']", eps[0].SpokenLanguages)
 	}
 }
 
@@ -628,5 +642,58 @@ func TestSearchExcludesMusicVideosAndPodcasts(t *testing.T) {
 
 	if tvResults[0].Title != "Sample TV Series" || tvResults[0].TitleType != mdb.TitleTypeTVSeries {
 		t.Errorf("got %+v, want Sample TV Series with TitleTypeTVSeries", tvResults[0])
+	}
+}
+
+func TestExtractLanguagesZxx(t *testing.T) {
+	t.Parallel()
+
+	// Case 1: zxx first, then en -> should pick en as primaryLang
+	td1 := &titleData{
+		SpokenLanguages: struct {
+			SpokenLanguages []struct {
+				ID   string `json:"id"`
+				Text string `json:"text"`
+			} `json:"spokenLanguages"`
+		}{
+			SpokenLanguages: []struct {
+				ID   string `json:"id"`
+				Text string `json:"text"`
+			}{
+				{ID: "zxx", Text: "None"},
+				{ID: "en", Text: "English"},
+			},
+		},
+	}
+	spoken1, primary1 := td1.extractLanguages()
+
+	if primary1 != "en" {
+		t.Errorf("primaryLang = %q, want 'en'", primary1)
+	}
+
+	if len(spoken1) != 2 || spoken1[0].ID != "zxx" || spoken1[1].ID != "en" {
+		t.Errorf("spoken = %v, want [zxx, en]", spoken1)
+	}
+
+	// Case 2: only zxx -> should pick zxx
+	td2 := &titleData{
+		SpokenLanguages: struct {
+			SpokenLanguages []struct {
+				ID   string `json:"id"`
+				Text string `json:"text"`
+			} `json:"spokenLanguages"`
+		}{
+			SpokenLanguages: []struct {
+				ID   string `json:"id"`
+				Text string `json:"text"`
+			}{
+				{ID: "zxx", Text: "None"},
+			},
+		},
+	}
+	_, primary2 := td2.extractLanguages()
+
+	if primary2 != "zxx" {
+		t.Errorf("primaryLang = %q, want 'zxx'", primary2)
 	}
 }

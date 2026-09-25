@@ -32,6 +32,7 @@ type SearchResult struct {
 	Title            string
 	OriginalTitle    string
 	OriginalLanguage string
+	SpokenLanguages  []string
 	AltTitle         []string
 	Year             int
 	Runtime          int
@@ -86,21 +87,22 @@ var ErrEmptyTarget = errors.New("target_value is empty")
 
 // EpisodeResult represents a TV episode found in an online database.
 type EpisodeResult struct {
-	Name          string
-	Airdate       string
-	Overview      string
-	Season        int
-	Episode       int
-	Runtime       int
-	TvdbID        int
-	TotalEpisodes int
-	ImdbID        string
-	IsFinale      bool
-	Directors     []string
-	Writers       []string
-	Genres        []string
-	Rating        float64
-	Votes         int
+	Name            string
+	Airdate         string
+	Overview        string
+	Season          int
+	Episode         int
+	Runtime         int
+	TvdbID          int
+	TotalEpisodes   int
+	ImdbID          string
+	IsFinale        bool
+	Directors       []string
+	Writers         []string
+	Genres          []string
+	Rating          float64
+	Votes           int
+	SpokenLanguages []string
 }
 
 // TagTemplateContext provides metadata to the tag rendering engine.
@@ -127,6 +129,14 @@ func FormatLanguage(lang string) string {
 	return lang
 }
 
+func shouldDisplaySpokenLanguages(spoken []string, origLang string) bool {
+	if len(spoken) > 1 {
+		return true
+	}
+
+	return len(spoken) == 1 && spoken[0] != origLang
+}
+
 // PrintResult prints a detailed SearchResult to the UI.
 func PrintResult(result SearchResult) {
 	title := fmt.Sprintf("%s (%d)", result.Title, result.Year)
@@ -142,6 +152,7 @@ func PrintResult(result SearchResult) {
 	ui.Println(ui.Card(title, subtitle, body, footer))
 }
 
+//nolint:cyclop // property list construction has multiple conditional checks
 func getResultBody(result SearchResult) string {
 	var props [][2]string
 	if result.OriginalTitle != "" && result.OriginalTitle != result.Title {
@@ -150,6 +161,15 @@ func getResultBody(result SearchResult) string {
 
 	if result.OriginalLanguage != "" {
 		props = append(props, [2]string{"Origin Lang", FormatLanguage(result.OriginalLanguage)})
+	}
+
+	if shouldDisplaySpokenLanguages(result.SpokenLanguages, result.OriginalLanguage) {
+		formatted := make([]string, 0, len(result.SpokenLanguages))
+		for _, lang := range result.SpokenLanguages {
+			formatted = append(formatted, FormatLanguage(lang))
+		}
+
+		props = append(props, [2]string{"Spoken Langs", strings.Join(formatted, ", ")})
 	}
 
 	if ShouldDisplayTitleType(result.TitleType, result.IsTV) {

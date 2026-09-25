@@ -11,13 +11,14 @@ type LanguageItem struct {
 
 // EpisodeDetail represents an individual episode item in an IMDb series listing.
 type EpisodeDetail struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	ReleaseDate string `json:"releaseDate"`
-	Season      int    `json:"season"`
-	Episode     int    `json:"episode"`
-	Runtime     int    `json:"runtime"`
-	Overview    string `json:"overview"`
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	ReleaseDate     string   `json:"releaseDate"`
+	Season          int      `json:"season"`
+	Episode         int      `json:"episode"`
+	Runtime         int      `json:"runtime"`
+	Overview        string   `json:"overview"`
+	SpokenLanguages []string `json:"spokenLanguages"`
 }
 
 // TitleDetails contains the title metadata collected from IMDb.

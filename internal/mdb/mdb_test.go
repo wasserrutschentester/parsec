@@ -38,3 +38,71 @@ func TestGetResultBodyTitleType(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldDisplaySpokenLanguages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		spoken   []string
+		origLang string
+		want     bool
+	}{
+		{"monolingual matching", []string{"en"}, "en", false},
+		{"monolingual differing silent", []string{"zxx"}, "en", true},
+		{"monolingual differing language", []string{"fr"}, "en", true},
+		{"two languages with zxx", []string{"de", "zxx"}, "de", true},
+		{"two languages with zxx first", []string{"zxx", "en"}, "en", true},
+		{"two languages neither matching orig", []string{"fr", "de"}, "en", true},
+		{"two regular languages with orig", []string{"en", "es"}, "en", true},
+		{"more than two languages", []string{"en", "de", "fr"}, "en", true},
+		{"more than two languages 4 langs", []string{"en", "de", "fr", "it"}, "en", true},
+		{"empty spoken", []string{}, "en", false},
+		{"pure silent same orig", []string{"zxx"}, "zxx", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := shouldDisplaySpokenLanguages(tt.spoken, tt.origLang)
+			if got != tt.want {
+				t.Errorf("shouldDisplaySpokenLanguages(%v, %q) = %v, want %v", tt.spoken, tt.origLang, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetResultBodySpokenLanguages(t *testing.T) {
+	t.Parallel()
+
+	// Inglourious Basterds: > 2 languages
+	body1 := getResultBody(SearchResult{
+		Title:            "Inglourious Basterds",
+		OriginalLanguage: "en",
+		SpokenLanguages:  []string{"en", "de", "fr", "it"},
+	})
+	if !strings.Contains(body1, "Spoken Langs") || !strings.Contains(body1, "en, de, fr, it") {
+		t.Errorf("expected Spoken Langs for multilingual movie, got %q", body1)
+	}
+
+	// Metropolis: silent with de + zxx
+	body2 := getResultBody(SearchResult{
+		Title:            "Metropolis",
+		OriginalLanguage: "de",
+		SpokenLanguages:  []string{"de", "zxx"},
+	})
+	if !strings.Contains(body2, "Spoken Langs") || !strings.Contains(body2, "de, zxx (No Dialogue)") {
+		t.Errorf("expected Spoken Langs for silent film, got %q", body2)
+	}
+
+	// Standard English movie: 1 language -> no Spoken Langs
+	body3 := getResultBody(SearchResult{
+		Title:            "Finding Nemo",
+		OriginalLanguage: "en",
+		SpokenLanguages:  []string{"en"},
+	})
+	if strings.Contains(body3, "Spoken Langs") {
+		t.Errorf("did not expect Spoken Langs for monolingual movie, got %q", body3)
+	}
+}

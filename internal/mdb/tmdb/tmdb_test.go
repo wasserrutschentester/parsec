@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -318,5 +319,26 @@ func TestDetermineTitleType(t *testing.T) {
 					tt.mediaType, tt.tmdbType, tt.genres, tt.video, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestExtractSpokenLanguages(t *testing.T) {
+	t.Parallel()
+
+	input := []struct {
+		Iso6391 string `json:"iso_639_1"`
+	}{
+		{Iso6391: "en"},
+		{Iso6391: "de"},
+		{Iso6391: "xx"},
+		{Iso6391: "EN"},
+		{Iso6391: ""},
+	}
+
+	got := extractSpokenLanguages(input)
+	want := []string{"en", "de", "zxx"}
+
+	if !slices.Equal(got, want) {
+		t.Errorf("extractSpokenLanguages() = %v, want %v", got, want)
 	}
 }

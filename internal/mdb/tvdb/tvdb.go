@@ -1243,4 +1243,11 @@ func backfillEpisodeFromIMDb(ctx context.Context, res *mdb.EpisodeResult) {
 		res.Rating = details.Rating
 		res.Votes = details.Votes
 	}
+
+	if len(res.SpokenLanguages) == 0 && len(details.SpokenLanguages) > 0 {
+		res.SpokenLanguages = make([]string, 0, len(details.SpokenLanguages))
+		for _, l := range details.SpokenLanguages {
+			res.SpokenLanguages = append(res.SpokenLanguages, l.ID)
+		}
+	}
 }
