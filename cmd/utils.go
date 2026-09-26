@@ -180,6 +180,11 @@ func completeGroups(_ *cobra.Command, _ []string, _ string) ([]string, cobra.She
 	return []string{g + "\tConfigured default group"}, cobra.ShellCompDirectiveNoFileComp
 }
 
+// completeCheckIdentifiers returns all available check identifiers for shell completion.
+func completeCheckIdentifiers(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return slices.Sorted(slices.Values(config.AllChecks)), cobra.ShellCompDirectiveNoFileComp
+}
+
 // formatMapCompletions converts a map of completions to a sorted slice of "key\tdescription" strings.
 func formatMapCompletions(m map[string]string) []string {
 	keys := slices.Collect(maps.Keys(m))

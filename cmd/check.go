@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/checks"
+	"codeberg.org/upPollo/parsec/internal/config"
 	mdbSearch "codeberg.org/upPollo/parsec/internal/mdb/search"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/filename"
@@ -26,6 +29,8 @@ var (
 	jsonOutputFlag        bool
 	individualReportsFlag bool
 	jobsFlag              int
+	moveFailedFlag        string
+	failingCheckFlag      string
 )
 
 type seasonKey struct {
@@ -34,7 +39,11 @@ type seasonKey struct {
 	season int
 }
 
-var errCheckDataCollection = errors.New("collecting check data failed")
+var (
+	errCheckDataCollection          = errors.New("collecting check data failed")
+	errFailingCheckRequiresMoveFlag = errors.New("--failing-check requires --move-failed")
+	errUnknownCheckIdentifier       = errors.New("unknown check identifier")
+)
 
 var checkCmd = &cobra.Command{
 	Use:   "check [path...]",
@@ -57,6 +66,14 @@ You can also pass a JSON check report file to render it.`),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.IsSilent = jsonOutputFlag
 		ui.IsJSON = jsonOutputFlag
+
+		if failingCheckFlag != "" && moveFailedFlag == "" {
+			return errFailingCheckRequiresMoveFlag
+		}
+
+		if failingCheckFlag != "" && !slices.Contains(config.AllChecks, failingCheckFlag) {
+			return fmt.Errorf("%w: %s", errUnknownCheckIdentifier, failingCheckFlag)
+		}
 
 		if originalLanguageFlag != "" {
 			viper.Set("original_language", originalLanguageFlag)
@@ -86,6 +103,12 @@ You can also pass a JSON check report file to render it.`),
 		// Run aggregate season checks
 		if !jsonOutputFlag {
 			runSeasonCompletenessChecks(seasonEpisodes, seasonMetas)
+		}
+
+		if moveFailedFlag != "" {
+			if err := moveFailedFiles(allReports, moveFailedFlag, failingCheckFlag); err != nil {
+				return err
+			}
 		}
 
 		if jsonOutputFlag {
@@ -291,6 +314,81 @@ func appendFailed(allIssues *[]types.IssueGroup, category string, results []chec
 	}
 }
 
+func filterFailedReports(reports []types.CheckReport, targetCheck string) []string {
+	var matchedFiles []string
+
+	for _, r := range reports {
+		for _, group := range r.Issues {
+			matched := slices.ContainsFunc(group.Results, func(res types.CheckResult) bool {
+				return !res.Passed && (targetCheck == "" || res.Identifier == targetCheck)
+			})
+			if matched {
+				matchedFiles = append(matchedFiles, r.File)
+
+				break
+			}
+		}
+	}
+
+	return matchedFiles
+}
+
+//nolint:cyclop // file relocation logic with interactive prompt and dry-run handling
+func moveFailedFiles(reports []types.CheckReport, destDir, targetCheck string) error {
+	matchedFiles := filterFailedReports(reports, targetCheck)
+	if len(matchedFiles) == 0 {
+		return nil
+	}
+
+	if !jsonOutputFlag {
+		ui.Println("\n" + ui.Header.Render("MOVING FAILED FILES"))
+	}
+
+	if dryRunFlag {
+		for _, f := range matchedFiles {
+			dest := filepath.Join(destDir, filepath.Base(f))
+			if !jsonOutputFlag {
+				ui.Println(ui.Muted.Render(fmt.Sprintf("Dry run: would move %s -> %s", f, dest)))
+			}
+		}
+
+		return nil
+	}
+
+	if !unattendedFlag && !jsonOutputFlag {
+		fmt.Printf("Move %d failing file(s) to %s? [y/N] ", len(matchedFiles), destDir)
+
+		var response string
+
+		_, _ = fmt.Scanln(&response)
+		if strings.ToLower(strings.TrimSpace(response)) != "y" {
+			ui.Println(ui.Muted.Render("Skipping move."))
+
+			return nil
+		}
+	}
+
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	for _, f := range matchedFiles {
+		dest := filepath.Join(destDir, filepath.Base(f))
+		// ponytail: os.Rename fails across filesystems (EXDEV); add io.Copy fallback if cross-device quarantine needed
+		if err := os.Rename(f, dest); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to move %s: %v", f, err))
+
+			continue
+		}
+
+		if !jsonOutputFlag {
+			ui.Println(ui.Success.Render(fmt.Sprintf("Moved: %s -> %s", filepath.Base(f), destDir)))
+		}
+	}
+
+	return nil
+}
+
 func printJSONReports(reports []types.CheckReport) {
 	data, err := json.MarshalIndent(reports, "", "  ")
 	if err != nil {
@@ -315,6 +413,9 @@ func init() {
 	checkCmd.Flags().StringVar(&originalLanguageFlag, "original-language", "", "Override original language")
 	checkCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "Do not prompt for confirmation")
 	checkCmd.Flags().IntVar(&jobsFlag, "jobs", 0, "Number of parallel jobs to run (default is number of CPUs)")
+	checkCmd.Flags().StringVar(&moveFailedFlag, "move-failed", "", "move files failing checks to destination folder")
+	checkCmd.Flags().StringVar(&failingCheckFlag, "failing-check", "", "only move files failing this specific check identifier")
+	checkCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate actions without modifying or moving files")
 
 	idFlags := []string{"imdb", "tmdb", "tvdb"}
 	for _, f := range idFlags {
@@ -326,6 +427,8 @@ func init() {
 		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
 
+	_ = checkCmd.MarkFlagDirname("move-failed")
+	_ = checkCmd.RegisterFlagCompletionFunc("failing-check", completeCheckIdentifiers)
 	_ = checkCmd.RegisterFlagCompletionFunc("original-language", completeLanguages)
 }
 

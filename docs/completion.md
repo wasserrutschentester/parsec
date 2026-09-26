@@ -23,6 +23,15 @@ movie-remux  -- High-quality BluRay remux (HEVC/AVC codec labels)
 
 > **Note:** Bash does not display completion descriptions — preset names still complete correctly, descriptions are simply not shown.
 
+## Check Identifier Completion
+
+The `--failing-check` flag on `parsec check` dynamically suggests all valid check identifiers (e.g. `mdb_runtime`, `filename_characters`, `matroska_track_order`):
+
+```
+parsec check /media --move-failed /quarantine --failing-check <Tab>
+filename_characters          matroska_default_flags       mdb_runtime ...
+```
+
 ## Supported Shells
 
 - [Bash](#bash)

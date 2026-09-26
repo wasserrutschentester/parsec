@@ -22,6 +22,28 @@ parsec check movie.mkv --json > report.json
 parsec check report.json
 ```
 
+### Quarantining Failed Files
+
+The `check` command can automatically move files that fail validation into a quarantine directory. This is useful for separating bad files during batch intake or staging pipelines.
+
+```bash
+# Move all files that fail any check to a quarantine folder
+parsec check /path/to/media --move-failed /path/to/quarantine
+
+# Preview which files would be moved without modifying anything
+parsec check /path/to/media --move-failed /path/to/quarantine --dry-run
+
+# Only move files failing a specific check identifier
+parsec check /path/to/media --move-failed /path/to/quarantine --failing-check mdb_runtime
+
+# Move failing files unattended without interactive confirmation prompts
+parsec check /path/to/media --move-failed /path/to/quarantine -u
+```
+
+- `--move-failed <dir>`: Target folder for failing files. The directory will be created if it does not already exist. In interactive mode, `parsec` prompts for confirmation (`Move N failing file(s) to <dir>? [y/N]`) before moving.
+- `--failing-check <identifier>`: Restricts relocation to only files that failed a specific check (e.g. `mdb_runtime`, `filename_characters`). Requires `--move-failed`. Shell auto-completion suggests all available check identifiers.
+- `--dry-run` / `-d`: Simulates moving files and prints what would be relocated without touching the filesystem.
+
 ## Features
 
 - **Batch Processing**: Validate multiple files or entire directories in one command.
@@ -30,6 +52,7 @@ parsec check report.json
 - **Technical Analysis**: Checks for technical anomalies using MediaInfo.
 - **Matroska Verification**: Ensures the container and track tagging meet standards.
 - **MDB Consistency**: Validates that file metadata matches information in online databases.
+- **Quarantine Failing Files**: Automatically relocate files failing any check (or a specific check identifier) to a destination directory.
 - **JSON Reports**: Machine-readable output for integration with other tools.
 
 ## Flags
@@ -43,13 +66,24 @@ Force identification using specific database IDs.
 | `--tmdb` | | integer | TMDB ID. |
 | `--tvdb` | | integer | TVDB ID. |
 
-### Other Flags
+### Output Flags
 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
 | `--json` | `-j` | boolean | Output check results in JSON format. |
-| `--unattended`| `-u` | boolean | Do not prompt for confirmation before displaying issue details. |
+| `--individual` | `-i` | boolean | Display the full individual reports for each file in the batch. |
 | `--verbose` | | boolean | Enable verbose output. |
+
+### Other Flags
+
+| Flag | Shorthand | Type | Description |
+|------|-----------|------|-------------|
+| `--move-failed` | | string | Move files failing checks to destination folder. |
+| `--failing-check` | | string | Only move files failing this specific check identifier (requires `--move-failed`). |
+| `--dry-run` | `-d` | boolean | Simulate actions without modifying or moving files. |
+| `--unattended` | `-u` | boolean | Do not prompt for confirmation. |
+| `--jobs` | | integer | Number of parallel jobs to run (default is number of CPUs). |
+| `--original-language` | | string | Override original language of media for integrity checks. |
 
 ## Available Checks
 

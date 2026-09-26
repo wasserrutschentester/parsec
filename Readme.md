@@ -57,6 +57,7 @@ Verify if a media file adheres to the specification.
 - **Stream Analysis**: Performs quality checks on video and audio tracks (framerate, bitrate, resolution).
 - **Matroska Verification**: Validates track order, default flags, and subtitle formats.
 - **MDB Integration**: Supports validation against TMDB, TVDB, and IMDb data.
+- **Quarantine / Relocation**: Move failing files to a separate directory via `--move-failed`, with optional filtering by check identifier via `--failing-check`.
 - **Interactive Output**: View the failing checks per group, not all at once.
 - **Report Rendering**: Load and view previously saved JSON reports in interactive mode.
 - **JSON Output**: Export check results as JSON using the `--json` flag.
