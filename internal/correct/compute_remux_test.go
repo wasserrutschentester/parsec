@@ -70,6 +70,27 @@ func TestComputeMatroskaRemuxTrackOrder(t *testing.T) {
 }
 
 //nolint:paralleltest // depends on shared global config state
+func TestComputeMatroskaRemuxTrackOrderOriginalAudioFirst(t *testing.T) {
+	viper.Reset()
+	config.InitDefaults() // preferred language is "de"
+	viper.Set("original_audio_first", true)
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger", Default: true, AudioChannels: 2}},
+		{ID: 2, Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng", Default: true, AudioChannels: 2}},
+	}
+
+	plan := ComputeMatroskaRemux(tracks, "eng")
+
+	// English (original) audio should sort ahead of German (preferred).
+	want := []int{0, 2, 1}
+	if !slices.Equal(plan.TrackOrder, want) {
+		t.Errorf("expected track order %v, got %v", want, plan.TrackOrder)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
 func TestComputeMatroskaRemuxCompressionDoesNotRemoveLooseDuplicates(t *testing.T) {
 	config.InitDefaults()
 

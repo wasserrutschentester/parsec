@@ -71,6 +71,7 @@ var expectedTypes = map[string]string{
 	"source":                "string",
 	"preferred_language":    "string",
 	"original_language":     "string",
+	"original_audio_first":  "bool",
 	"subbed_tagging":        "bool",
 	"audio_description":     "bool",
 	"template":              "string",

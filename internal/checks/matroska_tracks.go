@@ -426,7 +426,8 @@ func GetTrackPriority(track matroska.EbmlTrack, originalLang string) int64 {
 		isOriginal = metadata.MatchLanguage(language.Make(track.Properties.Language), language.Make(originalLang))
 	}
 
-	langScore := calculateLangScore(track.Properties.Language, isOriginal)
+	originalFirst := track.Type == "audio" && config.GetOriginalAudioFirst()
+	langScore := calculateLangScore(track.Properties.Language, isOriginal, originalFirst)
 	propertyScore := calculatePropertyScore(track) & maskProperty
 
 	isCommentary := track.Properties.Commentary || strings.Contains(strings.ToUpper(track.Properties.Name), "COMMENTARY")
@@ -448,16 +449,19 @@ func getCommentaryPriority(track matroska.EbmlTrack) int64 {
 	return priorityCommentaryBit + (getCommentarySubPriority(track.Properties.Name) << 3)
 }
 
-func calculateLangScore(lang string, isOriginal bool) int64 {
+func calculateLangScore(lang string, isOriginal, originalFirst bool) int64 {
 	tag := language.Make(lang)
 	prefTag := language.Make(config.GetPreferredLanguage())
+	isPreferred := metadata.MatchLanguage(tag, prefTag)
 
 	var langScore int64
 
 	switch {
-	case metadata.MatchLanguage(tag, prefTag):
+	case originalFirst && isOriginal:
 		langScore = priorityPreferred
-	case isOriginal:
+	case !originalFirst && isPreferred:
+		langScore = priorityPreferred
+	case isOriginal || isPreferred:
 		langScore = priorityOriginal
 	case metadata.MatchLanguage(tag, language.Make("mul")):
 		langScore = priorityMul

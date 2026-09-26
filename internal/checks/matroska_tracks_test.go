@@ -72,6 +72,31 @@ func TestGetTrackPriority(t *testing.T) {
 }
 
 //nolint:paralleltest // depends on shared global state
+func TestGetTrackPriorityOriginalAudioFirst(t *testing.T) {
+	viper.Reset()
+	config.InitDefaults()
+	viper.Set("original_audio_first", true)
+
+	origAudio := matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "eng"}}
+	prefAudio := matroska.EbmlTrack{Type: "audio", Properties: matroska.EbmlTrackProperties{Language: "ger"}}
+	prefSub := matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "ger"}}
+	origSub := matroska.EbmlTrack{Type: "subtitles", Properties: matroska.EbmlTrackProperties{Language: "eng"}}
+
+	origAudioPrio := GetTrackPriority(origAudio, "eng")
+	prefAudioPrio := GetTrackPriority(prefAudio, "eng")
+	prefSubPrio := GetTrackPriority(prefSub, "eng")
+	origSubPrio := GetTrackPriority(origSub, "eng")
+
+	if origAudioPrio >= prefAudioPrio {
+		t.Errorf("expected original audio priority (%v) < preferred audio priority (%v)", origAudioPrio, prefAudioPrio)
+	}
+
+	if prefSubPrio >= origSubPrio {
+		t.Errorf("expected preferred sub priority (%v) < original sub priority (%v)", prefSubPrio, origSubPrio)
+	}
+}
+
+//nolint:paralleltest // depends on shared global state
 func TestRunTrackChecksDuplicateTracks(t *testing.T) {
 	viper.Reset()
 	config.InitDefaults()

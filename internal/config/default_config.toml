@@ -19,6 +19,9 @@ source = "WEB-DL"
 # Preferred language for identification, tagging, and track ordering
 preferred_language = "de"
 
+# Place original language audio tracks before preferred language tracks in track ordering
+original_audio_first = false
+
 # If true, sets {language} to preferred_language and {language_ext} to "SUBBED"
 # if no audio is present but subs are available in the preferred language
 subbed_tagging = true

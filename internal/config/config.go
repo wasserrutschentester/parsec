@@ -23,6 +23,7 @@ func InitDefaults() {
 	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("original_language", "")
+	viper.SetDefault("original_audio_first", false)
 	viper.SetDefault("subbed_tagging", true)
 	viper.SetDefault("audio_description", false)
 	viper.SetDefault("source", "WEB-DL")
@@ -146,6 +147,11 @@ func GetPreferredLanguage() string {
 // GetOriginalLanguage returns the original language override from the configuration.
 func GetOriginalLanguage() string {
 	return getString("original_language")
+}
+
+// GetOriginalAudioFirst returns true if original audio should be ordered before preferred audio.
+func GetOriginalAudioFirst() bool {
+	return getBool("original_audio_first")
 }
 
 // GetOutputPath returns the output path from the configuration.
