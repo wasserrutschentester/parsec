@@ -285,6 +285,7 @@ func TestExecutePlan(t *testing.T) {
 				TrackOrder:       []int{2, 1, 3},
 				StripCompression: []int{2},
 				RemoveTracks:     []RemovalCandidate{{TrackID: 3}},
+				TruncatedTracks:  []TruncatedTrack{{TrackID: 1, Diff: 6.0}},
 			},
 		}
 
@@ -301,6 +302,7 @@ func TestExecutePlan(t *testing.T) {
 			TrackOrder:          []int{2, 1, 3},
 			StripCompressionIDs: []int{2},
 			RemoveTrackIDs:      []int{3},
+			StopAfterVideoEnds:  true,
 		}
 
 		if !reflect.DeepEqual(capturedOpts, expectedOpts) {

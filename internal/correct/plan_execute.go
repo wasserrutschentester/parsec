@@ -164,6 +164,7 @@ func executeRemux(filePath string, plan *FixPlan) error {
 		TrackOrder:          plan.Remux.TrackOrder,
 		StripCompressionIDs: plan.Remux.StripCompression,
 		RemoveTrackIDs:      removeIDs,
+		StopAfterVideoEnds:  len(plan.Remux.TruncatedTracks) > 0,
 	}
 
 	ui.Println(ui.Muted.Render("Remuxing... this may take a while for large files."))

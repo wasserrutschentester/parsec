@@ -8,6 +8,7 @@ import (
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
 // First of two German audio tracks lacks the default flag -> should be set.
@@ -211,5 +212,46 @@ func TestComputeMatroskaRemuxEmptyAudioTrackDisabled(t *testing.T) {
 
 	if got := ComputeMatroskaRemux(tracks, "").RemovalCandidates; len(got) != 0 {
 		t.Errorf("expected no removals when mediainfo_empty_tracks is disabled, got %+v", got)
+	}
+}
+
+//nolint:paralleltest // depends on shared global config state
+func TestComputeTruncatedTracks(t *testing.T) {
+	config.InitDefaults()
+
+	dur100 := 100.0
+	dur106 := 106.0
+	dur102 := 102.0
+
+	order1 := 1
+	order2 := 2
+
+	mi := &mediainfo.MediaInfo{
+		Media: mediainfo.Media{
+			Tracks: []mediainfo.Track{
+				{Type: "Video", Duration: &dur100},
+				{Type: "Audio", Duration: &dur106, ID: "2", TypeOrder: &order1},
+				{Type: "Audio", Duration: &dur102, ID: "3", TypeOrder: &order2},
+			},
+		},
+	}
+
+	tracks := []matroska.EbmlTrack{
+		{ID: 0, Type: "video", Properties: matroska.EbmlTrackProperties{Number: 1}},
+		{ID: 1, Type: "audio", TypeOrder: 1, Properties: matroska.EbmlTrackProperties{Number: 2, Language: "ger"}},
+		{ID: 2, Type: "audio", TypeOrder: 2, Properties: matroska.EbmlTrackProperties{Number: 3, Language: "eng"}},
+	}
+
+	truncated := ComputeTruncatedTracks(mi, tracks)
+	if len(truncated) != 1 {
+		t.Fatalf("expected 1 truncated track, got %d", len(truncated))
+	}
+
+	if truncated[0].TrackID != 1 {
+		t.Errorf("expected TrackID 1, got %d", truncated[0].TrackID)
+	}
+
+	if truncated[0].Diff != 6.0 {
+		t.Errorf("expected Diff 6.0, got %f", truncated[0].Diff)
 	}
 }

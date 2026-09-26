@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -301,6 +302,31 @@ func TestBuildRemuxArgsDoesNotStripCompressionWhenNotRequested(t *testing.T) {
 		if strings.HasPrefix(arg, "--compression") || strings.HasSuffix(arg, ":none") {
 			t.Fatalf("unexpected compression argument without confirmation: %v", got)
 		}
+	}
+}
+
+func TestBuildRemuxArgsStopAfterVideoEnds(t *testing.T) {
+	t.Parallel()
+
+	tracks := []EbmlTrack{
+		{ID: 0, Type: "video"},
+		{ID: 1, Type: "audio"},
+	}
+
+	opts := RemuxOptions{
+		StopAfterVideoEnds: true,
+	}
+
+	got := buildRemuxArgs("out.mkv", "in.mkv", opts, tracks)
+
+	want := []string{
+		"-o", "out.mkv",
+		"--stop-after-video-ends",
+		"in.mkv",
+	}
+
+	if !slices.Equal(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
 

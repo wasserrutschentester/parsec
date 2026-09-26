@@ -110,3 +110,65 @@ func TestFixPlanIsNotEmptyWhenChapterLanguageNeedsPrompt(t *testing.T) {
 		t.Fatal("chapter language input requirement must not be reported as a clean file")
 	}
 }
+
+//nolint:paralleltest // mutates global state
+func TestPlanFileStopAfterVideoEnds(t *testing.T) {
+	config.InitDefaults()
+	viper.Set("disabled_checks", []string{})
+
+	dur100 := 100.0
+	dur110 := 110.0
+
+	originalResolve := resolveMetadata
+	defer func() { resolveMetadata = originalResolve }()
+
+	resolveMetadata = func(_ resolve.Options) (*resolve.Result, error) {
+		return &resolve.Result{
+			Meta: &metadata.Metadata{},
+			MediaInfo: &mediainfo.MediaInfo{
+				Media: mediainfo.Media{
+					Tracks: []mediainfo.Track{
+						{Type: "Video", Duration: &dur100},
+						{Type: "Audio", Duration: &dur110},
+					},
+				},
+			},
+		}, nil
+	}
+
+	originalGetEbml := getEbmlMetadata
+	defer func() { getEbmlMetadata = originalGetEbml }()
+
+	getEbmlMetadata = func(_ string) (*matroska.EbmlMetadata, error) {
+		return &matroska.EbmlMetadata{
+			Tracks: []matroska.EbmlTrack{
+				{ID: 0, Type: "video"},
+				{ID: 1, Type: "audio"},
+			},
+		}, nil
+	}
+
+	originalExtractTags := extractTagsXML
+	defer func() { extractTagsXML = originalExtractTags }()
+
+	extractTagsXML = func(_ string) ([]byte, error) {
+		return []byte("<Tags></Tags>"), nil
+	}
+
+	plan, err := PlanFile("dummy.mkv", Options{})
+	if err != nil {
+		t.Fatalf("PlanFile failed: %v", err)
+	}
+
+	if len(plan.Remux.TruncatedTracks) != 1 {
+		t.Fatalf("expected 1 truncated track, got %d", len(plan.Remux.TruncatedTracks))
+	}
+
+	if plan.Remux.TruncatedTracks[0].TrackID != 1 {
+		t.Errorf("expected TruncatedTracks[0].TrackID 1, got %d", plan.Remux.TruncatedTracks[0].TrackID)
+	}
+
+	if !plan.Remux.Required {
+		t.Errorf("expected plan.Remux.Required to be true")
+	}
+}

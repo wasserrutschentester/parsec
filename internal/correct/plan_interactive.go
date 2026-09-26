@@ -42,7 +42,7 @@ func AppendInteractiveTrackEdits(filePath string, plan *FixPlan, opts Options) e
 	}
 
 	remuxPlan := ComputeMatroskaRemux(simulatedTracks, plan.OriginalLanguage)
-	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
+	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0 || len(plan.Remux.TruncatedTracks) > 0
 
 	plan.Remux.TrackOrder = remuxPlan.TrackOrder
 	plan.Remux.RemoveTracks = remuxPlan.RemovalCandidates

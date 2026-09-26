@@ -1199,11 +1199,12 @@ type RemuxOptions struct {
 	RemoveTrackIDs          []int
 	StripCompressionIDs     []int
 	DisableTrackCompression bool
+	StopAfterVideoEnds      bool
 }
 
 // IsEmpty reports whether the options describe no work.
 func (o RemuxOptions) IsEmpty() bool {
-	return len(o.TrackOrder) == 0 && len(o.RemoveTrackIDs) == 0 && len(o.StripCompressionIDs) == 0
+	return len(o.TrackOrder) == 0 && len(o.RemoveTrackIDs) == 0 && len(o.StripCompressionIDs) == 0 && !o.StopAfterVideoEnds
 }
 
 var errRemuxFailed = errors.New("mkvmerge remux failed")
@@ -1296,6 +1297,10 @@ func replaceFile(filePath, tmpPath string) error {
 
 func buildRemuxArgs(outPath, inPath string, opts RemuxOptions, tracks []EbmlTrack) []string {
 	args := []string{"-o", outPath}
+
+	if opts.StopAfterVideoEnds {
+		args = append(args, "--stop-after-video-ends")
+	}
 
 	removed := make(map[int]bool, len(opts.RemoveTrackIDs))
 	for _, id := range opts.RemoveTrackIDs {

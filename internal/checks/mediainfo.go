@@ -316,7 +316,7 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 		Passed:     true,
 	}
 
-	videoDur := getVideoDuration(mi)
+	videoDur := GetVideoDuration(mi)
 	if videoDur == 0 {
 		res.Passed = false
 		res.Severity = "error"
@@ -351,7 +351,12 @@ func checkDurations(mi *mediainfo.MediaInfo) []CheckResult {
 	return []CheckResult{res}
 }
 
-func getVideoDuration(mi *mediainfo.MediaInfo) float64 {
+// GetVideoDuration returns the duration of the primary video track in seconds, or 0 if missing.
+func GetVideoDuration(mi *mediainfo.MediaInfo) float64 {
+	if mi == nil {
+		return 0
+	}
+
 	for i := range mi.Media.Tracks {
 		if mi.Media.Tracks[i].Type == "Video" && mi.Media.Tracks[i].Duration != nil && *mi.Media.Tracks[i].Duration != 0 {
 			return *mi.Media.Tracks[i].Duration

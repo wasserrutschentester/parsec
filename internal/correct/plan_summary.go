@@ -146,5 +146,9 @@ func summarizeRemux(plan *FixPlan) string {
 		parts = append(parts, "Strip compression")
 	}
 
+	if n := len(plan.Remux.TruncatedTracks); n > 0 {
+		parts = append(parts, fmt.Sprintf("End %d tracks when video ends", n))
+	}
+
 	return strings.Join(parts, ", ")
 }

@@ -807,9 +807,10 @@ func reviewRemux(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
 
 	reviewRemuxTrackOrderAndRemoval(plan, ebml, opts)
 	reviewRemuxStripCompression(plan, ebml, opts)
+	reviewRemuxStopAfterVideoEnds(plan, ebml, opts)
 
 	// Re-evaluate if remux is still required after user choices
-	plan.Remux.Required = len(plan.Remux.TrackOrder) > 0 || len(plan.Remux.StripCompression) > 0 || len(plan.Remux.RemoveTracks) > 0
+	plan.Remux.Required = len(plan.Remux.TrackOrder) > 0 || len(plan.Remux.StripCompression) > 0 || len(plan.Remux.RemoveTracks) > 0 || len(plan.Remux.TruncatedTracks) > 0
 }
 
 func reviewRemuxTrackOrderAndRemoval(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
@@ -872,5 +873,41 @@ func reviewRemuxStripCompression(plan *FixPlan, ebml *matroska.EbmlMetadata, opt
 		if !ui.PromptYN("Strip compression from tracks?", "n") {
 			plan.Remux.StripCompression = nil
 		}
+	}
+}
+
+func reviewRemuxStopAfterVideoEnds(plan *FixPlan, ebml *matroska.EbmlMetadata, opts Options) {
+	if len(plan.Remux.TruncatedTracks) == 0 {
+		return
+	}
+
+	ui.Println(ui.ReportSection("Remux: Duration Correction"))
+	ui.Println(fmt.Sprintf("  - Cut %d track(s) when the video ends:", len(plan.Remux.TruncatedTracks)))
+
+	for _, item := range plan.Remux.TruncatedTracks {
+		label := fmt.Sprintf("UID %d", item.TrackID)
+
+		if ebml != nil {
+			if t := findTrackByID(ebml, item.TrackID); t != nil {
+				label = fmt.Sprintf("Track %d: %s", t.Properties.Number, trackLabel(t))
+			}
+		}
+
+		label += fmt.Sprintf(" (exceeds video by %.1fs)", item.Diff)
+		ui.Println("      " + label)
+	}
+
+	ui.Println()
+
+	if !canPrompt(opts) {
+		if !confirmApplyWithPolicy(opts, "Apply duration correction?", "Skipping duration correction...") {
+			plan.Remux.TruncatedTracks = nil
+		}
+
+		return
+	}
+
+	if !ui.PromptYN("Apply duration correction?", "n") {
+		plan.Remux.TruncatedTracks = nil
 	}
 }

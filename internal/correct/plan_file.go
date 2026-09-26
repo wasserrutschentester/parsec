@@ -60,7 +60,8 @@ func PlanFile(filePath string, opts Options) (*FixPlan, error) {
 	originalLang := lookupOriginalLanguage(filePath, ebml.Tracks, opts)
 	plan.OriginalLanguage = originalLang
 	remuxPlan := ComputeMatroskaRemux(simulatedTracks, originalLang)
-	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0
+	plan.Remux.TruncatedTracks = ComputeTruncatedTracks(res.MediaInfo, simulatedTracks)
+	plan.Remux.Required = len(remuxPlan.TrackOrder) > 0 || len(remuxPlan.RemovalCandidates) > 0 || len(remuxPlan.StripCompressionIDs) > 0 || len(plan.Remux.TruncatedTracks) > 0
 
 	plan.Remux.TrackOrder = remuxPlan.TrackOrder
 	plan.Remux.RemoveTracks = append(plan.Remux.RemoveTracks, remuxPlan.RemovalCandidates...)

@@ -65,12 +65,19 @@ type ChapterSnapEvent struct {
 	DefaultDuration  int64  `json:"default_duration"`
 }
 
+// TruncatedTrack describes a track proposed to be truncated by --stop-after-video-ends.
+type TruncatedTrack struct {
+	TrackID int     `json:"track_id"`
+	Diff    float64 `json:"diff"`
+}
+
 // RemuxPlan describes destructive file operations executed via mkvmerge.
 type RemuxPlan struct {
 	Required         bool               `json:"required"`
 	TrackOrder       []int              `json:"track_order"`
 	RemoveTracks     []RemovalCandidate `json:"remove_tracks"`
 	StripCompression []int              `json:"strip_compression"`
+	TruncatedTracks  []TruncatedTrack   `json:"truncated_tracks,omitempty"`
 }
 
 // NewFixPlan creates an empty FixPlan.
@@ -95,6 +102,7 @@ func NewFixPlan() *FixPlan {
 			TrackOrder:       make([]int, 0),
 			RemoveTracks:     make([]RemovalCandidate, 0),
 			StripCompression: make([]int, 0),
+			TruncatedTracks:  make([]TruncatedTrack, 0),
 		},
 	}
 }

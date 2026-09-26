@@ -69,6 +69,7 @@ Note that while most corrections are applied instantly in-place, operations that
 | `matroska_zlib_compression` | Strips zlib track compression. |
 | `mdb_unwanted_audio_lang` | Removes audio in languages other than the preferred or MDB original language. |
 | `mediainfo_empty_tracks` | Removes audio tracks reporting zero channels. |
+| `mediainfo_durations` | Truncates tracks that are longer than the video using mkvmerge's `--stop-after-video-ends`. |
 
 ## Not Corrected
 

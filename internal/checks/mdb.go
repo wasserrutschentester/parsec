@@ -491,7 +491,7 @@ func checkRuntime(mi *mediainfo.MediaInfo, meta *metadata.Metadata, result *mdb.
 		}
 	}
 
-	videoDurMins := getVideoDuration(mi) / 60.0
+	videoDurMins := GetVideoDuration(mi) / 60.0
 
 	if expectedRuntime == 0 {
 		if videoDurMins > 0 && videoDurMins < 1.0 {

@@ -3,6 +3,7 @@ package correct
 import (
 	"cmp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -10,6 +11,7 @@ import (
 	"codeberg.org/upPollo/parsec/internal/checks"
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
+	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
 // RemovalKind identifies why a track is proposed for removal.
@@ -71,6 +73,94 @@ func ComputeMatroskaRemux(tracks []matroska.EbmlTrack, originalLang string) Matr
 		StripCompressionIDs: computeCompressionStrips(tracks),
 		RemovalCandidates:   removals,
 	}
+}
+
+// ComputeTruncatedTracks returns tracks that exceed video duration and will be truncated
+// by mkvmerge --stop-after-video-ends.
+//
+//nolint:cyclop // flat loop with threshold checking
+func ComputeTruncatedTracks(mi *mediainfo.MediaInfo, tracks []matroska.EbmlTrack) []TruncatedTrack {
+	if !config.IsCheckEnabled(config.CheckMediainfoDurations) || mi == nil {
+		return nil
+	}
+
+	videoDur := checks.GetVideoDuration(mi)
+	if videoDur == 0 {
+		return nil
+	}
+
+	var truncated []TruncatedTrack
+
+	typeCounts := make(map[string]int)
+
+	for i := range mi.Media.Tracks {
+		miTrack := &mi.Media.Tracks[i]
+		if (miTrack.Type != "Audio" && miTrack.Type != "Text") || miTrack.Duration == nil || *miTrack.Duration == 0 {
+			continue
+		}
+
+		typeCounts[miTrack.Type]++
+
+		miTypeOrder := typeCounts[miTrack.Type]
+		if miTrack.TypeOrder != nil && *miTrack.TypeOrder > 0 {
+			miTypeOrder = *miTrack.TypeOrder
+		}
+
+		diff := *miTrack.Duration - videoDur
+		if diff <= 5.0 {
+			continue
+		}
+
+		trackID, _ := strconv.Atoi(miTrack.ID)
+		if matchedTrack, ok := matchEbmlTrack(tracks, miTrack, miTypeOrder); ok {
+			trackID = matchedTrack.ID
+		}
+
+		truncated = append(truncated, TruncatedTrack{
+			TrackID: trackID,
+			Diff:    diff,
+		})
+	}
+
+	return truncated
+}
+
+func matchEbmlTrack(tracks []matroska.EbmlTrack, miTrack *mediainfo.Track, miTypeOrder int) (matroska.EbmlTrack, bool) {
+	if id, err := strconv.Atoi(miTrack.ID); err == nil {
+		for _, t := range tracks {
+			if t.Properties.Number == id || t.ID == id {
+				return t, true
+			}
+		}
+	}
+
+	return matchEbmlByTypeOrder(tracks, miTrack.Type, miTypeOrder)
+}
+
+func matchEbmlByTypeOrder(tracks []matroska.EbmlTrack, miType string, miTypeOrder int) (matroska.EbmlTrack, bool) {
+	ebmlType := "audio"
+	if miType == "Text" {
+		ebmlType = "subtitles"
+	}
+
+	ebmlTypeCounts := 0
+
+	for _, t := range tracks {
+		if strings.EqualFold(t.Type, ebmlType) {
+			ebmlTypeCounts++
+
+			tOrder := t.TypeOrder
+			if tOrder == 0 {
+				tOrder = ebmlTypeCounts
+			}
+
+			if tOrder == miTypeOrder {
+				return t, true
+			}
+		}
+	}
+
+	return matroska.EbmlTrack{}, false
 }
 
 // computeTrackOrder returns the desired output order (by track ID).
