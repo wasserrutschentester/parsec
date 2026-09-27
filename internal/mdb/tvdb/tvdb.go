@@ -634,7 +634,7 @@ func applyExternalIDs(ctx context.Context, result *mdb.SearchResult, tvdbID int,
 	origLang := externalIDs.Data.OriginalLanguage
 
 	for _, alias := range externalIDs.Data.Aliases {
-		if isLanguageMatch(alias.Language, prefLang, "en", origLang) {
+		if metadata.IsLanguageMatch(alias.Language, prefLang, "en", origLang) {
 			result.AltTitle = append(result.AltTitle, alias.Name)
 		}
 	}
@@ -1136,22 +1136,6 @@ func fillEpisodeTranslation(ctx context.Context, res *mdb.EpisodeResult, tvdbID 
 			res.Overview = translation.Data.Overview
 		}
 	}
-}
-
-func isLanguageMatch(lang string, targets ...string) bool {
-	tag := language.Make(lang)
-
-	for _, target := range targets {
-		if target == "" {
-			continue
-		}
-
-		if metadata.MatchLanguage(tag, language.Make(target)) {
-			return true
-		}
-	}
-
-	return false
 }
 
 type tvdbEpisodeExtendedResponse struct {

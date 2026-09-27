@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -77,6 +78,15 @@ func MatchLanguage(tag1, tag2 language.Tag) bool {
 	b2, _ := tag2.Base()
 
 	return b1 == b2
+}
+
+// IsLanguageMatch checks if a language string matches any of the target language strings.
+func IsLanguageMatch(lang string, targets ...string) bool {
+	tag := language.Make(lang)
+
+	return slices.ContainsFunc(targets, func(target string) bool {
+		return target != "" && MatchLanguage(tag, language.Make(target))
+	})
 }
 
 // LanguageName returns the full name of a language given its code.

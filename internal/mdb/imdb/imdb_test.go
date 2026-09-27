@@ -161,8 +161,9 @@ func parasiteResponse() any {
 				},
 				"akas": map[string]any{
 					"edges": []any{
-						map[string]any{"node": map[string]any{"text": "Parasite"}},
-						map[string]any{"node": map[string]any{"text": "Parasite: Black & White Edition"}},
+						map[string]any{"node": map[string]any{"text": "Parasite", "country": map[string]any{"id": "US"}}},
+						map[string]any{"node": map[string]any{"text": "Parasite: Black & White Edition", "country": map[string]any{"id": "US"}}},
+						map[string]any{"node": map[string]any{"text": "Parasite en Français", "country": map[string]any{"id": "FR"}, "language": map[string]any{"id": "fr"}}},
 					},
 				},
 			},
@@ -695,5 +696,38 @@ func TestExtractLanguagesZxx(t *testing.T) {
 
 	if primary2 != "zxx" {
 		t.Errorf("primaryLang = %q, want 'zxx'", primary2)
+	}
+}
+
+func TestExtractAltTitles(t *testing.T) {
+	t.Parallel()
+
+	rawJSON := `{
+		"titleText": {"text": "Main Title"},
+		"originalTitleText": {"text": "Original Title"},
+		"akas": {
+			"edges": [
+				{"node": {"text": "Main Title", "country": {"id": "US"}}},
+				{"node": {"text": "Original Title", "country": {"id": "KR"}}},
+				{"node": {"text": "US Title", "country": {"id": "US"}}},
+				{"node": {"text": "UK Title", "country": {"id": "GB"}}},
+				{"node": {"text": "English in Japan", "country": {"id": "JP"}, "language": {"id": "en"}}},
+				{"node": {"text": "Korean Alt", "country": {"id": "KR"}}},
+				{"node": {"text": "French in Canada", "country": {"id": "CA"}, "language": {"id": "fr"}}},
+				{"node": {"text": "German Alt", "country": {"id": "DE"}}}
+			]
+		}
+	}`
+
+	var td titleData
+	if err := json.Unmarshal([]byte(rawJSON), &td); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	alts := td.extractAltTitles("ko", []string{"KR"})
+
+	expected := []string{"US Title", "UK Title", "English in Japan", "Korean Alt"}
+	if !slices.Equal(alts, expected) {
+		t.Errorf("extractAltTitles = %v, want %v", alts, expected)
 	}
 }

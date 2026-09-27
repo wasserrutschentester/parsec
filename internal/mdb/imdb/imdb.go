@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/text/language"
+
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/ui"
@@ -45,6 +48,8 @@ const (
       edges {
         node {
           text
+          country { id }
+          language { id }
         }
       }
     }
@@ -162,7 +167,13 @@ type titleData struct {
 	Akas struct {
 		Edges []struct {
 			Node struct {
-				Text string `json:"text"`
+				Text    string `json:"text"`
+				Country struct {
+					ID string `json:"id"`
+				} `json:"country"`
+				Language struct {
+					ID string `json:"id"`
+				} `json:"language"`
 			} `json:"node"`
 		} `json:"edges"`
 	} `json:"akas"`
@@ -320,12 +331,39 @@ func (t *titleData) extractLanguages() ([]LanguageItem, string) {
 	return spokenLanguages, primaryLang
 }
 
-func (t *titleData) extractAltTitles() []string {
+func isAkaMatch(lang, country, prefLang, origLang string, originCountries, countryTargets []string) bool {
+	if lang != "" {
+		return metadata.IsLanguageMatch(lang, prefLang, "en", origLang)
+	}
+
+	c := strings.ToUpper(country)
+	switch c {
+	case "US", "GB", "CA", "AU":
+		return true
+	case "":
+		return false
+	default:
+		return slices.Contains(originCountries, c) || slices.Contains(countryTargets, c)
+	}
+}
+
+func (t *titleData) extractAltTitles(origLang string, originCountries []string) []string {
 	var altTitles []string
+
+	prefLang := config.GetPreferredLanguage()
+	prefTag := language.Make(prefLang)
+	origTag := language.Make(origLang)
+	prefRegion, _ := prefTag.Region()
+	origRegion, _ := origTag.Region()
+	countryTargets := []string{strings.ToUpper(prefTag.String()), prefRegion.String(), origRegion.String()}
 
 	for _, edge := range t.Akas.Edges {
 		text := strings.TrimSpace(edge.Node.Text)
-		if text != "" && text != t.TitleText.Text && !slices.Contains(altTitles, text) {
+		if text == "" || text == t.TitleText.Text || text == t.OriginalTitleText.Text || slices.Contains(altTitles, text) {
+			continue
+		}
+
+		if isAkaMatch(edge.Node.Language.ID, edge.Node.Country.ID, prefLang, origLang, originCountries, countryTargets) {
 			altTitles = append(altTitles, text)
 		}
 	}
@@ -448,6 +486,7 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 
 	spokenLanguages, primaryLang := t.extractLanguages()
 	directors, writers, cast := t.extractCredits()
+	countries := t.extractCountries()
 
 	return &TitleDetails{
 		IMDbID:           t.ID,
@@ -465,8 +504,8 @@ func GetTitleDetails(ctx context.Context, imdbID string) (*TitleDetails, error) 
 		Votes:            t.RatingsSummary.VoteCount,
 		Certificate:      t.Certificate.Rating,
 		Genres:           t.extractGenres(),
-		Countries:        t.extractCountries(),
-		AltTitles:        t.extractAltTitles(),
+		Countries:        countries,
+		AltTitles:        t.extractAltTitles(primaryLang, countries),
 		Status:           t.computeStatus(),
 		Directors:        directors,
 		Writers:          writers,
