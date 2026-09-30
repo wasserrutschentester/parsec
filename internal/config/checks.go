@@ -35,6 +35,7 @@ const (
 	CheckMediainfoStereoLossless    = "mediainfo_stereo_lossless"
 	CheckMediainfoEmptyTracks       = "mediainfo_empty_tracks"
 	CheckMediainfoMissingStatistics = "mediainfo_missing_statistics"
+	CheckMediainfoFixedGOP          = "mediainfo_fixed_gop"
 
 	// Matroska: Track Basics
 	CheckMatroskaLanguageTag      = "matroska_language_tag"
@@ -121,6 +122,7 @@ var AllChecks = []string{
 	CheckMediainfoStereoLossless,
 	CheckMediainfoEmptyTracks,
 	CheckMediainfoMissingStatistics,
+	CheckMediainfoFixedGOP,
 	CheckMatroskaLanguageTag,
 	CheckMatroskaMultiLang,
 	CheckMatroskaNameQuality,

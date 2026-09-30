@@ -2,7 +2,9 @@ package checks
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"codeberg.org/upPollo/parsec/internal/config"
@@ -13,7 +15,7 @@ import (
 
 // RunMediaInfoChecks performs checks based on technical metadata from MediaInfo.
 //
-//nolint:cyclop // technical quality checks involve many different codecs, formats, and bitrate combinations
+//nolint:cyclop,funlen // technical quality checks involve many different codecs, formats, and bitrate combinations
 func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResult {
 	var (
 		results    []CheckResult
@@ -80,6 +82,11 @@ func RunMediaInfoChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []Chec
 	// 10. Missing Statistics
 	if config.IsCheckEnabled(config.CheckMediainfoMissingStatistics) {
 		results = append(results, checkMissingStatistics(mi)...)
+	}
+
+	// 11. Fixed GOP with encoder in name
+	if config.IsCheckEnabled(config.CheckMediainfoFixedGOP) {
+		results = append(results, checkFixedGOP(videoTrack, meta, mi)...)
 	}
 
 	return results
@@ -542,4 +549,108 @@ func checkMissingStatistics(mi *mediainfo.MediaInfo) []CheckResult {
 	}
 
 	return nil
+}
+
+func checkFixedGOP(videoTrack *mediainfo.Track, meta *metadata.Metadata, mi *mediainfo.MediaInfo) []CheckResult {
+	res := CheckResult{
+		Identifier: config.CheckMediainfoFixedGOP,
+		Passed:     true,
+	}
+
+	if videoTrack == nil {
+		return []CheckResult{res}
+	}
+
+	isFixed, keyint := isFixedGOP(videoTrack.EncodedLibrarySettings)
+	if !isFixed {
+		return []CheckResult{res}
+	}
+
+	if !filenameHasEncoder(mi, meta) {
+		return []CheckResult{res}
+	}
+
+	res.Passed = false
+	res.Severity = "warning"
+	res.Warning = fmt.Sprintf("Video has fixed GOP (%d frames) with encoder tag in filename; likely mislabeled WEB-DL or poor encoding settings", keyint)
+	res.Tracks = []TrackCheckResult{miTrackToResult(videoTrack, fmt.Sprintf("fixed GOP length %d frames (scenecut disabled)", keyint))}
+
+	return []CheckResult{res}
+}
+
+func filenameHasEncoder(mi *mediainfo.MediaInfo, meta *metadata.Metadata) bool {
+	var names []string
+	if mi != nil && mi.Media.Ref != "" {
+		names = append(names, filepath.Base(mi.Media.Ref))
+	}
+
+	if meta != nil {
+		if meta.VideoCodec != "" {
+			names = append(names, meta.VideoCodec)
+		}
+	}
+
+	for _, name := range names {
+		lower := strings.ToLower(name)
+		if strings.Contains(lower, "x264") || strings.Contains(lower, "x265") || strings.Contains(lower, "x266") {
+			return true
+		}
+	}
+
+	return false
+}
+
+//nolint:cyclop // parses multi-token encoded library settings string
+func isFixedGOP(settings string) (bool, int) {
+	if settings == "" {
+		return false, 0
+	}
+
+	var (
+		scenecutZero bool
+		keyint       int
+		minKeyint    int
+	)
+
+	for part := range strings.SplitSeq(settings, "/") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "no-scenecut" {
+			scenecutZero = true
+
+			continue
+		}
+
+		k, v, found := strings.Cut(trimmed, "=")
+		if !found {
+			continue
+		}
+
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+
+		switch k {
+		case "scenecut":
+			if v == "0" || v == "none" {
+				scenecutZero = true
+			}
+		case "keyint":
+			if val, err := strconv.Atoi(v); err == nil {
+				keyint = val
+			}
+		case "min-keyint", "keyint_min":
+			if val, err := strconv.Atoi(v); err == nil {
+				minKeyint = val
+			}
+		}
+	}
+
+	if scenecutZero && keyint > 0 {
+		return true, keyint
+	}
+
+	if keyint > 0 && minKeyint > 0 && keyint == minKeyint {
+		return true, keyint
+	}
+
+	return false, 0
 }

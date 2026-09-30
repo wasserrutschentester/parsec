@@ -3,6 +3,7 @@ package checks
 import (
 	"testing"
 
+	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/mediainfo"
 )
 
@@ -562,6 +563,163 @@ func TestCheckZeroChannelsElements(t *testing.T) {
 
 			if !tt.wantWarn && hasFailure {
 				t.Errorf("checkEmptyTracks() expected no warning/error, got failure")
+			}
+		})
+	}
+}
+
+//nolint:funlen // comprehensive test matrix for fixed GOP detection
+func TestIsFixedGOP(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		settings   string
+		wantFixed  bool
+		wantKeyint int
+	}{
+		{
+			name:       "Netflix fixed GOP 48 frames (24fps 2s chunks)",
+			settings:   "cabac=1 / ref=4 / deblock=1:0:0 / open_gop=0 / keyint=48 / min-keyint=48 / scenecut=0 / rc=2pass",
+			wantFixed:  true,
+			wantKeyint: 48,
+		},
+		{
+			name:       "PAL 25fps fixed GOP 50 frames",
+			settings:   "cabac=1 / ref=4 / open_gop=0 / keyint=50 / keyint_min=50 / scenecut=0",
+			wantFixed:  true,
+			wantKeyint: 50,
+		},
+		{
+			name:       "30fps fixed GOP 60 frames",
+			settings:   "keyint=60 / min-keyint=60 / scenecut=0",
+			wantFixed:  true,
+			wantKeyint: 60,
+		},
+		{
+			name:       "no-scenecut flag",
+			settings:   "keyint=48 / no-scenecut",
+			wantFixed:  true,
+			wantKeyint: 48,
+		},
+		{
+			name:       "min-keyint equals keyint",
+			settings:   "keyint=48 / min-keyint=48",
+			wantFixed:  true,
+			wantKeyint: 48,
+		},
+		{
+			name:       "Standard P2P WEBRip with adaptive scenecut",
+			settings:   "cabac=1 / ref=4 / keyint=240 / min-keyint=24 / scenecut=40 / rc=crf / crf=19.0",
+			wantFixed:  false,
+			wantKeyint: 0,
+		},
+		{
+			name:       "Empty settings",
+			settings:   "",
+			wantFixed:  false,
+			wantKeyint: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixed, keyint := isFixedGOP(tt.settings)
+			if fixed != tt.wantFixed || keyint != tt.wantKeyint {
+				t.Errorf("isFixedGOP() = (%v, %d), want (%v, %d)", fixed, keyint, tt.wantFixed, tt.wantKeyint)
+			}
+		})
+	}
+}
+
+//nolint:funlen // comprehensive test matrix covering various combinations of fixed GOP and encoder tags
+func TestCheckFixedGOP(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		ref        string
+		videoCodec string
+		settings   string
+		wantWarn   bool
+	}{
+		{
+			name:     "x264 in filename with fixed GOP (Netflix WEB-DL mislabeled)",
+			ref:      "/path/Show.S01E01.1080p.NF.WEB-DL.DDP5.1.Atmos.x264.mkv",
+			settings: "keyint=48 / min-keyint=48 / scenecut=0",
+			wantWarn: true,
+		},
+		{
+			name:     "x265 in filename with fixed GOP",
+			ref:      "/path/Movie.2024.2160p.WEB-DL.x265.mkv",
+			settings: "keyint=60 / scenecut=0",
+			wantWarn: true,
+		},
+		{
+			name:       "x264 in meta.VideoCodec with fixed GOP",
+			ref:        "/path/movie.mkv",
+			videoCodec: "x264",
+			settings:   "keyint=48 / min-keyint=48 / scenecut=0",
+			wantWarn:   true,
+		},
+		{
+			name:     "x264 in filename with dynamic GOP (legitimate encode)",
+			ref:      "/path/Show.S01E01.1080p.BluRay.x264.mkv",
+			settings: "keyint=240 / min-keyint=24 / scenecut=40",
+			wantWarn: false,
+		},
+		{
+			name:     "H.264 in filename with fixed GOP (properly labeled WEB-DL)",
+			ref:      "/path/Show.S01E01.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264.mkv",
+			settings: "keyint=48 / min-keyint=48 / scenecut=0",
+			wantWarn: false,
+		},
+		{
+			name:     "Empty settings",
+			ref:      "/path/Show.S01E01.1080p.x264.mkv",
+			settings: "",
+			wantWarn: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			videoTrack := &mediainfo.Track{
+				Type:                   "Video",
+				EncodedLibrarySettings: tt.settings,
+			}
+			mi := &mediainfo.MediaInfo{
+				Media: mediainfo.Media{
+					Ref:    tt.ref,
+					Tracks: []mediainfo.Track{*videoTrack},
+				},
+			}
+			meta := &metadata.Metadata{
+				VideoCodec: tt.videoCodec,
+			}
+
+			results := checkFixedGOP(videoTrack, meta, mi)
+
+			hasWarning := false
+
+			for _, r := range results {
+				if !r.Passed {
+					hasWarning = true
+
+					break
+				}
+			}
+
+			if tt.wantWarn && !hasWarning {
+				t.Errorf("checkFixedGOP() expected warning, got passed")
+			}
+
+			if !tt.wantWarn && hasWarning {
+				t.Errorf("checkFixedGOP() expected pass, got warning")
 			}
 		})
 	}

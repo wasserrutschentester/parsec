@@ -195,6 +195,7 @@ The checks disabled by default are:
 -   `mediainfo_stereo_lossless`: Warn if an audio track with 2 or less channels uses a different lossless codec than FLAC.
 -   `mediainfo_empty_tracks`: Warn (with error severity) if an audio track has zero channels or a subtitle track has zero elements.
 -   `mediainfo_missing_statistics`: Warn if a track is missing statistics tags.
+-   `mediainfo_fixed_gop`: Warn if video has a fixed GOP length with an encoder tag (x264/x265) in the filename.
 -   `matroska_track_order`: Verify track ordering rules.
 -   `matroska_language_tag`: Verify valid ISO language tags on tracks.
 -   `matroska_multi_lang`: Ensure 'mul' tracks have at least two full language names.
