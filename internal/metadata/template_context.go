@@ -61,7 +61,7 @@ func (meta *Metadata) ToTemplateContextWithRaw(mi, mdbRes any) TemplateContext {
 	}
 
 	// Season Pack indicator (matches nfo.Context.IsPack)
-	if meta.Season > 0 && len(meta.Episodes) == 0 {
+	if (meta.Season > 0 || meta.IsTV) && len(meta.Episodes) == 0 {
 		ctx.IsPack = true
 	}
 

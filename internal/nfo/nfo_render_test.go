@@ -251,3 +251,28 @@ func TestKodiTemplateRatingsAndCertificate(t *testing.T) {
 		}
 	}
 }
+
+func TestFileContext_BackwardCompatibility(t *testing.T) {
+	t.Parallel()
+
+	fctx := FileContext{
+		Metadata: metadata.Metadata{
+			LanguageISO:         "de",
+			LanguageExtra:       "DL",
+			Edition:             "Extended",
+			AudioExtra:          "Atmos",
+			OriginalLanguageISO: "en",
+			IsRepack:            true,
+			IsSubbed:            true,
+			IsDualAudio:         true,
+		},
+	}
+
+	tmplStr := `{{.Language}}-{{.LanguageExt}}-{{.CutEdition}}-{{.AudioMeta}}-{{.OriginalLanguage}}-{{.Repack}}-{{.Subbed}}-{{.DualAudio}}`
+	expected := "de-DL-Extended-Atmos-en-true-true-true"
+	res := renderTestHelper(t, tmplStr, fctx)
+
+	if res != expected {
+		t.Errorf("got %q, want %q", res, expected)
+	}
+}

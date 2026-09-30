@@ -137,6 +137,19 @@ func TestMetadata_Render_GoTemplates(t *testing.T) {
 			sep:      ".",
 			want:     "The.dark.knight-GRP",
 		},
+		{
+			name: "Contains function with slice",
+			meta: Metadata{
+				Title:          "Movie",
+				Year:           2023,
+				AudioLanguages: []string{"en", "de"},
+				Resolution:     "1080p",
+				Group:          "GRP",
+			},
+			template: `{{.Title}}.{{.YearTag}}{{if contains "de" .AudioLanguages}}.German{{end}}-{{.Group}}`,
+			sep:      ".",
+			want:     "Movie.2023.German-GRP",
+		},
 	}
 
 	for _, tt := range tests {
@@ -201,6 +214,16 @@ func TestDetermineCodecStyle(t *testing.T) {
 		{
 			name:     "Service with WEBRip source",
 			meta:     Metadata{Service: "NF", Source: "WEBRip", IsEncode: true},
+			expected: "encode",
+		},
+		{
+			name:     "WEBRip without encode flag",
+			meta:     Metadata{Source: "WEBRip"},
+			expected: "encode",
+		},
+		{
+			name:     "Service with WEBRip source without encode flag",
+			meta:     Metadata{Service: "NF", Source: "WEBRip"},
 			expected: "encode",
 		},
 		{
@@ -281,6 +304,48 @@ func TestTemplateContext_YearTag(t *testing.T) {
 	}
 }
 
+func TestTemplateContext_IsPack(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		meta Metadata
+		want bool
+	}{
+		{
+			name: "Regular Season Pack S01",
+			meta: Metadata{Season: 1, Episodes: nil},
+			want: true,
+		},
+		{
+			name: "Season 0 Specials Pack S00",
+			meta: Metadata{Season: 0, IsTV: true, Episodes: nil},
+			want: true,
+		},
+		{
+			name: "Single TV Episode S01E01",
+			meta: Metadata{Season: 1, IsTV: true, Episodes: []int{1}},
+			want: false,
+		},
+		{
+			name: "Movie not TV",
+			meta: Metadata{Season: 0, IsTV: false, Episodes: nil},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := tt.meta.ToTemplateContext()
+			if ctx.IsPack != tt.want {
+				t.Errorf("IsPack = %v, want %v", ctx.IsPack, tt.want)
+			}
+		})
+	}
+}
+
 func TestCodecStyleMatrix(t *testing.T) {
 	t.Parallel()
 
@@ -337,5 +402,88 @@ func TestCodecStyleMatrix(t *testing.T) {
 	ctxOverride := override.ToTemplateContext()
 	if got, want := ctxOverride.VideoCodec, "x265"; got != want {
 		t.Errorf("Override style VideoCodec = %q, want %q", got, want)
+	}
+}
+
+//nolint:paralleltest // mutates global viper config
+func TestFormatVideoCodec_LegacyOverrides(t *testing.T) {
+	origAVC := viper.GetString("video_codec_avc")
+	origHEVC := viper.GetString("video_codec_hevc")
+
+	t.Cleanup(func() {
+		viper.Set("video_codec_avc", origAVC)
+		viper.Set("video_codec_hevc", origHEVC)
+	})
+
+	// When not set, default style preserves raw codec
+	viper.Set("video_codec_avc", "")
+	viper.Set("video_codec_hevc", "")
+
+	if got := FormatVideoCodec("AVC", "default"); got != "AVC" {
+		t.Errorf("expected raw 'AVC', got %q", got)
+	}
+
+	if got := FormatVideoCodec("HEVC", "default"); got != "HEVC" {
+		t.Errorf("expected raw 'HEVC', got %q", got)
+	}
+
+	// Legacy settings override default style
+	viper.Set("video_codec_avc", "x264")
+	viper.Set("video_codec_hevc", "x265")
+
+	if got := FormatVideoCodec("AVC", "default"); got != "x264" {
+		t.Errorf("expected overridden 'x264', got %q", got)
+	}
+
+	if got := FormatVideoCodec("HEVC", "default"); got != "x265" {
+		t.Errorf("expected overridden 'x265', got %q", got)
+	}
+
+	// Specific styles take precedence over legacy overrides
+	if got := FormatVideoCodec("AVC", "remux"); got != "AVC" {
+		t.Errorf("remux style should take precedence over legacy override; got %q", got)
+	}
+}
+
+//nolint:paralleltest // uses default config template
+func TestDefaultTemplate_RemuxAndEncode(t *testing.T) {
+	config.InitDefaults()
+
+	remux := Metadata{
+		Title:         "Movie",
+		Year:          2024,
+		Resolution:    "1080p",
+		Source:        "BluRay",
+		IsRemux:       true,
+		AudioCodec:    "DTS-HD MA",
+		AudioChannels: "5.1",
+		VideoCodec:    "AVC",
+		Group:         "GRP",
+	}
+
+	wantRemux := "Movie.2024.1080p.BluRay.REMUX.DTS-HD.MA5.1.AVC-GRP"
+	remuxName := remux.GetReleaseName()
+
+	if remuxName != wantRemux {
+		t.Errorf("Remux release name = %q, want %q", remuxName, wantRemux)
+	}
+
+	encode := Metadata{
+		Title:         "Movie",
+		Year:          2024,
+		Resolution:    "1080p",
+		Source:        "BluRay",
+		IsEncode:      true,
+		AudioCodec:    "DTS-HD MA",
+		AudioChannels: "5.1",
+		VideoCodec:    "AVC",
+		Group:         "GRP",
+	}
+
+	wantEncode := "Movie.2024.1080p.BluRay.DTS-HD.MA5.1.x264-GRP"
+	encodeName := encode.GetReleaseName()
+
+	if encodeName != wantEncode {
+		t.Errorf("Encode release name = %q, want %q", encodeName, wantEncode)
 	}
 }

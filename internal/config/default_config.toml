@@ -28,14 +28,10 @@ subbed_tagging = true
 
 # Naming template for releases
 # for what is available see https://codeberg.org/upPollo/parsec/src/branch/main/docs/templates.md
-template = '{{join "." .Title .YearTag .SeasonEpisode .Edition .EpisodeTitle .VersionTag .RepackTag .LanguageName .LanguageExtra .Accessibility .Resolution .Service .Source .AudioSpec .HDR .VideoCodec}}-{{.Group}}'
+template = '{{join "." .Title .YearTag .SeasonEpisode .Edition .EpisodeTitle .VersionTag .RepackTag .LanguageName .LanguageExtra .Accessibility .Resolution .Service .Source (when .IsRemux "REMUX") .AudioSpec .HDR .VideoCodec}}-{{.Group}}'
 
 # Default template to use for NFO generation
 nfogen_template = "default"
-
-# Display names for video codecs
-video_codec_avc = "H.264"
-video_codec_hevc = "H.265"
 
 # Character used to replace spaces in titles, episode titles, and codecs.
 word_separator = "."
@@ -131,14 +127,12 @@ service = "DSNP"
 # ------------------------------------------------------------------------------
 # PRESET: remux
 # Use case: High-quality BluRay Remuxes.
-# use REMUX keyword and change order of video and audio codec info
 # ------------------------------------------------------------------------------
 [preset.movie-remux]
 description = "HEVC/AVC codec labels"
 source = "BluRay"
-video_codec_hevc = "HEVC"
-video_codec_avc = "AVC"
-template = '{{join "." .Title .YearTag .Resolution .Source "REMUX" .VideoCodec .AudioSpec}}-{{.Group}}'
+codec_style = "remux"
+template = '{{join "." .Title .YearTag .Resolution .Source "REMUX" .AudioSpec .HDR .VideoCodec}}-{{.Group}}'
 
 # ------------------------------------------------------------------------------
 # PRESET: encode
@@ -147,8 +141,7 @@ template = '{{join "." .Title .YearTag .Resolution .Source "REMUX" .VideoCodec .
 [preset.encode]
 description = "x264/x265 codec labels"
 source = "BluRay"
-video_codec_hevc = "x265"
-video_codec_avc = "x264"
+codec_style = "encode"
 
 # ------------------------------------------------------------------------------
 # PRESET: quick-check

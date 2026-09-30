@@ -469,6 +469,10 @@ func compareValues(val reflect.Value, op string, matchVal any) bool {
 		return Contains(itemVal, matchVal)
 	case "not in":
 		return !Contains(itemVal, matchVal)
+	case "contains":
+		return Contains(matchVal, itemVal)
+	case "not contains":
+		return !Contains(matchVal, itemVal)
 	}
 
 	return false

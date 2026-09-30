@@ -199,8 +199,8 @@ func Parse(filename string) *metadata.Metadata {
 
 	meta.Title = strings.Trim(meta.Title, ". -")
 
-	// Match AKA foreign title if present in Title
-	matchAKA(meta)
+	// Match AKA foreign title if present in Title or filename
+	matchAKA(filename, meta)
 
 	// Episode title
 	if t := matchEpisodeTitle(filename, meta); t != "" {
@@ -215,8 +215,13 @@ func Parse(filename string) *metadata.Metadata {
 func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 	end := len(filename)
 
+	langTag := ""
+	if meta.LanguageISO != "" {
+		langTag = metadata.LanguageName(meta.LanguageISO)
+	}
+
 	tags := []string{
-		meta.LanguageISO,
+		langTag,
 		meta.Resolution,
 		meta.Service,
 		meta.Source,
@@ -344,7 +349,9 @@ func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 	end := len(sub)
 
 	if meta.LanguageISO != "" {
-		re := regexp.MustCompile("(?i)[ .\\(\\[]" + regexp.QuoteMeta(meta.LanguageISO))
+		langName := metadata.LanguageName(meta.LanguageISO)
+
+		re := regexp.MustCompile("(?i)[ .\\(\\[]" + regexp.QuoteMeta(langName))
 		if loc := re.FindStringIndex(sub); loc != nil {
 			end = loc[0]
 		}
@@ -439,7 +446,7 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 
 func matchLanguage(filename string, meta *metadata.Metadata) {
 	if match := reLanguage.FindStringSubmatch(filename); len(match) > 0 {
-		meta.LanguageISO = match[1]
+		meta.LanguageISO = metadata.NormalizeLanguageISO(match[1])
 		if len(match) > 2 && match[2] != "" {
 			meta.LanguageExtra = match[2]
 			if match[2] == "SUBBED" {
@@ -693,21 +700,66 @@ func matchEncode(filename string, meta *metadata.Metadata) {
 	}
 }
 
-func matchAKA(meta *metadata.Metadata) {
-	if meta.Title == "" {
+func matchAKA(filename string, meta *metadata.Metadata) {
+	if matchAKATitle(meta) {
 		return
 	}
 
-	loc := reAKA.FindStringIndex(meta.Title)
-	if loc != nil {
-		orig := strings.Trim(meta.Title[:loc[0]], ". -")
-		title := strings.Trim(meta.Title[loc[1]:], ". -")
-
-		if orig != "" && title != "" {
-			meta.OriginalTitle = orig
-			meta.Title = title
-		}
+	loc := reAKA.FindStringIndex(filename)
+	if loc == nil {
+		return
 	}
+
+	orig := meta.Title
+	if orig == "" {
+		beforeAKA := filename[:loc[0]]
+		if meta.Group != "" {
+			beforeAKA = strings.TrimPrefix(beforeAKA, "["+meta.Group+"]")
+		}
+
+		orig = strings.Trim(beforeAKA, ". -")
+	}
+
+	afterAKA := filename[loc[1]:]
+
+	title, y := matchTitleYear(afterAKA)
+	if title == "" {
+		title = extractTitleFallback(afterAKA, meta)
+	}
+
+	if y > 0 && meta.Year == 0 {
+		meta.Year = y
+	}
+
+	title = strings.Trim(title, ". -")
+
+	if orig != "" && title != "" {
+		meta.OriginalTitle = orig
+		meta.Title = title
+	}
+}
+
+func matchAKATitle(meta *metadata.Metadata) bool {
+	if meta.Title == "" {
+		return false
+	}
+
+	loc := reAKA.FindStringIndex(meta.Title)
+	if loc == nil {
+		return false
+	}
+
+	orig := strings.Trim(meta.Title[:loc[0]], ". -")
+	title := strings.Trim(meta.Title[loc[1]:], ". -")
+
+	if orig != "" && title != "" {
+		meta.OriginalTitle = orig
+		meta.Title = title
+
+		return true
+	}
+
+	return false
 }
 
 func matchCRC32(filename string, meta *metadata.Metadata) {

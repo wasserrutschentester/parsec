@@ -19,7 +19,6 @@ import (
 var (
 	reDTSX = regexp.MustCompile(`\bX\b`)
 
-	reCleanKeys            = regexp.MustCompile(`\{[^}]*\}`)
 	reCleanEmptyEnclosures = []*regexp.Regexp{
 		regexp.MustCompile(`\(\s*[\.\-]*\s*\)`),
 		regexp.MustCompile(`\[\s*[\.\-]*\s*\]`),
@@ -135,6 +134,49 @@ func LanguageName(lang string) string {
 	}
 
 	return strings.ToUpper(lang)
+}
+
+var languageNameToISO = map[string]string{
+	"GERMAN":     "de",
+	"ENGLISH":    "en",
+	"FRENCH":     "fr",
+	"SPANISH":    "es",
+	"ITALIAN":    "it",
+	"PORTUGUESE": "pt",
+	"DUTCH":      "nl",
+	"SWEDISH":    "sv",
+	"NORWEGIAN":  "no",
+	"FINNISH":    "fi",
+	"GREEK":      "el",
+	"HEBREW":     "he",
+	"ARABIC":     "ar",
+	"CHINESE":    "zh",
+	"JAPANESE":   "ja",
+	"KOREAN":     "ko",
+	"THAI":       "th",
+	"VIETNAMESE": "vi",
+	"HUNGARIAN":  "hu",
+	"ROMANIAN":   "ro",
+	"POLISH":     "pl",
+	"CZECH":      "cs",
+	"SLOVAK":     "sk",
+	"SLOVENIAN":  "sl",
+	"MULTI":      "mul",
+	"ZXX":        "zxx",
+	"SILENT":     "zxx",
+}
+
+// NormalizeLanguageISO converts a language name or code to its standard ISO code (e.g. "GERMAN" -> "de").
+func NormalizeLanguageISO(lang string) string {
+	if lang == "" {
+		return ""
+	}
+
+	if code, ok := languageNameToISO[strings.ToUpper(lang)]; ok {
+		return code
+	}
+
+	return strings.ToLower(lang)
 }
 
 // ChanToNotation converts a number of channels to a string notation (e.g. 6 -> "5.1").
@@ -389,6 +431,10 @@ func (meta *Metadata) setTechnicalDefaults() {
 	if meta.Group == "" {
 		meta.Group = config.GetGroup()
 	}
+
+	if meta.CodecStyle == "" {
+		meta.CodecStyle = config.GetCodecStyle()
+	}
 }
 
 func (meta *Metadata) setIDDefaults() {
@@ -434,9 +480,6 @@ func (meta *Metadata) render(tmpl string) string {
 }
 
 func cleanName(name string) string {
-	// 0. remove remaining keys
-	name = reCleanKeys.ReplaceAllString(name, "")
-
 	// 1. Remove empty enclosures (parentheses, brackets, braces) that might contain only separators
 	for _, re := range reCleanEmptyEnclosures {
 		name = re.ReplaceAllString(name, "")

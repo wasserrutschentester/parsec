@@ -77,6 +77,7 @@ var expectedTypes = map[string]string{
 	"audio_description":     "bool",
 	"template":              "string",
 	"nfogen_template":       "string",
+	"codec_style":           "string",
 	"video_codec_avc":       "string",
 	"video_codec_hevc":      "string",
 	"word_separator":        "string",
@@ -344,6 +345,8 @@ func validateSpecificKeys(k string, v any, fullKey string) []string {
 		if checkList, ok := v.([]any); ok {
 			errors = append(errors, validateCheckIdentifiers(checkList, fullKey)...)
 		}
+	case "video_codec_avc", "video_codec_hevc":
+		errors = append(errors, fmt.Sprintf("'%s' is deprecated, please use 'video_codec_style' instead", fullKey))
 	}
 
 	return errors

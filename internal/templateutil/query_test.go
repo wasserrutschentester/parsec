@@ -161,7 +161,7 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
-//nolint:cyclop // tests multiple query operator branches
+//nolint:cyclop,funlen // tests multiple query operator branches
 func TestWhere(t *testing.T) {
 	t.Parallel()
 
@@ -221,6 +221,32 @@ func TestWhere(t *testing.T) {
 
 		if res, ok := enTracks.([]any); !ok || len(res) != 2 {
 			t.Fatalf("Where(Language in ['en']) len = %d, want 2", len(res))
+		}
+	})
+
+	t.Run("ContainsOperator", func(t *testing.T) {
+		t.Parallel()
+
+		resTracks, err := Where("Codec", "contains", "D", tracks)
+		if err != nil {
+			t.Fatalf("Where(Codec contains 'D') err: %v", err)
+		}
+
+		if res, ok := resTracks.([]any); !ok || len(res) != 1 {
+			t.Fatalf("Where(Codec contains 'D') len = %d, want 1", len(res))
+		}
+	})
+
+	t.Run("NotContainsOperator", func(t *testing.T) {
+		t.Parallel()
+
+		resTracks, err := Where("Codec", "not contains", "D", tracks)
+		if err != nil {
+			t.Fatalf("Where(Codec not contains 'D') err: %v", err)
+		}
+
+		if res, ok := resTracks.([]any); !ok || len(res) != 3 {
+			t.Fatalf("Where(Codec not contains 'D') len = %d, want 3", len(res))
 		}
 	})
 }

@@ -98,6 +98,31 @@ replacement = ""
 	})
 }
 
+func TestValidateLegacyCodecDeprecation(t *testing.T) {
+	t.Parallel()
+
+	cfg := map[string]any{
+		"video_codec_avc":  "x264",
+		"video_codec_hevc": "x265",
+	}
+
+	errs := validateMapTypes(cfg, "", expectedTypes)
+	if len(errs) != 2 {
+		t.Fatalf("expected 2 deprecation warnings, got %d: %v", len(errs), errs)
+	}
+
+	expected := map[string]bool{
+		"'video_codec_avc' is deprecated, please use 'video_codec_style' instead":  true,
+		"'video_codec_hevc' is deprecated, please use 'video_codec_style' instead": true,
+	}
+
+	for _, e := range errs {
+		if !expected[e] {
+			t.Errorf("unexpected error: %s", e)
+		}
+	}
+}
+
 func TestValidateLanguage(t *testing.T) {
 	t.Parallel()
 

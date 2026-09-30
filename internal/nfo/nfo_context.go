@@ -53,6 +53,21 @@ func (f FileContext) Subbed() bool { return f.IsSubbed }
 // DualAudio returns IsDualAudio for backward compatibility in NFO templates.
 func (f FileContext) DualAudio() bool { return f.IsDualAudio }
 
+// Language returns LanguageISO for backward compatibility in NFO templates.
+func (f FileContext) Language() string { return f.LanguageISO }
+
+// LanguageExt returns LanguageExtra for backward compatibility in NFO templates.
+func (f FileContext) LanguageExt() string { return f.LanguageExtra }
+
+// CutEdition returns Edition for backward compatibility in NFO templates.
+func (f FileContext) CutEdition() string { return f.Edition }
+
+// AudioMeta returns AudioExtra for backward compatibility in NFO templates.
+func (f FileContext) AudioMeta() string { return f.AudioExtra }
+
+// OriginalLanguage returns OriginalLanguageISO for backward compatibility in NFO templates.
+func (f FileContext) OriginalLanguage() string { return f.OriginalLanguageISO }
+
 // Context holds template variables
 type Context struct {
 	FileContext

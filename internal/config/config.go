@@ -20,7 +20,7 @@ var defaultConfig string
 
 // InitDefaults initializes the default configuration values in viper.
 func InitDefaults() {
-	viper.SetDefault("template", `{{join "." .Title .YearTag .SeasonEpisode .Edition .EpisodeTitle .VersionTag .RepackTag .LanguageName .LanguageExtra .Accessibility .Resolution .Service .Source .AudioSpec .HDR .VideoCodec}}-{{.Group}}`)
+	viper.SetDefault("template", `{{join "." .Title .YearTag .SeasonEpisode .Edition .EpisodeTitle .VersionTag .RepackTag .LanguageName .LanguageExtra .Accessibility .Resolution .Service .Source (when .IsRemux "REMUX") .AudioSpec .HDR .VideoCodec}}-{{.Group}}`)
 	viper.SetDefault("video_codec_style", map[string]map[string]string{
 		"web_dl": {
 			"AVC":  "H.264",
@@ -42,8 +42,6 @@ func InitDefaults() {
 	viper.SetDefault("audio_description", false)
 	viper.SetDefault("source", "WEB-DL")
 	viper.SetDefault("group", "PAARSEX")
-	viper.SetDefault("video_codec_avc", "H.264")
-	viper.SetDefault("video_codec_hevc", "H.265")
 	viper.SetDefault("update.check", true)
 	viper.SetDefault("update.auto", false)
 	viper.SetDefault("update.prerelease", false)
@@ -295,12 +293,21 @@ func GetWordSeparator() string {
 	return getString("word_separator")
 }
 
+// GetCodecStyle returns the configured video codec style name (e.g. web_dl, remux, encode).
+func GetCodecStyle() string {
+	return getString("codec_style")
+}
+
 // GetVideoCodecAVC returns the AVC video codec name.
+//
+// Deprecated: use video_codec_style instead.
 func GetVideoCodecAVC() string {
 	return getString("video_codec_avc")
 }
 
 // GetVideoCodecHEVC returns the HEVC video codec name.
+//
+// Deprecated: use video_codec_style instead.
 func GetVideoCodecHEVC() string {
 	return getString("video_codec_hevc")
 }

@@ -26,16 +26,14 @@ func DetermineCodecStyle(meta *Metadata) string {
 	}
 
 	src := strings.ToUpper(meta.Source)
-	if strings.Contains(src, "WEB-DL") || strings.Contains(src, "WEBDL") || (meta.Service != "" && !strings.Contains(src, "RIP")) {
+	isRip := strings.Contains(src, "RIP")
+
+	if !isRip && (strings.Contains(src, "WEB") || meta.Service != "") {
 		return "web_dl"
 	}
 
-	if meta.IsEncode {
+	if meta.IsEncode || isRip {
 		return "encode"
-	}
-
-	if strings.Contains(src, "WEB") || meta.Service != "" {
-		return "web_dl"
 	}
 
 	return "default"
@@ -44,6 +42,13 @@ func DetermineCodecStyle(meta *Metadata) string {
 // FormatVideoCodec formats a video codec name according to the specified style table.
 func FormatVideoCodec(rawCodec, style string) string {
 	canonical := canonicalCodec(rawCodec)
+
+	if (style == "" || style == "default") && canonical != "" {
+		if override := legacyCodecOverride(canonical); override != "" {
+			return override
+		}
+	}
+
 	styles := config.GetVideoCodecStyle()
 
 	table, ok := styles[style]
@@ -58,6 +63,18 @@ func FormatVideoCodec(rawCodec, style string) string {
 	}
 
 	return rawCodec
+}
+
+//nolint:staticcheck // fallback for deprecated video_codec_avc and video_codec_hevc
+func legacyCodecOverride(canonical string) string {
+	switch canonical {
+	case "AVC":
+		return config.GetVideoCodecAVC()
+	case "HEVC":
+		return config.GetVideoCodecHEVC()
+	default:
+		return ""
+	}
 }
 
 func canonicalCodec(codec string) string {
@@ -144,7 +161,7 @@ func ReleaseTemplateFuncMap() template.FuncMap {
 			return ""
 		},
 
-		// pad zero-pads an integer or slice of integers: pad 2 .Season -> "01"
+		// pad zero-pads an integer: pad 2 .Season -> "01"
 		"pad": func(digits int, val any) string {
 			return fmt.Sprintf("%0*d", digits, val)
 		},
@@ -223,9 +240,7 @@ func ReleaseTemplateFuncMap() template.FuncMap {
 
 			return re.ReplaceAllString(s, repl)
 		},
-		"contains": func(substr, s any) bool {
-			return strings.Contains(fmt.Sprint(s), fmt.Sprint(substr))
-		},
+		"contains":   templateutil.Contains,
 		"trimPrefix": strings.TrimPrefix,
 		"trimSuffix": strings.TrimSuffix,
 		"hasPrefix":  strings.HasPrefix,
