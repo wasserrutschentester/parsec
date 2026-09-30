@@ -20,7 +20,21 @@ var defaultConfig string
 
 // InitDefaults initializes the default configuration values in viper.
 func InitDefaults() {
-	viper.SetDefault("template", "{title}.{year}.{season_id}{episode_id}.{cut_edition}.{episode_title}.{language}.{language_ext}.{accessibility}.{repack}.{resolution}.{service}.{source}.{audio_codec}{audio_channels}.{audio_meta}.{hdr}.{video_codec}-{group}")
+	viper.SetDefault("template", `{{join "." .Title .YearTag .SeasonEpisode .Edition .EpisodeTitle .VersionTag .RepackTag .LanguageName .LanguageExtra .Accessibility .Resolution .Service .Source .AudioSpec .HDR .VideoCodec}}-{{.Group}}`)
+	viper.SetDefault("video_codec_style", map[string]map[string]string{
+		"web_dl": {
+			"AVC":  "H.264",
+			"HEVC": "H.265",
+		},
+		"remux": {
+			"AVC":  "AVC",
+			"HEVC": "HEVC",
+		},
+		"encode": {
+			"AVC":  "x264",
+			"HEVC": "x265",
+		},
+	})
 	viper.SetDefault("preferred_language", "de")
 	viper.SetDefault("original_language", "")
 	viper.SetDefault("original_audio_first", false)
@@ -289,6 +303,15 @@ func GetVideoCodecAVC() string {
 // GetVideoCodecHEVC returns the HEVC video codec name.
 func GetVideoCodecHEVC() string {
 	return getString("video_codec_hevc")
+}
+
+// GetVideoCodecStyle returns the video codec style mapping table.
+func GetVideoCodecStyle() map[string]map[string]string {
+	var styles map[string]map[string]string
+
+	_ = viper.UnmarshalKey(getPresetKey("video_codec_style"), &styles)
+
+	return styles
 }
 
 // Replacement represents a regex pattern and its replacement string.

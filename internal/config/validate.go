@@ -10,6 +10,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/text/language"
 
+	"codeberg.org/upPollo/parsec/internal/templateutil"
 	"codeberg.org/upPollo/parsec/internal/ui"
 )
 
@@ -234,23 +235,19 @@ func validateMapTypes(m map[string]any, prefix string, schema map[string]string)
 }
 
 func validateStructuralSections(k string, v any, prefix, fullKey string) ([]string, bool) {
+	if k == "video_codec_style" {
+		return validateVideoCodecStyle(v, fullKey), true
+	}
+
 	if prefix != "" {
 		return nil, false
 	}
 
+	if errs, handled := validateSubMapSection(k, v, fullKey); handled {
+		return errs, true
+	}
+
 	switch k {
-	case "api_keys":
-		if subMap, ok := v.(map[string]any); ok {
-			return validateMapTypes(subMap, fullKey, apiKeysExpectedTypes), true
-		}
-	case "prowlarr":
-		if subMap, ok := v.(map[string]any); ok {
-			return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
-		}
-	case "update":
-		if subMap, ok := v.(map[string]any); ok {
-			return validateMapTypes(subMap, fullKey, updateExpectedTypes), true
-		}
 	case "preset":
 		return validatePresetConfig(v), true
 	case "replacements":
@@ -258,6 +255,50 @@ func validateStructuralSections(k string, v any, prefix, fullKey string) ([]stri
 	}
 
 	return nil, false
+}
+
+func validateSubMapSection(k string, v any, fullKey string) ([]string, bool) {
+	subMap, ok := v.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+
+	switch k {
+	case "api_keys":
+		return validateMapTypes(subMap, fullKey, apiKeysExpectedTypes), true
+	case "prowlarr":
+		return validateMapTypes(subMap, fullKey, prowlarrExpectedTypes), true
+	case "update":
+		return validateMapTypes(subMap, fullKey, updateExpectedTypes), true
+	}
+
+	return nil, false
+}
+
+func validateVideoCodecStyle(v any, fullKey string) []string {
+	var errors []string
+
+	subMap, ok := v.(map[string]any)
+	if !ok {
+		return []string{fmt.Sprintf("Invalid type for '%s': expected table, got %T", fullKey, v)}
+	}
+
+	for styleName, styleContent := range subMap {
+		styleMap, ok := styleContent.(map[string]any)
+		if !ok {
+			errors = append(errors, fmt.Sprintf("Invalid type for '%s.%s': expected table, got %T", fullKey, styleName, styleContent))
+
+			continue
+		}
+
+		for codec, val := range styleMap {
+			if _, ok := val.(string); !ok {
+				errors = append(errors, fmt.Sprintf("Invalid value for '%s.%s.%s': expected string, got %T", fullKey, styleName, codec, val))
+			}
+		}
+	}
+
+	return errors
 }
 
 func validatePresetConfig(v any) []string {
@@ -322,7 +363,7 @@ func validateSpecificKeys(k string, v any, fullKey string) []string {
 	switch k {
 	case "template":
 		if templateStr, ok := v.(string); ok {
-			errors = append(errors, validateTemplateKeys(templateStr, fullKey)...)
+			errors = append(errors, validateTemplate(templateStr, fullKey)...)
 		}
 	case "preferred_language", "original_language":
 		if langStr, ok := v.(string); ok {
@@ -337,17 +378,23 @@ func validateSpecificKeys(k string, v any, fullKey string) []string {
 	return errors
 }
 
-func validateTemplateKeys(template, keyPath string) []string {
+func validateTemplate(templateStr, keyPath string) []string {
 	var errors []string
 
-	re := regexp.MustCompile(`\{([^}]+)\}`)
-	matches := re.FindAllStringSubmatch(template, -1)
+	if !strings.Contains(templateStr, "{{") {
+		re := regexp.MustCompile(`\{([^}]+)\}`)
+		matches := re.FindAllStringSubmatch(templateStr, -1)
 
-	for _, match := range matches {
-		token := match[1]
-		if !validTemplateKeys[token] {
-			errors = append(errors, fmt.Sprintf("Invalid template key in '%s': {%s}", keyPath, token))
+		for _, match := range matches {
+			token := match[1]
+			if !validTemplateKeys[token] {
+				errors = append(errors, fmt.Sprintf("Invalid template key in '%s': {%s}", keyPath, token))
+			}
 		}
+	}
+
+	if err := templateutil.ValidateTemplate(templateStr); err != nil {
+		errors = append(errors, fmt.Sprintf("Invalid template syntax in '%s': %v", keyPath, err))
 	}
 
 	return errors
