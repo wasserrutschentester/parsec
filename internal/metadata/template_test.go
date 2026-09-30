@@ -277,6 +277,56 @@ func TestFormatVideoCodec_WithMatrix(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // mutates global viper config
+func TestFormatVideoCodec_DefaultStyle(t *testing.T) {
+	origAVC := viper.GetString("video_codec_avc")
+	origHEVC := viper.GetString("video_codec_hevc")
+
+	t.Cleanup(func() {
+		viper.Reset()
+		config.InitDefaults()
+		viper.Set("video_codec_avc", origAVC)
+		viper.Set("video_codec_hevc", origHEVC)
+	})
+
+	// 1. Explicit default table
+	viper.Set("video_codec_style.default.AVC", "H.264")
+	viper.Set("video_codec_style.default.HEVC", "H.265")
+	viper.Set("video_codec_style.partial.AVC", "CustomAVC")
+	// "partial" intentionally omits HEVC to test fallback
+
+	if got := FormatVideoCodec("AVC", "default"); got != "H.264" {
+		t.Errorf("FormatVideoCodec('AVC', 'default') = %q, want 'H.264'", got)
+	}
+
+	if got := FormatVideoCodec("AVC", ""); got != "H.264" {
+		t.Errorf("FormatVideoCodec('AVC', '') = %q, want 'H.264'", got)
+	}
+
+	// Unknown style falls back to default table
+	if got := FormatVideoCodec("AVC", "unknown_style"); got != "H.264" {
+		t.Errorf("FormatVideoCodec('AVC', 'unknown_style') = %q, want 'H.264'", got)
+	}
+
+	// Missing codec in specific style falls back to default table
+	if got := FormatVideoCodec("HEVC", "partial"); got != "H.265" {
+		t.Errorf("FormatVideoCodec('HEVC', 'partial') fallback = %q, want 'H.265'", got)
+	}
+
+	// 2. Default style set as an alias to another style
+	viper.Set("video_codec_style.default", "encode")
+	viper.Set("video_codec_style.encode.AVC", "x264")
+	viper.Set("video_codec_style.encode.HEVC", "x265")
+
+	if got := FormatVideoCodec("AVC", "default"); got != "x264" {
+		t.Errorf("FormatVideoCodec('AVC', 'default') alias = %q, want 'x264'", got)
+	}
+
+	if got := FormatVideoCodec("HEVC", "default"); got != "x265" {
+		t.Errorf("FormatVideoCodec('HEVC', 'default') alias = %q, want 'x265'", got)
+	}
+}
+
 func TestTemplateContext_YearTag(t *testing.T) {
 	t.Parallel()
 

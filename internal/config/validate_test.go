@@ -123,6 +123,48 @@ func TestValidateLegacyCodecDeprecation(t *testing.T) {
 	}
 }
 
+func TestValidateVideoCodecStyle_Default(t *testing.T) {
+	t.Parallel()
+
+	// Table style default is valid
+	tableDefault := map[string]any{
+		"default": map[string]any{
+			"AVC":  "H.264",
+			"HEVC": "H.265",
+		},
+	}
+	if errs := validateVideoCodecStyle(tableDefault, "video_codec_style"); len(errs) > 0 {
+		t.Errorf("table default produced unexpected errors: %v", errs)
+	}
+
+	// Alias string default is valid
+	aliasDefault := map[string]any{
+		"default": "web_dl",
+		"web_dl": map[string]any{
+			"AVC": "H.264",
+		},
+	}
+	if errs := validateVideoCodecStyle(aliasDefault, "video_codec_style"); len(errs) > 0 {
+		t.Errorf("alias string default produced unexpected errors: %v", errs)
+	}
+
+	// Non-string, non-table default is invalid
+	intDefault := map[string]any{
+		"default": 123,
+	}
+	if errs := validateVideoCodecStyle(intDefault, "video_codec_style"); len(errs) == 0 {
+		t.Errorf("expected error for non-table/non-string default, got none")
+	}
+
+	// Non-default style must be a table
+	stringOther := map[string]any{
+		"remux": "encode",
+	}
+	if errs := validateVideoCodecStyle(stringOther, "video_codec_style"); len(errs) == 0 {
+		t.Errorf("expected error for non-table non-default style, got none")
+	}
+}
+
 func TestValidateLanguage(t *testing.T) {
 	t.Parallel()
 

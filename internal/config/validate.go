@@ -256,6 +256,10 @@ func validateVideoCodecStyle(v any, fullKey string) []string {
 	}
 
 	for styleName, styleContent := range subMap {
+		if _, ok := styleContent.(string); ok && styleName == "default" {
+			continue
+		}
+
 		styleMap, ok := styleContent.(map[string]any)
 		if !ok {
 			errors = append(errors, fmt.Sprintf("Invalid type for '%s.%s': expected table, got %T", fullKey, styleName, styleContent))

@@ -51,18 +51,25 @@ func FormatVideoCodec(rawCodec, style string) string {
 
 	styles := config.GetVideoCodecStyle()
 
-	table, ok := styles[style]
-	if !ok {
-		return rawCodec
+	if val := matchCodecTable(styles[style], rawCodec, canonical); val != "" {
+		return val
 	}
 
+	if val := matchCodecTable(styles["default"], rawCodec, canonical); val != "" {
+		return val
+	}
+
+	return rawCodec
+}
+
+func matchCodecTable(table map[string]string, rawCodec, canonical string) string {
 	for k, v := range table {
 		if strings.EqualFold(k, rawCodec) || strings.EqualFold(k, canonical) {
 			return v
 		}
 	}
 
-	return rawCodec
+	return ""
 }
 
 //nolint:staticcheck // fallback for deprecated video_codec_avc and video_codec_hevc

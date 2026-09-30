@@ -317,6 +317,9 @@ func GetVideoCodecStyle() map[string]map[string]string {
 	var styles map[string]map[string]string
 
 	_ = viper.UnmarshalKey(getPresetKey("video_codec_style"), &styles)
+	if target, ok := styles[viper.GetString(getPresetKey("video_codec_style.default"))]; ok && styles["default"] == nil {
+		styles["default"] = target
+	}
 
 	return styles
 }

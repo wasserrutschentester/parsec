@@ -44,6 +44,10 @@ normalize_diacritics = true
 
 # Video codec styling matrix
 # Automatically maps video codecs based on release type (web_dl, remux, encode)
+# To set a default style fallback, define a [video_codec_style.default] table or alias (e.g. default = "web_dl")
+[video_codec_style]
+default = "web_dl"
+
 [video_codec_style.web_dl]
 AVC = "H.264"
 HEVC = "H.265"
