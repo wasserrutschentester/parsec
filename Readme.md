@@ -73,6 +73,7 @@ Search and identify movies or TV shows in media databases.
 - **Matroska Tags**: Can write Title, IMDb ID, TMDB ID, TVDB ID, and Episode/Movie Title as Matroska tags.
 - **Episode Search**: Can find Episode details via Episode + Season Number, Episode Title or Aired Date.
 - **Release Search**: Search for existing releases on your indexers via Prowlarr.
+- **Relocation**: Move tagged files to a separate directory via `--move-tagged`.
 
 For more information see the [Identify Documentation](docs/identify.md)
 

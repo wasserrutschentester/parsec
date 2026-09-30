@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -34,5 +36,65 @@ func TestBatchIdentifyError(t *testing.T) {
 				t.Errorf("batchIdentifyError(%v) = %v, wantErr %v", tt.errs, err, tt.wantErr)
 			}
 		})
+	}
+}
+
+//nolint:paralleltest // modifies global flag state
+func TestMoveTaggedFiles(t *testing.T) {
+	tests := []struct {
+		name      string
+		dryRun    bool
+		wantMoved bool
+	}{
+		{name: "standard move", dryRun: false, wantMoved: true},
+		{name: "dry run", dryRun: true, wantMoved: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			srcFile := filepath.Join(tempDir, "tagged.mkv")
+			destDir := filepath.Join(tempDir, "completed")
+
+			if err := os.WriteFile(srcFile, []byte("dummy"), 0o644); err != nil {
+				t.Fatalf("failed to create srcFile: %v", err)
+			}
+
+			dryRunFlag = tt.dryRun
+			unattendedFlag = !tt.dryRun
+
+			defer func() {
+				dryRunFlag = false
+				unattendedFlag = false
+			}()
+
+			if err := moveTaggedFiles([]string{srcFile}, destDir); err != nil {
+				t.Fatalf("moveTaggedFiles failed: %v", err)
+			}
+
+			destFile := filepath.Join(destDir, "tagged.mkv")
+			if _, err := os.Stat(destFile); (err == nil) != tt.wantMoved {
+				t.Errorf("destFile exists = %v, want %v", err == nil, tt.wantMoved)
+			}
+
+			if _, err := os.Stat(srcFile); (err == nil) == tt.wantMoved {
+				t.Errorf("srcFile exists = %v, want %v", err == nil, !tt.wantMoved)
+			}
+		})
+	}
+}
+
+func TestMoveTaggedFilesEmpty(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	destDir := filepath.Join(tempDir, "completed")
+
+	if err := moveTaggedFiles(nil, destDir); err != nil {
+		t.Fatalf("moveTaggedFiles(nil) failed: %v", err)
+	}
+
+	if _, err := os.Stat(destDir); !os.IsNotExist(err) {
+		t.Errorf("destDir was created when no files were tagged")
 	}
 }

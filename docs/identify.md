@@ -10,6 +10,24 @@ parsec identify [path...] [flags]
 
 If filenames or directories are provided, `parsec` will process each one. Directories will be scanned recursively for Matroska (.mkv) files. Each file will be automatically parsed to extract initial metadata like title, year, season, and episode to seed the search.
 
+### Moving Tagged Files
+
+The `identify` command can automatically move files that were tagged into a destination directory. This is useful for separating processed files during intake or staging pipelines.
+
+```bash
+# Move all files that were tagged to a destination folder
+parsec identify /path/to/media --move-tagged /path/to/completed
+
+# Preview which files would be moved without modifying anything
+parsec identify /path/to/media --move-tagged /path/to/completed --dry-run
+
+# Move tagged files unattended without interactive confirmation prompts
+parsec identify /path/to/media --move-tagged /path/to/completed -u
+```
+
+- `--move-tagged <dir>`: Target folder for tagged files. The directory will be created if it does not already exist. In interactive mode, `parsec` prompts for confirmation (`Move N tagged file(s) to <dir>? [y/N]`) before moving.
+- `--dry-run` / `-d`: Simulates moving files and prints what would be relocated without touching the filesystem.
+
 ## Features
 
 - **Batch Processing**: Identify multiple files or entire directories in one command.
@@ -20,6 +38,7 @@ If filenames or directories are provided, `parsec` will process each one. Direct
 - **Episode Search**: Finds episode details via Season/Episode numbers, Episode Title, or Air Date.
 - **Release Search**: Search for existing releases on your indexers via Prowlarr.
 - **ID Verification**: If a file already contains metadata tags, `parsec` will warn you if the selected search result differs from the existing tags.
+- **Relocate Tagged Files**: Automatically relocate files that were successfully tagged to a destination directory.
 
 ## Flags
 
@@ -59,8 +78,9 @@ Additional metadata that can be written to tags.
 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
-| `--write-tags` | boolean | **DEPRECATED**. Use `--unattended` instead. |
-| `--comment` | string | Comment exposed to tag templates (e.g. for use with `{{.Comment}}`). |
+| `--move-tagged` | | string | Move files that were tagged to destination folder. |
+| `--write-tags` | | boolean | **DEPRECATED**. Use `--unattended` instead. |
+| `--comment` | | string | Comment exposed to tag templates (e.g. for use with `{{.Comment}}`). |
 | `--unattended` | `-u` | boolean| Run in unattended mode (selects the first search result, and implies writing tags). |
 | `--dry-run` | `-d` | boolean| Simulate the identification and display a tag preview without writing anything to the file. |
 | `--releases` | `-r` | boolean | Search for releases via Prowlarr for the identified entity. |

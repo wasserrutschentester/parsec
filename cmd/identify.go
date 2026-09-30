@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -21,9 +23,10 @@ import (
 )
 
 var (
-	writeTagsFlag bool
-	commentFlag   string
-	errSearch     = errors.New("search failed")
+	writeTagsFlag  bool
+	commentFlag    string
+	moveTaggedFlag string
+	errSearch      = errors.New("search failed")
 )
 
 // identifyCmd represents the identify command
@@ -44,7 +47,7 @@ Flags can be used to override or provide missing information.`),
 		ui.Println(ui.Banner(".: ENTITY CLASSIFICATION :."))
 
 		if len(args) == 0 {
-			_, err := identifyFile(cmd, "", nil)
+			_, _, err := identifyFile(cmd, "", nil)
 
 			return err
 		}
@@ -54,17 +57,28 @@ Flags can be used to override or provide missing information.`),
 }
 
 func runIdentifyBatch(cmd *cobra.Command, filePaths []string) error {
-	var prevResult *mdb.SearchResult
+	var (
+		prevResult  *mdb.SearchResult
+		taggedFiles []string
+	)
 
 	errs := make([]error, 0, len(filePaths))
 
 	for _, filePath := range filePaths {
-		result, err := identifyFile(cmd, filePath, prevResult)
+		result, tagged, err := identifyFile(cmd, filePath, prevResult)
 		errs = append(errs, err)
 
 		if err == nil {
 			prevResult = result
 		}
+
+		if tagged {
+			taggedFiles = append(taggedFiles, filePath)
+		}
+	}
+
+	if err := moveTaggedFiles(taggedFiles, moveTaggedFlag); err != nil {
+		return err
 	}
 
 	return batchIdentifyError(errs)
@@ -81,19 +95,19 @@ func batchIdentifyError(errs []error) error {
 	return nil
 }
 
-func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, error) {
+func identifyFile(cmd *cobra.Command, filePath string, prevResult *mdb.SearchResult) (*mdb.SearchResult, bool, error) {
 	meta := initializeMetadata(cmd, filePath)
 
 	result, err := mdbSearch.InteractiveSearch(meta, unattendedFlag, false)
 	if err != nil {
 		ui.PrintError(err.Error())
 
-		return nil, errSearch
+		return nil, false, errSearch
 	}
 
-	processIdentificationResult(filePath, result, meta, prevResult)
+	tagged := processIdentificationResult(filePath, result, meta, prevResult)
 
-	return result, nil
+	return result, tagged, nil
 }
 
 func initializeMetadata(cmd *cobra.Command, filePath string) *metadata.Metadata {
@@ -120,7 +134,7 @@ func isSameSeries(result, prevResult *mdb.SearchResult) bool {
 		result.TvdbID == prevResult.TvdbID
 }
 
-func processIdentificationResult(filePath string, result *mdb.SearchResult, meta *metadata.Metadata, prevResult *mdb.SearchResult) {
+func processIdentificationResult(filePath string, result *mdb.SearchResult, meta *metadata.Metadata, prevResult *mdb.SearchResult) bool {
 	warnOnIDMismatch(filePath, result)
 
 	if !isSameSeries(result, prevResult) {
@@ -156,18 +170,18 @@ func processIdentificationResult(filePath string, result *mdb.SearchResult, meta
 		prowlarr.PrintReleases(result, meta, bestFlag)
 	}
 
-	maybeWriteTags(filePath, tags)
+	return maybeWriteTags(filePath, tags)
 }
 
-func maybeWriteTags(filePath string, tags []mdb.MatroskaTagSet) {
+func maybeWriteTags(filePath string, tags []mdb.MatroskaTagSet) bool {
 	if filePath == "" || len(tags) == 0 {
-		return
+		return false
 	}
 
 	if dryRunFlag {
 		printTagPreview(tags)
 
-		return
+		return true
 	}
 
 	shouldWriteTags := writeTagsFlag || unattendedFlag
@@ -181,8 +195,10 @@ func maybeWriteTags(filePath string, tags []mdb.MatroskaTagSet) {
 	}
 
 	if shouldWriteTags {
-		writeTags(filePath, tags)
+		return writeTags(filePath, tags)
 	}
+
+	return false
 }
 
 var defaultTagOrder = map[string]int{
@@ -252,13 +268,66 @@ func shouldWriteTagsInteractively() bool {
 	return false
 }
 
-func writeTags(filePath string, tags []mdb.MatroskaTagSet) {
+func writeTags(filePath string, tags []mdb.MatroskaTagSet) bool {
 	err := matroska.SetGlobalTags(filePath, tags)
 	if err != nil {
 		ui.PrintError(fmt.Sprintf("Error writing tags: %v", err))
-	} else {
-		ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
+
+		return false
 	}
+
+	ui.Println(ui.Success.Render("All systems nominal! Tags written successfully"))
+
+	return true
+}
+
+//nolint:cyclop // file relocation logic with interactive prompt and dry-run handling
+func moveTaggedFiles(taggedFiles []string, destDir string) error {
+	if destDir == "" || len(taggedFiles) == 0 {
+		return nil
+	}
+
+	ui.Println("\n" + ui.Header.Render("MOVING TAGGED FILES"))
+
+	if dryRunFlag {
+		for _, f := range taggedFiles {
+			dest := filepath.Join(destDir, filepath.Base(f))
+			ui.Println(ui.Muted.Render(fmt.Sprintf("Dry run: would move %s -> %s", f, dest)))
+		}
+
+		return nil
+	}
+
+	if !unattendedFlag {
+		fmt.Printf("Move %d tagged file(s) to %s? [y/N] ", len(taggedFiles), destDir)
+
+		var response string
+
+		_, _ = fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			ui.Println(ui.Muted.Render("Skipping move."))
+
+			return nil
+		}
+	}
+
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	for _, f := range taggedFiles {
+		dest := filepath.Join(destDir, filepath.Base(f))
+		// ponytail: os.Rename fails across filesystems (EXDEV); add io.Copy fallback if cross-device move needed
+		if err := os.Rename(f, dest); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to move %s: %v", f, err))
+
+			continue
+		}
+
+		ui.Println(ui.Success.Render(fmt.Sprintf("Moved: %s -> %s", filepath.Base(f), destDir)))
+	}
+
+	return nil
 }
 
 func init() {
@@ -283,6 +352,7 @@ func init() {
 	identifyCmd.Flags().StringVar(&commentFlag, "comment", "", "comment to expose to tag templates")
 	identifyCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate identification and preview tags without writing to the file")
 	identifyCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "run in unattended mode (implies writing tags)")
+	identifyCmd.Flags().StringVar(&moveTaggedFlag, "move-tagged", "", "move files that were tagged to destination folder")
 	// Deprecated
 	identifyCmd.Flags().BoolVar(&writeTagsFlag, "write-tags", false, "write metadata tags to the file")
 	identifyCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
@@ -309,6 +379,8 @@ func init() {
 	for _, f := range outputFlags {
 		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
+
+	_ = identifyCmd.MarkFlagDirname("move-tagged")
 
 	// Disable sorting to keep the defined order
 	identifyCmd.Flags().SortFlags = false
