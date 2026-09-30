@@ -123,36 +123,7 @@ var updateExpectedTypes = map[string]string{
 	"prerelease": "bool",
 }
 
-var validTemplateKeys = map[string]bool{
-	"title":          true,
-	"date":           true,
-	"episode_title":  true,
-	"language":       true,
-	"language_ext":   true,
-	"cut_edition":    true,
-	"accessibility":  true,
-	"resolution":     true,
-	"service":        true,
-	"source":         true,
-	"hdr":            true,
-	"audio_codec":    true,
-	"audio_channels": true,
-	"audio_meta":     true,
-	"video_codec":    true,
-	"group":          true,
-	"bit_depth":      true,
-	"year":           true,
-	"season_raw":     true,
-	"season_02":      true,
-	"season_id":      true,
-	"episode_raw":    true,
-	"episode_02":     true,
-	"episode_03":     true,
-	"episode_id":     true,
-	"dual_audio":     true,
-	"crc32":          true,
-	"repack":         true,
-}
+var reLegacyToken = regexp.MustCompile(`\{([^}]+)\}`)
 
 var validCheckIdentifiers map[string]bool
 
@@ -382,12 +353,11 @@ func validateTemplate(templateStr, keyPath string) []string {
 	var errors []string
 
 	if !strings.Contains(templateStr, "{{") {
-		re := regexp.MustCompile(`\{([^}]+)\}`)
-		matches := re.FindAllStringSubmatch(templateStr, -1)
+		matches := reLegacyToken.FindAllStringSubmatch(templateStr, -1)
 
 		for _, match := range matches {
 			token := match[1]
-			if !validTemplateKeys[token] {
+			if _, ok := templateutil.LegacyTokenMap["{"+token+"}"]; !ok {
 				errors = append(errors, fmt.Sprintf("Invalid template key in '%s': {%s}", keyPath, token))
 			}
 		}

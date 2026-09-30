@@ -198,7 +198,7 @@ func runTrackChecks(filePath string, ebml *matroska.EbmlMetadata, xmlChapters *m
 
 	originalLang := ""
 	if meta != nil {
-		originalLang = meta.OriginalLanguage
+		originalLang = meta.OriginalLanguageISO
 	}
 
 	for i := range tracks {

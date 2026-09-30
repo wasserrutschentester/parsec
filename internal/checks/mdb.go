@@ -50,7 +50,7 @@ func RunMdbChecks(mi *mediainfo.MediaInfo, meta *metadata.Metadata) []CheckResul
 		searchResult.OriginalLanguage = origLangOverride
 	}
 
-	meta.OriginalLanguage = searchResult.OriginalLanguage
+	meta.OriginalLanguageISO = searchResult.OriginalLanguage
 
 	mdb.PrintCompactResult(*searchResult)
 

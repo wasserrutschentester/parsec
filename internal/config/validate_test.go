@@ -142,7 +142,7 @@ func TestValidateTemplate(t *testing.T) {
 		{name: "Valid legacy template", template: "{title}.{year}.{resolution}-{group}", wantErr: false},
 		{name: "Invalid legacy token", template: "{title}.{unknown_key}", wantErr: true},
 		{name: "Valid Go template", template: `{{join "." .Title .Year}}-{{.Group}}`, wantErr: false},
-		{name: "Valid Go template with cond and vcodec", template: `{{.Title}}.{{cond .IsRemux "REMUX" ""}}.{{vcodec "web_dl" .VideoCodec}}-{{.Group}}`, wantErr: false},
+		{name: "Valid Go template with when and vcodec", template: `{{.Title}}.{{when .IsRemux "REMUX" ""}}.{{vcodec "web_dl" .VideoCodec}}-{{.Group}}`, wantErr: false},
 		{name: "Invalid Go template syntax (unclosed tag)", template: `{{join "." .Title`, wantErr: true},
 		{name: "Invalid Go template function", template: `{{nonexistentFunction .Title}}`, wantErr: true},
 	}

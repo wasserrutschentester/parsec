@@ -52,16 +52,20 @@ var (
 	reSpaces         = regexp.MustCompile(`\s+`)
 
 	// Metadata tags patterns.
-	reDate          = regexp.MustCompile(`[ .\[\(](\d{4}-\d{2}-\d{2})([ .\]\)]|$)`)
-	reRepack        = regexp.MustCompile(`[ .\[\(]REPACK([ .\]\)-]|$|\d)`)
-	reCRC32         = regexp.MustCompile(`[\[\(]([A-Fa-f0-9]{8})[\]\)]`)
-	reDualAudio     = regexp.MustCompile(`(?i)[ .\[\(]Dual[ -]Audio[ .\]\)]`)
-	reResolutionTag = regexp.MustCompile(`[ .\[\(](\d{3,4}[p|i])([ .\]\)-]|$| )`)
-	reAudioCodec    = regexp.MustCompile(`[ .\[\(](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .\]\)-]|$| )`)
-	reVideoCodec    = regexp.MustCompile(`[ .\[\(]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .\]\)-]|$| )`)
-	reSource        = regexp.MustCompile(`(?i)[ .\[\(](BD|WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .\]\)-]|$| )`)
-	reLeadingGroup  = regexp.MustCompile(`^\[([^\]]+)\]`)
-	reTrailingGroup = regexp.MustCompile(`\-([^-]+)$`)
+	reDate           = regexp.MustCompile(`[ .\[\(](\d{4}-\d{2}-\d{2})([ .\]\)]|$)`)
+	reRepack         = regexp.MustCompile(`(?i)[ .\[\(](REREPACK|REPACK(\d+)?)([ .\]\)-]|$)`)
+	reRemux          = regexp.MustCompile(`(?i)[ .\[\(]REMUX([ .\]\)-]|$)`)
+	reReleaseVersion = regexp.MustCompile(`(?i)(?:[ .\[\(-]|E\d+)v(\d+)(?:[ .\]\)-]|$)`)
+	reAKA            = regexp.MustCompile(`(?i)(?:^|[ .])AKA[ .]`)
+	reCRC32          = regexp.MustCompile(`[\[\(]([A-Fa-f0-9]{8})[\]\)]`)
+	reDualAudio      = regexp.MustCompile(`(?i)[ .\[\(]Dual[ -]Audio[ .\]\)]`)
+	reResolutionTag  = regexp.MustCompile(`[ .\[\(](\d{3,4}[p|i])([ .\]\)-]|$| )`)
+	reAudioCodec     = regexp.MustCompile(`[ .\[\(](AAC|DDP|DD|DTS(?:-HD|:X)?|TrueHD|Atmos|Opus|FLAC)([ .](?:MA|HRA?))?([ .]?([0-9]\.[0-9]))?([ .]Atmos)?([ .\]\)-]|$| )`)
+	reVideoCodec     = regexp.MustCompile(`[ .\[\(]((H\.|H|h|x)26[456]|AVC|HEVC|AV1)([ .\]\)-]|$| )`)
+	reEncode         = regexp.MustCompile(`(?i)[ .\[\(](x26[456]|XviD|DivX|WEBRip|WEB-Rip|BRRip|BDRip|DVDRip)([ .\]\)-]|$)`)
+	reSource         = regexp.MustCompile(`(?i)[ .\[\(](BD|WEB(?:-?DL|-?Rip)?|UHD[ .]Blu-?Ray|Blu-?Ray|BRRip|BDRip|(?:PAL|NTSC)[ .]DVD[59]?|DVD[59]?|HDTV|DVDRip|HDDVD)([ .\]\)-]|$| )`)
+	reLeadingGroup   = regexp.MustCompile(`^\[([^\]]+)\]`)
+	reTrailingGroup  = regexp.MustCompile(`\-([^-]+)$`)
 
 	// Precompiled streaming service patterns for NormalizeService.
 	servicePatterns = []serviceMapping{
@@ -157,8 +161,8 @@ func Parse(filename string) *metadata.Metadata {
 	// CRC32
 	matchCRC32(filename, meta)
 
-	// match REPACK
-	matchRepack(filename, meta)
+	// match REPACK, REMUX, Release Version
+	matchReleaseFlags(filename, meta)
 
 	// Basic regex for resolution
 	matchResolution(filename, meta)
@@ -174,6 +178,9 @@ func Parse(filename string) *metadata.Metadata {
 
 	// Source
 	matchSource(filename, meta)
+
+	// Fallback encode detection from filename (e.g. x264, x265, WEBRip, BDRip)
+	matchEncode(filename, meta)
 
 	// Edition
 	matchEdition(filename, meta)
@@ -192,6 +199,9 @@ func Parse(filename string) *metadata.Metadata {
 
 	meta.Title = strings.Trim(meta.Title, ". -")
 
+	// Match AKA foreign title if present in Title
+	matchAKA(meta)
+
 	// Episode title
 	if t := matchEpisodeTitle(filename, meta); t != "" {
 		meta.EpisodeTitles = []string{t}
@@ -206,14 +216,18 @@ func extractTitleFallback(filename string, meta *metadata.Metadata) string {
 	end := len(filename)
 
 	tags := []string{
-		meta.Language,
+		meta.LanguageISO,
 		meta.Resolution,
 		meta.Service,
 		meta.Source,
-		meta.CutEdition,
+		meta.Edition,
 	}
-	if meta.Repack {
+	if meta.IsRepack {
 		tags = append(tags, "REPACK")
+	}
+
+	if meta.IsRemux {
+		tags = append(tags, "REMUX")
 	}
 
 	for _, tag := range tags {
@@ -329,8 +343,8 @@ func findEpisodeTitleStart(filename string, meta *metadata.Metadata) int {
 func findEpisodeTitleEnd(sub string, meta *metadata.Metadata) int {
 	end := len(sub)
 
-	if meta.Language != "" {
-		re := regexp.MustCompile("(?i)[ .\\(\\[]" + regexp.QuoteMeta(meta.Language))
+	if meta.LanguageISO != "" {
+		re := regexp.MustCompile("(?i)[ .\\(\\[]" + regexp.QuoteMeta(meta.LanguageISO))
 		if loc := re.FindStringIndex(sub); loc != nil {
 			end = loc[0]
 		}
@@ -425,11 +439,11 @@ func matchSeasonEpisode(filenameStr string) (int, []int) {
 
 func matchLanguage(filename string, meta *metadata.Metadata) {
 	if match := reLanguage.FindStringSubmatch(filename); len(match) > 0 {
-		meta.Language = match[1]
+		meta.LanguageISO = match[1]
 		if len(match) > 2 && match[2] != "" {
-			meta.LanguageExt = match[2]
+			meta.LanguageExtra = match[2]
 			if match[2] == "SUBBED" {
-				meta.Subbed = true
+				meta.IsSubbed = true
 			}
 		}
 	}
@@ -443,16 +457,16 @@ func matchLanguage(filename string, meta *metadata.Metadata) {
 func matchEdition(filename string, meta *metadata.Metadata) {
 	// Regex for Editions
 	if match := reEdition.FindStringSubmatch(filename); len(match) > 1 {
-		meta.CutEdition = match[1]
+		meta.Edition = match[1]
 	}
 
 	// Regex for 3D
 	if match := reThreeD.FindStringSubmatch(filename); len(match) > 1 {
 		tag := match[1]
-		if meta.CutEdition != "" {
-			meta.CutEdition += "." + tag
+		if meta.Edition != "" {
+			meta.Edition += "." + tag
 		} else {
-			meta.CutEdition = tag
+			meta.Edition = tag
 		}
 	}
 }
@@ -628,9 +642,71 @@ func matchDate(filename string, meta *metadata.Metadata) {
 	}
 }
 
+func matchReleaseFlags(filename string, meta *metadata.Metadata) {
+	matchRepack(filename, meta)
+	matchRemux(filename, meta)
+	matchReleaseVersion(filename, meta)
+}
+
 func matchRepack(filename string, meta *metadata.Metadata) {
-	if reRepack.MatchString(filename) {
-		meta.Repack = true
+	if match := reRepack.FindStringSubmatch(filename); len(match) > 1 {
+		meta.IsRepack = true
+		token := strings.ToUpper(match[1])
+
+		switch {
+		case token == "REREPACK":
+			meta.RepackLevel = 2
+		case strings.HasPrefix(token, "REPACK"):
+			numStr := strings.TrimPrefix(token, "REPACK")
+			if num, err := strconv.Atoi(numStr); err == nil && num > 0 {
+				meta.RepackLevel = num
+			} else {
+				meta.RepackLevel = 1
+			}
+		default:
+			meta.RepackLevel = 1
+		}
+	}
+}
+
+func matchRemux(filename string, meta *metadata.Metadata) {
+	if reRemux.MatchString(filename) {
+		meta.IsRemux = true
+	}
+}
+
+func matchReleaseVersion(filename string, meta *metadata.Metadata) {
+	if match := reReleaseVersion.FindStringSubmatch(filename); len(match) > 1 {
+		if v, err := strconv.Atoi(match[1]); err == nil {
+			meta.ReleaseVersion = v
+		}
+	}
+}
+
+func matchEncode(filename string, meta *metadata.Metadata) {
+	if meta.IsRemux || strings.EqualFold(meta.Source, "WEB-DL") || strings.EqualFold(meta.Source, "WEBDL") {
+		return
+	}
+
+	if reEncode.MatchString(filename) {
+		meta.IsEncode = true
+	}
+}
+
+func matchAKA(meta *metadata.Metadata) {
+	if meta.Title == "" {
+		return
+	}
+
+	loc := reAKA.FindStringIndex(meta.Title)
+	if loc != nil {
+		orig := strings.Trim(meta.Title[:loc[0]], ". -")
+		title := strings.Trim(meta.Title[loc[1]:], ". -")
+
+		if orig != "" && title != "" {
+			meta.OriginalTitle = orig
+			meta.Title = title
+		}
 	}
 }
 
@@ -642,7 +718,7 @@ func matchCRC32(filename string, meta *metadata.Metadata) {
 
 func matchDualAudio(filename string, meta *metadata.Metadata) {
 	if reDualAudio.MatchString(filename) {
-		meta.DualAudio = true
+		meta.IsDualAudio = true
 	}
 }
 
@@ -664,12 +740,12 @@ func matchAudio(filename string, meta *metadata.Metadata) {
 		}
 
 		if len(match) > 5 && match[5] != "" {
-			meta.AudioMeta = "Atmos"
+			meta.AudioExtra = "Atmos"
 		}
 
 		if meta.AudioCodec == "Atmos" {
 			meta.AudioCodec = ""
-			meta.AudioMeta = "Atmos"
+			meta.AudioExtra = "Atmos"
 		}
 	}
 }

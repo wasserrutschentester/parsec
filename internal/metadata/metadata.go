@@ -34,37 +34,58 @@ var (
 
 // Metadata represents the metadata for a media file.
 type Metadata struct {
-	Title    string
-	Year     int
-	Season   int
-	Episodes []int
+	// --- Core Identity & Series ---
+	Title         string
+	OriginalTitle string
+	Year          int
+	Date          string
+	Country       string
+	Season        int
+	Episodes      []int
+	EpisodeTitles []string
+	IsTV          bool
 
-	Date             string
-	EpisodeTitles    []string
-	Language         string
-	LanguageExt      string
-	Subbed           bool
-	CutEdition       string
-	Accessibility    string
-	HasAudioDesc     bool
-	Repack           bool
-	Resolution       string
-	Service          string
-	Source           string
-	HDR              string
-	BitDepth         int
-	AudioCodec       string
-	AudioChannels    string
-	OriginalLanguage string
-	AudioMeta        string
-	VideoCodec       string
-	DualAudio        bool
-	CRC32            string
-	Group            string
-	ImdbID           string
-	TmdbID           int
-	TvdbID           int
-	IsTV             bool
+	// --- Language & Audio Domain ---
+	LanguageISO         string
+	OriginalLanguageISO string
+	LanguageExtra       string
+	AudioLanguages      []string
+	SubtitleLanguages   []string
+	IsDualAudio         bool
+	IsMultiAudio        bool
+	IsSubbed            bool
+	HasPreferredAudio   bool
+
+	// --- Technical Video & Flags ---
+	Resolution string
+	Service    string
+	Source     string
+	HDR        string
+	BitDepth   int
+	VideoCodec string
+	ScanType   string
+	FrameRate  float64
+	IsRemux    bool
+	IsEncode   bool
+	CodecStyle string
+
+	// --- Technical Audio & Extras ---
+	AudioCodec    string
+	AudioChannels string
+	AudioExtra    string
+	Accessibility string
+	HasAudioDesc  bool
+
+	// --- Edition, Versioning & Release Info ---
+	Edition        string
+	IsRepack       bool
+	RepackLevel    int
+	ReleaseVersion int
+	Group          string
+	CRC32          string
+	ImdbID         string
+	TmdbID         int
+	TvdbID         int
 }
 
 // MatchLanguage determines if two language tags match based on their base language.
@@ -212,9 +233,9 @@ func detectDTS(uProfile, uFeatures string) string {
 func VideoCodecName(format, formatVersion, codecIDHint string) string {
 	switch format {
 	case "AVC":
-		return config.GetVideoCodecAVC()
+		return "AVC"
 	case "HEVC":
-		return config.GetVideoCodecHEVC()
+		return "HEVC"
 	case "MPEG Video":
 		if strings.Contains(formatVersion, "2") {
 			return "MPEG2"
@@ -341,8 +362,8 @@ func (meta *Metadata) setBasicDefaults() {
 }
 
 func (meta *Metadata) setTechnicalDefaults() {
-	if meta.CutEdition == "" {
-		meta.CutEdition = config.GetCutEdition()
+	if meta.Edition == "" {
+		meta.Edition = config.GetCutEdition()
 	}
 
 	if meta.HDR == "" {
@@ -357,8 +378,8 @@ func (meta *Metadata) setTechnicalDefaults() {
 		meta.Source = config.GetSource()
 	}
 
-	if !meta.Repack {
-		meta.Repack = config.GetRepack()
+	if !meta.IsRepack {
+		meta.IsRepack = config.GetRepack()
 	}
 
 	if !meta.HasAudioDesc {
@@ -394,161 +415,22 @@ func (meta *Metadata) setTypeDefaults() {
 
 // GetReleaseName returns the full release name generated from metadata.
 func (meta *Metadata) GetReleaseName() string {
-	template := config.GetTemplate()
-	ui.PrintDebug("using template: " + template)
+	ctx := meta.ToTemplateContext()
 
-	return meta.render(template)
+	return ctx.GetReleaseName()
 }
 
 // GetSeasonPackName returns a folder name for a season pack, omitting episode-specific details.
 func (meta *Metadata) GetSeasonPackName() string {
-	// Operate on a copy to avoid mutating the original metadata
-	metaCopy := *meta
-	metaCopy.Episodes = nil
-	metaCopy.EpisodeTitles = nil
-	metaCopy.Date = ""
+	ctx := meta.ToTemplateContext()
 
-	return metaCopy.GetReleaseName()
+	return ctx.GetSeasonPackName()
 }
 
-func (meta *Metadata) render(template string) string {
-	replacements := meta.getReplacements()
+func (meta *Metadata) render(tmpl string) string {
+	ctx := meta.ToTemplateContext()
 
-	result := template
-	for tag, val := range replacements {
-		result = strings.ReplaceAll(result, tag, val)
-	}
-
-	finalName := cleanName(result)
-	sep := config.GetWordSeparator()
-
-	if sep != " " {
-		finalName = strings.ReplaceAll(finalName, " ", sep)
-	}
-
-	// Filename length safeguard
-	finalName = meta.truncateIfTooLong(finalName, template)
-
-	return finalName
-}
-
-func (meta *Metadata) truncateIfTooLong(finalName, template string) string {
-	if len(finalName) <= 245 {
-		return finalName
-	}
-
-	ui.PrintWarning(fmt.Sprintf("Generated filename exceeds 245 bytes (%d bytes). Attempting to truncate.", len(finalName)))
-
-	if len(meta.EpisodeTitles) == 0 {
-		ui.PrintError("Cannot truncate: no episode title to remove. This might cause filesystem errors.")
-
-		return finalName
-	}
-
-	metaCopy := *meta
-	metaCopy.EpisodeTitles = nil
-
-	// Recursively render without episode title
-	truncatedName := metaCopy.render(template)
-
-	if len(truncatedName) <= 245 {
-		ui.PrintInfo("Successfully truncated by removing the episode title.")
-	} else {
-		ui.PrintError(fmt.Sprintf("Even without the episode title, the filename is still too long (%d bytes). This might cause filesystem errors.", len(truncatedName)))
-	}
-
-	return truncatedName
-}
-
-func (meta *Metadata) getReplacements() map[string]string {
-	replacements := map[string]string{
-		"{title}":          meta.Title,
-		"{date}":           meta.Date,
-		"{episode_title}":  strings.Join(meta.EpisodeTitles, " "),
-		"{language}":       LanguageName(meta.Language),
-		"{language_ext}":   meta.LanguageExt,
-		"{cut_edition}":    meta.CutEdition,
-		"{accessibility}":  meta.Accessibility,
-		"{resolution}":     meta.Resolution,
-		"{service}":        meta.Service,
-		"{source}":         meta.Source,
-		"{hdr}":            meta.HDR,
-		"{audio_codec}":    meta.AudioCodec,
-		"{audio_channels}": meta.AudioChannels,
-		"{audio_meta}":     meta.AudioMeta,
-		"{video_codec}":    meta.VideoCodec,
-		"{group}":          meta.Group,
-	}
-
-	if meta.DualAudio {
-		replacements["{dual_audio}"] = "Dual-Audio"
-	}
-
-	if meta.CRC32 != "" {
-		replacements["{crc32}"] = strings.ToUpper(strings.Trim(meta.CRC32, "[]"))
-	}
-
-	if meta.BitDepth > 8 {
-		replacements["{bit_depth}"] = fmt.Sprintf("%dbit", meta.BitDepth)
-	}
-
-	if meta.Year > 0 {
-		replacements["{year}"] = strconv.Itoa(meta.Year)
-	}
-
-	if meta.Season > 0 || meta.IsTV {
-		replacements["{season_raw}"] = strconv.Itoa(meta.Season)
-		replacements["{season_02}"] = fmt.Sprintf("%02d", meta.Season)
-		replacements["{season_id}"] = fmt.Sprintf("S%02d", meta.Season)
-	}
-
-	meta.setEpisodeReplacements(replacements)
-
-	if meta.Repack {
-		replacements["{repack}"] = "REPACK"
-	}
-
-	if meta.HasAudioDesc && meta.Accessibility == "" {
-		replacements["{accessibility}"] = "with.Audio.Description"
-	}
-
-	return replacements
-}
-
-func (meta *Metadata) setEpisodeReplacements(replacements map[string]string) {
-	if len(meta.Episodes) == 0 {
-		return
-	}
-
-	eps := make([]int, len(meta.Episodes))
-	copy(eps, meta.Episodes)
-
-	first := eps[0]
-
-	last := eps[0]
-	for _, e := range eps {
-		if e < first {
-			first = e
-		}
-
-		if e > last {
-			last = e
-		}
-	}
-
-	if len(eps) == 1 || first == last {
-		replacements["{episode_raw}"] = strconv.Itoa(first)
-		replacements["{episode_02}"] = fmt.Sprintf("%02d", first)
-		replacements["{episode_03}"] = fmt.Sprintf("%03d", first)
-		replacements["{episode_04}"] = fmt.Sprintf("%04d", first)
-		replacements["{episode_id}"] = fmt.Sprintf("E%02d", first)
-	} else {
-		replacements["{episode_raw}"] = fmt.Sprintf("%d-%d", first, last)
-		replacements["{episode_02}"] = fmt.Sprintf("%02d-%02d", first, last)
-		replacements["{episode_03}"] = fmt.Sprintf("%03d-%03d", first, last)
-		replacements["{episode_04}"] = fmt.Sprintf("%04d-%04d", first, last)
-		replacements["{episode_id}"] = fmt.Sprintf("E%02d-E%02d", first, last)
-	}
+	return ctx.Render(tmpl)
 }
 
 func cleanName(name string) string {

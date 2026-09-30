@@ -405,33 +405,62 @@ func (mi *MediaInfo) hasAudio() bool {
 // GetMetadata converts MediaInfo data into a normalized Metadata struct.
 func (mi *MediaInfo) GetMetadata() *metadata.Metadata {
 	meta := &metadata.Metadata{}
+
 	for _, track := range mi.Media.Tracks {
 		if track.Type == "Video" && meta.Resolution == "" {
-			meta.Resolution = metadata.HeightToResolution(track.Height, track.ScanType, track.FrameRate)
-
-			meta.VideoCodec = metadata.VideoCodecName(track.Format, track.FormatVersion, track.CodecIDHint)
-			if track.BitDepth != 8 {
-				// ignore bit depth if it's 8 (default)
-				meta.BitDepth = track.BitDepth
-			}
-
-			meta.HDR = track.detectHDR()
+			populateVideoMetadata(meta, track)
 		} else if track.Type == "Audio" && meta.AudioCodec == "" {
-			meta.AudioCodec = metadata.AudioCodecName(track.Format, track.FormatProfile, track.FormatAdditionalFeatures)
-			meta.AudioChannels = metadata.ChanToNotation(track.Channels)
-			meta.AudioMeta = metadata.AudioMetaName(track.Title, track.FormatAdditionalFeatures)
+			populateAudioMetadata(meta, track)
 		}
 	}
 
 	mi.SetLanguageTag(meta)
 
-	if strings.Contains(config.GetTemplate(), "{crc32}") {
+	if strings.Contains(strings.ToLower(config.GetTemplate()), "crc32") {
 		meta.CRC32 = calculateCRC32(mi.Media.Ref)
 	}
 
 	ui.PrintDebug(fmt.Sprintf("Mediainfo meta: %+v", meta))
 
 	return meta
+}
+
+func populateVideoMetadata(meta *metadata.Metadata, track Track) {
+	meta.Resolution = metadata.HeightToResolution(track.Height, track.ScanType, track.FrameRate)
+	meta.FrameRate = track.FrameRate
+	meta.ScanType = track.ScanType
+
+	meta.VideoCodec = metadata.VideoCodecName(track.Format, track.FormatVersion, track.CodecIDHint)
+	if track.BitDepth != 8 {
+		// ignore bit depth if it's 8 (default)
+		meta.BitDepth = track.BitDepth
+	}
+
+	meta.HDR = track.detectHDR()
+
+	if track.EncodedLibrarySettings != "" ||
+		isEncoderLibrary(track.EncodedLibraryName) ||
+		isEncoderLibrary(track.EncodedLibrary) ||
+		isEncoderLibrary(track.EncodedApplication) {
+		meta.IsEncode = true
+	}
+}
+
+func populateAudioMetadata(meta *metadata.Metadata, track Track) {
+	meta.AudioCodec = metadata.AudioCodecName(track.Format, track.FormatProfile, track.FormatAdditionalFeatures)
+	meta.AudioChannels = metadata.ChanToNotation(track.Channels)
+	meta.AudioExtra = metadata.AudioMetaName(track.Title, track.FormatAdditionalFeatures)
+}
+
+func isEncoderLibrary(name string) bool {
+	u := strings.ToLower(name)
+
+	return strings.Contains(u, "x264") ||
+		strings.Contains(u, "x265") ||
+		strings.Contains(u, "libvpx") ||
+		strings.Contains(u, "svt-av1") ||
+		strings.Contains(u, "rav1e") ||
+		strings.Contains(u, "handbrake")
 }
 
 func calculateCRC32(filePath string) string {
@@ -520,16 +549,20 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 	languages := mi.GetAudioLanguages()
 	preferredLanguage := config.GetPreferredLanguage()
 
+	meta.AudioLanguages = languages
+	meta.SubtitleLanguages = mi.GetSubtitleLanguages()
+
 	if len(languages) == 0 {
 		fmt.Println("no audio languages found")
 
-		meta.Language = ""
-		meta.LanguageExt = ""
+		meta.LanguageISO = ""
+		meta.LanguageExtra = ""
 
 		return
 	}
 
 	selectedLanguage, hasPreferredAudio := selectAudioLanguage(languages, preferredLanguage)
+	meta.HasPreferredAudio = hasPreferredAudio
 
 	// Only tag SUBBED when preferred-language subtitles exist but preferred
 	// audio does not. A preferred audio track later in the file still makes the
@@ -540,17 +573,17 @@ func (mi *MediaInfo) SetLanguageTag(meta *metadata.Metadata) {
 		}
 	}
 
-	meta.Language = metadata.LanguageName(selectedLanguage)
+	meta.LanguageISO = selectedLanguage
 
 	switch len(languages) {
 	case 0:
 	case 1:
 	case 2:
-		meta.LanguageExt = "DL"
-		meta.DualAudio = true
+		meta.LanguageExtra = "DL"
+		meta.IsDualAudio = true
 	default:
-		meta.LanguageExt = "ML"
-		meta.DualAudio = true
+		meta.LanguageExtra = "ML"
+		meta.IsMultiAudio = true
 	}
 }
 
@@ -572,9 +605,9 @@ func (mi *MediaInfo) checkIsSubbed(meta *metadata.Metadata, preferredLanguage st
 	if len(subtitleLanguages) > 0 {
 		for _, lang := range subtitleLanguages {
 			if sameLanguage(lang, preferredLanguage) {
-				meta.Language = metadata.LanguageName(preferredLanguage)
-				meta.LanguageExt = "SUBBED"
-				meta.Subbed = true
+				meta.LanguageISO = preferredLanguage
+				meta.LanguageExtra = "SUBBED"
+				meta.IsSubbed = true
 
 				return true
 			}

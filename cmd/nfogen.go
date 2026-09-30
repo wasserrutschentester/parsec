@@ -32,8 +32,6 @@ var (
 	nfogenFullDiffFlag bool
 	sourcesFlag        []string
 	sourceMapFlag      []string
-	dumpContextFlag    bool
-	dumpContextRawFlag bool
 	nfogenPerFileFlag  bool
 	nfogenQuietFlag    bool
 	nfogenForceFlag    bool

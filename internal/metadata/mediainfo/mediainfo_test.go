@@ -443,7 +443,7 @@ func TestMediaInfo_GetLanguageTag(t *testing.T) {
 			meta := &metadata.Metadata{}
 			mi.SetLanguageTag(meta)
 
-			if got := strings.Trim(meta.Language+"."+meta.LanguageExt, "."); got != tt.want {
+			if got := strings.Trim(metadata.LanguageName(meta.LanguageISO)+"."+meta.LanguageExtra, "."); got != tt.want {
 				t.Errorf("GetLanguageTag() = %v, want %v", got, tt.want)
 			}
 		})
@@ -477,18 +477,20 @@ func TestMediaInfo_GetMetadata(t *testing.T) {
 
 	got := mi.GetMetadata()
 	want := &metadata.Metadata{
-		Resolution:    "1080p",
-		VideoCodec:    "H.264",
-		AudioCodec:    "DDP",
-		AudioChannels: "5.1",
-		Language:      "GERMAN",
-		HDR:           "DV.HDR",
-		AudioMeta:     "Atmos",
-		BitDepth:      10,
+		Resolution:        "1080p",
+		VideoCodec:        "AVC",
+		AudioCodec:        "DDP",
+		AudioChannels:     "5.1",
+		LanguageISO:       "de",
+		AudioLanguages:    []string{"de"},
+		HasPreferredAudio: true,
+		HDR:               "DV.HDR",
+		AudioExtra:        "Atmos",
+		BitDepth:          10,
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("GetMetadata() mismatch. got: %+v, want: %+v", got, want)
+		t.Errorf("GetMetadata() mismatch.\ngot:  %+v\nwant: %+v", got, want)
 	}
 }
 

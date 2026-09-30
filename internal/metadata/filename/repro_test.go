@@ -20,7 +20,7 @@ func TestReproMultiEpisode(t *testing.T) {
 		Season:        1,
 		Episodes:      []int{1, 2, 3, 4, 5, 6},
 		EpisodeTitles: []string{"Wie.das.Schiff.zur.Klippe.kam.uvm"},
-		Language:      "GERMAN",
+		LanguageISO:   "GERMAN",
 		Resolution:    "1080p",
 		Service:       "ATV",
 		Source:        "WEB-DL",

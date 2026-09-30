@@ -44,6 +44,15 @@ type FileContext struct {
 	EpisodeList []EpisodeContext
 }
 
+// Repack returns IsRepack for backward compatibility in NFO templates.
+func (f FileContext) Repack() bool { return f.IsRepack }
+
+// Subbed returns IsSubbed for backward compatibility in NFO templates.
+func (f FileContext) Subbed() bool { return f.IsSubbed }
+
+// DualAudio returns IsDualAudio for backward compatibility in NFO templates.
+func (f FileContext) DualAudio() bool { return f.IsDualAudio }
+
 // Context holds template variables
 type Context struct {
 	FileContext

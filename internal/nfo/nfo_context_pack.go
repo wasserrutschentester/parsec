@@ -65,11 +65,11 @@ func (pa *packAggregator) processFile(i int, fctx *FileContext) {
 }
 
 func (pa *packAggregator) processBooleans(fctx *FileContext) {
-	if fctx.Subbed {
+	if fctx.IsSubbed {
 		pa.anySubbed = true
 	}
 
-	if fctx.DualAudio {
+	if fctx.IsDualAudio {
 		pa.anyDualAudio = true
 	}
 
@@ -77,7 +77,7 @@ func (pa *packAggregator) processBooleans(fctx *FileContext) {
 		pa.anyHasAudioDesc = true
 	}
 
-	if fctx.Repack {
+	if fctx.IsRepack {
 		pa.anyRepack = true
 	}
 }
@@ -121,10 +121,10 @@ func (pa *packAggregator) applyToContext(ctx *Context) {
 		ctx.Date = pa.earliestDate
 	}
 
-	ctx.Subbed = pa.anySubbed
-	ctx.DualAudio = pa.anyDualAudio
+	ctx.IsSubbed = pa.anySubbed
+	ctx.IsDualAudio = pa.anyDualAudio
 	ctx.HasAudioDesc = pa.anyHasAudioDesc
-	ctx.Repack = pa.anyRepack
+	ctx.IsRepack = pa.anyRepack
 
 	pa.applyRootFields(ctx)
 

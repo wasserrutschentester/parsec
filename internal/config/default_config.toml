@@ -138,7 +138,7 @@ description = "HEVC/AVC codec labels"
 source = "BluRay"
 video_codec_hevc = "HEVC"
 video_codec_avc = "AVC"
-template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_codec}.{audio_channels}-{group}"
+template = '{{join "." .Title .YearTag .Resolution .Source "REMUX" .VideoCodec .AudioSpec}}-{{.Group}}'
 
 # ------------------------------------------------------------------------------
 # PRESET: encode
@@ -182,7 +182,7 @@ description = "TV specials and extras"
 allow_special_matches = true
 season = 0
 is_tv = true
-template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resolution}.{service}.{source}.{video_codec}-{group}"
+template = '{{join "." .Title .YearTag .SeasonEpisode .Date .EpisodeTitle .Resolution .Service .Source .VideoCodec}}-{{.Group}}'
 
 # ------------------------------------------------------------------------------
 # PRESET: anime
@@ -192,67 +192,5 @@ template = "{title}.{year}.{season_id}{episode_id}.{date}.{episode_title}.{resol
 description = "CRC32 brackets and spaces"
 is_tv = true
 word_separator = " "
-template = "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]"
-
-# ------------------------------------------------------------------------------
-# TRACKER PRESETS
-# ------------------------------------------------------------------------------
-# TRACKER PRESETS
-# ------------------------------------------------------------------------------
-
-# --- TorrentSyndikat (TS / German Scene) ---
-[preset.ts]
-description = "TorrentSyndikat (German Scene)"
-word_separator = "."
-template = '{{join "." .Title .YearTag .SeasonEpisode .Edition .EpisodeTitle .LanguageName .LanguageExtra .Accessibility .VersionTag .RepackTag .Resolution .Service .Source .AudioCodec .HDR .VideoCodec}}-{{.Group}}'
-
-[preset.ts_daily]
-description = "TorrentSyndikat Daily"
-word_separator = "."
-template = '{{join "." .Title (parseDate "2006.01.02" .Date) .Edition .EpisodeTitle .LanguageName .LanguageExtra .Accessibility .VersionTag .RepackTag .Resolution .Service .Source .AudioCodec .HDR .VideoCodec}}-{{.Group}}'
-
-# --- Aither (UNIT3D / International P2P) ---
-[preset.aither]
-description = "Aither (UNIT3D / International P2P)"
-word_separator = " "
-preferred_language = "en"
-template = '{{join " " (aka .Title .OriginalTitle) .YearTag .SeasonEpisode (upper .EpisodeTitle) .Edition .VersionTag .RepackTag (cond .HasPreferredAudio "" .LanguageName) .Resolution .Service .Source (cond .IsDualAudio "Dual-Audio" "") .AudioCodec .AudioChannels .AudioExtra .HDR .VideoCodec}}-{{.Group}}'
-
-[preset.aither_remux]
-description = "Aither Remux"
-word_separator = " "
-preferred_language = "en"
-template = '{{join " " (aka .Title .OriginalTitle) .YearTag .SeasonEpisode (upper .EpisodeTitle) .Edition .VersionTag .RepackTag (cond .HasPreferredAudio "" .LanguageName) .Resolution .Source "REMUX" .HDR .VideoCodec (cond .IsDualAudio "Dual-Audio" "") .AudioCodec .AudioChannels .AudioExtra}}-{{.Group}}'
-
-# --- HUNO ---
-[preset.huno]
-description = "HUNO"
-word_separator = " "
-preferred_language = "en"
-template = '{{.Title}} ({{.YearTag}}) {{.SeasonEpisode}} {{.Edition}} ({{join " " .Resolution .Service .Source (cond .IsRemux "REMUX" "") .VideoCodec .HDR .AudioCodec .AudioChannels (when .IsMultiAudio "MULTI" .IsDualAudio "DUAL" (title .LanguageName))}} - {{.Group}}) {{when .IsSubbed "[SUBBED]" .RepackTag (cat "[" .RepackTag "]") ""}}'
-
-# --- Nacho (P2P Encoders) ---
-[preset.nacho]
-description = "Nacho (P2P Encoders)"
-word_separator = "."
-template = '{{join "." (aka "." .Title .OriginalTitle .YearTag) .Edition .VersionTag .RepackTag .Resolution .Service .Source .AudioSpec .HDR .VideoCodec}}-{{.Group}}'
-
-[preset.nacho_remux]
-description = "Nacho Remux"
-word_separator = "."
-template = '{{join "." (aka "." .Title .OriginalTitle .YearTag) .Edition .VersionTag .Resolution .Source "Remux" .HDR .VideoCodec .AudioSpec}}-{{.Group}}'
-
-# --- Handjob (PTP Encoders) ---
-[preset.handjob]
-description = "Handjob (PTP Encoders)"
-word_separator = "."
-template = '{{join "." (aka "." .Title .OriginalTitle) (when .IsTV (cat .EpisodeID "." (join "." .EpisodeTitles)) "") .YearTag .Edition (when (ne .Source "DVDRip") .Resolution "") .Source (when (contains .AudioCodec "FLAC AAC DTS") .AudioCodec "") .VideoCodec}}-HANDJOB'
-
-# --- MixMux (Boutique Remuxes) ---
-[preset.mixmux]
-description = "MixMux (Boutique Remuxes)"
-word_separator = "."
-template = '{{join "." .Title .YearTag .Country .Edition .Resolution "Bluray.Remux" .VideoCodec .AudioCodec .AudioChannels}}-MIXMUX'
-
-
+template = '[{{.Group}}] {{.Title}} - {{.SeasonEpisode}} - ({{join " " .Source .Resolution .VideoCodec .AudioCodec}}){{when .IsDualAudio " Dual-Audio"}} [{{.CRC32}}]'
 

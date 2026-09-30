@@ -91,6 +91,7 @@ func TestRenameNewPathMultipleFlags(t *testing.T) {
 	}
 
 	tests := getRenameNewPathTestCases(seasonPackName, newNameBase)
+	tCtx := meta.ToTemplateContext()
 
 	for _, tt := range tests {
 		oldSeasonPackFlag := seasonPackFlag
@@ -99,7 +100,7 @@ func TestRenameNewPathMultipleFlags(t *testing.T) {
 		seasonPackFlag = tt.seasonPackFlag
 		releaseFolderFlag = tt.releaseFolderFlag
 
-		gotDestDir, gotNewNameBase := renameNewPath(tt.filePath, meta)
+		gotDestDir, gotNewNameBase := renameNewPath(tt.filePath, &tCtx)
 
 		if gotNewNameBase != newNameBase {
 			t.Errorf("[%s] gotNewNameBase = %q, want %q", tt.name, gotNewNameBase, newNameBase)
@@ -115,5 +116,46 @@ func TestRenameNewPathMultipleFlags(t *testing.T) {
 		// Restore flag state after each case since they run sequentially
 		seasonPackFlag = oldSeasonPackFlag
 		releaseFolderFlag = oldReleaseFolderFlag
+	}
+}
+
+//nolint:paralleltest // depends on shared global flag variables
+func TestApplyMetadataFlags_NewFlags(t *testing.T) {
+	meta := &metadata.Metadata{}
+
+	repackFlag = 2
+	isRemuxFlag = true
+	originalTitleFlag = "Original Japanese Title"
+	vcodecStyleFlag = "remux"
+	versionTagFlag = 3
+
+	defer func() {
+		repackFlag = 0
+		isRemuxFlag = false
+		originalTitleFlag = ""
+		vcodecStyleFlag = ""
+		versionTagFlag = 0
+	}()
+
+	applyMetadataFlags(renameCmd, meta)
+
+	if !meta.IsRepack || meta.RepackLevel != 2 {
+		t.Errorf("expected IsRepack=true, RepackLevel=2; got IsRepack=%v, RepackLevel=%d", meta.IsRepack, meta.RepackLevel)
+	}
+
+	if !meta.IsRemux {
+		t.Errorf("expected IsRemux=true; got %v", meta.IsRemux)
+	}
+
+	if meta.OriginalTitle != "Original Japanese Title" {
+		t.Errorf("expected OriginalTitle='Original Japanese Title'; got %q", meta.OriginalTitle)
+	}
+
+	if meta.CodecStyle != "remux" {
+		t.Errorf("expected CodecStyle='remux'; got %q", meta.CodecStyle)
+	}
+
+	if meta.ReleaseVersion != 3 {
+		t.Errorf("expected ReleaseVersion=3; got %d", meta.ReleaseVersion)
 	}
 }

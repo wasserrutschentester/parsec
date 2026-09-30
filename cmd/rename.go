@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -81,7 +82,10 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	applyMetadataFlags(cmd, meta)
 
 	// 4. MDB Search to get "correct" title and year
-	renameApplyMdbSearch(meta)
+	mdbResult := renameApplyMdbSearch(meta)
+
+	// Re-apply flags in case user explicitly overrode MDB fields (like title or original-title)
+	applyMetadataFlags(cmd, meta)
 
 	renameApplyNormalization(meta)
 
@@ -91,8 +95,14 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	meta.SetDefaults()
 
+	tCtx := meta.ToTemplateContextWithRaw(res.MediaInfo, mdbResult)
+
+	if dumpContextFlag || dumpContextRawFlag {
+		return dumpTemplateContext(tCtx, dumpContextRawFlag)
+	}
+
 	// 8. Generate new name
-	destDir, newNameBase := renameNewPath(filePath, meta)
+	destDir, newNameBase := renameNewPath(filePath, &tCtx)
 
 	newName := newNameBase + ext
 	newPath := filepath.Join(destDir, newName)
@@ -107,9 +117,9 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 }
 
 //nolint:cyclop // logic is naturally complex due to nested folder structures, but kept clean and readable
-func renameNewPath(filePath string, meta *metadata.Metadata) (string, string) {
+func renameNewPath(filePath string, ctx *metadata.TemplateContext) (string, string) {
 	// 8. Generate new name
-	newNameBase := meta.GetReleaseName()
+	newNameBase := ctx.GetReleaseName()
 	newNameBase = filename.ApplyReplacements(newNameBase, config.GetOutputReplacements())
 
 	destDir := filepath.Dir(filePath)
@@ -127,8 +137,8 @@ func renameNewPath(filePath string, meta *metadata.Metadata) (string, string) {
 	base := filepath.Base(absDestDir)
 	parentBase := filepath.Base(filepath.Dir(absDestDir))
 
-	if seasonPackFlag && meta.IsTV && meta.Season >= 0 {
-		seasonPackName := meta.GetSeasonPackName()
+	if seasonPackFlag && ctx.IsTV && ctx.Season >= 0 {
+		seasonPackName := ctx.GetSeasonPackName()
 
 		switch {
 		case !releaseFolderFlag && (base != seasonPackName):
@@ -256,7 +266,7 @@ func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo, ebm
 	}
 }
 
-func renameApplyMdbSearch(meta *metadata.Metadata) {
+func renameApplyMdbSearch(meta *metadata.Metadata) *mdb.SearchResult {
 	meta.SetDefaults()
 	result, _ := mdbSearch.InteractiveSearch(meta, true, false)
 
@@ -264,15 +274,11 @@ func renameApplyMdbSearch(meta *metadata.Metadata) {
 		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
 		ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
 
-		return
+		return nil
 	}
 
 	mdb.PrintCompactResult(*result)
-
-	meta.Title = result.Title
-	if result.Year > 0 {
-		meta.Year = result.Year
-	}
+	applyMdbMetadata(meta, result)
 
 	if meta.IsTV {
 		episodes := renameGetEpisodeInfos(result, meta)
@@ -286,6 +292,28 @@ func renameApplyMdbSearch(meta *metadata.Metadata) {
 	}
 
 	ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
+
+	return result
+}
+
+func applyMdbMetadata(meta *metadata.Metadata, result *mdb.SearchResult) {
+	meta.Title = result.Title
+
+	if meta.OriginalTitle == "" && result.OriginalTitle != "" && result.OriginalTitle != result.Title {
+		meta.OriginalTitle = result.OriginalTitle
+	}
+
+	if meta.OriginalLanguageISO == "" && result.OriginalLanguage != "" {
+		meta.OriginalLanguageISO = result.OriginalLanguage
+	}
+
+	if meta.Country == "" && len(result.Countries) > 0 {
+		meta.Country = result.Countries[0]
+	}
+
+	if result.Year > 0 {
+		meta.Year = result.Year
+	}
 }
 
 func renameApplyNormalization(meta *metadata.Metadata) {
@@ -325,6 +353,7 @@ func init() {
 	rootCmd.AddCommand(renameCmd)
 	// Metadata
 	renameCmd.Flags().StringVarP(&titleFlag, "title", "t", "", "title of the movie or TV show")
+	renameCmd.Flags().StringVar(&originalTitleFlag, "original-title", "", "original foreign title")
 	renameCmd.Flags().IntVarP(&yearFlag, "year", "y", 0, "release year")
 	renameCmd.Flags().IntVarP(&seasonFlag, "season", "s", 0, "season number")
 	renameCmd.Flags().IntSliceVarP(&episodeFlag, "episode", "e", nil, "episode numbers (comma-separated)")
@@ -332,10 +361,15 @@ func init() {
 	renameCmd.Flags().StringVar(&episodeTitleFlag, "episode-title", "", "episode title")
 	renameCmd.Flags().StringVar(&cutEditionFlag, "cut-edition", "", "special edition or cut")
 	renameCmd.Flags().StringVar(&hdrFlag, "hdr", "", "HDR format")
+
 	// P2P
 	renameCmd.Flags().StringVarP(&serviceFlag, "service", "S", "", "streaming service")
 	renameCmd.Flags().StringVarP(&sourceFlag, "source", "o", "", "source (WEB-DL, BluRay, etc.)")
-	renameCmd.Flags().BoolVarP(&isRepackFlag, "repack", "R", false, "is repack")
+	renameCmd.Flags().IntVarP(&repackFlag, "repack", "R", 0, "mark as repack (optional level, e.g. -R or -R 2)")
+	renameCmd.Flags().Lookup("repack").NoOptDefVal = "1"
+	renameCmd.Flags().IntVar(&versionTagFlag, "version-tag", 0, "release quality upgrade version (e.g. 2 for v2)")
+	renameCmd.Flags().BoolVar(&isRemuxFlag, "remux", false, "identify release as a REMUX")
+	renameCmd.Flags().StringVar(&vcodecStyleFlag, "vcodec-style", "", "override video codec style (web_dl, encode, remux)")
 	renameCmd.Flags().BoolVar(&isSubbedFlag, "subbed", false, "has subtitles in the preferred language")
 	renameCmd.Flags().BoolVar(&isAudioDescFlag, "audio-description", false, "add audio description tag")
 	renameCmd.Flags().StringVarP(&groupFlag, "group", "g", "", "release group")
@@ -352,14 +386,16 @@ func init() {
 	// Other
 	renameCmd.Flags().BoolVarP(&unattendedFlag, "unattended", "u", false, "unattended mode (do not prompt for confirmation)")
 	renameCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "only print the new filename without renaming")
+	renameCmd.Flags().BoolVar(&dumpContextFlag, "dump-context", false, "dump template context data as JSON")
+	renameCmd.Flags().BoolVar(&dumpContextRawFlag, "dump-context-raw", false, "dump full context including raw MediaInfo and MDB as JSON")
 
 	// Group metadata flags
-	metadataFlags := []string{"title", "year", "season", "episode", "date", "episode-title", "cut-edition", "hdr"}
+	metadataFlags := []string{"title", "original-title", "year", "season", "episode", "date", "episode-title", "cut-edition", "hdr"}
 	for _, f := range metadataFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"metadata"})
 	}
 
-	p2pFlags := []string{"service", "source", "repack", "subbed", "audio-description", "group"}
+	p2pFlags := []string{"service", "source", "repack", "remux", "subbed", "audio-description", "group", "vcodec-style", "version-tag"}
 	for _, f := range p2pFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"p2p"})
 	}
@@ -383,4 +419,21 @@ func init() {
 	_ = renameCmd.RegisterFlagCompletionFunc("group", completeGroups)
 
 	renameCmd.Flags().SortFlags = false
+}
+
+func dumpTemplateContext(tCtx metadata.TemplateContext, raw bool) error {
+	if !raw {
+		tCtx.RawMediaInfo = nil
+		tCtx.RawMDB = nil
+	}
+
+	//nolint:musttag // TemplateContext dynamically embeds Metadata for context inspection
+	data, err := json.MarshalIndent(tCtx, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal template context: %w", err)
+	}
+
+	ui.Println(string(data))
+
+	return nil
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -253,4 +254,46 @@ func TestListPresets(t *testing.T) {
 			}
 		}
 	})
+}
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestGetTemplate(t *testing.T) {
+	viper.Reset()
+	InitDefaults()
+
+	defaultTmpl := GetTemplate()
+	if defaultTmpl == "" || !strings.Contains(defaultTmpl, "{{join") {
+		t.Errorf("GetTemplate() default = %v, want template containing {{join", defaultTmpl)
+	}
+
+	presets := map[string]string{
+		// Updated existing presets converted to Go templates
+		"movie-remux": `{{join "." .Title .YearTag .Resolution .Source "REMUX" .VideoCodec .AudioSpec}}-{{.Group}}`,
+		"special":     `{{join "." .Title .YearTag .SeasonEpisode .Date .EpisodeTitle .Resolution .Service .Source .VideoCodec}}-{{.Group}}`,
+		"anime":       `[{{.Group}}] {{.Title}} - {{.SeasonEpisode}} - ({{join " " .Source .Resolution .VideoCodec .AudioCodec}}){{when .IsDualAudio " Dual-Audio"}} [{{.CRC32}}]`,
+		// Showcase templates demonstrating parsec Go template capabilities
+		"foreign-aka":       `{{join "." (aka .OriginalTitle .Title .YearTag) .Edition (vcodec "encode" .VideoCodec) .AudioSpec}}-{{.Group}}`,
+		"p2p-parenthetical": `{{.Title}} ({{.YearTag}}) {{.SeasonEpisode}} ({{join " " .Resolution .Source (when .IsRemux "REMUX") .VideoCodec (when .IsMultiAudio "MULTI" .IsDualAudio "DUAL" (title .LanguageName))}} - {{.Group}}){{when .IsSubbed " [SUBBED]"}}`,
+		"daily-show":        `{{join "." .Title (parseDate "2006.01.02" .Date) .LanguageName .Resolution .Service .Source .VideoCodec}}-{{.Group}}`,
+	}
+
+	for name, tmpl := range presets {
+		if errs := validateTemplate(tmpl, "template"); len(errs) > 0 {
+			t.Fatalf("preset %q template failed validation: %v", name, errs)
+		}
+
+		viper.Set("preset."+name+".template", tmpl)
+		SetPreset(name)
+
+		if got := GetTemplate(); got != tmpl {
+			t.Errorf("GetTemplate() for %s = %v, want %v", name, got, tmpl)
+		}
+	}
+
+	// Reset preset returns default
+	SetPreset("")
+
+	if got := GetTemplate(); got != defaultTmpl {
+		t.Errorf("GetTemplate() after reset = %v, want default %v", got, defaultTmpl)
+	}
 }

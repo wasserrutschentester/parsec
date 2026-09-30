@@ -20,12 +20,12 @@ func TestTranspileLegacyTemplate(t *testing.T) {
 		{
 			name:     "Episode raw and padding",
 			input:    "{title}.S{season_02}E{episode_02}",
-			expected: `{{.Title}}.S{{cond (or .IsTV (gt .Season 0)) (pad 2 .Season) ""}}E{{eprange "" 2 .Episodes}}`,
+			expected: `{{.Title}}.S{{when (or .IsTV (gt .Season 0)) (pad 2 .Season)}}E{{eprange "" 2 .Episodes}}`,
 		},
 		{
 			name:     "Conditional legacy tokens",
 			input:    "{title}.{dual_audio}.{subbed}.{repack}.{bit_depth}",
-			expected: `{{.Title}}.{{cond .IsDualAudio "Dual-Audio" ""}}.{{cond .IsSubbed "[SUBBED]" ""}}.{{.RepackTag}}.{{cond (gt .BitDepth 8) (cat .BitDepth "bit") ""}}`,
+			expected: `{{.Title}}.{{when .IsDualAudio "Dual-Audio"}}.{{when .IsSubbed "[SUBBED]"}}.{{.RepackTag}}.{{when (gt .BitDepth 8) (cat .BitDepth "bit")}}`,
 		},
 		{
 			name:     "Language and audio tokens",
@@ -51,7 +51,7 @@ func TestValidateTemplate(t *testing.T) {
 
 	validCases := []string{
 		`{{join "." .Title .Year}}-{{.Group}}`,
-		`{{cond .IsDualAudio "Dual-Audio" ""}}`,
+		`{{when .IsDualAudio "Dual-Audio"}}`,
 		`{{pad 2 .Season}}`,
 		`{{where "Type" "audio" .Tracks}}`,
 		`{title}.{year}-{group}`, // Transpiled legacy

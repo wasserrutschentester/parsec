@@ -133,8 +133,8 @@ func TestVideoCodecName(t *testing.T) {
 		hint    string
 		want    string
 	}{
-		{"AVC", "", "", "H.264"},
-		{"HEVC", "", "", "H.265"},
+		{"AVC", "", "", "AVC"},
+		{"HEVC", "", "", "HEVC"},
 		{"AV1", "", "", "AV1"},
 		{"MPEG Video", "Version 2", "", "MPEG2"},
 		{"MPEG-4 Visual", "", "XviD", "XviD"},
@@ -214,7 +214,7 @@ func TestMetadata_String(t *testing.T) {
 				Year:          2024,
 				Season:        1,
 				Episodes:      []int{2},
-				Language:      "de",
+				LanguageISO:   "de",
 				Resolution:    "1080p",
 				Service:       "Netflix",
 				Source:        "WEB-DL",
@@ -223,9 +223,9 @@ func TestMetadata_String(t *testing.T) {
 				VideoCodec:    "H.265",
 				Group:         "GRP",
 				HDR:           "DV.HDR",
-				AudioMeta:     "Atmos",
+				AudioExtra:    "Atmos",
 				BitDepth:      10,
-				CutEdition:    "Unrated",
+				Edition:       "Unrated",
 			},
 			want: "Movie.2024.S01E02.Unrated.GERMAN.1080p.Netflix.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-GRP",
 		},
@@ -250,9 +250,9 @@ func TestMetadata_String(t *testing.T) {
 		{
 			name: "Repack",
 			meta: Metadata{
-				Title:  "Movie",
-				Repack: true,
-				Group:  "GRP",
+				Title:    "Movie",
+				IsRepack: true,
+				Group:    "GRP",
 			},
 			want: "Movie.REPACK-GRP",
 		},
@@ -319,7 +319,7 @@ func TestMetadata_GetSeasonPackName(t *testing.T) {
 				Source:        "WEB-DL",
 				AudioCodec:    "DDP",
 				AudioChannels: "5.1",
-				AudioMeta:     "Atmos",
+				AudioExtra:    "Atmos",
 				HDR:           "DV.HDR",
 				VideoCodec:    "H.265",
 				Group:         "PAARSEX",
@@ -362,13 +362,13 @@ func TestMetadata_Override(t *testing.T) {
 	t.Parallel()
 
 	meta := &Metadata{
-		Title:  "Old",
-		Year:   2000,
-		Repack: true,
+		Title:    "Old",
+		Year:     2000,
+		IsRepack: true,
 	}
 	newMeta := &Metadata{
-		Title:  "New",
-		Repack: false,
+		Title:    "New",
+		IsRepack: false,
 	}
 
 	updated := meta.Override(newMeta)
@@ -384,7 +384,7 @@ func TestMetadata_Override(t *testing.T) {
 		t.Errorf("Override() Year should remain 2000, got %v", meta.Year)
 	}
 
-	if meta.Repack == false {
+	if meta.IsRepack == false {
 		t.Errorf("Override() bool flags should not get overridden by default")
 	}
 
@@ -415,17 +415,17 @@ func TestAnimeRendering(t *testing.T) {
 		{
 			name: "Standard Anime Template",
 			meta: Metadata{
-				Title:      "Anime Name",
-				Season:     1,
-				Episodes:   []int{1},
-				Source:     "BD",
-				Resolution: "1080p",
-				VideoCodec: "HEVC",
-				AudioCodec: "FLAC",
-				DualAudio:  true,
-				CRC32:      "48F1910E",
-				Group:      "Group",
-				IsTV:       true,
+				Title:       "Anime Name",
+				Season:      1,
+				Episodes:    []int{1},
+				Source:      "BD",
+				Resolution:  "1080p",
+				VideoCodec:  "HEVC",
+				AudioCodec:  "FLAC",
+				IsDualAudio: true,
+				CRC32:       "48F1910E",
+				Group:       "Group",
+				IsTV:        true,
 			},
 			template: "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]",
 			want:     "[Group] Anime Name - S01E01 - (BD 1080p HEVC FLAC) Dual-Audio [48F1910E]",
@@ -433,16 +433,16 @@ func TestAnimeRendering(t *testing.T) {
 		{
 			name: "Anime Template without CRC",
 			meta: Metadata{
-				Title:      "Anime Name",
-				Season:     1,
-				Episodes:   []int{2},
-				Source:     "BD",
-				Resolution: "1080p",
-				VideoCodec: "HEVC",
-				AudioCodec: "FLAC",
-				DualAudio:  false,
-				Group:      "Group",
-				IsTV:       true,
+				Title:       "Anime Name",
+				Season:      1,
+				Episodes:    []int{2},
+				Source:      "BD",
+				Resolution:  "1080p",
+				VideoCodec:  "HEVC",
+				AudioCodec:  "FLAC",
+				IsDualAudio: false,
+				Group:       "Group",
+				IsTV:        true,
 			},
 			template: "[{group}] {title} - {season_id}{episode_id} - ({source} {resolution} {video_codec} {audio_codec}) {dual_audio} [{crc32}]",
 			want:     "[Group] Anime Name - S01E02 - (BD 1080p HEVC FLAC)",
@@ -458,7 +458,7 @@ func TestAnimeRendering(t *testing.T) {
 				Resolution:    "1080p",
 				VideoCodec:    "HEVC",
 				AudioCodec:    "FLAC",
-				DualAudio:     true,
+				IsDualAudio:   true,
 				Group:         "Group",
 				IsTV:          true,
 			},

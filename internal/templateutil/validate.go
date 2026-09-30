@@ -10,38 +10,21 @@ import (
 // This allows parsing and validating template syntax without external package dependencies.
 func KnownTemplateFuncs() template.FuncMap {
 	stub := func(_ ...any) any { return "" }
-	stubBool := func(_ ...any) bool { return false }
-	stubSlice := func(_ ...any) []any { return nil }
 
-	return template.FuncMap{
-		"join":         stub,
-		"cat":          stub,
-		"cond":         stub,
-		"when":         stub,
-		"pad":          stub,
-		"eprange":      stub,
-		"vcodec":       stub,
-		"aka":          stub,
-		"upper":        stub,
-		"lower":        stub,
-		"title":        stub,
-		"replace":      stub,
-		"regexReplace": stub,
-		"contains":     stubBool,
-		"trimPrefix":   stub,
-		"trimSuffix":   stub,
-		"hasPrefix":    stubBool,
-		"hasSuffix":    stubBool,
-		"default":      stub,
-		"where":        stub,
-		"pluck":        stubSlice,
-		"first":        stub,
-		"last":         stub,
-		"uniq":         stub,
-		"indexOrEmpty": stub,
-		"languageName": stub,
-		"parseDate":    stub,
+	funcs := []string{
+		"join", "cat", "when", "pad", "eprange", "vcodec", "aka",
+		"upper", "lower", "title", "replace", "regexReplace",
+		"contains", "trimPrefix", "trimSuffix", "hasPrefix", "hasSuffix",
+		"default", "where", "pluck", "first", "last", "uniq",
+		"indexOrEmpty", "languageName", "parseDate",
 	}
+
+	fm := make(template.FuncMap, len(funcs))
+	for _, fn := range funcs {
+		fm[fn] = stub
+	}
+
+	return fm
 }
 
 // ValidateTemplate checks if a template string contains valid Go template syntax.

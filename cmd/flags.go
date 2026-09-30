@@ -20,12 +20,18 @@ var (
 	cutEditionFlag   string
 	hdrFlag          string
 	// P2P
-	serviceFlag     string
-	sourceFlag      string
-	isRepackFlag    bool
-	isSubbedFlag    bool
-	isAudioDescFlag bool
-	groupFlag       string
+	serviceFlag        string
+	sourceFlag         string
+	repackFlag         int
+	isRemuxFlag        bool
+	isSubbedFlag       bool
+	isAudioDescFlag    bool
+	groupFlag          string
+	originalTitleFlag  string
+	vcodecStyleFlag    string
+	versionTagFlag     int
+	dumpContextFlag    bool
+	dumpContextRawFlag bool
 	// MDB IDs
 	isTVFlag             bool
 	isMovieFlag          bool
@@ -72,7 +78,7 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 	}
 
 	if cutEditionFlag != "" {
-		meta.CutEdition = cutEditionFlag
+		meta.Edition = cutEditionFlag
 	}
 
 	if hdrFlag != "" {
@@ -87,12 +93,29 @@ func applyMetadataFlags(cmd *cobra.Command, meta *metadata.Metadata) {
 		meta.Source = sourceFlag
 	}
 
-	if isRepackFlag {
-		meta.Repack = isRepackFlag
+	if cmd.Flags().Changed("repack") || repackFlag > 0 {
+		meta.IsRepack = true
+		meta.RepackLevel = max(1, repackFlag)
+	}
+
+	if isRemuxFlag {
+		meta.IsRemux = true
+	}
+
+	if originalTitleFlag != "" {
+		meta.OriginalTitle = originalTitleFlag
+	}
+
+	if vcodecStyleFlag != "" {
+		meta.CodecStyle = vcodecStyleFlag
+	}
+
+	if versionTagFlag > 0 {
+		meta.ReleaseVersion = versionTagFlag
 	}
 
 	if isSubbedFlag {
-		meta.Subbed = isSubbedFlag
+		meta.IsSubbed = isSubbedFlag
 	}
 
 	if isAudioDescFlag {
