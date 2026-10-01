@@ -29,9 +29,10 @@ You can provide one or more files or directories to be processed. Directories wi
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
 | `--title` | `-t` | string | Title of the movie or TV show. |
+| `--original-title` | | string | Original foreign or alternative title. |
 | `--year` | `-y` | integer | Release year. |
 | `--season` | `-s` | integer | Season number. |
-| `--episode` | `-e` | integer | Episode number. |
+| `--episode` | `-e` | integer | Episode numbers (comma-separated). |
 | `--date` | `-D` | string | Episode air date (YYYY-MM-DD). |
 | `--episode-title`| | string | Title of the episode. |
 | `--cut-edition` | | string | Override for the release edition (e.g., `Director's Cut`). |
@@ -43,9 +44,12 @@ You can provide one or more files or directories to be processed. Directories wi
 |------|-----------|------|-------------|
 | `--service` | `-S` | string | Streaming service (e.g., `DSNP`, `NF`). |
 | `--source` | `-o` | string | Source (e.g., `WEB-DL`, `BluRay`). |
-| `--repack` | `-R` | boolean | Mark the release as a REPACK. |
+| `--repack` | `-R` | integer (optional) | Mark the release as a repack (optional level, e.g. `-R` or `-R 2`). |
+| `--remux` | | boolean | Identify release as a REMUX. |
+| `--vcodec-style` | | string | Override video codec style (`web_dl`, `encode`, `remux`). |
+| `--version-tag` | | integer | Quality upgrade version iteration (e.g. `2` for v2). |
 | `--subbed` | | boolean | Add `.SUBBED` tag. |
-| `--audio-description`| | boolean | Add `.AD` tag for audio description. |
+| `--audio-description`| | boolean | Add audio description tag. |
 | `--group` | `-g` | string | Release group name. |
 
 ### ID Flags
@@ -58,15 +62,17 @@ You can provide one or more files or directories to be processed. Directories wi
 | `--tmdb` | | integer | TMDB ID. |
 | `--tvdb` | | integer | TVDB ID. |
 
-### Other Flags
+### Other & Inspection Flags
 
 | Flag | Shorthand | Type | Description |
 |------|-----------|------|-------------|
 | `--unattended`| `-u` | boolean | Do not prompt for confirmation before renaming. |
 | `--dry-run` | `-d` | boolean | Print the proposed new filename but do not perform the actual rename. |
 | `--season-pack`| `-P` | boolean | Move episodes into a correctly named season pack folder (omitting episode-specific info). |
-| `--release-folder`| `-F` | boolean | move each release into a identivally named folder |
+| `--release-folder`| `-F` | boolean | Move each release into an identically named folder. |
 | `--output` | `-O` | string | Output path where to move the files after renaming (absolute or relative to current working directory). |
+| `--dump-context` | | boolean | Dump the template context data as JSON and exit without renaming. |
+| `--dump-context-raw` | | boolean | Dump full context including raw MediaInfo and MDB search data as JSON. |
 
 ## Examples
 

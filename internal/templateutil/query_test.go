@@ -3,7 +3,6 @@ package templateutil
 import (
 	"reflect"
 	"testing"
-	"time"
 )
 
 type sampleTrack struct {
@@ -140,27 +139,6 @@ func TestDefault(t *testing.T) {
 	}
 }
 
-func TestParseDate(t *testing.T) {
-	t.Parallel()
-
-	// 1 arg -> time.Time
-	resTime := ParseDate("2024-05-18")
-	if tm, ok := resTime.(time.Time); !ok || tm.Year() != 2024 || tm.Month() != 5 || tm.Day() != 18 {
-		t.Errorf("ParseDate('2024-05-18') = %v, want 2024-05-18 time.Time", resTime)
-	}
-
-	// 2 args -> formatted string
-	resStr := ParseDate("2006.01.02", "2024-05-18")
-	if resStr != "2024.05.18" {
-		t.Errorf("ParseDate(2006.01.02, 2024-05-18) = %v, want '2024.05.18'", resStr)
-	}
-
-	// Invalid / empty date
-	if got := ParseDate("2006.01.02", ""); got != "" {
-		t.Errorf("ParseDate with empty date = %v, want ''", got)
-	}
-}
-
 //nolint:cyclop,funlen // tests multiple query operator branches
 func TestWhere(t *testing.T) {
 	t.Parallel()
@@ -249,4 +227,74 @@ func TestWhere(t *testing.T) {
 			t.Fatalf("Where(Codec not contains 'D') len = %d, want 3", len(res))
 		}
 	})
+}
+
+//nolint:cyclop,funlen // comprehensive test for template helper utilities
+func TestTemplateutilHelpers(t *testing.T) {
+	t.Parallel()
+
+	// FormatDate
+	if got := FormatDate("2006-01-02", "2024-05-18"); got != "2024-05-18" {
+		t.Errorf("FormatDate = %q, want '2024-05-18'", got)
+	}
+
+	if got := FormatDate("02.01.2006", "2024-05-18"); got != "18.05.2024" {
+		t.Errorf("FormatDate layout = %q, want '18.05.2024'", got)
+	}
+
+	if got := FormatDate("2024-05-18"); got != "2024-05-18" {
+		t.Errorf("FormatDate default layout = %q, want '2024-05-18'", got)
+	}
+
+	// List
+	l := List("a", "b", 3)
+	if len(l) != 3 || l[0] != "a" || l[1] != "b" || l[2] != 3 {
+		t.Errorf("List = %v", l)
+	}
+
+	// Pipe-friendly string helpers (s is last)
+	if got := Replace("foo", "bar", "foobar"); got != "barbar" {
+		t.Errorf("Replace = %q", got)
+	}
+
+	if got := TrimPrefix("The.", "The.Matrix"); got != "Matrix" {
+		t.Errorf("TrimPrefix = %q", got)
+	}
+
+	if got := TrimSuffix(".mkv", "file.mkv"); got != "file" {
+		t.Errorf("TrimSuffix = %q", got)
+	}
+
+	if !HasPrefix("The.", "The.Matrix") {
+		t.Errorf("HasPrefix failed")
+	}
+
+	if !HasSuffix(".mkv", "file.mkv") {
+		t.Errorf("HasSuffix failed")
+	}
+
+	if got := RegexReplace(`\d+`, "X", "item123"); got != "itemX" {
+		t.Errorf("RegexReplace = %q", got)
+	}
+
+	// Cat, When, Pad, Eprange
+	if got := Cat("[", "TEST", "]"); got != "[TEST]" {
+		t.Errorf("Cat = %q", got)
+	}
+
+	if got := When(true, "A", "B"); got != "A" {
+		t.Errorf("When = %q", got)
+	}
+
+	if got := When(false, "A", "B"); got != "B" {
+		t.Errorf("When fallback = %q", got)
+	}
+
+	if got := Pad(2, 5); got != "05" {
+		t.Errorf("Pad = %q", got)
+	}
+
+	if got := Eprange("E", 2, []int{1, 2, 3}); got != "E01-E03" {
+		t.Errorf("Eprange = %q", got)
+	}
 }

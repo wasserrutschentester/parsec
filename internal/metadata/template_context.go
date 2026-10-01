@@ -19,35 +19,32 @@ type TemplateContext struct {
 	Metadata
 
 	// Precomputed convenience fields (used in templates & release naming)
-	YearTag       string `json:"YearTag"`       // Formatted release year (e.g. "2024") or "" if unknown/zero
-	SeasonID      string `json:"SeasonID"`      // "S01", "S00" for specials, or "" for movies
-	EpisodeID     string `json:"EpisodeID"`     // "E01", "E01-E05", or "" for movies
-	SeasonEpisode string `json:"SeasonEpisode"` // Combined "S01E01", "S01" for packs, or "" for movies
-	EpisodeTitle  string `json:"EpisodeTitle"`  // Joined episode titles ("Pilot") or ""
-	AudioSpec     string `json:"AudioSpec"`     // Merged audio spec: AudioCodec + AudioChannels, plus AudioExtra if present ("DDP5.1.Atmos", "DDP5.1")
-	LanguageName  string `json:"LanguageName"`  // Full uppercase language ("GERMAN", "ENGLISH")
-	RepackTag     string `json:"RepackTag"`     // Formatted repack token ("REPACK", "REPACK2", or "")
-	VersionTag    string `json:"VersionTag"`    // Formatted release version token ("v2", "v3", or "")
-	IsPack        bool   `json:"IsPack"`        // True if season pack (matches nfo.Context.IsPack)
+	ConvenienceFields
+
+	EpisodeTitle string `json:"EpisodeTitle"`
+	IsPack       bool   `json:"IsPack"` // True if season pack (matches nfo.Context.IsPack)
 
 	// Raw context objects (for advanced querying with where/pluck and --dump-context-raw)
-	RawMediaInfo any `json:"RawMediaInfo,omitempty"`
-	RawMDB       any `json:"RawMDB,omitempty"`
+	RawMediaInfo      any `json:"RawMediaInfo,omitempty"`
+	RawEbmlMetadata   any `json:"RawEbmlMetadata,omitempty"`
+	RawSearchResult   any `json:"RawSearchResult,omitempty"`
+	RawEpisodeResults any `json:"RawEpisodeResults,omitempty"`
 }
 
 // ToTemplateContext converts Metadata to TemplateContext without raw context objects.
 func (meta *Metadata) ToTemplateContext() TemplateContext {
-	return meta.ToTemplateContextWithRaw(nil, nil)
+	return meta.ToTemplateContextWithRaw(nil, nil, nil, nil)
 }
 
 // ToTemplateContextWithRaw converts Metadata to TemplateContext with explicit raw context objects.
-//
-//nolint:cyclop,funlen // context initialization maps domain fields into flat convenience properties
-func (meta *Metadata) ToTemplateContextWithRaw(mi, mdbRes any) TemplateContext {
+func (meta *Metadata) ToTemplateContextWithRaw(mi, mdbRes, ebml, episodeResults any) TemplateContext {
 	ctx := TemplateContext{
-		Metadata:     *meta,
-		RawMediaInfo: mi,
-		RawMDB:       mdbRes,
+		Metadata:          *meta,
+		ConvenienceFields: ComputeConvenienceFields(meta),
+		RawMediaInfo:      mi,
+		RawSearchResult:   mdbRes,
+		RawEbmlMetadata:   ebml,
+		RawEpisodeResults: episodeResults,
 	}
 
 	// Sanitize OriginalTitle: if identical to Title, treat as empty
@@ -55,59 +52,14 @@ func (meta *Metadata) ToTemplateContextWithRaw(mi, mdbRes any) TemplateContext {
 		ctx.OriginalTitle = ""
 	}
 
-	// Formatted Year Tag (e.g. "2024" or "" if unknown/zero)
-	if meta.Year > 0 {
-		ctx.YearTag = strconv.Itoa(meta.Year)
-	}
-
 	// Season Pack indicator (matches nfo.Context.IsPack)
 	if (meta.Season > 0 || meta.IsTV) && len(meta.Episodes) == 0 {
 		ctx.IsPack = true
 	}
 
-	// Season ID
-	if meta.Season > 0 || meta.IsTV {
-		ctx.SeasonID = fmt.Sprintf("S%02d", meta.Season)
-	}
-
-	// Episode ID
-	ctx.EpisodeID = computeEpisodeID(meta.Episodes)
-
-	// Combined Season + Episode (S01E01, S01, or "")
-	ctx.SeasonEpisode = ctx.SeasonID + ctx.EpisodeID
-
 	// Episode Title
 	if len(meta.EpisodeTitles) > 0 {
 		ctx.EpisodeTitle = strings.Join(meta.EpisodeTitles, " ")
-	}
-
-	// Audio Specification: merges AudioCodec + AudioChannels, appending AudioExtra if present (e.g. "DDP5.1.Atmos" or "DDP5.1")
-	if meta.AudioCodec != "" || meta.AudioChannels != "" {
-		spec := meta.AudioCodec + meta.AudioChannels
-		if meta.AudioExtra != "" {
-			spec += "." + meta.AudioExtra
-		}
-
-		ctx.AudioSpec = spec
-	} else if meta.AudioExtra != "" {
-		ctx.AudioSpec = meta.AudioExtra
-	}
-
-	// Full Language Name (e.g. "GERMAN")
-	if meta.LanguageISO != "" {
-		ctx.LanguageName = LanguageName(meta.LanguageISO)
-	}
-
-	// Repack Tag
-	if meta.RepackLevel > 1 {
-		ctx.RepackTag = fmt.Sprintf("REPACK%d", meta.RepackLevel)
-	} else if meta.IsRepack || meta.RepackLevel == 1 {
-		ctx.RepackTag = "REPACK"
-	}
-
-	// Version Tag (e.g. "v2", "v3", or "")
-	if meta.ReleaseVersion > 1 {
-		ctx.VersionTag = fmt.Sprintf("v%d", meta.ReleaseVersion)
 	}
 
 	// Audio Description fallback if accessibility tag is empty
@@ -125,6 +77,64 @@ func (meta *Metadata) ToTemplateContextWithRaw(mi, mdbRes any) TemplateContext {
 	ctx.VideoCodec = FormatVideoCodec(meta.VideoCodec, style)
 
 	return ctx
+}
+
+// ConvenienceFields holds precomputed display-ready fields derived from Metadata.
+// Used by both TemplateContext and nfo.FileContext via ComputeConvenienceFields.
+type ConvenienceFields struct {
+	YearTag       string
+	SeasonID      string
+	EpisodeID     string
+	SeasonEpisode string
+	AudioSpec     string
+	LanguageName  string
+	RepackTag     string
+	VersionTag    string
+}
+
+// ComputeConvenienceFields derives the shared display-ready fields from meta.
+//
+//nolint:cyclop // Field assignment requires bunch of if statements
+func ComputeConvenienceFields(meta *Metadata) ConvenienceFields {
+	var f ConvenienceFields
+
+	if meta.Year > 0 {
+		f.YearTag = strconv.Itoa(meta.Year)
+	}
+
+	if meta.Season > 0 || meta.IsTV {
+		f.SeasonID = fmt.Sprintf("S%02d", meta.Season)
+	}
+
+	f.EpisodeID = computeEpisodeID(meta.Episodes)
+	f.SeasonEpisode = f.SeasonID + f.EpisodeID
+
+	if meta.AudioCodec != "" || meta.AudioChannels != "" {
+		spec := meta.AudioCodec + meta.AudioChannels
+		if meta.AudioExtra != "" {
+			spec += "." + meta.AudioExtra
+		}
+
+		f.AudioSpec = spec
+	} else if meta.AudioExtra != "" {
+		f.AudioSpec = meta.AudioExtra
+	}
+
+	if meta.LanguageISO != "" {
+		f.LanguageName = LanguageName(meta.LanguageISO)
+	}
+
+	if meta.RepackLevel > 1 {
+		f.RepackTag = fmt.Sprintf("REPACK%d", meta.RepackLevel)
+	} else if meta.IsRepack || meta.RepackLevel == 1 {
+		f.RepackTag = "REPACK"
+	}
+
+	if meta.ReleaseVersion > 1 {
+		f.VersionTag = fmt.Sprintf("v%d", meta.ReleaseVersion)
+	}
+
+	return f
 }
 
 func computeEpisodeID(episodes []int) string {

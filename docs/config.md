@@ -40,8 +40,10 @@ An optional `description` field can be added to any preset. It is displayed as a
 # Global defaults
 source = "WEB-DL"
 group = "YourGroup"
-video_codec_avc = "H.264"
-video_codec_hevc = "H.265"
+
+[video_codec_style.web_dl]
+AVC = "H.264"
+HEVC = "H.265"
 
 [api_keys]
 tmdb = "your_tmdb_api_key"
@@ -57,9 +59,8 @@ tmdb_id = 84958
 [preset.remux]
 description = "AVC/HEVC codec names"
 source = "BluRay"
-video_codec_avc = "AVC"
-video_codec_hevc = "HEVC"
-template = "{title}.{year}.{resolution}.{source}.REMUX.{video_codec}.{audio_codec}{audio_channels}-{group}"
+codec_style = "remux"
+template = '{{join "." .Title .YearTag .Resolution .Source "REMUX" .VideoCodec .AudioSpec}}-{{.Group}}'
 ```
 
 ### Using Presets
@@ -123,8 +124,10 @@ These options can be set globally OR within a `[preset.NAME]` block.
 | `original_audio_first` | boolean | Order original language audio tracks before preferred language tracks (default: `false`). |
 | `subbed_tagging` | boolean | If there are subtitles but no audio for the preferred language (e.g. `de`) set language Info to GERMAN.SUBBED (default: `true`). |
 | `tag_preview` | boolean | Display a simplified preview of the Matroska tags before applying them (default: `true`). |
-| `video_codec_avc` | string | Display name for AVC/H.264 (default: `H.264`). |
-| `video_codec_hevc` | string | Display name for HEVC/H.265 (default: `H.265`). |
+| `codec_style` | string | Override active video codec style name (e.g. `web_dl`, `remux`, `encode`). |
+| `video_codec_style` | table | Codec style mapping matrix per release type. See [Naming Templates](templates.md) for details. |
+| `video_codec_avc` | string | *(Deprecated: use `video_codec_style`)* Display name for AVC/H.264 (default: `H.264`). |
+| `video_codec_hevc` | string | *(Deprecated: use `video_codec_style`)* Display name for HEVC/H.265 (default: `H.265`). |
 | `word_separator` | string | The character used to replace spaces in the generated filename, such as in the Title, Episode Title, and Audio Codec names. Use `" "` to preserve spaces (default: `.` ). |
 | `allow_special_matches` | boolean | Allow fallback matching of episodes by Air Date or Episode Title against Specials (Season 0). Prevents incorrectly matching a regular episode without season/episode numbers to a TV special (default: `false`). |
 | `normalize_diacritics` | boolean | Replace diacritics and special characters with their ASCII equivalents (e.g., ä -> ae, ß -> ss) (default: `true`). |
@@ -141,6 +144,7 @@ These are especially useful within presets to provide missing information or ove
 | Key | Type | Description |
 |-----|------|-------------|
 | `title` | string | Title of the movie or TV show. |
+| `original_title` | string | Original foreign or alternative title. |
 | `year` | integer | Release year. |
 | `season` | integer | Season number. |
 | `episode` | integer | Episode number. |
@@ -151,7 +155,10 @@ These are especially useful within presets to provide missing information or ove
 | `service` | string | Streaming service (e.g., `DSNP`, `NF`). |
 | `source` | string | Default source (e.g., `WEB-DL`, `BluRay`). |
 | `group` | string | Default release group name. |
-| `repack` | boolean | Set to `true` if the release is a repack. |
+| `repack` | boolean / integer | Mark as repack (boolean or numeric level, e.g. `2` for REPACK2). |
+| `remux` | boolean | Force identification as a REMUX. |
+| `codec_style` | string | Override video codec style (`web_dl`, `encode`, `remux`). |
+| `version_tag` | integer | Quality upgrade version iteration (e.g. `2` for v2). |
 | `is_tv` | boolean | Force identification as a TV show. |
 | `is_movie` | boolean | Force identification as a movie. |
 

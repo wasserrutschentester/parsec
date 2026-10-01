@@ -82,7 +82,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 	applyMetadataFlags(cmd, meta)
 
 	// 4. MDB Search to get "correct" title and year
-	mdbResult := renameApplyMdbSearch(meta)
+	mdbResult, episodeResults := renameApplyMdbSearch(meta)
 
 	// Re-apply flags in case user explicitly overrode MDB fields (like title or original-title)
 	applyMetadataFlags(cmd, meta)
@@ -95,7 +95,7 @@ func renameFile(cmd *cobra.Command, filePath string) error {
 
 	meta.SetDefaults()
 
-	tCtx := meta.ToTemplateContextWithRaw(res.MediaInfo, mdbResult)
+	tCtx := meta.ToTemplateContextWithRaw(res.MediaInfo, mdbResult, res.Ebml, episodeResults)
 
 	if dumpContextFlag || dumpContextRawFlag {
 		return dumpTemplateContext(tCtx, dumpContextRawFlag)
@@ -266,7 +266,7 @@ func renameMigrateCache(oldAbs, newAbs string, oldInfo, newInfo os.FileInfo, ebm
 	}
 }
 
-func renameApplyMdbSearch(meta *metadata.Metadata) *mdb.SearchResult {
+func renameApplyMdbSearch(meta *metadata.Metadata) (*mdb.SearchResult, []mdb.EpisodeResult) {
 	meta.SetDefaults()
 	result, _ := mdbSearch.InteractiveSearch(meta, true, false)
 
@@ -274,14 +274,15 @@ func renameApplyMdbSearch(meta *metadata.Metadata) *mdb.SearchResult {
 		ui.PrintWarning("Could not find matching Result on TMDB or TVDB")
 		ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
 
-		return nil
+		return nil, nil
 	}
 
 	mdb.PrintCompactResult(*result)
 	applyMdbMetadata(meta, result)
 
+	var episodes []mdb.EpisodeResult
 	if meta.IsTV {
-		episodes := renameGetEpisodeInfos(result, meta)
+		episodes = renameGetEpisodeInfos(result, meta)
 		if len(episodes) == 0 {
 			ui.PrintWarning("Could not find matching Episode on TMDB or TVDB")
 		}
@@ -293,7 +294,7 @@ func renameApplyMdbSearch(meta *metadata.Metadata) *mdb.SearchResult {
 
 	ui.PrintDebug(fmt.Sprintf("search result: %+v", result))
 
-	return result
+	return result, episodes
 }
 
 func applyMdbMetadata(meta *metadata.Metadata, result *mdb.SearchResult) {
@@ -424,7 +425,9 @@ func init() {
 func dumpTemplateContext(tCtx metadata.TemplateContext, raw bool) error {
 	if !raw {
 		tCtx.RawMediaInfo = nil
-		tCtx.RawMDB = nil
+		tCtx.RawEbmlMetadata = nil
+		tCtx.RawSearchResult = nil
+		tCtx.RawEpisodeResults = nil
 	}
 
 	//nolint:musttag // TemplateContext dynamically embeds Metadata for context inspection

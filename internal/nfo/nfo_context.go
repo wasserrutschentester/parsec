@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,9 @@ type FileContext struct {
 	Audio        []Audio
 	Subtitles    []Subtitle
 	Plot         string
+
+	// Precomputed convenience fields matching TemplateContext
+	metadata.ConvenienceFields
 
 	RawEpisodeResults []mdb.EpisodeResult    `json:"RawEpisodeResults,omitempty"`
 	RawMediaInfo      *mediainfo.MediaInfo   `json:"RawMediaInfo,omitempty"`
@@ -232,6 +236,7 @@ func BuildFileContext(in FileInput) FileContext {
 		Metadata:          *in.Meta,
 		ReleaseName:       strings.TrimSuffix(filepath.Base(in.Path), filepath.Ext(in.Path)),
 		EpisodeTitle:      strings.Join(in.Meta.EpisodeTitles, " / "),
+		ConvenienceFields: metadata.ComputeConvenienceFields(in.Meta),
 		RawEpisodeResults: in.EpisodeResults,
 		RawMediaInfo:      in.Info,
 		RawEbmlMetadata:   in.Ebml,
@@ -302,6 +307,7 @@ func buildSingleFileContext(ctx *Context, file FileInput) {
 	ctx.Title = title
 	if year > 0 {
 		ctx.Year = year
+		ctx.YearTag = strconv.Itoa(year)
 	}
 
 	ctx.Date = date
@@ -311,8 +317,9 @@ func buildSingleFileContext(ctx *Context, file FileInput) {
 func BuildContext(releaseName string, baseMeta *metadata.Metadata, files []FileInput, notes string, searchResult *mdb.SearchResult, appVersion string) *Context {
 	ctx := Context{
 		FileContext: FileContext{
-			Metadata:    *baseMeta,
-			ReleaseName: releaseName,
+			Metadata:          *baseMeta,
+			ReleaseName:       releaseName,
+			ConvenienceFields: metadata.ComputeConvenienceFields(baseMeta),
 		},
 		Notes:           notes,
 		RawSearchResult: searchResult,
@@ -374,6 +381,7 @@ func populateFromSearchResult(ctx *Context, searchResult *mdb.SearchResult) {
 
 	if searchResult.Year > 0 {
 		ctx.Year = searchResult.Year
+		ctx.YearTag = strconv.Itoa(searchResult.Year)
 	}
 }
 

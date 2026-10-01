@@ -13,10 +13,11 @@ func KnownTemplateFuncs() template.FuncMap {
 
 	funcs := []string{
 		"join", "cat", "when", "pad", "eprange", "vcodec", "aka",
-		"upper", "lower", "title", "replace", "regexReplace",
+		"toUpper", "toLower", "titleCase",
+		"replace", "regexReplace", "list",
 		"contains", "trimPrefix", "trimSuffix", "hasPrefix", "hasSuffix",
 		"default", "where", "pluck", "first", "last", "uniq",
-		"indexOrEmpty", "languageName", "parseDate",
+		"indexOrEmpty", "languageName", "parseDate", "formatDate",
 	}
 
 	fm := make(template.FuncMap, len(funcs))

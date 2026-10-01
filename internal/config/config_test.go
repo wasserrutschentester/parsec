@@ -273,7 +273,7 @@ func TestGetTemplate(t *testing.T) {
 		"anime":       `[{{.Group}}] {{.Title}} - {{.SeasonEpisode}} - ({{join " " .Source .Resolution .VideoCodec .AudioCodec}}){{when .IsDualAudio " Dual-Audio"}} [{{.CRC32}}]`,
 		// Showcase templates demonstrating parsec Go template capabilities
 		"foreign-aka":       `{{join "." (aka .OriginalTitle .Title .YearTag) .Edition (vcodec "encode" .VideoCodec) .AudioSpec}}-{{.Group}}`,
-		"p2p-parenthetical": `{{.Title}} ({{.YearTag}}) {{.SeasonEpisode}} ({{join " " .Resolution .Source (when .IsRemux "REMUX") .VideoCodec (when .IsMultiAudio "MULTI" .IsDualAudio "DUAL" (title .LanguageName))}} - {{.Group}}){{when .IsSubbed " [SUBBED]"}}`,
+		"p2p-parenthetical": `{{.Title}} ({{.YearTag}}) {{.SeasonEpisode}} ({{join " " .Resolution .Source (when .IsRemux "REMUX") .VideoCodec (when .IsMultiAudio "MULTI" .IsDualAudio "DUAL" (titleCase .LanguageName))}} - {{.Group}}){{when .IsSubbed " [SUBBED]"}}`,
 		"daily-show":        `{{join "." .Title (parseDate "2006.01.02" .Date) .LanguageName .Resolution .Service .Source .VideoCodec}}-{{.Group}}`,
 	}
 

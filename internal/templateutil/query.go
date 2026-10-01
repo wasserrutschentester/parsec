@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -265,27 +267,47 @@ func Default(defaultVal, input any) any {
 	return input
 }
 
-// ParseDate parses dateStr (YYYY, YYYY-MM, YYYY-MM-DD, RFC3339).
-// If a single arg is given, it returns time.Time.
-// If two args are given (format, dateStr), it formats the date into the requested layout string.
-func ParseDate(args ...string) any {
-	if len(args) == 0 {
-		return time.Time{}
+// Join joins parts using sep, skipping nil and empty-string values.
+// Accepts any mix of scalar values and slices/arrays; slices are unpacked in place.
+func Join(sep string, parts ...any) string {
+	var items []string
+
+	for _, p := range parts {
+		if p == nil {
+			continue
+		}
+
+		v := reflect.ValueOf(p)
+		if v.Kind() == reflect.Pointer {
+			if v.IsNil() {
+				continue
+			}
+
+			v = v.Elem()
+		}
+
+		if v.Kind() == reflect.Slice || v.Kind() == reflect.Array {
+			for i := 0; i < v.Len(); i++ {
+				if s := fmt.Sprint(v.Index(i).Interface()); s != "" {
+					items = append(items, s)
+				}
+			}
+
+			continue
+		}
+
+		if s := fmt.Sprint(p); s != "" {
+			items = append(items, s)
+		}
 	}
 
-	if len(args) == 1 {
-		return parseDateInternal(args[0])
-	}
+	return strings.Join(items, sep)
+}
 
-	format := args[0]
-	dateStr := args[1]
-
-	t := parseDateInternal(dateStr)
-	if t.IsZero() {
-		return dateStr
-	}
-
-	return t.Format(format)
+// ParseDate parses dateStr (YYYY, YYYY-MM, YYYY-MM-DD, RFC3339) and returns time.Time.
+// Use formatDate to parse and reformat in one step.
+func ParseDate(dateStr string) time.Time {
+	return parseDateInternal(dateStr)
 }
 
 func parseDateInternal(dateStr string) time.Time {
@@ -314,6 +336,143 @@ func parseDateInternal(dateStr string) time.Time {
 	}
 
 	return t
+}
+
+// FormatDate formats a date (string or time.Time) using the specified layout.
+// Pipe-friendly: date is the last argument.
+// Supports: formatDate format date, or piped: date | formatDate [format].
+// Defaults to "2006-01-02" if format is omitted.
+func FormatDate(args ...any) string {
+	if len(args) == 0 {
+		return ""
+	}
+
+	var (
+		format string
+		date   any
+	)
+
+	if len(args) == 1 {
+		format = "2006-01-02"
+		date = args[0]
+	} else {
+		format = fmt.Sprint(args[0])
+		date = args[len(args)-1]
+	}
+
+	if date == nil {
+		return ""
+	}
+
+	switch d := date.(type) {
+	case time.Time:
+		if d.IsZero() {
+			return ""
+		}
+
+		return d.Format(format)
+	case string:
+		if d == "" {
+			return ""
+		}
+
+		t := parseDateInternal(d)
+		if t.IsZero() {
+			return d
+		}
+
+		return t.Format(format)
+	default:
+		return fmt.Sprint(date)
+	}
+}
+
+// List returns the arguments as a slice of any.
+func List(args ...any) []any {
+	return args
+}
+
+// Replace replaces occurrences of oldStr with newStr in s. (Pipe-friendly: s is last).
+func Replace(oldStr, newStr, s string) string {
+	return strings.ReplaceAll(s, oldStr, newStr)
+}
+
+// TrimPrefix removes prefix from the start of s. (Pipe-friendly: s is last).
+func TrimPrefix(prefix, s string) string {
+	return strings.TrimPrefix(s, prefix)
+}
+
+// TrimSuffix removes suffix from the end of s. (Pipe-friendly: s is last).
+func TrimSuffix(suffix, s string) string {
+	return strings.TrimSuffix(s, suffix)
+}
+
+// HasPrefix tests whether s begins with prefix. (Pipe-friendly: s is last).
+func HasPrefix(prefix, s string) bool {
+	return strings.HasPrefix(s, prefix)
+}
+
+// HasSuffix tests whether s ends with suffix. (Pipe-friendly: s is last).
+func HasSuffix(suffix, s string) bool {
+	return strings.HasSuffix(s, suffix)
+}
+
+// RegexReplace replaces regex matches of pattern with repl in s. (Pipe-friendly: s is last).
+func RegexReplace(pattern, repl, s string) string {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return s
+	}
+
+	return re.ReplaceAllString(s, repl)
+}
+
+// Cat joins parts with NO separator.
+func Cat(parts ...any) string {
+	var sb strings.Builder
+
+	for _, p := range parts {
+		if s := fmt.Sprint(p); s != "" {
+			sb.WriteString(s)
+		}
+	}
+
+	return sb.String()
+}
+
+// When evaluates flat condition-value pairs: when cond1 val1 cond2 val2 ... fallback.
+func When(args ...any) any {
+	for i := 0; i < len(args)-1; i += 2 {
+		if !IsEmpty(args[i]) {
+			return args[i+1]
+		}
+	}
+
+	if len(args)%2 != 0 {
+		return args[len(args)-1]
+	}
+
+	return ""
+}
+
+// Pad zero-pads an integer: pad 2 .Season -> "01".
+func Pad(digits int, val any) string {
+	return fmt.Sprintf("%0*d", digits, val)
+}
+
+// Eprange formats an episode range with optional prefix and padding:
+// eprange "E" 2 .Episodes -> "E01" or "E01-E05".
+func Eprange(prefix string, digits int, episodes []int) string {
+	if len(episodes) == 0 {
+		return ""
+	}
+
+	first, last := slices.Min(episodes), slices.Max(episodes)
+	if first == last {
+		return fmt.Sprintf("%s%0*d", prefix, digits, first)
+	}
+
+	return fmt.Sprintf("%s%0*d-%s%0*d", prefix, digits, first, prefix, digits, last)
 }
 
 // ResolveKeyPath navigates dotted key paths (e.g. "Properties.Language") across structs and maps.

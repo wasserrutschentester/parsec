@@ -276,3 +276,100 @@ func TestFileContext_BackwardCompatibility(t *testing.T) {
 		t.Errorf("got %q, want %q", res, expected)
 	}
 }
+
+func TestFileContext_PrecomputedFields(t *testing.T) {
+	t.Parallel()
+
+	meta := metadata.Metadata{
+		Title:          "Movie",
+		Year:           2024,
+		Season:         1,
+		Episodes:       []int{1},
+		LanguageISO:    "de",
+		AudioCodec:     "DDP",
+		AudioChannels:  "5.1",
+		AudioExtra:     "Atmos",
+		IsRepack:       true,
+		ReleaseVersion: 2,
+		IsTV:           true,
+	}
+
+	fctx := BuildFileContext(FileInput{
+		Path: "Movie.S01E01.mkv",
+		Meta: &meta,
+	})
+
+	tmplStr := `{{.YearTag}}-{{.SeasonEpisode}}-{{.AudioSpec}}-{{.LanguageName}}-{{.RepackTag}}-{{.VersionTag}}`
+	expected := "2024-S01E01-DDP5.1.Atmos-GERMAN-REPACK-v2"
+	res := renderTestHelper(t, tmplStr, fctx)
+
+	if res != expected {
+		t.Errorf("got %q, want %q", res, expected)
+	}
+}
+
+func TestNfo_ReleaseNameHelpers(t *testing.T) {
+	t.Parallel()
+
+	// when, cat, pad, eprange, list
+	resWhen := renderTestHelper(t, `{{ when true "YES" "NO" }}-{{ when false "YES" "NO" }}`, nil)
+	if resWhen != "YES-NO" {
+		t.Errorf("when got %q, want 'YES-NO'", resWhen)
+	}
+
+	resCat := renderTestHelper(t, `{{ cat "[" "REPACK" "]" }}`, nil)
+	if resCat != "[REPACK]" {
+		t.Errorf("cat got %q, want '[REPACK]'", resCat)
+	}
+
+	resPad := renderTestHelper(t, `{{ pad 2 3 }}`, nil)
+	if resPad != "03" {
+		t.Errorf("pad got %q, want '03'", resPad)
+	}
+
+	resEprange := renderTestHelper(t, `{{ eprange "E" 2 . }}`, []int{1, 2, 3})
+	if resEprange != "E01-E03" {
+		t.Errorf("eprange got %q, want 'E01-E03'", resEprange)
+	}
+
+	resList := renderTestHelper(t, `{{ list "A" "B" | join "-" }}`, nil)
+	if resList != "A-B" {
+		t.Errorf("list got %q, want 'A-B'", resList)
+	}
+
+	// formatDate
+	resDate := renderTestHelper(t, `{{ "2024-05-18" | formatDate "02.01.2006" }}`, nil)
+	if resDate != "18.05.2024" {
+		t.Errorf("formatDate got %q, want '18.05.2024'", resDate)
+	}
+
+	// casing aliases: toUpper, toLower, titleCase
+	resCasing := renderTestHelper(t, `{{ "hi" | toUpper }}-{{ "BYE" | toLower }}-{{ "title test" | titleCase }}`, nil)
+	if resCasing != "HI-bye-Title Test" {
+		t.Errorf("casing aliases got %q, want 'HI-bye-Title Test'", resCasing)
+	}
+
+	// regexReplace
+	resRegex := renderTestHelper(t, `{{ "sample_title" | regexReplace "_" "." }}`, nil)
+	if resRegex != "sample.title" {
+		t.Errorf("regexReplace got %q, want 'sample.title'", resRegex)
+	}
+}
+
+func TestNfo_IndexOrEmpty_AnySlice(t *testing.T) {
+	t.Parallel()
+
+	audios := []Audio{
+		{Language: "de", Codec: "DDP"},
+		{Language: "en", Codec: "AAC"},
+	}
+
+	// pluck returns []any; indexOrEmpty must accept []any without type mismatch!
+	tmplStr := `{{ . | pluck "Language" | indexOrEmpty 0 }}-{{ . | pluck "Language" | indexOrEmpty 1 }}-{{ . | pluck "Language" | indexOrEmpty 99 }}`
+	expected := "de-en-"
+	res := renderTestHelper(t, tmplStr, audios)
+
+	if res != expected {
+		t.Errorf("indexOrEmpty on []any got %q, want %q", res, expected)
+	}
+}

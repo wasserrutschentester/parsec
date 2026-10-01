@@ -411,14 +411,6 @@ func centerFunc(length int, val any) string {
 	return strings.Repeat(" ", leftPad) + s + strings.Repeat(" ", rightPad)
 }
 
-func indexOrEmptyFunc(index int, lines []string) string {
-	if index >= 0 && index < len(lines) {
-		return lines[index]
-	}
-
-	return ""
-}
-
 func applyBorderFunc(leftBorder, rightBorder, s string) string {
 	s = strings.Trim(s, "\n\r")
 	if s == "" {
@@ -700,10 +692,6 @@ func parseDateFunc(dateStr string) time.Time {
 	return t
 }
 
-func replaceFunc(oldStr, newStr, s string) string {
-	return strings.ReplaceAll(s, oldStr, newStr)
-}
-
 func repeatFunc(count int, s string) string {
 	return strings.Repeat(s, count)
 }
@@ -751,8 +739,10 @@ func templateFuncs() template.FuncMap {
 		"padLeft":           padLeftFunc,
 		"center":            centerFunc,
 		"toUpper":           strings.ToUpper,
+		"toLower":           strings.ToLower,
+		"titleCase":         cases.Title(language.Und).String,
 		"languageName":      metadata.LanguageName,
-		"replace":           replaceFunc,
+		"replace":           templateutil.Replace,
 		"repeat":            repeatFunc,
 		"split":             splitFunc,
 		"pluck":             templateutil.Pluck,
@@ -761,15 +751,15 @@ func templateFuncs() template.FuncMap {
 		"join":              joinFunc,
 		"wordWrap":          wordWrapFunc,
 		"breakReleaseName":  breakReleaseNameFunc,
-		"indexOrEmpty":      indexOrEmptyFunc,
+		"indexOrEmpty":      templateutil.IndexOrEmpty,
 		"applyBorder":       applyBorderFunc,
 		"formatNumber":      formatNumberFunc,
 		"formatDuration":    formatDurationFunc,
 		"formatSize":        formatSizeFunc,
 		"formatSizeDynamic": formatSizeDynamicFunc,
 		"parseDate":         parseDateFunc,
+		"formatDate":        templateutil.FormatDate,
 		"formatBitrate":     formatBitrateFunc,
-		"titleCase":         cases.Title(language.Und).String,
 		"sum":               sumFunc,
 		"mean":              meanFunc,
 		"median":            medianFunc,
@@ -779,21 +769,28 @@ func templateFuncs() template.FuncMap {
 		"mul":               mulFunc,
 		"div":               divFunc,
 		"dict":              dictFunc,
+		"list":              templateutil.List,
 		"default":           templateutil.Default,
 		"where":             templateutil.Where,
 		"first":             templateutil.First,
 		"last":              templateutil.Last,
-		"toLower":           strings.ToLower,
-		"trimPrefix":        trimPrefixFunc,
-		"trimSuffix":        trimSuffixFunc,
-		"hasPrefix":         hasPrefixFunc,
-		"hasSuffix":         hasSuffixFunc,
+		"trimPrefix":        templateutil.TrimPrefix,
+		"trimSuffix":        templateutil.TrimSuffix,
+		"hasPrefix":         templateutil.HasPrefix,
+		"hasSuffix":         templateutil.HasSuffix,
 		"humanize":          humanizeFunc,
 		"truncate":          truncateFunc,
 		"chomp":             chompFunc,
 		"max":               maxFunc,
 		"min":               minFunc,
 		"round":             roundFunc,
+		"when":              templateutil.When,
+		"cat":               templateutil.Cat,
+		"pad":               templateutil.Pad,
+		"eprange":           templateutil.Eprange,
+		"vcodec":            metadata.Vcodec,
+		"aka":               metadata.Aka,
+		"regexReplace":      templateutil.RegexReplace,
 	}
 }
 
@@ -813,22 +810,6 @@ func dictFunc(values ...any) (map[string]any, error) {
 	}
 
 	return dict, nil
-}
-
-func trimPrefixFunc(prefix, s string) string {
-	return strings.TrimPrefix(s, prefix)
-}
-
-func trimSuffixFunc(suffix, s string) string {
-	return strings.TrimSuffix(s, suffix)
-}
-
-func hasPrefixFunc(prefix, s string) bool {
-	return strings.HasPrefix(s, prefix)
-}
-
-func hasSuffixFunc(suffix, s string) bool {
-	return strings.HasSuffix(s, suffix)
 }
 
 func isCapOrDigit(r rune) bool {

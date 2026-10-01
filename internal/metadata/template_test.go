@@ -133,7 +133,7 @@ func TestMetadata_Render_GoTemplates(t *testing.T) {
 				Title: "the.dark.knight",
 				Group: "grp",
 			},
-			template: `{{title .Title}}-{{upper .Group}}`,
+			template: `{{titleCase .Title}}-{{toUpper .Group}}`,
 			sep:      ".",
 			want:     "The.dark.knight-GRP",
 		},
@@ -167,10 +167,8 @@ func TestMetadata_Render_GoTemplates(t *testing.T) {
 	}
 }
 
-//nolint:funlen // comprehensive test matrix for codec style determination
+//nolint:funlen,paralleltest // comprehensive test matrix for codec style determination mutating Metadata struct
 func TestDetermineCodecStyle(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		meta     Metadata
@@ -235,7 +233,6 @@ func TestDetermineCodecStyle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 
 			if got := DetermineCodecStyle(&tt.meta); got != tt.expected {
 				t.Errorf("DetermineCodecStyle() = %q, want %q", got, tt.expected)
@@ -535,5 +532,72 @@ func TestDefaultTemplate_RemuxAndEncode(t *testing.T) {
 
 	if encodeName != wantEncode {
 		t.Errorf("Encode release name = %q, want %q", encodeName, wantEncode)
+	}
+}
+
+//nolint:funlen,paralleltest // table-driven test covering multiple template helpers
+func TestTemplate_PipingAndUnifiedHelpers(t *testing.T) {
+	config.InitDefaults()
+
+	meta := Metadata{
+		Title:      "The.Great.Movie",
+		Year:       2024,
+		Date:       "2024-05-18",
+		Resolution: "1080p",
+		Group:      "grp",
+	}
+
+	tCtx := meta.ToTemplateContextWithRaw("mi-mock", "search-mock", "ebml-mock", "ep-mock")
+
+	// Verify raw fields
+	if tCtx.RawMediaInfo != "mi-mock" || tCtx.RawEbmlMetadata != "ebml-mock" ||
+		tCtx.RawSearchResult != "search-mock" || tCtx.RawEpisodeResults != "ep-mock" {
+		t.Errorf("Raw fields mismatch: %+v", tCtx)
+	}
+
+	tests := []struct {
+		name     string
+		template string
+		want     string
+	}{
+		{
+			name:     "Piping trimPrefix",
+			template: `{{.Title | trimPrefix "The."}}-{{.Group}}`,
+			want:     "Great.Movie-grp",
+		},
+		{
+			name:     "Piping trimSuffix",
+			template: `{{.Title | trimSuffix ".Movie"}}-{{.Group}}`,
+			want:     "The.Great-grp",
+		},
+		{
+			name:     "Piping replace",
+			template: `{{.Title | replace "Great" "Super"}}-{{.Group}}`,
+			want:     "The.Super.Movie-grp",
+		},
+		{
+			name:     "Casing toUpper, toLower, titleCase",
+			template: `{{.Title | toLower}}.{{.Group | toUpper}}`,
+			want:     "the.great.movie.GRP",
+		},
+		{
+			name:     "FormatDate",
+			template: `{{.Title}}.{{.Date | formatDate "20060102"}}-{{.Group}}`,
+			want:     "The.Great.Movie.20240518-grp",
+		},
+		{
+			name:     "List with join",
+			template: `{{list "A" "B" "C" | join "."}}`,
+			want:     "A.B.C",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tCtx.Render(tt.template)
+			if got != tt.want {
+				t.Errorf("Render(%q) = %q, want %q", tt.template, got, tt.want)
+			}
+		})
 	}
 }
