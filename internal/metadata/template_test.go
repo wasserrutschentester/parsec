@@ -392,8 +392,9 @@ func TestTemplateContext_IsPack(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // mutates global viper config
 func TestCodecStyleMatrix(t *testing.T) {
-	t.Parallel()
+	config.InitDefaults()
 
 	// WEB-DL style: AVC -> H.264, HEVC -> H.265
 	webDL := Metadata{
