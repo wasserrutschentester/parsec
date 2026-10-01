@@ -233,7 +233,6 @@ func TestDetermineCodecStyle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			if got := DetermineCodecStyle(&tt.meta); got != tt.expected {
 				t.Errorf("DetermineCodecStyle() = %q, want %q", got, tt.expected)
 			}
