@@ -405,6 +405,7 @@ func init() {
 	checkCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	checkCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
 	checkCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
+	checkCmd.Flags().String("tvdb-order", "", "TVDB episode ordering for completeness checks (default, official, dvd, absolute, alternate, regional)")
 	// output
 	checkCmd.Flags().BoolVarP(&individualReportsFlag, "individual", "i", false, "Display the full individual reports for each file in the batch")
 	checkCmd.Flags().BoolVarP(&jsonOutputFlag, "json", "j", false, "Output check results in JSON")
@@ -417,7 +418,7 @@ func init() {
 	checkCmd.Flags().StringVar(&failingCheckFlag, "failing-check", "", "only move files failing this specific check identifier")
 	checkCmd.Flags().BoolVarP(&dryRunFlag, "dry-run", "d", false, "simulate actions without modifying or moving files")
 
-	idFlags := []string{"imdb", "tmdb", "tvdb"}
+	idFlags := []string{"imdb", "tmdb", "tvdb", "tvdb-order"}
 	for _, f := range idFlags {
 		_ = checkCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
@@ -430,6 +431,8 @@ func init() {
 	_ = checkCmd.MarkFlagDirname("move-failed")
 	_ = checkCmd.RegisterFlagCompletionFunc("failing-check", completeCheckIdentifiers)
 	_ = checkCmd.RegisterFlagCompletionFunc("original-language", completeLanguages)
+	_ = checkCmd.RegisterFlagCompletionFunc("tvdb-order", completeTvdbOrders)
+	_ = viper.BindPFlag("tvdb_order", checkCmd.Flags().Lookup("tvdb-order"))
 }
 
 type checkJobResult struct {

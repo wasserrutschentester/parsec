@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
 	"codeberg.org/upPollo/parsec/internal/metadata"
 	"codeberg.org/upPollo/parsec/internal/metadata/matroska"
@@ -27,6 +28,7 @@ type FileContext struct {
 	metadata.Metadata
 
 	ReleaseName  string
+	TvdbOrder    string
 	EpisodeTitle string
 	Size         string
 	SizeBytes    int64
@@ -207,6 +209,7 @@ func BuildFileContext(in FileInput) FileContext {
 	fctx := FileContext{
 		Metadata:          *in.Meta,
 		ReleaseName:       strings.TrimSuffix(filepath.Base(in.Path), filepath.Ext(in.Path)),
+		TvdbOrder:         config.GetTvdbOrder(),
 		EpisodeTitle:      strings.Join(in.Meta.EpisodeTitles, " / "),
 		RawEpisodeResults: in.EpisodeResults,
 		RawMediaInfo:      in.Info,
@@ -289,6 +292,7 @@ func BuildContext(releaseName string, baseMeta *metadata.Metadata, files []FileI
 		FileContext: FileContext{
 			Metadata:    *baseMeta,
 			ReleaseName: releaseName,
+			TvdbOrder:   config.GetTvdbOrder(),
 		},
 		Notes:           notes,
 		RawSearchResult: searchResult,

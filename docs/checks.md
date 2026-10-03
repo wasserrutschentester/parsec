@@ -65,6 +65,7 @@ Force identification using specific database IDs.
 | `--imdb` | | string | IMDb ID (e.g., `tt1234567`). |
 | `--tmdb` | | integer | TMDB ID. |
 | `--tvdb` | | integer | TVDB ID. |
+| `--tvdb-order` | | string | TVDB episode ordering for completeness checks (`default`, `official`, `dvd`, `absolute`, `alternate`, `regional`). |
 
 ### Output Flags
 

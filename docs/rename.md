@@ -57,6 +57,8 @@ You can provide one or more files or directories to be processed. Directories wi
 | `--imdb` | | string | IMDb ID. |
 | `--tmdb` | | integer | TMDB ID. |
 | `--tvdb` | | integer | TVDB ID. |
+| `--tvdb-order` | | string | TVDB episode ordering for identification (`default`, `official`, `dvd`, `absolute`, `alternate`, `regional`). |
+| `--tvdb-remap-order` | | string | TVDB episode ordering to remap into for the output filename (`default`, `official`, `dvd`, `absolute`, `alternate`, `regional`). |
 
 ### Other Flags
 
@@ -88,4 +90,9 @@ parsec rename file.mkv --title "Better Title" --year 2022
 **Use a specific database ID for identification:**
 ```bash
 parsec rename movie.mkv --tmdb 12345
+```
+
+**Identify TV show using DVD order and remap into absolute episode numbering:**
+```bash
+parsec rename "Anime.S01E01.mkv" --tvdb-order dvd --tvdb-remap-order absolute
 ```

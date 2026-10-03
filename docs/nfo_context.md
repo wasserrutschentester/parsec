@@ -18,6 +18,7 @@ Use `parsec nfogen file.mkv --dump-context` to inspect the exact values for a sp
 | `{{ .ImdbID }}` | `string` | IMDB ID (e.g. `tt1234567`). |
 | `{{ .TmdbID }}` | `int` | TMDB numeric ID. |
 | `{{ .TvdbID }}` | `int` | TVDB numeric ID. |
+| `{{ .TvdbOrder }}` | `string` | TVDB episode ordering used for identification (e.g. `"default"`, `"dvd"`, `"absolute"`). |
 | `{{ .ImdbURL }}` | `string` | Full IMDB URL (e.g. `https://www.imdb.com/title/tt1234567`). |
 | `{{ .TmdbURL }}` | `string` | Full TMDB URL. Includes the correct `movie` or `tv` path based on media type. |
 | `{{ .TvdbURL }}` | `string` | Full TVDB URL. Uses a slug-based URL when available, otherwise falls back to `?id=` format. |

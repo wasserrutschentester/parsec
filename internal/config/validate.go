@@ -95,6 +95,8 @@ var expectedTypes = map[string]string{
 	"imdb_id":               "string",
 	"tmdb_id":               "int64",
 	"tvdb_id":               "int64",
+	"tvdb_order":            "string",
+	"tvdb_remap_order":      "string",
 	"allow_special_matches": "bool",
 	"title_cleaning_regex":  "string",
 	"enabled_checks":        "[]interface {}",

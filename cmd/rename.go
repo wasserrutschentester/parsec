@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/cache"
 	"codeberg.org/upPollo/parsec/internal/config"
@@ -345,6 +346,8 @@ func init() {
 	renameCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	renameCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	renameCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	renameCmd.Flags().String("tvdb-order", "", "TVDB episode ordering for identification (default, official, dvd, absolute, alternate, regional)")
+	renameCmd.Flags().String("tvdb-remap-order", "", "TVDB episode ordering to remap into for output (default, official, dvd, absolute, alternate, regional)")
 	// Output
 	renameCmd.Flags().BoolVarP(&seasonPackFlag, "season-pack", "P", false, "move episodes into a correctly named season pack folder")
 	renameCmd.Flags().BoolVarP(&releaseFolderFlag, "release-folder", "F", false, "move each release into a identivally named folder")
@@ -365,7 +368,7 @@ func init() {
 	}
 
 	// Group ID flags
-	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
+	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb", "tvdb-order", "tvdb-remap-order"}
 	for _, f := range idFlags {
 		_ = renameCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
@@ -381,6 +384,11 @@ func init() {
 	_ = renameCmd.RegisterFlagCompletionFunc("service", completeServices)
 	_ = renameCmd.RegisterFlagCompletionFunc("cut-edition", completeCutEditions)
 	_ = renameCmd.RegisterFlagCompletionFunc("group", completeGroups)
+	_ = renameCmd.RegisterFlagCompletionFunc("tvdb-order", completeTvdbOrders)
+	_ = renameCmd.RegisterFlagCompletionFunc("tvdb-remap-order", completeTvdbOrders)
+
+	_ = viper.BindPFlag("tvdb_order", renameCmd.Flags().Lookup("tvdb-order"))
+	_ = viper.BindPFlag("tvdb_remap_order", renameCmd.Flags().Lookup("tvdb-remap-order"))
 
 	renameCmd.Flags().SortFlags = false
 }

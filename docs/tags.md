@@ -184,6 +184,7 @@ Templates have access to these core objects under the context root:
 - `.Episodes`: An array of all matched episodes for the file (useful for looping).
 - `.Comment`: The user-provided string from the `--comment` flag.
 - `.ReleaseName`: The name of the file being processed (without the extension).
+- `.TvdbOrder`: The TVDB episode ordering used for identification (e.g. `"default"`, `"dvd"`, `"absolute"`).
 
 ### `.Media` (Always present)
 Contains the metadata of the matched Movie or TV Show. Key fields include:

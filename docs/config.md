@@ -164,6 +164,8 @@ Provide specific IDs to ensure the correct metadata is fetched from databases.
 | `imdb_id` | string | IMDb ID (e.g., `tt1234567`). |
 | `tmdb_id` | integer | TMDB ID. |
 | `tvdb_id` | integer | TVDB ID. |
+| `tvdb_order` | string | Episode ordering to use when querying TVDB for identification (`default`/`aired`, `official`, `dvd`, `absolute`, `alternate`, `regional`; default: `default`). |
+| `tvdb_remap_order` | string | Remap matched episodes to a different ordering in the generated output filename (e.g., identify using `dvd` order, but rename to `absolute` order). Leave unset or empty to disable remapping (default: `""`). |
 
 #### Check Control
 

@@ -689,10 +689,10 @@ func getExternalIDs(ctx context.Context, tvdbID int, mediaType string) (tvdbExte
 	return data, nil
 }
 
-func getEpisodes(ctx context.Context, seriesID, page int, lang string) (tvdbEpisodeResponse, error) {
+func getEpisodes(ctx context.Context, seriesID, page int, lang, seasonType string) (tvdbEpisodeResponse, error) {
 	var data tvdbEpisodeResponse
 
-	endpoint := fmt.Sprintf("series/%d/episodes/default", seriesID)
+	endpoint := fmt.Sprintf("series/%d/episodes/%s", seriesID, seasonType)
 	if lang != "" {
 		endpoint = fmt.Sprintf("%s/%s", endpoint, lang)
 	}
@@ -704,12 +704,12 @@ func getEpisodes(ctx context.Context, seriesID, page int, lang string) (tvdbEpis
 	return data, nil
 }
 
-func getEnrichedFromMemory(seriesID int, lang string) ([]Episode, bool) {
+func getEnrichedFromMemory(seriesID int, seasonType, lang string) ([]Episode, bool) {
 	if config.NoCache {
 		return nil, false
 	}
 
-	memKey := fmt.Sprintf("%d:%s", seriesID, lang)
+	memKey := fmt.Sprintf("%d:%s:%s", seriesID, seasonType, lang)
 	if val, ok := enrichedEpisodesMemoryCache.Load(memKey); ok {
 		if eps, ok := val.([]Episode); ok {
 			return slices.Clone(eps), true
@@ -719,9 +719,9 @@ func getEnrichedFromMemory(seriesID int, lang string) ([]Episode, bool) {
 	return nil, false
 }
 
-func getEnrichedFromDisk(seriesID int, lang string) ([]Episode, bool) {
+func getEnrichedFromDisk(seriesID int, seasonType, lang string) ([]Episode, bool) {
 	prefLang := config.GetPreferredLanguage()
-	diskKey := fmt.Sprintf("tvdb:%s:series:%d:enriched_episodes:%s", prefLang, seriesID, lang)
+	diskKey := fmt.Sprintf("tvdb:%s:series:%d:enriched_episodes:%s:%s", prefLang, seriesID, seasonType, lang)
 
 	var cachedEpisodes []Episode
 
@@ -731,15 +731,15 @@ func getEnrichedFromDisk(seriesID int, lang string) ([]Episode, bool) {
 	}
 
 	if !config.NoCache {
-		memKey := fmt.Sprintf("%d:%s", seriesID, lang)
+		memKey := fmt.Sprintf("%d:%s:%s", seriesID, seasonType, lang)
 		enrichedEpisodesMemoryCache.Store(memKey, slices.Clone(cachedEpisodes))
 	}
 
 	return cachedEpisodes, true
 }
 
-func saveEnrichedEpisodes(seriesID int, lang string, episodes []Episode) {
-	memKey := fmt.Sprintf("%d:%s", seriesID, lang)
+func saveEnrichedEpisodes(seriesID int, seasonType, lang string, episodes []Episode) {
+	memKey := fmt.Sprintf("%d:%s:%s", seriesID, seasonType, lang)
 	if !config.NoCache {
 		enrichedEpisodesMemoryCache.Store(memKey, slices.Clone(episodes))
 	}
@@ -750,15 +750,15 @@ func saveEnrichedEpisodes(seriesID int, lang string, episodes []Episode) {
 	}
 
 	prefLang := config.GetPreferredLanguage()
-	diskKey := fmt.Sprintf("tvdb:%s:series:%d:enriched_episodes:%s", prefLang, seriesID, lang)
+	diskKey := fmt.Sprintf("tvdb:%s:series:%d:enriched_episodes:%s:%s", prefLang, seriesID, seasonType, lang)
 	_ = cache.Set(diskKey, data)
 }
 
-func fetchRawEpisodes(ctx context.Context, seriesID int, lang string) ([]Episode, error) {
+func fetchRawEpisodes(ctx context.Context, seriesID int, seasonType, lang string) ([]Episode, error) {
 	var episodes []Episode
 
 	for page := range 20 {
-		data, err := getEpisodes(ctx, seriesID, page, lang)
+		data, err := getEpisodes(ctx, seriesID, page, lang, seasonType)
 		if err != nil {
 			if page == 0 {
 				return nil, err
@@ -776,25 +776,52 @@ func fetchRawEpisodes(ctx context.Context, seriesID int, lang string) ([]Episode
 	return episodes, nil
 }
 
-// GetAllEpisodes retrieves all episodes for a given series from TVDB.
-func GetAllEpisodes(ctx context.Context, seriesID int, lang string) ([]Episode, error) {
-	if eps, ok := getEnrichedFromMemory(seriesID, lang); ok {
+func getAllEpisodesForOrder(ctx context.Context, seriesID int, seasonType, lang string) ([]Episode, error) {
+	if eps, ok := getEnrichedFromMemory(seriesID, seasonType, lang); ok {
 		return eps, nil
 	}
 
-	if eps, ok := getEnrichedFromDisk(seriesID, lang); ok {
+	if eps, ok := getEnrichedFromDisk(seriesID, seasonType, lang); ok {
 		return eps, nil
 	}
 
-	episodes, err := fetchRawEpisodes(ctx, seriesID, lang)
+	episodes, err := fetchRawEpisodes(ctx, seriesID, seasonType, lang)
 	if err != nil {
 		return nil, err
 	}
 
 	enrichFromCacheOnly(episodes, []string{lang}, 0)
-	saveEnrichedEpisodes(seriesID, lang, episodes)
+	saveEnrichedEpisodes(seriesID, seasonType, lang, episodes)
 
 	return episodes, nil
+}
+
+// GetAllEpisodes retrieves all episodes for a given series from TVDB.
+func GetAllEpisodes(ctx context.Context, seriesID int, lang string) ([]Episode, error) {
+	return getAllEpisodesForOrder(ctx, seriesID, config.GetTvdbOrder(), lang)
+}
+
+func remapEpisodeOrder(ctx context.Context, seriesID, episodeID int, targetOrder, lang string, res *mdb.EpisodeResult) {
+	eps, err := getAllEpisodesForOrder(ctx, seriesID, targetOrder, lang)
+	if err != nil {
+		ui.PrintDebug(fmt.Sprintf("remap: failed to fetch %s order episodes: %v", targetOrder, err))
+
+		return
+	}
+
+	for _, ep := range eps {
+		if ep.ID == episodeID {
+			ui.PrintDebug(fmt.Sprintf("remapped episode %d: S%02dE%02d (%s) → S%02dE%02d (%s)",
+				episodeID, res.Season, res.Episode, config.GetTvdbOrder(), ep.SeasonNumber, ep.Number, targetOrder))
+
+			res.Season = ep.SeasonNumber
+			res.Episode = ep.Number
+
+			return
+		}
+	}
+
+	ui.PrintDebug(fmt.Sprintf("remap: episode %d not found in %s order — keeping original", episodeID, targetOrder))
 }
 
 // IdentifyEpisode attempts to find a specific episode in a TVDB series based on metadata.
@@ -808,6 +835,9 @@ func IdentifyEpisode(ctx context.Context, result mdb.SearchResult, meta *metadat
 		normalizedQueryTitle = metadata.Normalize(strings.Join(meta.EpisodeTitles, " / "))
 	}
 
+	seasonType := config.GetTvdbOrder()
+	remapOrder := config.GetTvdbRemapOrder()
+
 	for _, lang := range uniqueLangs {
 		episodes, err := GetAllEpisodes(ctx, result.TvdbID, lang)
 		if err != nil {
@@ -818,9 +848,14 @@ func IdentifyEpisode(ctx context.Context, result mdb.SearchResult, meta *metadat
 
 		ep := findEpisodeInList(ctx, episodes, meta, normalizedQueryTitle, allowSpecials, uniqueLangs)
 		if ep != nil {
-			saveEnrichedEpisodes(result.TvdbID, lang, episodes)
+			saveEnrichedEpisodes(result.TvdbID, seasonType, lang, episodes)
 
-			return finalizeEpisodeResult(ctx, ep, episodes, uniqueLangs), nil
+			res := finalizeEpisodeResult(ctx, ep, episodes, uniqueLangs)
+			if remapOrder != "" && remapOrder != seasonType {
+				remapEpisodeOrder(ctx, result.TvdbID, ep.ID, remapOrder, lang, &res)
+			}
+
+			return res, nil
 		}
 	}
 

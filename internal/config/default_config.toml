@@ -72,6 +72,14 @@ replacement = ''
 # pattern = 'BluRay'
 # replacement = 'Blu-Ray'
 
+# Episode ordering to use when fetching episodes from TVDB for identification.
+# Options: default/aired, official, dvd, absolute, alternate, regional
+tvdb_order = "default"
+
+# Remap episode numbers to a different ordering in the output filename.
+# Leave unset (or same as tvdb_order) to skip remapping.
+# tvdb_remap_order = "absolute"
+
 # Api keys for Media Databases (required for most features)
 [api_keys]
 tmdb = "your_tmdb_api_key" # https://developer.themoviedb.org/docs/getting-started

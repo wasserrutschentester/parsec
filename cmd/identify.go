@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
@@ -345,6 +346,7 @@ func init() {
 	identifyCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	identifyCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	identifyCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
+	identifyCmd.Flags().String("tvdb-order", "", "TVDB episode ordering for identification (default, official, dvd, absolute, alternate, regional)")
 	// Output
 	identifyCmd.Flags().BoolVarP(&releasesFlag, "releases", "r", false, "search for releases via Prowlarr")
 	identifyCmd.Flags().BoolVarP(&bestFlag, "best-release", "b", false, "only show the best release per indexer")
@@ -369,7 +371,7 @@ func init() {
 	}
 
 	// Group ID flags
-	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb"}
+	idFlags := []string{"tv", "movie", "imdb", "tmdb", "tvdb", "tvdb-order"}
 	for _, f := range idFlags {
 		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"id"})
 	}
@@ -379,6 +381,9 @@ func init() {
 	for _, f := range outputFlags {
 		_ = identifyCmd.Flags().SetAnnotation(f, "group", []string{"output"})
 	}
+
+	_ = identifyCmd.RegisterFlagCompletionFunc("tvdb-order", completeTvdbOrders)
+	_ = viper.BindPFlag("tvdb_order", identifyCmd.Flags().Lookup("tvdb-order"))
 
 	_ = identifyCmd.MarkFlagDirname("move-tagged")
 

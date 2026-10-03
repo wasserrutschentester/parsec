@@ -254,3 +254,42 @@ func TestListPresets(t *testing.T) {
 		}
 	})
 }
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestTvdbOrderGetters(t *testing.T) {
+	viper.Reset()
+	InitDefaults()
+	SetPreset("")
+
+	if GetTvdbOrder() != "default" {
+		t.Errorf("GetTvdbOrder() default = %v, want default", GetTvdbOrder())
+	}
+
+	if GetTvdbRemapOrder() != "" {
+		t.Errorf("GetTvdbRemapOrder() default = %v, want empty", GetTvdbRemapOrder())
+	}
+
+	viper.Set("tvdb_order", "aired")
+
+	if GetTvdbOrder() != "default" {
+		t.Errorf("GetTvdbOrder() aired alias = %v, want default", GetTvdbOrder())
+	}
+
+	viper.Set("tvdb_order", "dvd")
+
+	if GetTvdbOrder() != "dvd" {
+		t.Errorf("GetTvdbOrder() = %v, want dvd", GetTvdbOrder())
+	}
+
+	viper.Set("tvdb_remap_order", "aired")
+
+	if GetTvdbRemapOrder() != "default" {
+		t.Errorf("GetTvdbRemapOrder() aired alias = %v, want default", GetTvdbRemapOrder())
+	}
+
+	viper.Set("tvdb_remap_order", "absolute")
+
+	if GetTvdbRemapOrder() != "absolute" {
+		t.Errorf("GetTvdbRemapOrder() = %v, want absolute", GetTvdbRemapOrder())
+	}
+}

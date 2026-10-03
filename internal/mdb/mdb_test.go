@@ -106,3 +106,15 @@ func TestGetResultBodySpokenLanguages(t *testing.T) {
 		t.Errorf("did not expect Spoken Langs for monolingual movie, got %q", body3)
 	}
 }
+
+func TestTagTemplateContextTvdbOrder(t *testing.T) {
+	t.Parallel()
+
+	ctx := TagTemplateContext{
+		TvdbOrder: "dvd",
+	}
+
+	if ctx.TvdbOrder != "dvd" {
+		t.Errorf("TvdbOrder = %q, want %q", ctx.TvdbOrder, "dvd")
+	}
+}

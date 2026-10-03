@@ -26,6 +26,7 @@ Parsec will automatically scan the file(s) with `mediainfo`, fetch metadata from
 | `--force` | `-f` | boolean | Force overwrite of existing NFO files. |
 | `--per-file` | `-F` | boolean | Generate NFO per media file instead of per directory. |
 | `--dry-run` | `-d` | boolean | Print the generated NFO to the console without writing to disk. |
+| `--tvdb-order` | | string | TVDB episode ordering for identification (`default`, `official`, `dvd`, `absolute`, `alternate`, `regional`). |
 | `--dump-context` | | boolean | Dump the template context data as JSON (hides raw fields) for debugging templates. |
 | `--dump-context-raw` | | boolean | Dump the template context data as JSON, including all raw database API responses. |
 

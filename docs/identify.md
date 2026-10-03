@@ -64,6 +64,7 @@ Force identification using specific database IDs.
 | `--imdb` | | string | IMDb ID (e.g., `tt1234567`). |
 | `--tmdb` | | integer | TMDB ID. |
 | `--tvdb` | | integer | TVDB ID. |
+| `--tvdb-order` | | string | TVDB episode ordering for identification (`default`, `official`, `dvd`, `absolute`, `alternate`, `regional`). |
 
 ### P2P Info Flags
 Additional metadata that can be written to tags.

@@ -264,3 +264,14 @@ var cutEditionOptions = map[string]string{
 	"UNCENSORED":      "Uncensored Version",
 	"UNRATED":         "Unrated Version",
 }
+
+func completeTvdbOrders(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	return []string{
+		"default\taired",
+		"official",
+		"dvd",
+		"absolute",
+		"alternate",
+		"regional",
+	}, cobra.ShellCompDirectiveNoFileComp
+}

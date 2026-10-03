@@ -112,6 +112,7 @@ type TagTemplateContext struct {
 	Episodes    []EpisodeResult
 	Comment     string
 	ReleaseName string
+	TvdbOrder   string
 }
 
 // MatroskaTagSet represents metadata tags that can be written to a Matroska file for a specific target.
@@ -369,6 +370,10 @@ func ExtractEpisodeNumbers(episodes []EpisodeResult) []int {
 
 // GetMatroskaTags creates a slice of MatroskaTagSet from a TagTemplateContext using templates.
 func GetMatroskaTags(ctx TagTemplateContext) ([]MatroskaTagSet, error) {
+	if ctx.TvdbOrder == "" {
+		ctx.TvdbOrder = config.GetTvdbOrder()
+	}
+
 	configs, err := config.GetTagProfile()
 	if err != nil {
 		return nil, err

@@ -251,3 +251,22 @@ func TestKodiTemplateRatingsAndCertificate(t *testing.T) {
 		}
 	}
 }
+
+func TestTvdbOrderContext(t *testing.T) {
+	t.Parallel()
+
+	in := FileInput{
+		Path: "test.mkv",
+		Meta: &metadata.Metadata{Title: "Test"},
+	}
+
+	fctx := BuildFileContext(in)
+	if fctx.TvdbOrder == "" {
+		t.Errorf("BuildFileContext() TvdbOrder is empty")
+	}
+
+	ctx := BuildContext("Test.Release", &metadata.Metadata{Title: "Test"}, []FileInput{in}, "", nil, "v1.0")
+	if ctx.TvdbOrder == "" {
+		t.Errorf("BuildContext() TvdbOrder is empty")
+	}
+}

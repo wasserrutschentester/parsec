@@ -266,6 +266,28 @@ func GetTvdbID() int {
 	return getInt("tvdb_id")
 }
 
+// GetTvdbOrder returns the TVDB episode ordering used for identification.
+// Defaults to "default" (aired). Valid values: default/aired, official, dvd, absolute, alternate, regional.
+func GetTvdbOrder() string {
+	v := getString("tvdb_order")
+	if v == "" || v == "aired" {
+		return "default"
+	}
+
+	return v
+}
+
+// GetTvdbRemapOrder returns the TVDB episode ordering to use for the output filename,
+// when it differs from the identification order. Empty means no remapping.
+func GetTvdbRemapOrder() string {
+	v := getString("tvdb_remap_order")
+	if v == "aired" {
+		return "default"
+	}
+
+	return v
+}
+
 // GetAllowSpecials returns true if special episodes are allowed.
 func GetAllowSpecials() bool {
 	return getBool("allow_special_matches")
