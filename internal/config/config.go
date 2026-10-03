@@ -59,7 +59,20 @@ var (
 	activePreset string
 	// NoCache bypasses the API cache if set to true.
 	NoCache bool
+
+	tvdbOrderOverride      string
+	tvdbRemapOrderOverride string
 )
+
+// SetTvdbOrder sets the explicit override for TVDB episode ordering.
+func SetTvdbOrder(order string) {
+	tvdbOrderOverride = order
+}
+
+// SetTvdbRemapOrder sets the explicit override for TVDB episode remap ordering.
+func SetTvdbRemapOrder(order string) {
+	tvdbRemapOrderOverride = order
+}
 
 // SetPreset sets the active configuration preset.
 func SetPreset(name string) {
@@ -269,7 +282,11 @@ func GetTvdbID() int {
 // GetTvdbOrder returns the TVDB episode ordering used for identification.
 // Defaults to "default" (aired). Valid values: default/aired, official, dvd, absolute, alternate, regional.
 func GetTvdbOrder() string {
-	v := getString("tvdb_order")
+	v := tvdbOrderOverride
+	if v == "" {
+		v = getString("tvdb_order")
+	}
+
 	if v == "" || v == "aired" {
 		return "default"
 	}
@@ -280,7 +297,11 @@ func GetTvdbOrder() string {
 // GetTvdbRemapOrder returns the TVDB episode ordering to use for the output filename,
 // when it differs from the identification order. Empty means no remapping.
 func GetTvdbRemapOrder() string {
-	v := getString("tvdb_remap_order")
+	v := tvdbRemapOrderOverride
+	if v == "" {
+		v = getString("tvdb_remap_order")
+	}
+
 	if v == "aired" {
 		return "default"
 	}

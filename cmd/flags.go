@@ -33,6 +33,8 @@ var (
 	tmdbIDFlag           int
 	tvdbIDFlag           int
 	originalLanguageFlag string
+	tvdbOrderFlag        string
+	tvdbRemapOrderFlag   string
 	// other
 	dryRunFlag     bool
 	unattendedFlag bool

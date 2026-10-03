@@ -13,7 +13,6 @@ import (
 
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"codeberg.org/upPollo/parsec/internal/config"
 	"codeberg.org/upPollo/parsec/internal/mdb"
@@ -53,7 +52,7 @@ func init() {
 	nfogenCmd.Flags().StringVar(&imdbIDFlag, "imdb", "", "IMDb ID")
 	nfogenCmd.Flags().IntVar(&tmdbIDFlag, "tmdb", 0, "TMDB ID")
 	nfogenCmd.Flags().IntVar(&tvdbIDFlag, "tvdb", 0, "TVDB ID")
-	nfogenCmd.Flags().String("tvdb-order", "", "TVDB episode ordering for identification (default, official, dvd, absolute, alternate, regional)")
+	nfogenCmd.Flags().StringVar(&tvdbOrderFlag, "tvdb-order", "", "TVDB episode ordering for identification (default, official, dvd, absolute, alternate, regional)")
 	// Output
 	nfogenCmd.Flags().BoolVar(&dumpContextFlag, "dump-context", false, "dump the template context data as JSON (hides raw fields)")
 	nfogenCmd.Flags().BoolVar(&dumpContextRawFlag, "dump-context-raw", false, "dump the template context data as JSON including all raw provider data")
@@ -68,7 +67,6 @@ func init() {
 	nfogenCmd.Flags().StringVarP(&nfogenTemplateFlag, "template", "t", "", "NFO template to use (builtin: default; or name of .tmpl in config dir, or default via config)")
 	_ = nfogenCmd.RegisterFlagCompletionFunc("template", completeTemplates)
 	_ = nfogenCmd.RegisterFlagCompletionFunc("tvdb-order", completeTvdbOrders)
-	_ = viper.BindPFlag("tvdb_order", nfogenCmd.Flags().Lookup("tvdb-order"))
 
 	// group Flags
 	p2pFlags := []string{"notes", "source", "source-map"}

@@ -293,3 +293,43 @@ func TestTvdbOrderGetters(t *testing.T) {
 		t.Errorf("GetTvdbRemapOrder() = %v, want absolute", GetTvdbRemapOrder())
 	}
 }
+
+//nolint:paralleltest // depends on shared global state (viper)
+func TestTvdbOrderOverrides(t *testing.T) {
+	viper.Reset()
+	InitDefaults()
+	SetPreset("")
+
+	t.Cleanup(func() {
+		SetTvdbOrder("")
+		SetTvdbRemapOrder("")
+		SetPreset("")
+	})
+
+	// Test explicit overrides take precedence over viper and presets
+	SetTvdbOrder("official")
+
+	if GetTvdbOrder() != "official" {
+		t.Errorf("GetTvdbOrder() override = %v, want official", GetTvdbOrder())
+	}
+
+	SetPreset("anime")
+	viper.Set("preset.anime.tvdb_order", "absolute")
+
+	if GetTvdbOrder() != "official" {
+		t.Errorf("GetTvdbOrder() override with preset = %v, want official", GetTvdbOrder())
+	}
+
+	// Clearing override falls back to preset
+	SetTvdbOrder("")
+
+	if GetTvdbOrder() != "absolute" {
+		t.Errorf("GetTvdbOrder() fallback to preset = %v, want absolute", GetTvdbOrder())
+	}
+
+	SetTvdbRemapOrder("regional")
+
+	if GetTvdbRemapOrder() != "regional" {
+		t.Errorf("GetTvdbRemapOrder() override = %v, want regional", GetTvdbRemapOrder())
+	}
+}

@@ -45,11 +45,26 @@ var rootCmd = &cobra.Command{
 		initConfig()
 		config.InitDefaults()
 
+		applyFlagOverrides(cmd)
+
 		// Suppress update check for certain commands
 		if !isExcludedFromUpdateCheck(cmd) {
 			update.CheckForUpdateBackground(Version)
 		}
 	},
+}
+
+func applyFlagOverrides(cmd *cobra.Command) {
+	config.SetTvdbOrder("")
+	config.SetTvdbRemapOrder("")
+
+	if cmd.Flags().Lookup("tvdb-order") != nil && cmd.Flags().Changed("tvdb-order") {
+		config.SetTvdbOrder(tvdbOrderFlag)
+	}
+
+	if cmd.Flags().Lookup("tvdb-remap-order") != nil && cmd.Flags().Changed("tvdb-remap-order") {
+		config.SetTvdbRemapOrder(tvdbRemapOrderFlag)
+	}
 }
 
 func isExcludedFromUpdateCheck(cmd *cobra.Command) bool {
